@@ -86,6 +86,14 @@ function MatchInner() {
         </Section>
       )}
 
+      {/* Team lists */}
+      <Section title="Team Lists" subtitle="Official squad named on NRL.com">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <SquadPanel team={details.homeTeam} />
+          <SquadPanel team={details.awayTeam} />
+        </div>
+      </Section>
+
       {/* Stats / form */}
       <Section title="Form & Season Stats" subtitle="Source: NRL.com">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

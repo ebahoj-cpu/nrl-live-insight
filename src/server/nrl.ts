@@ -130,6 +130,15 @@ export type NrlMatchDetails = {
   statGroups: any[];
 };
 
+export type NrlPlayer = {
+  firstName: string;
+  lastName: string;
+  position: string;
+  jerseyNumber?: number;
+  headImage?: string;
+  isCaptain?: boolean;
+};
+
 export type NrlMatchTeam = {
   teamId: number;
   name: string;
@@ -139,6 +148,8 @@ export type NrlMatchTeam = {
   position?: string;
   recentForm: { result: string; summary: string; score: string }[];
   nextOpponent?: string;
+  players: NrlPlayer[];
+  captainPlayerId?: number;
 };
 
 export async function fetchMatchDetails(matchId: string): Promise<NrlMatchDetails> {

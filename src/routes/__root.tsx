@@ -1,48 +1,47 @@
-import { Outlet, Link, createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
-
+import {
+  Outlet, Link, HeadContent, Scripts,
+  createRootRouteWithContext, useRouter,
+} from "@tanstack/react-router";
+import { QueryClient, QueryClientProvider, useIsFetching } from "@tanstack/react-query";
 import appCss from "../styles.css?url";
+import { RotateCw } from "lucide-react";
+
+interface RouterContext { queryClient: QueryClient }
 
 function NotFoundComponent() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="max-w-md text-center">
-        <h1 className="text-7xl font-bold text-foreground">404</h1>
-        <h2 className="mt-4 text-xl font-semibold text-foreground">Page not found</h2>
-        <p className="mt-2 text-sm text-muted-foreground">
-          The page you're looking for doesn't exist or has been moved.
-        </p>
-        <div className="mt-6">
-          <Link
-            to="/"
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-          >
-            Go home
-          </Link>
-        </div>
+    <div className="min-h-screen flex items-center justify-center p-6">
+      <div className="text-center">
+        <h1 className="text-7xl font-bold tracking-tight">404</h1>
+        <p className="mt-3 text-muted-foreground">That page doesn't exist.</p>
+        <Link to="/" className="mt-6 inline-block px-5 py-2 bg-accent text-accent-foreground rounded-full font-semibold">
+          Back to fixtures
+        </Link>
       </div>
     </div>
   );
 }
 
-export const Route = createRootRoute({
+export const Route = createRootRouteWithContext<RouterContext>()({
   head: () => ({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { title: "LINEBREAK – NRL Betting Insights" },
+      { name: "description", content: "Live NRL odds, official stats, and AI-generated betting insights for every match." },
+      { name: "theme-color", content: "#0A0A0A" },
+      { property: "og:title", content: "LINEBREAK – NRL Betting Insights" },
+      { property: "og:description", content: "Live NRL odds, official stats, and AI-generated betting insights." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
-      { name: "twitter:site", content: "@Lovable" },
     ],
     links: [
-      {
-        rel: "stylesheet",
-        href: appCss,
-      },
+      { rel: "stylesheet", href: appCss },
+      { rel: "preconnect", href: "https://www.nrl.com" },
+      { rel: "preconnect", href: "https://api.the-odds-api.com" },
+      { rel: "preconnect", href: "https://fonts.googleapis.com" },
+      { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "" },
+      { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" },
     ],
   }),
   shellComponent: RootShell,
@@ -52,11 +51,9 @@ export const Route = createRootRoute({
 
 function RootShell({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <head>
-        <HeadContent />
-      </head>
-      <body>
+    <html lang="en" className="dark">
+      <head><HeadContent /></head>
+      <body className="bg-background text-foreground antialiased">
         {children}
         <Scripts />
       </body>
@@ -65,5 +62,53 @@ function RootShell({ children }: { children: React.ReactNode }) {
 }
 
 function RootComponent() {
-  return <Outlet />;
+  const { queryClient } = Route.useRouteContext();
+  return (
+    <QueryClientProvider client={queryClient}>
+      <Header />
+      <main className="mx-auto max-w-6xl px-4 sm:px-6 pb-24">
+        <Outlet />
+      </main>
+      <Footer />
+    </QueryClientProvider>
+  );
+}
+
+function Header() {
+  const router = useRouter();
+  const fetching = useIsFetching();
+  const refresh = () => router.invalidate();
+  return (
+    <header className="sticky top-0 z-30 backdrop-blur-xl bg-background/70 border-b border-border">
+      <div className="mx-auto max-w-6xl px-4 sm:px-6 h-16 flex items-center justify-between">
+        <Link to="/" className="flex items-center gap-2 group">
+          <span className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-accent text-accent-foreground font-black">
+            L
+          </span>
+          <span className="font-display font-extrabold tracking-tight text-lg">
+            LINE<span className="text-accent">BREAK</span>
+          </span>
+        </Link>
+        <button
+          onClick={refresh}
+          aria-label="Refresh data"
+          className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-1.5 text-sm font-medium hover:bg-surface-2 transition"
+        >
+          <RotateCw className={`h-4 w-4 ${fetching ? "animate-spin-slow" : ""}`} />
+          <span className="hidden sm:inline">Refresh</span>
+        </button>
+      </div>
+    </header>
+  );
+}
+
+function Footer() {
+  return (
+    <footer className="border-t border-border mt-16">
+      <div className="mx-auto max-w-6xl px-4 sm:px-6 py-6 text-xs text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1">
+        <span>Data: NRL.com (official) · Odds: The Odds API · Insights: Lovable AI</span>
+        <span className="ml-auto">© LINEBREAK</span>
+      </div>
+    </footer>
+  );
 }

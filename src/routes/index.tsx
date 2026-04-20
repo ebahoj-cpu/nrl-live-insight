@@ -1,26 +1,90 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useSuspenseQuery, queryOptions } from "@tanstack/react-query";
+import { getCurrentRoundFixtures, getOdds } from "@/server/index.functions";
+import { MatchCard } from "@/components/MatchCard";
+import { Suspense } from "react";
 
-export const Route = createFileRoute("/")({
-  component: Index,
+const fixturesQO = () => queryOptions({
+  queryKey: ["fixtures", "current"],
+  queryFn: () => getCurrentRoundFixtures({ data: {} }),
+});
+const oddsQO = () => queryOptions({
+  queryKey: ["odds"],
+  queryFn: () => getOdds({ data: {} }),
 });
 
-// IMPORTANT: Replace this placeholder. For sites with multiple pages (About, Services, Contact, etc.),
-// create separate route files (about.tsx, services.tsx, contact.tsx) — don't put all pages in this file.
-function PlaceholderIndex() {
+export const Route = createFileRoute("/")({
+  loader: ({ context: { queryClient } }) => {
+    void queryClient.ensureQueryData(fixturesQO());
+    void queryClient.ensureQueryData(oddsQO());
+  },
+  component: HomePage,
+  errorComponent: ({ error }) => (
+    <div className="py-16 text-center">
+      <p className="text-danger font-semibold">Live data unavailable</p>
+      <p className="mt-2 text-sm text-muted-foreground">{error.message}</p>
+    </div>
+  ),
+});
+
+function HomePage() {
   return (
-    <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
-    >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="https://cdn.gpteng.co/blank-app-v1.svg"
-        alt="Your app will live here!"
-      />
+    <Suspense fallback={<HomeSkeleton />}>
+      <Fixtures />
+    </Suspense>
+  );
+}
+
+function Fixtures() {
+  const fx = useSuspenseQuery(fixturesQO()).data;
+  const oddsList = useSuspenseQuery(oddsQO()).data;
+
+  return (
+    <div className="pt-8">
+      <div className="flex items-end justify-between mb-6">
+        <div>
+          <div className="text-[11px] uppercase tracking-[0.2em] text-accent font-bold">Round {fx.round} · {fx.season}</div>
+          <h1 className="font-display font-extrabold text-3xl sm:text-4xl tracking-tight mt-1">
+            This week's NRL
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            {fx.fixtures.length} matches · official NRL data · live AU bookmaker odds
+          </p>
+        </div>
+      </div>
+
+      {fx.fixtures.length === 0 ? (
+        <div className="glass p-10 text-center text-muted-foreground">
+          No fixtures available for this round.
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {fx.fixtures.map((f) => {
+            const matched = oddsList.find((o) => {
+              const sameDay = Math.abs(new Date(o.commenceUtc).getTime() - new Date(f.kickoffUtc).getTime()) < 12 * 3600_000;
+              return sameDay && (
+                (o.homeNickname === f.homeTeam.nickName && o.awayNickname === f.awayTeam.nickName) ||
+                (o.homeNickname === f.awayTeam.nickName && o.awayNickname === f.homeTeam.nickName)
+              );
+            }) ?? null;
+            return <MatchCard key={f.matchId} fixture={f} odds={matched} />;
+          })}
+        </div>
+      )}
     </div>
   );
 }
 
-function Index() {
-  return <PlaceholderIndex />;
+function HomeSkeleton() {
+  return (
+    <div className="pt-8">
+      <div className="h-9 w-64 bg-surface rounded mb-2 animate-pulse" />
+      <div className="h-4 w-40 bg-surface rounded mb-6 animate-pulse" />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="glass p-5 h-44 animate-pulse" />
+        ))}
+      </div>
+    </div>
+  );
 }

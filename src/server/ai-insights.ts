@@ -21,6 +21,8 @@ export async function generateInsights(payload: {
   awayRecentForm: { result: string; summary: string; score: string }[];
   homePosition?: string;
   awayPosition?: string;
+  homeSquad: { firstName: string; lastName: string; position: string; isCaptain?: boolean }[];
+  awaySquad: { firstName: string; lastName: string; position: string; isCaptain?: boolean }[];
   ladder: { nickname: string; played: number; wins: number; losses: number; for: number; against: number; diff: number; points: number }[];
   oddsSummary: string;
 }): Promise<Insights> {
@@ -30,14 +32,19 @@ export async function generateInsights(payload: {
   const homeRow = payload.ladder.find((l) => l.nickname === payload.homeName);
   const awayRow = payload.ladder.find((l) => l.nickname === payload.awayName);
 
+  const fmtSquad = (s: typeof payload.homeSquad) =>
+    s.map((p) => `${p.position}: ${p.firstName} ${p.lastName}${p.isCaptain ? " (C)" : ""}`).join("; ") || "n/a";
+
   const prompt = [
     `Match: ${payload.homeName} (home) vs ${payload.awayName} (away) at ${payload.venue}.`,
     homeRow ? `${payload.homeName}: ${homeRow.wins}W-${homeRow.losses}L, PF ${homeRow.for}, PA ${homeRow.against}, diff ${homeRow.diff}, pos ${payload.homePosition ?? "?"}.` : "",
     awayRow ? `${payload.awayName}: ${awayRow.wins}W-${awayRow.losses}L, PF ${awayRow.for}, PA ${awayRow.against}, diff ${awayRow.diff}, pos ${payload.awayPosition ?? "?"}.` : "",
+    `${payload.homeName} named squad (NRL.com official): ${fmtSquad(payload.homeSquad)}`,
+    `${payload.awayName} named squad (NRL.com official): ${fmtSquad(payload.awaySquad)}`,
     `Home recent form: ${payload.homeRecentForm.map((f) => `${f.result} ${f.summary} ${f.score}`).join("; ") || "n/a"}`,
     `Away recent form: ${payload.awayRecentForm.map((f) => `${f.result} ${f.summary} ${f.score}`).join("; ") || "n/a"}`,
     `Live AU bookie odds summary: ${payload.oddsSummary}`,
-    `Provide a sharp NRL betting analysis. Be specific. Reference the data.`,
+    `Provide a sharp NRL betting analysis. Be specific. Reference the data. When citing players, only use names from the named squads above — never invent players.`,
   ].filter(Boolean).join("\n");
 
   const res = await fetch(GATEWAY, {

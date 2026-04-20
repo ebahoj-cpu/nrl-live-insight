@@ -130,6 +130,15 @@ export type NrlMatchDetails = {
   statGroups: any[];
 };
 
+export type NrlPlayer = {
+  firstName: string;
+  lastName: string;
+  position: string;
+  jerseyNumber?: number;
+  headImage?: string;
+  isCaptain?: boolean;
+};
+
 export type NrlMatchTeam = {
   teamId: number;
   name: string;
@@ -139,6 +148,8 @@ export type NrlMatchTeam = {
   position?: string;
   recentForm: { result: string; summary: string; score: string }[];
   nextOpponent?: string;
+  players: NrlPlayer[];
+  captainPlayerId?: number;
 };
 
 export async function fetchMatchDetails(matchId: string): Promise<NrlMatchDetails> {
@@ -146,18 +157,31 @@ export async function fetchMatchDetails(matchId: string): Promise<NrlMatchDetail
   const res = await fetch(url, { headers: { "User-Agent": UA, "Accept": "application/json" } });
   if (!res.ok) throw new Error(`NRL match HTTP ${res.status}`);
   const d = await res.json() as any;
-  const mapTeam = (t: any): NrlMatchTeam => ({
-    teamId: t.teamId,
-    name: t.name,
-    nickName: t.nickName,
-    themeKey: t.theme?.key,
-    odds: t.odds,
-    position: t.teamPosition,
-    recentForm: (t.recentForm ?? []).map((r: any) => ({
-      result: r.result, summary: r.summary, score: r.score,
-    })),
-    nextOpponent: t.nextOpponent?.fullName,
-  });
+  const mapTeam = (t: any): NrlMatchTeam => {
+    const captainId = t.captainPlayerId;
+    const players: NrlPlayer[] = (t.players ?? []).map((p: any) => ({
+      firstName: p.firstName ?? "",
+      lastName: p.lastName ?? "",
+      position: p.position ?? "",
+      jerseyNumber: p.number ?? p.jerseyNumber,
+      headImage: p.headImage ? (p.headImage.startsWith("http") ? p.headImage : `https://www.nrl.com${p.headImage}`) : undefined,
+      isCaptain: p.isCaptain === true || (captainId != null && p.playerId === captainId),
+    }));
+    return {
+      teamId: t.teamId,
+      name: t.name,
+      nickName: t.nickName,
+      themeKey: t.theme?.key,
+      odds: t.odds,
+      position: t.teamPosition,
+      recentForm: (t.recentForm ?? []).map((r: any) => ({
+        result: r.result, summary: r.summary, score: r.score,
+      })),
+      nextOpponent: t.nextOpponent?.fullName,
+      players,
+      captainPlayerId: captainId,
+    };
+  };
   return {
     matchId,
     matchState: d.matchState,

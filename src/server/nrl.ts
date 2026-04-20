@@ -163,9 +163,9 @@ export async function fetchMatchDetails(matchId: string): Promise<NrlMatchDetail
       firstName: p.firstName ?? "",
       lastName: p.lastName ?? "",
       position: p.position ?? "",
-      jerseyNumber: p.jerseyNumber ?? p.shirtNumber,
+      jerseyNumber: p.number ?? p.jerseyNumber,
       headImage: p.headImage ? (p.headImage.startsWith("http") ? p.headImage : `https://www.nrl.com${p.headImage}`) : undefined,
-      isCaptain: captainId != null && p.playerId === captainId,
+      isCaptain: p.isCaptain === true || (captainId != null && p.playerId === captainId),
     }));
     return {
       teamId: t.teamId,

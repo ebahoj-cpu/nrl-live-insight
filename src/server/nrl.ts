@@ -157,18 +157,31 @@ export async function fetchMatchDetails(matchId: string): Promise<NrlMatchDetail
   const res = await fetch(url, { headers: { "User-Agent": UA, "Accept": "application/json" } });
   if (!res.ok) throw new Error(`NRL match HTTP ${res.status}`);
   const d = await res.json() as any;
-  const mapTeam = (t: any): NrlMatchTeam => ({
-    teamId: t.teamId,
-    name: t.name,
-    nickName: t.nickName,
-    themeKey: t.theme?.key,
-    odds: t.odds,
-    position: t.teamPosition,
-    recentForm: (t.recentForm ?? []).map((r: any) => ({
-      result: r.result, summary: r.summary, score: r.score,
-    })),
-    nextOpponent: t.nextOpponent?.fullName,
-  });
+  const mapTeam = (t: any): NrlMatchTeam => {
+    const captainId = t.captainPlayerId;
+    const players: NrlPlayer[] = (t.players ?? []).map((p: any) => ({
+      firstName: p.firstName ?? "",
+      lastName: p.lastName ?? "",
+      position: p.position ?? "",
+      jerseyNumber: p.jerseyNumber ?? p.shirtNumber,
+      headImage: p.headImage ? (p.headImage.startsWith("http") ? p.headImage : `https://www.nrl.com${p.headImage}`) : undefined,
+      isCaptain: captainId != null && p.playerId === captainId,
+    }));
+    return {
+      teamId: t.teamId,
+      name: t.name,
+      nickName: t.nickName,
+      themeKey: t.theme?.key,
+      odds: t.odds,
+      position: t.teamPosition,
+      recentForm: (t.recentForm ?? []).map((r: any) => ({
+        result: r.result, summary: r.summary, score: r.score,
+      })),
+      nextOpponent: t.nextOpponent?.fullName,
+      players,
+      captainPlayerId: captainId,
+    };
+  };
   return {
     matchId,
     matchState: d.matchState,

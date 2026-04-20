@@ -77,6 +77,8 @@ export const getMatchPage = createServerFn({ method: "GET" })
           awayRecentForm: details.awayTeam.recentForm,
           homePosition: details.homeTeam.position,
           awayPosition: details.awayTeam.position,
+          homeSquad: details.homeTeam.players,
+          awaySquad: details.awayTeam.players,
           ladder: ladder.map((r) => ({
             nickname: r.nickname, played: r.played, wins: r.wins, losses: r.losses,
             for: r.for, against: r.against, diff: r.diff, points: r.points,

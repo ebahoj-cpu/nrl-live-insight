@@ -144,6 +144,48 @@ function Empty({ msg }: { msg: string }) {
   return <div className="glass p-6 text-center text-sm text-muted-foreground">{msg}</div>;
 }
 
+const POSITION_ORDER = [
+  "Fullback","Winger","Centre","Five-Eighth","Halfback",
+  "Prop","Hooker","2nd Row","Lock","Interchange","Reserve",
+];
+
+function SquadPanel({ team }: { team: { nickName: string; themeKey: string; players: { firstName: string; lastName: string; position: string; jerseyNumber?: number; headImage?: string; isCaptain?: boolean }[] } }) {
+  const sorted = [...team.players].sort((a, b) => {
+    const ai = POSITION_ORDER.indexOf(a.position);
+    const bi = POSITION_ORDER.indexOf(b.position);
+    return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+  });
+  return (
+    <div className="glass p-5">
+      <div className="flex items-center gap-3 mb-4">
+        <TeamLogo themeKey={team.themeKey} name={team.nickName} size={40} />
+        <div>
+          <div className="font-bold">{team.nickName}</div>
+          <div className="text-xs text-muted-foreground">{sorted.length} players</div>
+        </div>
+      </div>
+      {sorted.length === 0 ? (
+        <div className="text-xs text-muted-foreground">Squad not yet named.</div>
+      ) : (
+        <ul className="space-y-2">
+          {sorted.map((p, i) => (
+            <li key={i} className="flex items-center gap-3 text-sm">
+              {p.jerseyNumber != null && (
+                <span className="kbd w-6 text-center text-xs font-bold text-muted-foreground">{p.jerseyNumber}</span>
+              )}
+              <span className="flex-1">
+                <span className="font-medium">{p.firstName} {p.lastName}</span>
+                {p.isCaptain && <span className="ml-1.5 text-[10px] font-bold text-accent">(C)</span>}
+              </span>
+              <span className="text-[11px] uppercase tracking-wider text-muted-foreground">{p.position}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 function OddsTable({ odds, home, away }: { odds: OddsEvent; home: string; away: string }) {
   const homeNick = findTeam(home)?.nickname ?? home;
   const awayNick = findTeam(away)?.nickname ?? away;

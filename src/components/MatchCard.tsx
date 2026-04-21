@@ -2,17 +2,26 @@ import { Link } from "@tanstack/react-router";
 import { TeamLogo } from "./TeamLogo";
 import type { NrlFixture } from "@/server/nrl";
 import type { OddsEvent } from "@/server/odds";
+import type { WeatherSnapshot } from "@/server/weather";
 import { findTeam } from "@/lib/teams";
-import { Clock, MapPin, ArrowRight } from "lucide-react";
+import { Calendar, Clock, MapPin, ArrowRight, CloudSun } from "lucide-react";
 
-function formatKickoff(utc: string) {
+function formatDate(utc: string) {
   if (!utc) return "TBC";
   const d = new Date(utc);
   return new Intl.DateTimeFormat("en-AU", {
     timeZone: "Australia/Sydney",
     weekday: "short", day: "numeric", month: "short",
-    hour: "numeric", minute: "2-digit", hour12: true,
   }).format(d);
+}
+
+function formatTime(utc: string) {
+  if (!utc) return "";
+  const d = new Date(utc);
+  return new Intl.DateTimeFormat("en-AU", {
+    timeZone: "Australia/Sydney",
+    hour: "numeric", minute: "2-digit", hour12: true,
+  }).format(d).toLowerCase();
 }
 
 function bestPrice(odds: OddsEvent | null, nickname: string | null): { price: number; book: string } | null {
@@ -30,13 +39,14 @@ function bestPrice(odds: OddsEvent | null, nickname: string | null): { price: nu
   return best;
 }
 
-export function MatchCard({ fixture, odds }: { fixture: NrlFixture; odds: OddsEvent | null }) {
+export function MatchCard({ fixture, odds }: { fixture: NrlFixture & { weather?: WeatherSnapshot | null }; odds: OddsEvent | null }) {
   const homeNick = findTeam(fixture.homeTeam.nickName)?.nickname ?? fixture.homeTeam.nickName;
   const awayNick = findTeam(fixture.awayTeam.nickName)?.nickname ?? fixture.awayTeam.nickName;
   const homeOdds = bestPrice(odds, homeNick);
   const awayOdds = bestPrice(odds, awayNick);
 
   const fav = homeOdds && awayOdds ? (homeOdds.price < awayOdds.price ? "home" : "away") : null;
+  const w = fixture.weather ?? null;
 
   return (
     <Link
@@ -44,11 +54,15 @@ export function MatchCard({ fixture, odds }: { fixture: NrlFixture; odds: OddsEv
       params={{ matchId: fixture.matchId }}
       className="glass p-5 hover:border-accent/50 transition group block flex flex-col h-full"
     >
-      {/* Meta row */}
-      <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground mb-5">
-        <span className="inline-flex items-center gap-1.5 min-w-0">
+      {/* Meta row — date · time · venue */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground mb-5">
+        <span className="inline-flex items-center gap-1.5">
+          <Calendar className="h-3.5 w-3.5 shrink-0 text-accent" />
+          <span>{formatDate(fixture.kickoffUtc)}</span>
+        </span>
+        <span className="inline-flex items-center gap-1.5">
           <Clock className="h-3.5 w-3.5 shrink-0 text-accent" />
-          <span className="truncate">{formatKickoff(fixture.kickoffUtc)}</span>
+          <span className="kbd">{formatTime(fixture.kickoffUtc)}</span>
         </span>
         <span className="inline-flex items-center gap-1.5 min-w-0">
           <MapPin className="h-3.5 w-3.5 shrink-0 text-accent" />
@@ -82,9 +96,19 @@ export function MatchCard({ fixture, odds }: { fixture: NrlFixture; odds: OddsEv
         </div>
       </div>
 
-      {/* CTA — always visible */}
-      <div className="mt-5 pt-4 border-t border-border flex items-center justify-end text-xs">
-        <span className="inline-flex items-center gap-1 text-accent font-semibold group-hover:gap-2 transition-all">
+      {/* Footer — weather/ground left, view analysis right */}
+      <div className="mt-5 pt-4 border-t border-border flex items-center justify-between gap-3 text-xs">
+        <div className="inline-flex items-center gap-1.5 text-muted-foreground min-w-0">
+          <CloudSun className="h-3.5 w-3.5 shrink-0 text-accent" />
+          {w ? (
+            <span className="truncate">
+              {w.tempC}° {w.condition} · <span className="text-foreground/80">{w.groundCondition}</span>
+            </span>
+          ) : (
+            <span className="truncate">Forecast pending</span>
+          )}
+        </div>
+        <span className="inline-flex items-center gap-1 text-accent font-semibold group-hover:gap-2 transition-all shrink-0">
           View analysis <ArrowRight className="h-3.5 w-3.5" />
         </span>
       </div>

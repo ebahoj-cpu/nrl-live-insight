@@ -20,6 +20,7 @@ export type Insights = {
   firstTryscorer: { pick: string; reasoning: string };
   anytimeTryscorers: { pick: string; reasoning: string }[];
   multiTryscorer: { pick: string; reasoning: string; confidence: number };
+  keysToVictory: { home: string[]; away: string[] };
   keyFactors: string[];
   bettingAngles: BettingAngle[];
   script: {
@@ -42,6 +43,7 @@ export async function generateInsights(payload: {
   awaySquad: { firstName: string; lastName: string; position: string; isCaptain?: boolean }[];
   ladder: { nickname: string; played: number; wins: number; losses: number; for: number; against: number; diff: number; points: number }[];
   oddsSummary: string;
+  weatherSummary?: string;
 }): Promise<Insights> {
   const key = process.env.LOVABLE_API_KEY;
   if (!key) throw new Error("LOVABLE_API_KEY not configured");
@@ -61,7 +63,8 @@ export async function generateInsights(payload: {
     `Home recent form: ${payload.homeRecentForm.map((f) => `${f.result} ${f.summary} ${f.score}`).join("; ") || "n/a"}`,
     `Away recent form: ${payload.awayRecentForm.map((f) => `${f.result} ${f.summary} ${f.score}`).join("; ") || "n/a"}`,
     `Live AU bookie odds summary: ${payload.oddsSummary}`,
-    `Provide a sharp, complete NRL betting analysis covering: winner, margin, HT/FT double, total points, first/anytime tryscorers, and multi-tryscorer angles. Also produce a "script" — head-to-head context, form analysis, and any notable upcoming milestones for players or coaches you can reasonably infer from the data. When citing players, only use names from the named squads above — never invent players.`,
+    payload.weatherSummary ? `Forecast at venue at kickoff: ${payload.weatherSummary}` : "",
+    `Provide a sharp, complete NRL betting analysis covering: winner, margin, HT/FT double, total points, first/anytime tryscorers, and multi-tryscorer angles. Also produce 3 specific "keys to victory" for EACH team (what they must do to win this match — concrete tactical/structural points referencing real squad players, recent form, opposition weakness, or weather/ground impact). Plus a "script" — head-to-head context, form analysis, and any notable upcoming milestones for players or coaches you can reasonably infer from the data. When citing players, only use names from the named squads above — never invent players.`,
   ].filter(Boolean).join("\n");
 
   const res = await fetch(GATEWAY, {
@@ -151,6 +154,14 @@ export async function generateInsights(payload: {
                 },
                 required: ["pick", "reasoning", "confidence"], additionalProperties: false,
               },
+              keysToVictory: {
+                type: "object",
+                properties: {
+                  home: { type: "array", minItems: 3, maxItems: 3, items: { type: "string", description: "Specific tactical key for home team to win" } },
+                  away: { type: "array", minItems: 3, maxItems: 3, items: { type: "string", description: "Specific tactical key for away team to win" } },
+                },
+                required: ["home", "away"], additionalProperties: false,
+              },
               keyFactors: { type: "array", items: { type: "string" }, minItems: 3, maxItems: 6 },
               bettingAngles: {
                 type: "array",
@@ -184,7 +195,7 @@ export async function generateInsights(payload: {
             required: [
               "predictedScore","winner","margin","total","htft",
               "firstTryscorer","anytimeTryscorers","multiTryscorer",
-              "keyFactors","bettingAngles","script",
+              "keysToVictory","keyFactors","bettingAngles","script",
             ],
             additionalProperties: false,
           },

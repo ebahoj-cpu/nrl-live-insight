@@ -26,4 +26,5 @@ export const TTL = {
   match: 10 * 60_000,
   odds: 5 * 60_000,
   insights: 60 * 60_000,
+  weather: 30 * 60_000,
 };

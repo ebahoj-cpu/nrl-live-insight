@@ -5,6 +5,7 @@ import { cached, TTL } from "./cache";
 import { fetchDraw, fetchLadder, fetchMatchDetails } from "./nrl";
 import { fetchNrlOdds, fetchEventOdds, type OddsEvent } from "./odds";
 import { generateInsights } from "./ai-insights";
+import { fetchVenueWeather, type WeatherSnapshot } from "./weather";
 import { findTeam } from "@/lib/teams";
 
 // ---------- Fixtures + current round ----------
@@ -19,7 +20,16 @@ export const getCurrentRoundFixtures = createServerFn({ method: "GET" })
         const all = await fetchDraw(season);
         const currentRound = all.find((f) => f.isCurrentRound)?.roundNumber ?? all[0]?.roundNumber ?? 1;
         const fixtures = all.filter((f) => f.roundNumber === currentRound);
-        return { season, round: currentRound, fixtures };
+        const enriched = await Promise.all(fixtures.map(async (f) => {
+          const weather = await cached(
+            `weather:${f.matchId}`,
+            TTL.weather,
+            () => fetchVenueWeather(f.venue, f.venueCity, f.kickoffUtc),
+            { bypass: data.refresh },
+          );
+          return { ...f, weather };
+        }));
+        return { season, round: currentRound, fixtures: enriched };
       },
       { bypass: data.refresh },
     );
@@ -55,6 +65,13 @@ export const getMatchPage = createServerFn({ method: "GET" })
       cached(`odds:nrl`, TTL.odds, () => fetchNrlOdds(), { bypass: data.refresh }),
     ]);
 
+    const weather: WeatherSnapshot | null = await cached(
+      `weather:${data.matchId}`,
+      TTL.weather,
+      () => fetchVenueWeather(details.venue, details.venueCity, details.kickoffUtc),
+      { bypass: data.refresh },
+    );
+
     // Match this fixture to an OddsEvent by team nicknames + kickoff date
     const homeNick = findTeam(details.homeTeam.nickName)?.nickname ?? details.homeTeam.nickName;
     const awayNick = findTeam(details.awayTeam.nickName)?.nickname ?? details.awayTeam.nickName;
@@ -84,6 +101,7 @@ export const getMatchPage = createServerFn({ method: "GET" })
             for: r.for, against: r.against, diff: r.diff, points: r.points,
           })),
           oddsSummary: odds ? summariseOdds(odds, homeNick, awayNick) : "No live odds available",
+          weatherSummary: weather ? `${weather.tempC}°C, ${weather.condition}, ${weather.windKph} km/h wind, ${weather.precipMm}mm rain (${weather.groundCondition} ground)` : "Weather unavailable",
         }),
         { bypass: data.refresh },
       );
@@ -91,7 +109,7 @@ export const getMatchPage = createServerFn({ method: "GET" })
       insightsError = e instanceof Error ? e.message : "AI insights unavailable";
     }
 
-    return { details, odds, ladder, insights, insightsError, generatedAt: new Date().toISOString() };
+    return { details: { ...details, weather }, odds, ladder, insights, insightsError, generatedAt: new Date().toISOString() };
   });
 
 function currentSeason(): number {

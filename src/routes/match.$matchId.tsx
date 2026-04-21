@@ -5,7 +5,7 @@ import { TeamLogo } from "@/components/TeamLogo";
 import { Suspense, useState } from "react";
 import {
   ArrowLeft, Clock, MapPin, Users, BarChart3, Sparkles, ScrollText,
-  Trophy, Target, Flag, Crown, TrendingUp, AlertCircle,
+  Trophy, Target, Flag, Crown, TrendingUp, AlertCircle, CloudSun, Calendar, Zap,
 } from "lucide-react";
 
 const matchQO = (matchId: string) => queryOptions({
@@ -70,15 +70,28 @@ function MatchInner() {
           <TeamColumn name={details.awayTeam.nickName} themeKey={details.awayTeam.themeKey} position={details.awayTeam.position} />
         </div>
 
-        <div className="mt-6 pt-5 border-t border-border grid grid-cols-2 gap-4 text-sm">
+        <div className="mt-6 pt-5 border-t border-border grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
           <div className="inline-flex items-center gap-2">
+            <Calendar className="h-4 w-4 text-accent shrink-0" />
+            <span className="text-muted-foreground">{formatDate(details.kickoffUtc)}</span>
+            <span className="text-muted-foreground">·</span>
             <Clock className="h-4 w-4 text-accent shrink-0" />
-            <span className="text-muted-foreground">{formatKickoff(details.kickoffUtc)}</span>
+            <span className="text-muted-foreground kbd">{formatTime(details.kickoffUtc)}</span>
           </div>
-          <div className="inline-flex items-center gap-2 justify-end text-right">
+          <div className="inline-flex items-center gap-2 sm:justify-end sm:text-right">
             <MapPin className="h-4 w-4 text-accent shrink-0" />
             <span className="text-muted-foreground truncate">{details.venue}{details.venueCity ? `, ${details.venueCity}` : ""}</span>
           </div>
+          {details.weather && (
+            <div className="inline-flex items-center gap-2 sm:col-span-2 pt-3 border-t border-border">
+              <CloudSun className="h-4 w-4 text-accent shrink-0" />
+              <span className="text-muted-foreground">
+                {details.weather.tempC}° {details.weather.condition} · {details.weather.windKph} km/h wind · {details.weather.precipMm}mm rain
+              </span>
+              <span className="text-muted-foreground">·</span>
+              <span className="font-semibold text-foreground">{details.weather.groundCondition} ground</span>
+            </div>
+          )}
         </div>
       </section>
 
@@ -316,9 +329,6 @@ function InsightsTab({ insights, insightsError, home, away }: { insights: any; i
           <div className="text-center">
             <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Winner</div>
             <div className="text-sm font-bold mt-1">{winnerName}</div>
-            <div className="mt-2 inline-block px-2 py-0.5 rounded-full bg-accent text-accent-foreground text-xs font-bold">
-              {insights.winner.confidence}% confident
-            </div>
           </div>
           <div className="text-center">
             <div className="text-xs text-muted-foreground">{away}</div>
@@ -328,7 +338,7 @@ function InsightsTab({ insights, insightsError, home, away }: { insights: any; i
         <p className="mt-4 text-xs text-muted-foreground">{insights.winner.reasoning}</p>
       </Card>
 
-      {/* Pick grid */}
+      {/* Pick grid — no confidence percentages */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <PickCard
           icon={Target}
@@ -347,7 +357,6 @@ function InsightsTab({ insights, insightsError, home, away }: { insights: any; i
           market="Half-time / Full-time"
           pick={insights.htft.pick}
           reasoning={insights.htft.reasoning}
-          confidence={insights.htft.confidence}
         />
         <PickCard
           icon={Flag}
@@ -360,7 +369,6 @@ function InsightsTab({ insights, insightsError, home, away }: { insights: any; i
           market="Multi-tryscorer"
           pick={insights.multiTryscorer.pick}
           reasoning={insights.multiTryscorer.reasoning}
-          confidence={insights.multiTryscorer.confidence}
         />
         {insights.bettingAngles.map((a: any, i: number) => (
           <PickCard
@@ -369,10 +377,17 @@ function InsightsTab({ insights, insightsError, home, away }: { insights: any; i
             market={a.market}
             pick={a.pick}
             reasoning={a.reasoning}
-            confidence={a.confidence}
           />
         ))}
       </div>
+
+      {/* Keys to victory — both teams */}
+      {insights.keysToVictory && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <KeysCard team={home} keys={insights.keysToVictory.home} />
+          <KeysCard team={away} keys={insights.keysToVictory.away} />
+        </div>
+      )}
 
       {/* Anytime tryscorers */}
       <Card title="Anytime tryscorers" icon={Flag}>
@@ -404,21 +419,31 @@ function InsightsTab({ insights, insightsError, home, away }: { insights: any; i
   );
 }
 
-function PickCard({ icon: Icon, market, pick, reasoning, confidence }:
-  { icon: typeof Sparkles; market: string; pick: string; reasoning: string; confidence?: number }) {
+function PickCard({ icon: Icon, market, pick, reasoning }:
+  { icon: typeof Sparkles; market: string; pick: string; reasoning: string }) {
   return (
     <div className="glass p-4 flex flex-col">
-      <div className="flex items-center justify-between mb-2">
-        <div className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">
-          <Icon className="h-3.5 w-3.5 text-accent" /> {market}
-        </div>
-        {confidence != null && (
-          <div className="text-[10px] font-bold text-accent">{confidence}%</div>
-        )}
+      <div className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground mb-2">
+        <Icon className="h-3.5 w-3.5 text-accent" /> {market}
       </div>
       <div className="font-bold mb-1.5">{pick}</div>
       <div className="text-xs text-muted-foreground">{reasoning}</div>
     </div>
+  );
+}
+
+function KeysCard({ team, keys }: { team: string; keys: string[] }) {
+  return (
+    <Card title={`${team} — keys to victory`} icon={Zap}>
+      <ol className="space-y-3">
+        {keys.map((k, i) => (
+          <li key={i} className="flex gap-3 text-sm">
+            <span className="kbd w-6 h-6 shrink-0 rounded-full bg-accent text-accent-foreground text-xs font-bold flex items-center justify-center">{i + 1}</span>
+            <span className="leading-relaxed">{k}</span>
+          </li>
+        ))}
+      </ol>
+    </Card>
   );
 }
 
@@ -464,12 +489,20 @@ function ScriptTab({ insights, insightsError, home, away }:
   );
 }
 
-function formatKickoff(utc: string) {
+function formatDate(utc: string) {
   if (!utc) return "TBC";
   const d = new Date(utc);
   return new Intl.DateTimeFormat("en-AU", {
     timeZone: "Australia/Sydney",
     weekday: "short", day: "numeric", month: "short",
-    hour: "numeric", minute: "2-digit", hour12: true,
   }).format(d);
+}
+
+function formatTime(utc: string) {
+  if (!utc) return "";
+  const d = new Date(utc);
+  return new Intl.DateTimeFormat("en-AU", {
+    timeZone: "Australia/Sydney",
+    hour: "numeric", minute: "2-digit", hour12: true,
+  }).format(d).toLowerCase();
 }

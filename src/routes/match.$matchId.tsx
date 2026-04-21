@@ -338,7 +338,7 @@ function InsightsTab({ insights, insightsError, home, away }: { insights: any; i
         <p className="mt-4 text-xs text-muted-foreground">{insights.winner.reasoning}</p>
       </Card>
 
-      {/* Pick grid */}
+      {/* Pick grid — no confidence percentages */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <PickCard
           icon={Target}
@@ -357,7 +357,6 @@ function InsightsTab({ insights, insightsError, home, away }: { insights: any; i
           market="Half-time / Full-time"
           pick={insights.htft.pick}
           reasoning={insights.htft.reasoning}
-          confidence={insights.htft.confidence}
         />
         <PickCard
           icon={Flag}
@@ -370,7 +369,6 @@ function InsightsTab({ insights, insightsError, home, away }: { insights: any; i
           market="Multi-tryscorer"
           pick={insights.multiTryscorer.pick}
           reasoning={insights.multiTryscorer.reasoning}
-          confidence={insights.multiTryscorer.confidence}
         />
         {insights.bettingAngles.map((a: any, i: number) => (
           <PickCard
@@ -379,10 +377,17 @@ function InsightsTab({ insights, insightsError, home, away }: { insights: any; i
             market={a.market}
             pick={a.pick}
             reasoning={a.reasoning}
-            confidence={a.confidence}
           />
         ))}
       </div>
+
+      {/* Keys to victory — both teams */}
+      {insights.keysToVictory && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <KeysCard team={home} keys={insights.keysToVictory.home} />
+          <KeysCard team={away} keys={insights.keysToVictory.away} />
+        </div>
+      )}
 
       {/* Anytime tryscorers */}
       <Card title="Anytime tryscorers" icon={Flag}>

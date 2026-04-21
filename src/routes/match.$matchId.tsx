@@ -329,9 +329,6 @@ function InsightsTab({ insights, insightsError, home, away }: { insights: any; i
           <div className="text-center">
             <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Winner</div>
             <div className="text-sm font-bold mt-1">{winnerName}</div>
-            <div className="mt-2 inline-block px-2 py-0.5 rounded-full bg-accent text-accent-foreground text-xs font-bold">
-              {insights.winner.confidence}% confident
-            </div>
           </div>
           <div className="text-center">
             <div className="text-xs text-muted-foreground">{away}</div>

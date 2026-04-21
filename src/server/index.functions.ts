@@ -65,6 +65,13 @@ export const getMatchPage = createServerFn({ method: "GET" })
       cached(`odds:nrl`, TTL.odds, () => fetchNrlOdds(), { bypass: data.refresh }),
     ]);
 
+    const weather: WeatherSnapshot | null = await cached(
+      `weather:${data.matchId}`,
+      TTL.weather,
+      () => fetchVenueWeather(details.venue, details.venueCity, details.kickoffUtc),
+      { bypass: data.refresh },
+    );
+
     // Match this fixture to an OddsEvent by team nicknames + kickoff date
     const homeNick = findTeam(details.homeTeam.nickName)?.nickname ?? details.homeTeam.nickName;
     const awayNick = findTeam(details.awayTeam.nickName)?.nickname ?? details.awayTeam.nickName;

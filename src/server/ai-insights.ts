@@ -154,6 +154,14 @@ export async function generateInsights(payload: {
                 },
                 required: ["pick", "reasoning", "confidence"], additionalProperties: false,
               },
+              keysToVictory: {
+                type: "object",
+                properties: {
+                  home: { type: "array", minItems: 3, maxItems: 3, items: { type: "string", description: "Specific tactical key for home team to win" } },
+                  away: { type: "array", minItems: 3, maxItems: 3, items: { type: "string", description: "Specific tactical key for away team to win" } },
+                },
+                required: ["home", "away"], additionalProperties: false,
+              },
               keyFactors: { type: "array", items: { type: "string" }, minItems: 3, maxItems: 6 },
               bettingAngles: {
                 type: "array",
@@ -187,7 +195,7 @@ export async function generateInsights(payload: {
             required: [
               "predictedScore","winner","margin","total","htft",
               "firstTryscorer","anytimeTryscorers","multiTryscorer",
-              "keyFactors","bettingAngles","script",
+              "keysToVictory","keyFactors","bettingAngles","script",
             ],
             additionalProperties: false,
           },

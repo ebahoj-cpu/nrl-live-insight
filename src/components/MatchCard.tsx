@@ -3,6 +3,7 @@ import { TeamLogo } from "./TeamLogo";
 import type { NrlFixture } from "@/server/nrl";
 import type { OddsEvent } from "@/server/odds";
 import { findTeam } from "@/lib/teams";
+import { Clock, MapPin, ArrowRight } from "lucide-react";
 
 function formatKickoff(utc: string) {
   if (!utc) return "TBC";
@@ -41,55 +42,51 @@ export function MatchCard({ fixture, odds }: { fixture: NrlFixture; odds: OddsEv
     <Link
       to="/match/$matchId"
       params={{ matchId: fixture.matchId }}
-      className="glass p-5 hover:border-accent/50 transition group block"
+      className="glass p-5 hover:border-accent/50 transition group block flex flex-col h-full"
     >
-      <div className="flex items-center justify-between text-xs text-muted-foreground mb-3">
-        <span>{formatKickoff(fixture.kickoffUtc)}</span>
-        <span className="truncate ml-3 text-right">{fixture.venue}</span>
+      {/* Meta row */}
+      <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground mb-5">
+        <span className="inline-flex items-center gap-1.5 min-w-0">
+          <Clock className="h-3.5 w-3.5 shrink-0 text-accent" />
+          <span className="truncate">{formatKickoff(fixture.kickoffUtc)}</span>
+        </span>
+        <span className="inline-flex items-center gap-1.5 min-w-0">
+          <MapPin className="h-3.5 w-3.5 shrink-0 text-accent" />
+          <span className="truncate">{fixture.venue}</span>
+        </span>
       </div>
 
-      <div className="flex items-center justify-between gap-3">
-        {/* Home */}
-        <div className="flex flex-col items-center text-center w-24">
+      {/* Teams + odds */}
+      <div className="grid grid-cols-3 items-center gap-3 flex-1">
+        <div className="flex flex-col items-center text-center">
           <TeamLogo themeKey={fixture.homeTeam.themeKey} name={fixture.homeTeam.nickName} size={56} />
           <div className="mt-2 text-sm font-semibold leading-tight">{fixture.homeTeam.nickName}</div>
-          {fixture.homeTeam.teamPosition && (
-            <div className="text-[10px] text-muted-foreground">{fixture.homeTeam.teamPosition}</div>
-          )}
         </div>
 
-        {/* Odds / vs */}
-        <div className="flex-1 flex flex-col items-center">
-          <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Best H2H</div>
-          <div className="flex items-center gap-2 mt-1 kbd">
+        <div className="flex flex-col items-center justify-center">
+          <div className="text-[10px] uppercase tracking-widest text-muted-foreground">H2H</div>
+          <div className="flex items-center gap-1.5 mt-1.5 kbd">
             <span className={`px-2 py-1 rounded-md text-sm font-semibold ${fav === "home" ? "bg-accent text-accent-foreground" : "bg-surface-2"}`}>
               {homeOdds ? homeOdds.price.toFixed(2) : "—"}
             </span>
-            <span className="text-muted-foreground text-xs">vs</span>
+            <span className="text-muted-foreground text-xs">v</span>
             <span className={`px-2 py-1 rounded-md text-sm font-semibold ${fav === "away" ? "bg-accent text-accent-foreground" : "bg-surface-2"}`}>
               {awayOdds ? awayOdds.price.toFixed(2) : "—"}
             </span>
           </div>
-          {(homeOdds || awayOdds) && (
-            <div className="text-[10px] text-muted-foreground mt-1">
-              {(homeOdds?.book || awayOdds?.book) ?? ""}
-            </div>
-          )}
         </div>
 
-        {/* Away */}
-        <div className="flex flex-col items-center text-center w-24">
+        <div className="flex flex-col items-center text-center">
           <TeamLogo themeKey={fixture.awayTeam.themeKey} name={fixture.awayTeam.nickName} size={56} />
           <div className="mt-2 text-sm font-semibold leading-tight">{fixture.awayTeam.nickName}</div>
-          {fixture.awayTeam.teamPosition && (
-            <div className="text-[10px] text-muted-foreground">{fixture.awayTeam.teamPosition}</div>
-          )}
         </div>
       </div>
 
-      <div className="mt-4 pt-3 border-t border-border flex items-center justify-between text-xs text-muted-foreground">
-        <span>{fixture.matchState}</span>
-        <span className="text-accent font-medium opacity-0 group-hover:opacity-100 transition">View analysis →</span>
+      {/* CTA — always visible */}
+      <div className="mt-5 pt-4 border-t border-border flex items-center justify-end text-xs">
+        <span className="inline-flex items-center gap-1 text-accent font-semibold group-hover:gap-2 transition-all">
+          View analysis <ArrowRight className="h-3.5 w-3.5" />
+        </span>
       </div>
     </Link>
   );

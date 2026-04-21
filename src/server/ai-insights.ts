@@ -4,13 +4,30 @@
 const GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
 const MODEL = "google/gemini-2.5-flash";
 
+export type BettingAngle = {
+  market: string;
+  pick: string;
+  reasoning: string;
+  confidence: number;
+};
+
 export type Insights = {
   predictedScore: { home: number; away: number };
-  winner: { team: "home" | "away"; confidence: number };
-  margin: { value: number; reasoning: string };
+  winner: { team: "home" | "away"; confidence: number; reasoning: string };
+  margin: { value: number; bucket: string; reasoning: string };
   total: { line: number; pick: "over" | "under"; reasoning: string };
+  htft: { pick: string; reasoning: string; confidence: number };
+  firstTryscorer: { pick: string; reasoning: string };
+  anytimeTryscorers: { pick: string; reasoning: string }[];
+  multiTryscorer: { pick: string; reasoning: string; confidence: number };
   keyFactors: string[];
-  bettingAngles: { market: string; pick: string; reasoning: string; confidence: number }[];
+  bettingAngles: BettingAngle[];
+  script: {
+    headToHead: string;
+    formAnalysis: string;
+    milestones: string[];
+    xFactor: string;
+  };
 };
 
 export async function generateInsights(payload: {
@@ -44,7 +61,7 @@ export async function generateInsights(payload: {
     `Home recent form: ${payload.homeRecentForm.map((f) => `${f.result} ${f.summary} ${f.score}`).join("; ") || "n/a"}`,
     `Away recent form: ${payload.awayRecentForm.map((f) => `${f.result} ${f.summary} ${f.score}`).join("; ") || "n/a"}`,
     `Live AU bookie odds summary: ${payload.oddsSummary}`,
-    `Provide a sharp NRL betting analysis. Be specific. Reference the data. When citing players, only use names from the named squads above — never invent players.`,
+    `Provide a sharp, complete NRL betting analysis covering: winner, margin, HT/FT double, total points, first/anytime tryscorers, and multi-tryscorer angles. Also produce a "script" — head-to-head context, form analysis, and any notable upcoming milestones for players or coaches you can reasonably infer from the data. When citing players, only use names from the named squads above — never invent players.`,
   ].filter(Boolean).join("\n");
 
   const res = await fetch(GATEWAY, {
@@ -53,7 +70,7 @@ export async function generateInsights(payload: {
     body: JSON.stringify({
       model: MODEL,
       messages: [
-        { role: "system", content: "You are a professional NRL analyst. Use only the data provided. Never invent stats." },
+        { role: "system", content: "You are a professional NRL analyst and betting tipster. Use only the data provided. Never invent stats or players. Each pick must include a one-sentence reasoning the user can act on." },
         { role: "user", content: prompt },
       ],
       tools: [{
@@ -71,18 +88,68 @@ export async function generateInsights(payload: {
               },
               winner: {
                 type: "object",
-                properties: { team: { type: "string", enum: ["home", "away"] }, confidence: { type: "number", minimum: 0, maximum: 100 } },
-                required: ["team", "confidence"], additionalProperties: false,
+                properties: {
+                  team: { type: "string", enum: ["home", "away"] },
+                  confidence: { type: "number", minimum: 0, maximum: 100 },
+                  reasoning: { type: "string" },
+                },
+                required: ["team", "confidence", "reasoning"], additionalProperties: false,
               },
               margin: {
                 type: "object",
-                properties: { value: { type: "number" }, reasoning: { type: "string" } },
-                required: ["value", "reasoning"], additionalProperties: false,
+                properties: {
+                  value: { type: "number" },
+                  bucket: { type: "string", description: "e.g. 1-12, 13+, 1-6" },
+                  reasoning: { type: "string" },
+                },
+                required: ["value", "bucket", "reasoning"], additionalProperties: false,
               },
               total: {
                 type: "object",
-                properties: { line: { type: "number" }, pick: { type: "string", enum: ["over", "under"] }, reasoning: { type: "string" } },
+                properties: {
+                  line: { type: "number" },
+                  pick: { type: "string", enum: ["over", "under"] },
+                  reasoning: { type: "string" },
+                },
                 required: ["line", "pick", "reasoning"], additionalProperties: false,
+              },
+              htft: {
+                type: "object",
+                properties: {
+                  pick: { type: "string", description: "e.g. 'Storm / Storm' or 'Draw / Storm'" },
+                  reasoning: { type: "string" },
+                  confidence: { type: "number", minimum: 0, maximum: 100 },
+                },
+                required: ["pick", "reasoning", "confidence"], additionalProperties: false,
+              },
+              firstTryscorer: {
+                type: "object",
+                properties: {
+                  pick: { type: "string", description: "Player full name from named squads" },
+                  reasoning: { type: "string" },
+                },
+                required: ["pick", "reasoning"], additionalProperties: false,
+              },
+              anytimeTryscorers: {
+                type: "array",
+                minItems: 3, maxItems: 5,
+                items: {
+                  type: "object",
+                  properties: {
+                    pick: { type: "string" },
+                    reasoning: { type: "string" },
+                  },
+                  required: ["pick", "reasoning"], additionalProperties: false,
+                },
+              },
+              multiTryscorer: {
+                type: "object",
+                properties: {
+                  pick: { type: "string", description: "Player + 'double' or 'hat-trick'" },
+                  reasoning: { type: "string" },
+                  confidence: { type: "number", minimum: 0, maximum: 100 },
+                },
+                required: ["pick", "reasoning", "confidence"], additionalProperties: false,
               },
               keyFactors: { type: "array", items: { type: "string" }, minItems: 3, maxItems: 6 },
               bettingAngles: {
@@ -99,8 +166,26 @@ export async function generateInsights(payload: {
                 },
                 minItems: 2, maxItems: 4,
               },
+              script: {
+                type: "object",
+                properties: {
+                  headToHead: { type: "string", description: "Recent head-to-head context, trends, venue history" },
+                  formAnalysis: { type: "string", description: "Comparative form, attack vs defence, trajectories" },
+                  milestones: {
+                    type: "array",
+                    minItems: 1, maxItems: 4,
+                    items: { type: "string", description: "Notable milestone for player/coach/club" },
+                  },
+                  xFactor: { type: "string", description: "Single biggest swing factor" },
+                },
+                required: ["headToHead", "formAnalysis", "milestones", "xFactor"], additionalProperties: false,
+              },
             },
-            required: ["predictedScore", "winner", "margin", "total", "keyFactors", "bettingAngles"],
+            required: [
+              "predictedScore","winner","margin","total","htft",
+              "firstTryscorer","anytimeTryscorers","multiTryscorer",
+              "keyFactors","bettingAngles","script",
+            ],
             additionalProperties: false,
           },
         },

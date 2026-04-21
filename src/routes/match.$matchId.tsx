@@ -419,21 +419,31 @@ function InsightsTab({ insights, insightsError, home, away }: { insights: any; i
   );
 }
 
-function PickCard({ icon: Icon, market, pick, reasoning, confidence }:
-  { icon: typeof Sparkles; market: string; pick: string; reasoning: string; confidence?: number }) {
+function PickCard({ icon: Icon, market, pick, reasoning }:
+  { icon: typeof Sparkles; market: string; pick: string; reasoning: string }) {
   return (
     <div className="glass p-4 flex flex-col">
-      <div className="flex items-center justify-between mb-2">
-        <div className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">
-          <Icon className="h-3.5 w-3.5 text-accent" /> {market}
-        </div>
-        {confidence != null && (
-          <div className="text-[10px] font-bold text-accent">{confidence}%</div>
-        )}
+      <div className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground mb-2">
+        <Icon className="h-3.5 w-3.5 text-accent" /> {market}
       </div>
       <div className="font-bold mb-1.5">{pick}</div>
       <div className="text-xs text-muted-foreground">{reasoning}</div>
     </div>
+  );
+}
+
+function KeysCard({ team, keys }: { team: string; keys: string[] }) {
+  return (
+    <Card title={`${team} — keys to victory`} icon={Zap}>
+      <ol className="space-y-3">
+        {keys.map((k, i) => (
+          <li key={i} className="flex gap-3 text-sm">
+            <span className="kbd w-6 h-6 shrink-0 rounded-full bg-accent text-accent-foreground text-xs font-bold flex items-center justify-center">{i + 1}</span>
+            <span className="leading-relaxed">{k}</span>
+          </li>
+        ))}
+      </ol>
+    </Card>
   );
 }
 
@@ -479,12 +489,20 @@ function ScriptTab({ insights, insightsError, home, away }:
   );
 }
 
-function formatKickoff(utc: string) {
+function formatDate(utc: string) {
   if (!utc) return "TBC";
   const d = new Date(utc);
   return new Intl.DateTimeFormat("en-AU", {
     timeZone: "Australia/Sydney",
     weekday: "short", day: "numeric", month: "short",
-    hour: "numeric", minute: "2-digit", hour12: true,
   }).format(d);
+}
+
+function formatTime(utc: string) {
+  if (!utc) return "";
+  const d = new Date(utc);
+  return new Intl.DateTimeFormat("en-AU", {
+    timeZone: "Australia/Sydney",
+    hour: "numeric", minute: "2-digit", hour12: true,
+  }).format(d).toLowerCase();
 }

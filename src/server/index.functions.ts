@@ -101,6 +101,7 @@ export const getMatchPage = createServerFn({ method: "GET" })
             for: r.for, against: r.against, diff: r.diff, points: r.points,
           })),
           oddsSummary: odds ? summariseOdds(odds, homeNick, awayNick) : "No live odds available",
+          weatherSummary: weather ? `${weather.tempC}°C, ${weather.condition}, ${weather.windKph} km/h wind, ${weather.precipMm}mm rain (${weather.groundCondition} ground)` : "Weather unavailable",
         }),
         { bypass: data.refresh },
       );
@@ -108,7 +109,7 @@ export const getMatchPage = createServerFn({ method: "GET" })
       insightsError = e instanceof Error ? e.message : "AI insights unavailable";
     }
 
-    return { details, odds, ladder, insights, insightsError, generatedAt: new Date().toISOString() };
+    return { details: { ...details, weather }, odds, ladder, insights, insightsError, generatedAt: new Date().toISOString() };
   });
 
 function currentSeason(): number {

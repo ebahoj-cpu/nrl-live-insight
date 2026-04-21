@@ -5,7 +5,7 @@ import { TeamLogo } from "@/components/TeamLogo";
 import { Suspense, useState } from "react";
 import {
   ArrowLeft, Clock, MapPin, Users, BarChart3, Sparkles, ScrollText,
-  Trophy, Target, Flag, Crown, TrendingUp, AlertCircle,
+  Trophy, Target, Flag, Crown, TrendingUp, AlertCircle, CloudSun, Calendar, Zap,
 } from "lucide-react";
 
 const matchQO = (matchId: string) => queryOptions({
@@ -70,15 +70,28 @@ function MatchInner() {
           <TeamColumn name={details.awayTeam.nickName} themeKey={details.awayTeam.themeKey} position={details.awayTeam.position} />
         </div>
 
-        <div className="mt-6 pt-5 border-t border-border grid grid-cols-2 gap-4 text-sm">
+        <div className="mt-6 pt-5 border-t border-border grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
           <div className="inline-flex items-center gap-2">
+            <Calendar className="h-4 w-4 text-accent shrink-0" />
+            <span className="text-muted-foreground">{formatDate(details.kickoffUtc)}</span>
+            <span className="text-muted-foreground">·</span>
             <Clock className="h-4 w-4 text-accent shrink-0" />
-            <span className="text-muted-foreground">{formatKickoff(details.kickoffUtc)}</span>
+            <span className="text-muted-foreground kbd">{formatTime(details.kickoffUtc)}</span>
           </div>
-          <div className="inline-flex items-center gap-2 justify-end text-right">
+          <div className="inline-flex items-center gap-2 sm:justify-end sm:text-right">
             <MapPin className="h-4 w-4 text-accent shrink-0" />
             <span className="text-muted-foreground truncate">{details.venue}{details.venueCity ? `, ${details.venueCity}` : ""}</span>
           </div>
+          {details.weather && (
+            <div className="inline-flex items-center gap-2 sm:col-span-2 pt-3 border-t border-border">
+              <CloudSun className="h-4 w-4 text-accent shrink-0" />
+              <span className="text-muted-foreground">
+                {details.weather.tempC}° {details.weather.condition} · {details.weather.windKph} km/h wind · {details.weather.precipMm}mm rain
+              </span>
+              <span className="text-muted-foreground">·</span>
+              <span className="font-semibold text-foreground">{details.weather.groundCondition} ground</span>
+            </div>
+          )}
         </div>
       </section>
 

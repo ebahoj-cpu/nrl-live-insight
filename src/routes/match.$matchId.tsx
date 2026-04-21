@@ -2,10 +2,11 @@ import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useSuspenseQuery, queryOptions } from "@tanstack/react-query";
 import { getMatchPage } from "@/server/index.functions";
 import { TeamLogo } from "@/components/TeamLogo";
-import { findTeam } from "@/lib/teams";
-import type { OddsEvent } from "@/server/odds";
-import { Suspense } from "react";
-import { ArrowLeft, Sparkles, TrendingUp } from "lucide-react";
+import { Suspense, useState } from "react";
+import {
+  ArrowLeft, Clock, MapPin, Users, BarChart3, Sparkles, ScrollText,
+  Trophy, Target, Flag, Crown, TrendingUp, AlertCircle,
+} from "lucide-react";
 
 const matchQO = (matchId: string) => queryOptions({
   queryKey: ["match", matchId],
@@ -33,6 +34,8 @@ export const Route = createFileRoute("/match/$matchId")({
   },
 });
 
+type TabKey = "lineup" | "stats" | "insights" | "script";
+
 function MatchPage() {
   return (
     <Suspense fallback={<div className="py-12 text-center text-muted-foreground">Loading match…</div>}>
@@ -44,7 +47,8 @@ function MatchPage() {
 function MatchInner() {
   const { matchId } = Route.useParams();
   const { data } = useSuspenseQuery(matchQO(matchId));
-  const { details, odds, ladder, insights, insightsError } = data;
+  const { details, ladder, insights, insightsError } = data;
+  const [tab, setTab] = useState<TabKey>("lineup");
 
   const homeRow = ladder.find((r) => r.nickname === details.homeTeam.nickName);
   const awayRow = ladder.find((r) => r.nickname === details.awayTeam.nickName);
@@ -61,58 +65,68 @@ function MatchInner() {
         <div className="grid grid-cols-3 items-center mt-4 gap-4">
           <TeamColumn name={details.homeTeam.nickName} themeKey={details.homeTeam.themeKey} position={details.homeTeam.position} />
           <div className="text-center">
-            <div className="text-xs text-muted-foreground">{formatKickoff(details.kickoffUtc)}</div>
-            <div className="text-2xl sm:text-3xl font-extrabold mt-1">vs</div>
-            <div className="text-xs text-muted-foreground mt-1">{details.venue}</div>
-            <div className="text-[10px] text-muted-foreground">{details.venueCity}</div>
+            <div className="text-2xl sm:text-3xl font-extrabold">vs</div>
           </div>
           <TeamColumn name={details.awayTeam.nickName} themeKey={details.awayTeam.themeKey} position={details.awayTeam.position} />
         </div>
+
+        <div className="mt-6 pt-5 border-t border-border grid grid-cols-2 gap-4 text-sm">
+          <div className="inline-flex items-center gap-2">
+            <Clock className="h-4 w-4 text-accent shrink-0" />
+            <span className="text-muted-foreground">{formatKickoff(details.kickoffUtc)}</span>
+          </div>
+          <div className="inline-flex items-center gap-2 justify-end text-right">
+            <MapPin className="h-4 w-4 text-accent shrink-0" />
+            <span className="text-muted-foreground truncate">{details.venue}{details.venueCity ? `, ${details.venueCity}` : ""}</span>
+          </div>
+        </div>
       </section>
 
-      {/* Live odds */}
-      <Section title="Live H2H Odds" subtitle="Best price across AU bookmakers">
-        {odds && odds.bookmakers.length > 0 ? (
-          <OddsTable odds={odds} home={details.homeTeam.nickName} away={details.awayTeam.nickName} />
-        ) : (
-          <Empty msg="No live odds posted yet for this match." />
+      {/* Tabs */}
+      <nav className="mt-6 grid grid-cols-4 gap-1 p-1 glass" role="tablist">
+        <TabButton active={tab === "lineup"} onClick={() => setTab("lineup")} icon={Users} label="Lineup" />
+        <TabButton active={tab === "stats"} onClick={() => setTab("stats")} icon={BarChart3} label="Stats" />
+        <TabButton active={tab === "insights"} onClick={() => setTab("insights")} icon={Sparkles} label="Insights" />
+        <TabButton active={tab === "script"} onClick={() => setTab("script")} icon={ScrollText} label="Script" />
+      </nav>
+
+      <div className="mt-6">
+        {tab === "lineup" && <LineupTab home={details.homeTeam} away={details.awayTeam} />}
+        {tab === "stats" && <StatsTab home={details.homeTeam} away={details.awayTeam} homeRow={homeRow} awayRow={awayRow} />}
+        {tab === "insights" && (
+          <InsightsTab
+            insights={insights}
+            insightsError={insightsError}
+            home={details.homeTeam.nickName}
+            away={details.awayTeam.nickName}
+          />
         )}
-      </Section>
-
-      {/* Lines & totals */}
-      {odds && (
-        <Section title="Spreads & Totals" subtitle="Line and over/under markets">
-          <SpreadTotalsTable odds={odds} home={details.homeTeam.nickName} away={details.awayTeam.nickName} />
-        </Section>
-      )}
-
-      {/* Team lists */}
-      <Section title="Team Lists" subtitle="Official squad named on NRL.com">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <SquadPanel team={details.homeTeam} />
-          <SquadPanel team={details.awayTeam} />
-        </div>
-      </Section>
-
-      {/* Stats / form */}
-      <Section title="Form & Season Stats" subtitle="Source: NRL.com">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormPanel team={details.homeTeam} row={homeRow} />
-          <FormPanel team={details.awayTeam} row={awayRow} />
-        </div>
-      </Section>
-
-      {/* AI Insights */}
-      <Section title="AI Betting Insights" subtitle="Generated from live data">
-        {insightsError && <Empty msg={insightsError} />}
-        {insights && <InsightsPanel insights={insights} home={details.homeTeam.nickName} away={details.awayTeam.nickName} />}
-        {!insights && !insightsError && <Empty msg="Insights unavailable." />}
-      </Section>
+        {tab === "script" && (
+          <ScriptTab insights={insights} insightsError={insightsError} home={details.homeTeam} away={details.awayTeam} />
+        )}
+      </div>
 
       <p className="text-[11px] text-muted-foreground text-center mt-10">
         Updated {new Date(data.generatedAt).toLocaleTimeString()} · Bet responsibly · 18+
       </p>
     </div>
+  );
+}
+
+function TabButton({ active, onClick, icon: Icon, label }:
+  { active: boolean; onClick: () => void; icon: typeof Users; label: string }) {
+  return (
+    <button
+      role="tab"
+      aria-selected={active}
+      onClick={onClick}
+      className={`inline-flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs sm:text-sm font-semibold transition ${
+        active ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:text-foreground"
+      }`}
+    >
+      <Icon className="h-4 w-4" />
+      <span>{label}</span>
+    </button>
   );
 }
 
@@ -126,14 +140,13 @@ function TeamColumn({ name, themeKey, position }: { name: string; themeKey: stri
   );
 }
 
-function Section({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
+function Card({ title, icon: Icon, children, className = "" }:
+  { title: string; icon?: typeof Users; children: React.ReactNode; className?: string }) {
   return (
-    <section className="mt-8">
-      <div className="flex items-end justify-between mb-3">
-        <div>
-          <h2 className="font-display font-bold text-xl">{title}</h2>
-          {subtitle && <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>}
-        </div>
+    <section className={`glass p-5 ${className}`}>
+      <div className="flex items-center gap-2 mb-4">
+        {Icon && <Icon className="h-4 w-4 text-accent" />}
+        <h3 className="font-bold text-sm uppercase tracking-wider">{title}</h3>
       </div>
       {children}
     </section>
@@ -141,28 +154,40 @@ function Section({ title, subtitle, children }: { title: string; subtitle?: stri
 }
 
 function Empty({ msg }: { msg: string }) {
-  return <div className="glass p-6 text-center text-sm text-muted-foreground">{msg}</div>;
+  return (
+    <div className="glass p-6 text-center text-sm text-muted-foreground inline-flex items-center justify-center gap-2 w-full">
+      <AlertCircle className="h-4 w-4" /> {msg}
+    </div>
+  );
 }
+
+/* ================= LINEUP TAB ================= */
 
 const POSITION_ORDER = [
   "Fullback","Winger","Centre","Five-Eighth","Halfback",
   "Prop","Hooker","2nd Row","Lock","Interchange","Reserve",
 ];
 
-function SquadPanel({ team }: { team: { nickName: string; themeKey: string; players: { firstName: string; lastName: string; position: string; jerseyNumber?: number; headImage?: string; isCaptain?: boolean }[] } }) {
+function LineupTab({ home, away }: { home: any; away: any }) {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <SquadPanel team={home} />
+      <SquadPanel team={away} />
+    </div>
+  );
+}
+
+function SquadPanel({ team }: { team: { nickName: string; themeKey: string; players: { firstName: string; lastName: string; position: string; jerseyNumber?: number; isCaptain?: boolean }[] } }) {
   const sorted = [...team.players].sort((a, b) => {
     const ai = POSITION_ORDER.indexOf(a.position);
     const bi = POSITION_ORDER.indexOf(b.position);
     return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
   });
   return (
-    <div className="glass p-5">
+    <Card title={team.nickName} icon={Users}>
       <div className="flex items-center gap-3 mb-4">
-        <TeamLogo themeKey={team.themeKey} name={team.nickName} size={40} />
-        <div>
-          <div className="font-bold">{team.nickName}</div>
-          <div className="text-xs text-muted-foreground">{sorted.length} players</div>
-        </div>
+        <TeamLogo themeKey={team.themeKey} name={team.nickName} size={36} />
+        <div className="text-xs text-muted-foreground">{sorted.length} players named</div>
       </div>
       {sorted.length === 0 ? (
         <div className="text-xs text-muted-foreground">Squad not yet named.</div>
@@ -175,135 +200,90 @@ function SquadPanel({ team }: { team: { nickName: string; themeKey: string; play
               )}
               <span className="flex-1">
                 <span className="font-medium">{p.firstName} {p.lastName}</span>
-                {p.isCaptain && <span className="ml-1.5 text-[10px] font-bold text-accent">(C)</span>}
+                {p.isCaptain && <Crown className="inline h-3 w-3 ml-1.5 text-accent" />}
               </span>
               <span className="text-[11px] uppercase tracking-wider text-muted-foreground">{p.position}</span>
             </li>
           ))}
         </ul>
       )}
-    </div>
+    </Card>
   );
 }
 
-function OddsTable({ odds, home, away }: { odds: OddsEvent; home: string; away: string }) {
-  const homeNick = findTeam(home)?.nickname ?? home;
-  const awayNick = findTeam(away)?.nickname ?? away;
-  const rows = odds.bookmakers
-    .map((b) => {
-      const h2h = b.markets.find((m) => m.key === "h2h");
-      if (!h2h) return null;
-      const h = h2h.outcomes.find((o) => findTeam(o.name)?.nickname === homeNick);
-      const a = h2h.outcomes.find((o) => findTeam(o.name)?.nickname === awayNick);
-      if (!h || !a) return null;
-      return { book: b.title, home: h.price, away: a.price, updated: b.lastUpdate };
-    })
-    .filter((r): r is { book: string; home: number; away: number; updated: string } => r !== null);
+/* ================= STATS TAB ================= */
 
-  const bestHome = Math.max(...rows.map((r) => r.home));
-  const bestAway = Math.max(...rows.map((r) => r.away));
-
+function StatsTab({ home, away, homeRow, awayRow }: { home: any; away: any; homeRow?: any; awayRow?: any }) {
   return (
-    <div className="glass overflow-hidden">
-      <div className="grid grid-cols-3 gap-2 px-4 py-3 text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border">
-        <span>Bookmaker</span>
-        <span className="text-right">{home}</span>
-        <span className="text-right">{away}</span>
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <SeasonStats team={home} row={homeRow} />
+        <SeasonStats team={away} row={awayRow} />
       </div>
-      {rows.map((r) => (
-        <div key={r.book} className="grid grid-cols-3 gap-2 px-4 py-3 text-sm border-b border-border last:border-0">
-          <span className="font-medium">{r.book}</span>
-          <span className={`text-right kbd font-semibold ${r.home === bestHome ? "text-accent" : ""}`}>{r.home.toFixed(2)}</span>
-          <span className={`text-right kbd font-semibold ${r.away === bestAway ? "text-accent" : ""}`}>{r.away.toFixed(2)}</span>
-        </div>
-      ))}
+      {(homeRow && awayRow) && (
+        <Card title="Side by side" icon={BarChart3}>
+          <CompareRow label="Ladder position" h={`#${homeRow.position}`} a={`#${awayRow.position}`} />
+          <CompareRow label="Wins" h={homeRow.wins} a={awayRow.wins} betterHigh higherWins={homeRow.wins > awayRow.wins} />
+          <CompareRow label="Points for" h={homeRow.for} a={awayRow.for} betterHigh higherWins={homeRow.for > awayRow.for} />
+          <CompareRow label="Points against" h={homeRow.against} a={awayRow.against} higherWins={homeRow.against < awayRow.against} />
+          <CompareRow label="Differential" h={fmtSigned(homeRow.diff)} a={fmtSigned(awayRow.diff)} higherWins={homeRow.diff > awayRow.diff} />
+          <CompareRow label="Comp points" h={homeRow.points} a={awayRow.points} higherWins={homeRow.points > awayRow.points} last />
+        </Card>
+      )}
     </div>
   );
 }
 
-function SpreadTotalsTable({ odds, home, away }: { odds: OddsEvent; home: string; away: string }) {
-  const homeNick = findTeam(home)?.nickname ?? home;
-  const rows = odds.bookmakers.map((b) => {
-    const sp = b.markets.find((m) => m.key === "spreads");
-    const tot = b.markets.find((m) => m.key === "totals");
-    const homeSp = sp?.outcomes.find((o) => findTeam(o.name)?.nickname === homeNick);
-    const awaySp = sp?.outcomes.find((o) => findTeam(o.name)?.nickname && findTeam(o.name)?.nickname !== homeNick);
-    const over = tot?.outcomes.find((o) => o.name === "Over");
-    const under = tot?.outcomes.find((o) => o.name === "Under");
-    return { book: b.title, homeSp, awaySp, over, under };
-  }).filter((r) => r.homeSp || r.over);
+function fmtSigned(n: number) { return n > 0 ? `+${n}` : `${n}`; }
 
-  if (rows.length === 0) return <Empty msg="No spread/total markets posted." />;
-
+function CompareRow({ label, h, a, higherWins, last }: { label: string; h: any; a: any; betterHigh?: boolean; higherWins?: boolean; last?: boolean }) {
   return (
-    <div className="glass overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead className="text-[11px] uppercase tracking-wider text-muted-foreground">
-          <tr className="border-b border-border">
-            <th className="text-left px-4 py-3">Bookmaker</th>
-            <th className="text-right px-3 py-3">{home} line</th>
-            <th className="text-right px-3 py-3">{away} line</th>
-            <th className="text-right px-3 py-3">Over</th>
-            <th className="text-right px-3 py-3">Under</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r) => (
-            <tr key={r.book} className="border-b border-border last:border-0">
-              <td className="px-4 py-3 font-medium">{r.book}</td>
-              <td className="px-3 py-3 text-right kbd">{r.homeSp ? `${formatLine(r.homeSp.point)} @ ${r.homeSp.price.toFixed(2)}` : "—"}</td>
-              <td className="px-3 py-3 text-right kbd">{r.awaySp ? `${formatLine(r.awaySp.point)} @ ${r.awaySp.price.toFixed(2)}` : "—"}</td>
-              <td className="px-3 py-3 text-right kbd">{r.over ? `${r.over.point} @ ${r.over.price.toFixed(2)}` : "—"}</td>
-              <td className="px-3 py-3 text-right kbd">{r.under ? `${r.under.point} @ ${r.under.price.toFixed(2)}` : "—"}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className={`grid grid-cols-3 items-center py-2.5 ${last ? "" : "border-b border-border"}`}>
+      <div className={`text-right kbd font-semibold ${higherWins ? "text-accent" : "text-foreground"}`}>{h}</div>
+      <div className="text-center text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
+      <div className={`text-left kbd font-semibold ${higherWins === false ? "text-accent" : "text-foreground"}`}>{a}</div>
     </div>
   );
 }
 
-function formatLine(n: number | undefined): string {
-  if (n == null) return "—";
-  return n > 0 ? `+${n}` : `${n}`;
-}
-
-function FormPanel({ team, row }: { team: { nickName: string; themeKey: string; recentForm: { result: string; summary: string; score: string }[]; odds?: string }; row?: { played: number; wins: number; losses: number; for: number; against: number; diff: number; points: number; position: number } }) {
+function SeasonStats({ team, row }: { team: any; row?: any }) {
   return (
-    <div className="glass p-5">
+    <Card title={team.nickName} icon={Trophy}>
       <div className="flex items-center gap-3 mb-4">
-        <TeamLogo themeKey={team.themeKey} name={team.nickName} size={40} />
-        <div>
-          <div className="font-bold">{team.nickName}</div>
-          {row && <div className="text-xs text-muted-foreground">Ladder #{row.position}</div>}
-        </div>
+        <TeamLogo themeKey={team.themeKey} name={team.nickName} size={36} />
+        {row && <div className="text-xs text-muted-foreground">Ladder #{row.position}</div>}
       </div>
 
-      {row && (
+      {row ? (
         <div className="grid grid-cols-4 gap-2 mb-4">
           <Stat label="W-L" value={`${row.wins}-${row.losses}`} />
           <Stat label="Pts" value={String(row.points)} />
           <Stat label="PF" value={String(row.for)} />
-          <Stat label="Diff" value={(row.diff > 0 ? "+" : "") + row.diff} accent={row.diff > 0} danger={row.diff < 0} />
+          <Stat label="Diff" value={fmtSigned(row.diff)} accent={row.diff > 0} danger={row.diff < 0} />
         </div>
+      ) : (
+        <div className="text-xs text-muted-foreground mb-4">No 2026 ladder data yet.</div>
       )}
 
-      <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-2">Last 5</div>
-      <div className="space-y-1.5">
-        {team.recentForm.slice(0, 5).map((f, i) => (
-          <div key={i} className="flex items-center justify-between text-xs">
-            <span className="flex items-center gap-2">
-              <span className={`inline-block w-5 text-center font-bold rounded ${f.result === "Won" ? "bg-accent text-accent-foreground" : f.result === "Lost" ? "bg-danger/20 text-danger" : "bg-surface-2 text-muted-foreground"}`}>
-                {f.result.charAt(0)}
+      <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Last 5</div>
+      {team.recentForm.length === 0 ? (
+        <div className="text-xs text-muted-foreground">No recent matches.</div>
+      ) : (
+        <div className="space-y-1.5">
+          {team.recentForm.slice(0, 5).map((f: any, i: number) => (
+            <div key={i} className="flex items-center justify-between text-xs">
+              <span className="flex items-center gap-2 min-w-0">
+                <span className={`inline-block w-5 text-center font-bold rounded ${f.result === "Won" ? "bg-accent text-accent-foreground" : f.result === "Lost" ? "bg-danger/20 text-danger" : "bg-surface-2 text-muted-foreground"}`}>
+                  {f.result.charAt(0)}
+                </span>
+                <span className="text-muted-foreground truncate">{f.summary}</span>
               </span>
-              <span className="text-muted-foreground">{f.summary}</span>
-            </span>
-            <span className="kbd font-semibold">{f.score}</span>
-          </div>
-        ))}
-        {team.recentForm.length === 0 && <div className="text-xs text-muted-foreground">No recent matches.</div>}
-      </div>
-    </div>
+              <span className="kbd font-semibold shrink-0">{f.score}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </Card>
   );
 }
 
@@ -316,14 +296,18 @@ function Stat({ label, value, accent, danger }: { label: string; value: string; 
   );
 }
 
-function InsightsPanel({ insights, home, away }: { insights: any; home: string; away: string }) {
+/* ================= INSIGHTS TAB ================= */
+
+function InsightsTab({ insights, insightsError, home, away }: { insights: any; insightsError: string | null; home: string; away: string }) {
+  if (insightsError) return <Empty msg={insightsError} />;
+  if (!insights) return <Empty msg="Insights unavailable." />;
+
   const winnerName = insights.winner.team === "home" ? home : away;
+
   return (
     <div className="space-y-4">
-      <div className="glass p-5 accent-glow">
-        <div className="flex items-center gap-2 text-accent text-xs font-bold uppercase tracking-wider mb-3">
-          <Sparkles className="h-4 w-4" /> Predicted result
-        </div>
+      {/* Predicted result hero */}
+      <Card title="Predicted result" icon={Sparkles} className="accent-glow">
         <div className="grid grid-cols-3 gap-4 items-center">
           <div className="text-center">
             <div className="text-xs text-muted-foreground">{home}</div>
@@ -341,18 +325,72 @@ function InsightsPanel({ insights, home, away }: { insights: any; home: string; 
             <div className="text-4xl font-black kbd">{insights.predictedScore.away}</div>
           </div>
         </div>
-        <div className="mt-4 text-xs text-muted-foreground border-t border-border pt-3">
-          <span className="font-semibold text-foreground">Margin: {insights.margin.value}</span> · {insights.margin.reasoning}
-        </div>
-        <div className="mt-2 text-xs text-muted-foreground">
-          <span className="font-semibold text-foreground">Total {insights.total.line} ({insights.total.pick.toUpperCase()})</span> · {insights.total.reasoning}
-        </div>
+        <p className="mt-4 text-xs text-muted-foreground">{insights.winner.reasoning}</p>
+      </Card>
+
+      {/* Pick grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <PickCard
+          icon={Target}
+          market="Winning margin"
+          pick={`${winnerName} by ${insights.margin.bucket}`}
+          reasoning={insights.margin.reasoning}
+        />
+        <PickCard
+          icon={TrendingUp}
+          market={`Total points ${insights.total.line}`}
+          pick={insights.total.pick.toUpperCase()}
+          reasoning={insights.total.reasoning}
+        />
+        <PickCard
+          icon={Clock}
+          market="Half-time / Full-time"
+          pick={insights.htft.pick}
+          reasoning={insights.htft.reasoning}
+          confidence={insights.htft.confidence}
+        />
+        <PickCard
+          icon={Flag}
+          market="First tryscorer"
+          pick={insights.firstTryscorer.pick}
+          reasoning={insights.firstTryscorer.reasoning}
+        />
+        <PickCard
+          icon={Trophy}
+          market="Multi-tryscorer"
+          pick={insights.multiTryscorer.pick}
+          reasoning={insights.multiTryscorer.reasoning}
+          confidence={insights.multiTryscorer.confidence}
+        />
+        {insights.bettingAngles.map((a: any, i: number) => (
+          <PickCard
+            key={i}
+            icon={Sparkles}
+            market={a.market}
+            pick={a.pick}
+            reasoning={a.reasoning}
+            confidence={a.confidence}
+          />
+        ))}
       </div>
 
-      <div className="glass p-5">
-        <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">
-          <TrendingUp className="h-4 w-4" /> Key factors
-        </div>
+      {/* Anytime tryscorers */}
+      <Card title="Anytime tryscorers" icon={Flag}>
+        <ul className="space-y-3">
+          {insights.anytimeTryscorers.map((t: any, i: number) => (
+            <li key={i} className="flex gap-3">
+              <span className="kbd w-6 h-6 shrink-0 rounded-full bg-accent text-accent-foreground text-xs font-bold flex items-center justify-center">{i + 1}</span>
+              <div className="min-w-0">
+                <div className="font-semibold text-sm">{t.pick}</div>
+                <div className="text-xs text-muted-foreground mt-0.5">{t.reasoning}</div>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </Card>
+
+      {/* Key factors */}
+      <Card title="Key factors" icon={TrendingUp}>
         <ul className="space-y-2 text-sm">
           {insights.keyFactors.map((k: string, i: number) => (
             <li key={i} className="flex gap-2">
@@ -361,20 +399,67 @@ function InsightsPanel({ insights, home, away }: { insights: any; home: string; 
             </li>
           ))}
         </ul>
-      </div>
+      </Card>
+    </div>
+  );
+}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        {insights.bettingAngles.map((a: any, i: number) => (
-          <div key={i} className="glass p-4">
-            <div className="flex items-center justify-between mb-2">
-              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{a.market}</div>
-              <div className="text-[10px] font-bold text-accent">{a.confidence}%</div>
-            </div>
-            <div className="font-bold mb-1">{a.pick}</div>
-            <div className="text-xs text-muted-foreground">{a.reasoning}</div>
-          </div>
-        ))}
+function PickCard({ icon: Icon, market, pick, reasoning, confidence }:
+  { icon: typeof Sparkles; market: string; pick: string; reasoning: string; confidence?: number }) {
+  return (
+    <div className="glass p-4 flex flex-col">
+      <div className="flex items-center justify-between mb-2">
+        <div className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">
+          <Icon className="h-3.5 w-3.5 text-accent" /> {market}
+        </div>
+        {confidence != null && (
+          <div className="text-[10px] font-bold text-accent">{confidence}%</div>
+        )}
       </div>
+      <div className="font-bold mb-1.5">{pick}</div>
+      <div className="text-xs text-muted-foreground">{reasoning}</div>
+    </div>
+  );
+}
+
+/* ================= SCRIPT TAB ================= */
+
+function ScriptTab({ insights, insightsError, home, away }:
+  { insights: any; insightsError: string | null; home: any; away: any }) {
+  if (insightsError) return <Empty msg={insightsError} />;
+  if (!insights?.script) return <Empty msg="Script unavailable." />;
+
+  const s = insights.script;
+
+  return (
+    <div className="space-y-4">
+      <Card title="Head to head" icon={ScrollText}>
+        <div className="flex items-center justify-center gap-6 mb-4">
+          <TeamLogo themeKey={home.themeKey} name={home.nickName} size={48} />
+          <span className="text-muted-foreground text-sm font-bold">vs</span>
+          <TeamLogo themeKey={away.themeKey} name={away.nickName} size={48} />
+        </div>
+        <p className="text-sm leading-relaxed text-muted-foreground">{s.headToHead}</p>
+      </Card>
+
+      <Card title="Form analysis" icon={TrendingUp}>
+        <p className="text-sm leading-relaxed text-muted-foreground">{s.formAnalysis}</p>
+      </Card>
+
+      <Card title="Upcoming milestones" icon={Crown}>
+        <ul className="space-y-3">
+          {s.milestones.map((m: string, i: number) => (
+            <li key={i} className="flex gap-2 text-sm">
+              <span className="text-accent shrink-0">›</span>
+              <span>{m}</span>
+            </li>
+          ))}
+        </ul>
+      </Card>
+
+      <Card title="X-factor" icon={Sparkles} className="accent-glow">
+        <p className="text-sm leading-relaxed">{s.xFactor}</p>
+      </Card>
     </div>
   );
 }

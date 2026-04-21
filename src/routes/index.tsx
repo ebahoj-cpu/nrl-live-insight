@@ -41,17 +41,12 @@ function Fixtures() {
 
   return (
     <div className="pt-8">
-      <div className="flex items-end justify-between mb-6">
-        <div>
-          <div className="text-[11px] uppercase tracking-[0.2em] text-accent font-bold">Round {fx.round} · {fx.season}</div>
-          <h1 className="font-display font-extrabold text-3xl sm:text-4xl tracking-tight mt-1">
-            This week's NRL
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {fx.fixtures.length} matches · official NRL data · live AU bookmaker odds
-          </p>
-        </div>
-      </div>
+      <header className="mb-8">
+        <div className="text-[11px] uppercase tracking-[0.25em] text-accent font-bold">Season {fx.season}</div>
+        <h1 className="font-display font-extrabold text-3xl sm:text-4xl tracking-tight mt-1">
+          NRL Fixtures · Round {fx.round}
+        </h1>
+      </header>
 
       {fx.fixtures.length === 0 ? (
         <div className="glass p-10 text-center text-muted-foreground">

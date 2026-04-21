@@ -110,7 +110,7 @@ function Footer() {
   return (
     <footer className="border-t border-border mt-16">
       <div className="mx-auto max-w-6xl px-4 sm:px-6 py-6 text-xs text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1">
-        <span>Data: NRL.com (official) · Odds: The Odds API · Insights: Lovable AI</span>
+        <span>Bet responsibly · 18+</span>
         <span className="ml-auto">© LINEBREAK</span>
       </div>
     </footer>

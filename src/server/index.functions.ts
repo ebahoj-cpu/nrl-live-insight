@@ -5,6 +5,7 @@ import { cached, TTL } from "./cache";
 import { fetchDraw, fetchLadder, fetchMatchDetails } from "./nrl";
 import { fetchNrlOdds, fetchEventOdds, type OddsEvent } from "./odds";
 import { generateInsights } from "./ai-insights";
+import { fetchVenueWeather, type WeatherSnapshot } from "./weather";
 import { findTeam } from "@/lib/teams";
 
 // ---------- Fixtures + current round ----------

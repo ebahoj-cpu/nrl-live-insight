@@ -20,7 +20,16 @@ export const getCurrentRoundFixtures = createServerFn({ method: "GET" })
         const all = await fetchDraw(season);
         const currentRound = all.find((f) => f.isCurrentRound)?.roundNumber ?? all[0]?.roundNumber ?? 1;
         const fixtures = all.filter((f) => f.roundNumber === currentRound);
-        return { season, round: currentRound, fixtures };
+        const enriched = await Promise.all(fixtures.map(async (f) => {
+          const weather = await cached(
+            `weather:${f.matchId}`,
+            TTL.weather,
+            () => fetchVenueWeather(f.venue, f.venueCity, f.kickoffUtc),
+            { bypass: data.refresh },
+          );
+          return { ...f, weather };
+        }));
+        return { season, round: currentRound, fixtures: enriched };
       },
       { bypass: data.refresh },
     );

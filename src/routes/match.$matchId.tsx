@@ -281,20 +281,36 @@ function SeasonStats({ team, row }: { team: any; row?: any }) {
         <div className="text-xs text-muted-foreground mb-4">No 2026 ladder data yet.</div>
       )}
 
-      <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Last 5</div>
+      <div className="flex items-center justify-between mb-3">
+        <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Form · Last 5</div>
+        {team.recentForm.length > 0 && (
+          <div className="flex gap-1">
+            {team.recentForm.slice(0, 5).map((f: any, i: number) => (
+              <span
+                key={i}
+                title={`${f.result} ${f.score}`}
+                className={`h-6 w-6 rounded-md flex items-center justify-center text-[11px] font-black ${
+                  f.result === "Won"
+                    ? "bg-accent text-accent-foreground shadow-[0_0_8px_color-mix(in_oklab,var(--accent)_55%,transparent)]"
+                    : f.result === "Lost"
+                    ? "bg-danger/15 text-danger border border-danger/30"
+                    : "bg-surface-2 text-muted-foreground"
+                }`}
+              >
+                {f.result.charAt(0)}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
       {team.recentForm.length === 0 ? (
         <div className="text-xs text-muted-foreground">No recent matches.</div>
       ) : (
         <div className="space-y-1.5">
           {team.recentForm.slice(0, 5).map((f: any, i: number) => (
-            <div key={i} className="flex items-center justify-between text-xs">
-              <span className="flex items-center gap-2 min-w-0">
-                <span className={`inline-block w-5 text-center font-bold rounded ${f.result === "Won" ? "bg-accent text-accent-foreground" : f.result === "Lost" ? "bg-danger/20 text-danger" : "bg-surface-2 text-muted-foreground"}`}>
-                  {f.result.charAt(0)}
-                </span>
-                <span className="text-muted-foreground truncate">{f.summary}</span>
-              </span>
-              <span className="kbd font-semibold shrink-0">{f.score}</span>
+            <div key={i} className="flex items-center justify-between text-xs py-1 border-b border-border last:border-0">
+              <span className="text-muted-foreground truncate pr-2">{f.summary}</span>
+              <span className={`kbd font-bold shrink-0 ${f.result === "Won" ? "text-accent" : f.result === "Lost" ? "text-danger" : ""}`}>{f.score}</span>
             </div>
           ))}
         </div>

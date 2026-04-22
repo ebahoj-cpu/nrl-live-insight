@@ -1,14 +1,15 @@
 // The Odds API — live AU bookmaker odds for NRL.
 // Docs: https://the-odds-api.com/liveapi/guides/v4/
-// Markets confirmed available: h2h, spreads (line), totals (over/under).
-// NOTE: Player props (try scorers etc.) are NOT offered by any region for NRL.
+// Confirmed available: h2h, spreads, totals (always)
+// Player markets (released ~24h before kickoff once team lists drop):
+//   player_try_scorer_first, player_try_scorer_anytime, player_try_scorer_over
 
 import { findTeam } from "@/lib/teams";
 
 const BASE = "https://api.the-odds-api.com/v4";
 const SPORT = "rugbyleague_nrl";
 
-export type Outcome = { name: string; price: number; point?: number };
+export type Outcome = { name: string; price: number; point?: number; description?: string };
 export type Market = { key: string; outcomes: Outcome[] };
 export type BookmakerOdds = {
   key: string;
@@ -51,6 +52,77 @@ export async function fetchEventOdds(eventId: string): Promise<OddsEvent | null>
   return mapEvent(data);
 }
 
+// Player tryscorer markets — only released by bookies once team lists drop
+// (typically ~24h before kickoff). Returns null if no markets exist yet.
+export type TryscorerOdds = {
+  player: string;
+  price: number;
+  book: string;
+};
+
+export type TryscorerMarkets = {
+  first: TryscorerOdds[];   // first tryscorer
+  anytime: TryscorerOdds[]; // anytime tryscorer
+  multi: TryscorerOdds[];   // 2+ tries
+  hasAny: boolean;
+  lastUpdate: string | null;
+};
+
+export async function fetchTryscorerOdds(eventId: string): Promise<TryscorerMarkets> {
+  const key = ensureKey();
+  const markets = "player_try_scorer_first,player_try_scorer_anytime,player_try_scorer_over";
+  const url = `${BASE}/sports/${SPORT}/events/${eventId}/odds/?apiKey=${key}&regions=au&markets=${markets}&oddsFormat=decimal`;
+
+  const res = await fetch(url);
+  const empty: TryscorerMarkets = { first: [], anytime: [], multi: [], hasAny: false, lastUpdate: null };
+  if (!res.ok) return empty;
+
+  const data = await res.json() as any;
+  const bookmakers: any[] = data?.bookmakers ?? [];
+  if (bookmakers.length === 0) return empty;
+
+  // Best price per player per market across all bookies
+  const best: Record<"first" | "anytime" | "multi", Map<string, TryscorerOdds>> = {
+    first: new Map(), anytime: new Map(), multi: new Map(),
+  };
+  let lastUpdate: string | null = null;
+
+  for (const b of bookmakers) {
+    for (const m of b.markets ?? []) {
+      const slot: "first" | "anytime" | "multi" | null =
+        m.key === "player_try_scorer_first" ? "first" :
+        m.key === "player_try_scorer_anytime" ? "anytime" :
+        m.key === "player_try_scorer_over" ? "multi" : null;
+      if (!slot) continue;
+      if (!lastUpdate || m.last_update > lastUpdate) lastUpdate = m.last_update;
+
+      for (const o of m.outcomes ?? []) {
+        // "Yes" outcomes carry the player in `description`. Some books put it in `name`.
+        const player: string | undefined = o.description ?? (o.name !== "Yes" && o.name !== "No" ? o.name : undefined);
+        if (!player || typeof o.price !== "number") continue;
+        // For "over" markets, only keep 1.5 line (i.e. 2+ tries / double)
+        if (slot === "multi" && o.point != null && o.point !== 1.5) continue;
+
+        const existing = best[slot].get(player);
+        if (!existing || o.price > existing.price) {
+          best[slot].set(player, { player, price: o.price, book: b.title });
+        }
+      }
+    }
+  }
+
+  const sortByPrice = (a: TryscorerOdds, b: TryscorerOdds) => a.price - b.price;
+  const out: TryscorerMarkets = {
+    first: Array.from(best.first.values()).sort(sortByPrice).slice(0, 8),
+    anytime: Array.from(best.anytime.values()).sort(sortByPrice).slice(0, 12),
+    multi: Array.from(best.multi.values()).sort(sortByPrice).slice(0, 6),
+    hasAny: false,
+    lastUpdate,
+  };
+  out.hasAny = out.first.length + out.anytime.length + out.multi.length > 0;
+  return out;
+}
+
 function mapEvent(e: any): OddsEvent {
   return {
     id: e.id,
@@ -66,7 +138,7 @@ function mapEvent(e: any): OddsEvent {
       markets: (b.markets ?? []).map((m: any) => ({
         key: m.key,
         outcomes: (m.outcomes ?? []).map((o: any) => ({
-          name: o.name, price: o.price, point: o.point,
+          name: o.name, price: o.price, point: o.point, description: o.description,
         })),
       })),
     })),

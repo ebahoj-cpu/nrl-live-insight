@@ -3,7 +3,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { cached, TTL } from "./cache";
 import { fetchDraw, fetchLadder, fetchMatchDetails } from "./nrl";
-import { fetchNrlOdds, fetchEventOdds, type OddsEvent } from "./odds";
+import { fetchNrlOdds, fetchEventOdds, fetchTryscorerOdds, type OddsEvent, type TryscorerMarkets } from "./odds";
 import { generateInsights } from "./ai-insights";
 import { fetchVenueWeather, type WeatherSnapshot } from "./weather";
 import { findTeam } from "@/lib/teams";
@@ -80,6 +80,17 @@ export const getMatchPage = createServerFn({ method: "GET" })
       return (eh === homeNick && ea === awayNick) || (eh === awayNick && ea === homeNick);
     }) ?? null;
 
+    // Try-scorer markets — bookies release these once team lists drop (~24h pre-game).
+    // Cache short so it auto-fills as soon as bookies post lines.
+    const tryscorers: TryscorerMarkets | null = odds
+      ? await cached(
+          `tryscorers:${odds.id}`,
+          TTL.odds,
+          () => fetchTryscorerOdds(odds.id),
+          { bypass: data.refresh },
+        ).catch(() => null)
+      : null;
+
     // AI insights (cached per match for an hour)
     let insights: any = null; let insightsError: string | null = null;
     try {
@@ -109,7 +120,7 @@ export const getMatchPage = createServerFn({ method: "GET" })
       insightsError = e instanceof Error ? e.message : "AI insights unavailable";
     }
 
-    return { details: { ...details, weather }, odds, ladder, insights, insightsError, generatedAt: new Date().toISOString() };
+    return { details: { ...details, weather }, odds, tryscorers, ladder, insights, insightsError, generatedAt: new Date().toISOString() };
   });
 
 function currentSeason(): number {

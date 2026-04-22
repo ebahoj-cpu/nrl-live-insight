@@ -47,7 +47,7 @@ function MatchPage() {
 function MatchInner() {
   const { matchId } = Route.useParams();
   const { data } = useSuspenseQuery(matchQO(matchId));
-  const { details, ladder, insights, insightsError } = data;
+  const { details, ladder, insights, insightsError, tryscorers } = data;
   const [tab, setTab] = useState<TabKey>("lineup");
 
   const homeRow = ladder.find((r) => r.nickname === details.homeTeam.nickName);
@@ -112,6 +112,8 @@ function MatchInner() {
             insightsError={insightsError}
             home={details.homeTeam.nickName}
             away={details.awayTeam.nickName}
+            tryscorers={tryscorers}
+            kickoffUtc={details.kickoffUtc}
           />
         )}
         {tab === "script" && (

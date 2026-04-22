@@ -28,6 +28,11 @@ export type Insights = {
     formAnalysis: string;
     milestones: string[];
     xFactor: string;
+    bookieScript: {
+      wantToWin: string;
+      wantToLose: string;
+      liability: string;
+    };
   };
 };
 
@@ -64,7 +69,7 @@ export async function generateInsights(payload: {
     `Away recent form: ${payload.awayRecentForm.map((f) => `${f.result} ${f.summary} ${f.score}`).join("; ") || "n/a"}`,
     `Live AU bookie odds summary: ${payload.oddsSummary}`,
     payload.weatherSummary ? `Forecast at venue at kickoff: ${payload.weatherSummary}` : "",
-    `Provide a sharp, complete NRL betting analysis covering: winner, margin, HT/FT double, total points, first/anytime tryscorers, and multi-tryscorer angles. Also produce 3 specific "keys to victory" for EACH team (what they must do to win this match — concrete tactical/structural points referencing real squad players, recent form, opposition weakness, or weather/ground impact). Plus a "script" — head-to-head context, form analysis, and any notable upcoming milestones for players or coaches you can reasonably infer from the data. When citing players, only use names from the named squads above — never invent players.`,
+    `Provide a sharp, complete NRL betting analysis covering: winner, margin, HT/FT double, total points, first/anytime tryscorers, and multi-tryscorer angles. Also produce 3 specific "keys to victory" for EACH team (concrete tactical/structural points referencing real squad players, recent form, opposition weakness, or weather/ground impact). Plus a "script" — head-to-head context, form analysis, notable upcoming milestones, and a "bookie script": from a sharp Australian bookmaker's perspective, which result/outcome do they WANT to land (limits liability, public is on the other side), which result they want to AVOID (heavy public liability), and a one-sentence summary of where their book is most exposed. When citing players, only use names from the named squads above — never invent players.`,
   ].filter(Boolean).join("\n");
 
   const res = await fetch(GATEWAY, {
@@ -188,8 +193,17 @@ export async function generateInsights(payload: {
                     items: { type: "string", description: "Notable milestone for player/coach/club" },
                   },
                   xFactor: { type: "string", description: "Single biggest swing factor" },
+                  bookieScript: {
+                    type: "object",
+                    properties: {
+                      wantToWin: { type: "string", description: "The result/outcome bookmakers want — public is on the other side, low liability" },
+                      wantToLose: { type: "string", description: "The result/outcome bookmakers fear — heavy public money, big payout exposure" },
+                      liability: { type: "string", description: "One-sentence summary of where the book is most exposed" },
+                    },
+                    required: ["wantToWin", "wantToLose", "liability"], additionalProperties: false,
+                  },
                 },
-                required: ["headToHead", "formAnalysis", "milestones", "xFactor"], additionalProperties: false,
+                required: ["headToHead", "formAnalysis", "milestones", "xFactor", "bookieScript"], additionalProperties: false,
               },
             },
             required: [

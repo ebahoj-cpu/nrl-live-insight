@@ -7,6 +7,7 @@ import { Suspense, useState } from "react";
 import {
   ArrowLeft, Clock, MapPin, Users, BarChart3, Sparkles, ScrollText,
   Trophy, Target, Flag, Crown, TrendingUp, AlertCircle, CloudSun, Calendar, Zap, Hourglass,
+  Coins, ThumbsUp, ThumbsDown,
 } from "lucide-react";
 
 const matchQO = (matchId: string) => queryOptions({
@@ -281,20 +282,36 @@ function SeasonStats({ team, row }: { team: any; row?: any }) {
         <div className="text-xs text-muted-foreground mb-4">No 2026 ladder data yet.</div>
       )}
 
-      <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Last 5</div>
+      <div className="flex items-center justify-between mb-3">
+        <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Form · Last 5</div>
+        {team.recentForm.length > 0 && (
+          <div className="flex gap-1">
+            {team.recentForm.slice(0, 5).map((f: any, i: number) => (
+              <span
+                key={i}
+                title={`${f.result} ${f.score}`}
+                className={`h-6 w-6 rounded-md flex items-center justify-center text-[11px] font-black ${
+                  f.result === "Won"
+                    ? "bg-accent text-accent-foreground shadow-[0_0_8px_color-mix(in_oklab,var(--accent)_55%,transparent)]"
+                    : f.result === "Lost"
+                    ? "bg-danger/15 text-danger border border-danger/30"
+                    : "bg-surface-2 text-muted-foreground"
+                }`}
+              >
+                {f.result.charAt(0)}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
       {team.recentForm.length === 0 ? (
         <div className="text-xs text-muted-foreground">No recent matches.</div>
       ) : (
         <div className="space-y-1.5">
           {team.recentForm.slice(0, 5).map((f: any, i: number) => (
-            <div key={i} className="flex items-center justify-between text-xs">
-              <span className="flex items-center gap-2 min-w-0">
-                <span className={`inline-block w-5 text-center font-bold rounded ${f.result === "Won" ? "bg-accent text-accent-foreground" : f.result === "Lost" ? "bg-danger/20 text-danger" : "bg-surface-2 text-muted-foreground"}`}>
-                  {f.result.charAt(0)}
-                </span>
-                <span className="text-muted-foreground truncate">{f.summary}</span>
-              </span>
-              <span className="kbd font-semibold shrink-0">{f.score}</span>
+            <div key={i} className="flex items-center justify-between text-xs py-1 border-b border-border last:border-0">
+              <span className="text-muted-foreground truncate pr-2">{f.summary}</span>
+              <span className={`kbd font-bold shrink-0 ${f.result === "Won" ? "text-accent" : f.result === "Lost" ? "text-danger" : ""}`}>{f.score}</span>
             </div>
           ))}
         </div>
@@ -362,15 +379,17 @@ function InsightsTab({ insights, insightsError, home, away, tryscorers, kickoffU
           pick={insights.htft.pick}
           reasoning={insights.htft.reasoning}
         />
-        {insights.bettingAngles.map((a: any, i: number) => (
-          <PickCard
-            key={i}
-            icon={Sparkles}
-            market={a.market}
-            pick={a.pick}
-            reasoning={a.reasoning}
-          />
-        ))}
+        {insights.bettingAngles
+          .filter((a: any) => !/try\s*scorer|tryscorer|first\s*try|anytime\s*try/i.test(`${a.market} ${a.pick}`))
+          .map((a: any, i: number) => (
+            <PickCard
+              key={i}
+              icon={Sparkles}
+              market={a.market}
+              pick={a.pick}
+              reasoning={a.reasoning}
+            />
+          ))}
       </div>
 
       {/* Keys to victory — both teams */}
@@ -595,6 +614,31 @@ function ScriptTab({ insights, insightsError, home, away }:
       <Card title="X-factor" icon={Sparkles} className="accent-glow">
         <p className="text-sm leading-relaxed">{s.xFactor}</p>
       </Card>
+
+      {s.bookieScript && (
+        <Card title="Bookie script" icon={Coins}>
+          <p className="text-[11px] text-muted-foreground mb-4 italic">
+            How an Australian bookmaker is praying this game plays out — and the result that hurts their book.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="rounded-xl border border-accent/30 bg-accent/5 p-4">
+              <div className="inline-flex items-center gap-2 text-[10px] uppercase tracking-wider text-accent font-bold mb-2">
+                <ThumbsUp className="h-3.5 w-3.5" /> Bookies want
+              </div>
+              <p className="text-sm leading-relaxed">{s.bookieScript.wantToWin}</p>
+            </div>
+            <div className="rounded-xl border border-danger/30 bg-danger/5 p-4">
+              <div className="inline-flex items-center gap-2 text-[10px] uppercase tracking-wider text-danger font-bold mb-2">
+                <ThumbsDown className="h-3.5 w-3.5" /> Bookies fear
+              </div>
+              <p className="text-sm leading-relaxed">{s.bookieScript.wantToLose}</p>
+            </div>
+          </div>
+          <div className="mt-3 text-xs text-muted-foreground border-t border-border pt-3">
+            <span className="font-bold text-foreground">Liability: </span>{s.bookieScript.liability}
+          </div>
+        </Card>
+      )}
     </div>
   );
 }

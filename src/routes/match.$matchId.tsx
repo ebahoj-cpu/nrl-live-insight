@@ -2,10 +2,11 @@ import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useSuspenseQuery, queryOptions } from "@tanstack/react-query";
 import { getMatchPage } from "@/server/index.functions";
 import { TeamLogo } from "@/components/TeamLogo";
+import type { TryscorerMarkets, TryscorerOdds } from "@/server/odds";
 import { Suspense, useState } from "react";
 import {
   ArrowLeft, Clock, MapPin, Users, BarChart3, Sparkles, ScrollText,
-  Trophy, Target, Flag, Crown, TrendingUp, AlertCircle, CloudSun, Calendar, Zap,
+  Trophy, Target, Flag, Crown, TrendingUp, AlertCircle, CloudSun, Calendar, Zap, Hourglass,
 } from "lucide-react";
 
 const matchQO = (matchId: string) => queryOptions({
@@ -313,7 +314,8 @@ function Stat({ label, value, accent, danger }: { label: string; value: string; 
 
 /* ================= INSIGHTS TAB ================= */
 
-function InsightsTab({ insights, insightsError, home, away }: { insights: any; insightsError: string | null; home: string; away: string }) {
+function InsightsTab({ insights, insightsError, home, away, tryscorers, kickoffUtc }:
+  { insights: any; insightsError: string | null; home: string; away: string; tryscorers: TryscorerMarkets | null; kickoffUtc: string }) {
   if (insightsError) return <Empty msg={insightsError} />;
   if (!insights) return <Empty msg="Insights unavailable." />;
 
@@ -360,18 +362,6 @@ function InsightsTab({ insights, insightsError, home, away }: { insights: any; i
           pick={insights.htft.pick}
           reasoning={insights.htft.reasoning}
         />
-        <PickCard
-          icon={Flag}
-          market="First tryscorer"
-          pick={insights.firstTryscorer.pick}
-          reasoning={insights.firstTryscorer.reasoning}
-        />
-        <PickCard
-          icon={Trophy}
-          market="Multi-tryscorer"
-          pick={insights.multiTryscorer.pick}
-          reasoning={insights.multiTryscorer.reasoning}
-        />
         {insights.bettingAngles.map((a: any, i: number) => (
           <PickCard
             key={i}
@@ -391,20 +381,14 @@ function InsightsTab({ insights, insightsError, home, away }: { insights: any; i
         </div>
       )}
 
-      {/* Anytime tryscorers */}
-      <Card title="Anytime tryscorers" icon={Flag}>
-        <ul className="space-y-3">
-          {insights.anytimeTryscorers.map((t: any, i: number) => (
-            <li key={i} className="flex gap-3">
-              <span className="kbd w-6 h-6 shrink-0 rounded-full bg-accent text-accent-foreground text-xs font-bold flex items-center justify-center">{i + 1}</span>
-              <div className="min-w-0">
-                <div className="font-semibold text-sm">{t.pick}</div>
-                <div className="text-xs text-muted-foreground mt-0.5">{t.reasoning}</div>
-              </div>
-            </li>
-          ))}
-        </ul>
-      </Card>
+      {/* Real bookie tryscorer odds, with placeholder until markets release */}
+      <TryscorersSection
+        tryscorers={tryscorers}
+        aiAnytime={insights.anytimeTryscorers}
+        aiFirst={insights.firstTryscorer}
+        aiMulti={insights.multiTryscorer}
+        kickoffUtc={kickoffUtc}
+      />
 
       {/* Key factors */}
       <Card title="Key factors" icon={TrendingUp}>
@@ -417,6 +401,130 @@ function InsightsTab({ insights, insightsError, home, away }: { insights: any; i
           ))}
         </ul>
       </Card>
+    </div>
+  );
+}
+
+function TryscorersSection({ tryscorers, aiAnytime, aiFirst, aiMulti, kickoffUtc }: {
+  tryscorers: TryscorerMarkets | null;
+  aiAnytime: { pick: string; reasoning: string }[];
+  aiFirst: { pick: string; reasoning: string };
+  aiMulti: { pick: string; reasoning: string };
+  kickoffUtc: string;
+}) {
+  const hasReal = tryscorers?.hasAny ?? false;
+
+  return (
+    <div className="space-y-4">
+      {/* Header strip showing live vs awaiting */}
+      <div className="glass p-3 flex items-center justify-between text-xs">
+        <div className="inline-flex items-center gap-2">
+          <Flag className="h-4 w-4 text-accent" />
+          <span className="font-bold uppercase tracking-wider">Tryscorer markets</span>
+        </div>
+        {hasReal ? (
+          <span className="inline-flex items-center gap-1.5 text-accent font-semibold">
+            <span className="h-1.5 w-1.5 rounded-full bg-accent animate-pulse" /> Live odds
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+            <Hourglass className="h-3.5 w-3.5" /> Awaiting team list
+          </span>
+        )}
+      </div>
+
+      {hasReal ? (
+        <>
+          {tryscorers!.first.length > 0 && (
+            <TryOddsCard
+              title="First tryscorer"
+              icon={Flag}
+              picks={tryscorers!.first.slice(0, 6)}
+              note="Best price across AU bookies. Higher decimal = longer odds."
+            />
+          )}
+          {tryscorers!.anytime.length > 0 && (
+            <TryOddsCard
+              title="Anytime tryscorer"
+              icon={Sparkles}
+              picks={tryscorers!.anytime.slice(0, 8)}
+              note="Strongest implied chances first."
+            />
+          )}
+          {tryscorers!.multi.length > 0 && (
+            <TryOddsCard
+              title="2+ tries (double / hat-trick)"
+              icon={Trophy}
+              picks={tryscorers!.multi.slice(0, 6)}
+              note="Outsider value plays — pair with form."
+            />
+          )}
+          {tryscorers!.lastUpdate && (
+            <p className="text-[11px] text-muted-foreground text-center">
+              Odds updated {new Date(tryscorers!.lastUpdate).toLocaleTimeString()}
+            </p>
+          )}
+        </>
+      ) : (
+        <Card title="Tryscorer odds — coming soon" icon={Hourglass}>
+          <p className="text-sm text-muted-foreground mb-4">
+            AU bookmakers release tryscorer markets once team lists are confirmed
+            (usually around <span className="font-semibold text-foreground">24 hours before kickoff</span>).
+            They&rsquo;ll appear here automatically as soon as they&rsquo;re live.
+          </p>
+          <p className="text-[11px] text-muted-foreground mb-4">
+            Kickoff: {new Date(kickoffUtc).toLocaleString()}
+          </p>
+
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">
+            Early AI lean (no markets yet)
+          </div>
+          <div className="space-y-3">
+            <PreviewRow label="First" pick={aiFirst.pick} reasoning={aiFirst.reasoning} />
+            <PreviewRow label="Multi" pick={aiMulti.pick} reasoning={aiMulti.reasoning} />
+            {aiAnytime.slice(0, 3).map((t, i) => (
+              <PreviewRow key={i} label={`#${i + 1}`} pick={t.pick} reasoning={t.reasoning} />
+            ))}
+          </div>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+function TryOddsCard({ title, icon, picks, note }: {
+  title: string;
+  icon: typeof Flag;
+  picks: TryscorerOdds[];
+  note: string;
+}) {
+  return (
+    <Card title={title} icon={icon}>
+      <ul className="divide-y divide-border">
+        {picks.map((p, i) => (
+          <li key={i} className="flex items-center gap-3 py-2.5 text-sm">
+            <span className="kbd w-5 text-center text-[11px] font-bold text-muted-foreground">{i + 1}</span>
+            <span className="flex-1 font-medium truncate">{p.player}</span>
+            <span className="text-[10px] text-muted-foreground hidden sm:inline">{p.book}</span>
+            <span className="kbd font-bold text-accent">${p.price.toFixed(2)}</span>
+          </li>
+        ))}
+      </ul>
+      <p className="text-[11px] text-muted-foreground mt-3">{note}</p>
+    </Card>
+  );
+}
+
+function PreviewRow({ label, pick, reasoning }: { label: string; pick: string; reasoning: string }) {
+  return (
+    <div className="flex gap-3">
+      <span className="kbd shrink-0 w-12 h-6 rounded-md bg-surface-2 text-[10px] font-bold text-muted-foreground flex items-center justify-center uppercase">
+        {label}
+      </span>
+      <div className="min-w-0">
+        <div className="font-semibold text-sm">{pick}</div>
+        <div className="text-xs text-muted-foreground mt-0.5">{reasoning}</div>
+      </div>
     </div>
   );
 }

@@ -193,8 +193,17 @@ export async function generateInsights(payload: {
                     items: { type: "string", description: "Notable milestone for player/coach/club" },
                   },
                   xFactor: { type: "string", description: "Single biggest swing factor" },
+                  bookieScript: {
+                    type: "object",
+                    properties: {
+                      wantToWin: { type: "string", description: "The result/outcome bookmakers want — public is on the other side, low liability" },
+                      wantToLose: { type: "string", description: "The result/outcome bookmakers fear — heavy public money, big payout exposure" },
+                      liability: { type: "string", description: "One-sentence summary of where the book is most exposed" },
+                    },
+                    required: ["wantToWin", "wantToLose", "liability"], additionalProperties: false,
+                  },
                 },
-                required: ["headToHead", "formAnalysis", "milestones", "xFactor"], additionalProperties: false,
+                required: ["headToHead", "formAnalysis", "milestones", "xFactor", "bookieScript"], additionalProperties: false,
               },
             },
             required: [

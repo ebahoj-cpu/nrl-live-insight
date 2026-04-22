@@ -120,7 +120,7 @@ export const getMatchPage = createServerFn({ method: "GET" })
       insightsError = e instanceof Error ? e.message : "AI insights unavailable";
     }
 
-    return { details: { ...details, weather }, odds, ladder, insights, insightsError, generatedAt: new Date().toISOString() };
+    return { details: { ...details, weather }, odds, tryscorers, ladder, insights, insightsError, generatedAt: new Date().toISOString() };
   });
 
 function currentSeason(): number {

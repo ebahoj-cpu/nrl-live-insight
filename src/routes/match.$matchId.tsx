@@ -378,15 +378,17 @@ function InsightsTab({ insights, insightsError, home, away, tryscorers, kickoffU
           pick={insights.htft.pick}
           reasoning={insights.htft.reasoning}
         />
-        {insights.bettingAngles.map((a: any, i: number) => (
-          <PickCard
-            key={i}
-            icon={Sparkles}
-            market={a.market}
-            pick={a.pick}
-            reasoning={a.reasoning}
-          />
-        ))}
+        {insights.bettingAngles
+          .filter((a: any) => !/try\s*scorer|tryscorer|first\s*try|anytime\s*try/i.test(`${a.market} ${a.pick}`))
+          .map((a: any, i: number) => (
+            <PickCard
+              key={i}
+              icon={Sparkles}
+              market={a.market}
+              pick={a.pick}
+              reasoning={a.reasoning}
+            />
+          ))}
       </div>
 
       {/* Keys to victory — both teams */}

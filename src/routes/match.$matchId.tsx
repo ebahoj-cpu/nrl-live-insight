@@ -614,6 +614,31 @@ function ScriptTab({ insights, insightsError, home, away }:
       <Card title="X-factor" icon={Sparkles} className="accent-glow">
         <p className="text-sm leading-relaxed">{s.xFactor}</p>
       </Card>
+
+      {s.bookieScript && (
+        <Card title="Bookie script" icon={Coins}>
+          <p className="text-[11px] text-muted-foreground mb-4 italic">
+            How an Australian bookmaker is praying this game plays out — and the result that hurts their book.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="rounded-xl border border-accent/30 bg-accent/5 p-4">
+              <div className="inline-flex items-center gap-2 text-[10px] uppercase tracking-wider text-accent font-bold mb-2">
+                <ThumbsUp className="h-3.5 w-3.5" /> Bookies want
+              </div>
+              <p className="text-sm leading-relaxed">{s.bookieScript.wantToWin}</p>
+            </div>
+            <div className="rounded-xl border border-danger/30 bg-danger/5 p-4">
+              <div className="inline-flex items-center gap-2 text-[10px] uppercase tracking-wider text-danger font-bold mb-2">
+                <ThumbsDown className="h-3.5 w-3.5" /> Bookies fear
+              </div>
+              <p className="text-sm leading-relaxed">{s.bookieScript.wantToLose}</p>
+            </div>
+          </div>
+          <div className="mt-3 text-xs text-muted-foreground border-t border-border pt-3">
+            <span className="font-bold text-foreground">Liability: </span>{s.bookieScript.liability}
+          </div>
+        </Card>
+      )}
     </div>
   );
 }

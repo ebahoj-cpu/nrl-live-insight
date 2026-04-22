@@ -28,6 +28,11 @@ export type Insights = {
     formAnalysis: string;
     milestones: string[];
     xFactor: string;
+    bookieScript: {
+      wantToWin: string;
+      wantToLose: string;
+      liability: string;
+    };
   };
 };
 

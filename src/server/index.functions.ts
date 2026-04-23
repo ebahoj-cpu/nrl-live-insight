@@ -3,9 +3,11 @@
 import { createServerFn } from "@tanstack/react-start";
 import { cached, TTL } from "./cache";
 import { fetchDraw, fetchLadder, fetchMatchDetails } from "./nrl";
-import { fetchNrlOdds, fetchEventOdds, fetchTryscorerOdds, type OddsEvent, type TryscorerMarkets } from "./odds";
+import { fetchNrlOdds, fetchTryscorerOdds, type OddsEvent, type TryscorerMarkets } from "./odds";
 import { generateInsights } from "./ai-insights";
 import { fetchVenueWeather, type WeatherSnapshot } from "./weather";
+import { buildStatsBundle, compareStats, type StatsBundle, type StatEdge } from "./stats";
+import { buildPlayerForms, type PlayerForm } from "./players";
 import { findTeam } from "@/lib/teams";
 
 // ---------- Fixtures + current round ----------
@@ -50,7 +52,7 @@ export const getOdds = createServerFn({ method: "GET" })
     return cached(`odds:nrl`, TTL.odds, () => fetchNrlOdds(), { bypass: data.refresh });
   });
 
-// ---------- Match details + odds + ladder + AI ----------
+// ---------- Match page (everything) ----------
 export const getMatchPage = createServerFn({ method: "GET" })
   .inputValidator((i: { matchId: string; refresh?: boolean }) => {
     if (!i?.matchId) throw new Error("matchId required");
@@ -72,7 +74,6 @@ export const getMatchPage = createServerFn({ method: "GET" })
       { bypass: data.refresh },
     );
 
-    // Match this fixture to an OddsEvent by team nicknames + kickoff date
     const homeNick = findTeam(details.homeTeam.nickName)?.nickname ?? details.homeTeam.nickName;
     const awayNick = findTeam(details.awayTeam.nickName)?.nickname ?? details.awayTeam.nickName;
     const odds: OddsEvent | null = allOdds.find((e) => {
@@ -80,18 +81,49 @@ export const getMatchPage = createServerFn({ method: "GET" })
       return (eh === homeNick && ea === awayNick) || (eh === awayNick && ea === homeNick);
     }) ?? null;
 
-    // Try-scorer markets — bookies release these once team lists drop (~24h pre-game).
-    // Cache short so it auto-fills as soon as bookies post lines.
+    // Tryscorer markets (~24h before kickoff)
     const tryscorers: TryscorerMarkets | null = odds
-      ? await cached(
-          `tryscorers:${odds.id}`,
-          TTL.odds,
-          () => fetchTryscorerOdds(odds.id),
-          { bypass: data.refresh },
-        ).catch(() => null)
+      ? await cached(`tryscorers:${odds.id}`, TTL.odds, () => fetchTryscorerOdds(odds.id), { bypass: data.refresh }).catch(() => null)
       : null;
 
-    // AI insights (cached per match for an hour)
+    // Per-game stats bundle from each team's recent played matches
+    const homeRecentUrls = (details.homeTeam.recentForm ?? []).map((f: any) => f.url).filter(Boolean);
+    const awayRecentUrls = (details.awayTeam.recentForm ?? []).map((f: any) => f.url).filter(Boolean);
+
+    let statsBundle: StatsBundle | null = null;
+    let statEdges: StatEdge[] = [];
+    let homePlayerForms: PlayerForm[] = [];
+    let awayPlayerForms: PlayerForm[] = [];
+
+    try {
+      statsBundle = await cached(
+        `statsbundle:${data.matchId}`,
+        TTL.match,
+        () => buildStatsBundle(details.homeTeam.nickName, homeRecentUrls, details.awayTeam.nickName, awayRecentUrls),
+        { bypass: data.refresh },
+      );
+      statEdges = compareStats(statsBundle.home, statsBundle.away);
+    } catch { /* stats optional */ }
+
+    try {
+      [homePlayerForms, awayPlayerForms] = await Promise.all([
+        buildPlayerForms(details.homeTeam.nickName, details.homeTeam.players, homeRecentUrls),
+        buildPlayerForms(details.awayTeam.nickName, details.awayTeam.players, awayRecentUrls),
+      ]);
+    } catch { /* player forms optional */ }
+
+    // Distill top 6 players per team for AI prompt
+    const topFor = (forms: PlayerForm[]) => forms
+      .filter((p) => p.appearances > 0)
+      .sort((a, b) => (b.avgRunMetres + b.avgTackles * 3 + b.avgTries * 50 + b.avgTryAssists * 30) -
+                      (a.avgRunMetres + a.avgTackles * 3 + a.avgTries * 50 + a.avgTryAssists * 30))
+      .slice(0, 6)
+      .map((p) => ({
+        name: `${p.firstName} ${p.lastName}`, position: p.position, trend: p.trend,
+        avgRunMetres: p.avgRunMetres, avgTackles: p.avgTackles, avgTries: p.avgTries,
+        avgTryAssists: p.avgTryAssists, roleNote: p.roleNote,
+      }));
+
     let insights: any = null; let insightsError: string | null = null;
     try {
       insights = await cached(
@@ -113,6 +145,9 @@ export const getMatchPage = createServerFn({ method: "GET" })
           })),
           oddsSummary: odds ? summariseOdds(odds, homeNick, awayNick) : "No live odds available",
           weatherSummary: weather ? `${weather.tempC}°C, ${weather.condition}, ${weather.windKph} km/h wind, ${weather.precipMm}mm rain (${weather.groundCondition} ground)` : "Weather unavailable",
+          statEdges: statEdges.map((e) => ({ field: e.field, homeAvg: e.homeAvg, awayAvg: e.awayAvg, edge: e.edge, framing: e.framing })),
+          homeTopPlayers: topFor(homePlayerForms),
+          awayTopPlayers: topFor(awayPlayerForms),
         }),
         { bypass: data.refresh },
       );
@@ -120,11 +155,17 @@ export const getMatchPage = createServerFn({ method: "GET" })
       insightsError = e instanceof Error ? e.message : "AI insights unavailable";
     }
 
-    return { details: { ...details, weather }, odds, tryscorers, ladder, insights, insightsError, generatedAt: new Date().toISOString() };
+    return {
+      details: { ...details, weather },
+      odds, tryscorers, ladder,
+      statsBundle, statEdges,
+      homePlayerForms, awayPlayerForms,
+      insights, insightsError,
+      generatedAt: new Date().toISOString(),
+    };
   });
 
 function currentSeason(): number {
-  // NRL season runs Mar–Oct. Use current calendar year.
   return new Date().getUTCFullYear();
 }
 
@@ -136,6 +177,14 @@ function summariseOdds(ev: OddsEvent, home: string, away: string): string {
     const h = h2h.outcomes.find((o) => findTeam(o.name)?.nickname === home);
     const a = h2h.outcomes.find((o) => findTeam(o.name)?.nickname === away);
     if (h && a) lines.push(`${b.title}: ${home} ${h.price} / ${away} ${a.price}`);
+  }
+  // Add spreads + totals for richer market signal
+  const first = ev.bookmakers[0];
+  if (first) {
+    const sp = first.markets.find((m) => m.key === "spreads");
+    const tot = first.markets.find((m) => m.key === "totals");
+    if (sp) lines.push(`spread: ${sp.outcomes.map((o) => `${o.name} ${o.point}`).join(" / ")}`);
+    if (tot) lines.push(`total: ${tot.outcomes[0]?.point ?? "?"}`);
   }
   return lines.join(" | ") || "Odds present but unparseable";
 }

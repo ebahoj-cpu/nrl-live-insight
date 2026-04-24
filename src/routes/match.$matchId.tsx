@@ -214,12 +214,58 @@ const POSITION_ORDER = [
   "Prop","Hooker","2nd Row","Lock","Interchange","Reserve",
 ];
 
-function LineupTab({ home, away }: { home: any; away: any }) {
+function LineupTab({ home, away, officials }: { home: any; away: any; officials: { position: string; firstName: string; lastName: string; headImage?: string }[] }) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <SquadPanel team={home} />
-      <SquadPanel team={away} />
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <SquadPanel team={home} />
+        <SquadPanel team={away} />
+      </div>
+      <OfficialsCard officials={officials} />
     </div>
+  );
+}
+
+function OfficialsCard({ officials }: { officials: { position: string; firstName: string; lastName: string; headImage?: string }[] }) {
+  if (!officials || officials.length === 0) {
+    return (
+      <Card title="Match officials" icon={Shield}>
+        <p className="text-xs text-muted-foreground">Officials not yet announced.</p>
+      </Card>
+    );
+  }
+  // Order: Referee, Senior Review Official (TMO/Bunker), Touch Judge, Pocket Referee, others
+  const order = ["Referee", "Senior Review Official", "Bunker Official", "Touch Judge", "Pocket Referee"];
+  const sorted = [...officials].sort((a, b) => {
+    const ai = order.findIndex((o) => a.position.toLowerCase().includes(o.toLowerCase()));
+    const bi = order.findIndex((o) => b.position.toLowerCase().includes(o.toLowerCase()));
+    return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+  });
+  return (
+    <Card title="Match officials" icon={Shield}>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+        {sorted.map((o, i) => {
+          const isTMO = /Senior Review|Bunker/i.test(o.position);
+          return (
+            <div key={i} className="bg-surface-2 rounded-lg p-3 flex items-center gap-3">
+              {o.headImage ? (
+                <img src={o.headImage} alt="" className="h-10 w-10 rounded-full object-cover bg-surface" loading="lazy" />
+              ) : (
+                <div className="h-10 w-10 rounded-full bg-surface flex items-center justify-center text-xs font-bold text-muted-foreground">
+                  {o.firstName.charAt(0)}{o.lastName.charAt(0)}
+                </div>
+              )}
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-semibold truncate">{o.firstName} {o.lastName}</div>
+                <div className={`text-[10px] uppercase tracking-wider truncate ${isTMO ? "text-accent font-bold" : "text-muted-foreground"}`}>
+                  {isTMO ? "TMO / Bunker" : o.position}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </Card>
   );
 }
 

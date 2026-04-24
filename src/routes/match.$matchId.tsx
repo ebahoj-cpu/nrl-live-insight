@@ -120,16 +120,17 @@ function MatchInner() {
       </section>
 
       {/* Tabs */}
-      <nav className="mt-6 grid grid-cols-4 gap-1 p-1 glass" role="tablist">
+      <nav className="mt-6 grid grid-cols-5 gap-1 p-1 glass" role="tablist">
         <TabButton active={tab === "lineup"} onClick={() => setTab("lineup")} icon={Users} label="Lineup" />
         <TabButton active={tab === "stats"} onClick={() => setTab("stats")} icon={BarChart3} label="Stats" />
         <TabButton active={tab === "insights"} onClick={() => setTab("insights")} icon={Sparkles} label="Insights" />
         <TabButton active={tab === "script"} onClick={() => setTab("script")} icon={ScrollText} label="Script" />
+        <TabButton active={tab === "bets"} onClick={() => setTab("bets")} icon={Wallet} label="Bets" />
       </nav>
 
       <div className="mt-6">
-        {tab === "lineup" && <LineupTab home={details.homeTeam} away={details.awayTeam} />}
-        {tab === "stats" && <StatsTab home={details.homeTeam} away={details.awayTeam} homeRow={homeRow} awayRow={awayRow} />}
+        {tab === "lineup" && <LineupTab home={details.homeTeam} away={details.awayTeam} officials={details.officials} />}
+        {tab === "stats" && <StatsTab home={details.homeTeam} away={details.awayTeam} homeRow={homeRow} awayRow={awayRow} statGroups={details.statGroups} />}
         {tab === "insights" && (
           <InsightsTab
             insights={insights}
@@ -145,6 +146,9 @@ function MatchInner() {
         )}
         {tab === "script" && (
           <ScriptTab insights={insights} insightsError={insightsError} home={details.homeTeam} away={details.awayTeam} />
+        )}
+        {tab === "bets" && (
+          <BetsTab insights={insights} insightsError={insightsError} />
         )}
       </div>
 

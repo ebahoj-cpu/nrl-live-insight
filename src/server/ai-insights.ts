@@ -11,6 +11,17 @@ export type BettingAngle = {
   confidence: number;
 };
 
+
+export type BetSuggestion = {
+  risk: "low" | "medium" | "high";
+  title: string;          // e.g. "Roosters -12.5 + Tedesco anytime tryscorer"
+  legs: string[];         // each leg of the multi
+  estimatedOdds: string;  // e.g. "$4.20"
+  stake: string;          // e.g. "$20"
+  potentialReturn: string;// e.g. "$84"
+  reasoning: string;      // why this combo
+};
+
 export type Insights = {
   predictedScore: { home: number; away: number };
   winner: { team: "home" | "away"; confidence: number; reasoning: string };
@@ -22,7 +33,7 @@ export type Insights = {
   multiTryscorer: { pick: string; reasoning: string; confidence: number };
   keysToVictory: { home: string[]; away: string[] };
   keyFactors: string[];
-  bettingAngles: BettingAngle[];
+  betSuggestions: BetSuggestion[];
   script: {
     headToHead: string;
     formAnalysis: string;

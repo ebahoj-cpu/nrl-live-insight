@@ -743,8 +743,21 @@ function ScriptTab({ insights, insightsError, home, away }:
       </Card>
 
       <Card title="Form analysis" icon={TrendingUp}>
-        <p className="text-sm leading-relaxed text-muted-foreground">{s.formAnalysis}</p>
+        <p className="text-sm leading-relaxed text-muted-foreground whitespace-pre-line">{s.formAnalysis}</p>
       </Card>
+
+      <Card title="X-factor" icon={Sparkles} className="accent-glow">
+        <p className="text-sm leading-relaxed">{s.xFactor}</p>
+      </Card>
+
+      {s.psychological && (
+        <Card title="Psychological" icon={Brain}>
+          <p className="text-[11px] text-muted-foreground mb-3 italic">
+            Ladder pressure · occasion · crowd · home/away mentality · stadium hoodoos.
+          </p>
+          <p className="text-sm leading-relaxed text-muted-foreground whitespace-pre-line">{s.psychological}</p>
+        </Card>
+      )}
 
       <Card title="Upcoming milestones" icon={Crown}>
         <ul className="space-y-3">
@@ -755,10 +768,6 @@ function ScriptTab({ insights, insightsError, home, away }:
             </li>
           ))}
         </ul>
-      </Card>
-
-      <Card title="X-factor" icon={Sparkles} className="accent-glow">
-        <p className="text-sm leading-relaxed">{s.xFactor}</p>
       </Card>
 
       {s.bookieScript && (

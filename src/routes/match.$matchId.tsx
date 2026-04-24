@@ -246,18 +246,13 @@ function OfficialsCard({ officials }: { officials: { position: string; firstName
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
         {sorted.map((o, i) => {
           const isTMO = /Senior Review|Bunker/i.test(o.position);
+          const isRef = /^Referee$/i.test(o.position);
           return (
-            <div key={i} className="bg-surface-2 rounded-lg p-3 flex items-center gap-3">
-              {o.headImage ? (
-                <img src={o.headImage} alt="" className="h-10 w-10 rounded-full object-cover bg-surface" loading="lazy" />
-              ) : (
-                <div className="h-10 w-10 rounded-full bg-surface flex items-center justify-center text-xs font-bold text-muted-foreground">
-                  {o.firstName.charAt(0)}{o.lastName.charAt(0)}
-                </div>
-              )}
+            <div key={i} className={`bg-surface-2 rounded-lg p-3 flex items-center gap-3 ${isRef ? "ring-1 ring-accent/40" : ""}`}>
+              <OfficialAvatar src={o.headImage} firstName={o.firstName} lastName={o.lastName} size={isRef ? 56 : 44} />
               <div className="min-w-0 flex-1">
                 <div className="text-sm font-semibold truncate">{o.firstName} {o.lastName}</div>
-                <div className={`text-[10px] uppercase tracking-wider truncate ${isTMO ? "text-accent font-bold" : "text-muted-foreground"}`}>
+                <div className={`text-[10px] uppercase tracking-wider truncate ${isTMO ? "text-accent font-bold" : isRef ? "text-foreground font-bold" : "text-muted-foreground"}`}>
                   {isTMO ? "TMO / Bunker" : o.position}
                 </div>
               </div>
@@ -266,6 +261,30 @@ function OfficialsCard({ officials }: { officials: { position: string; firstName
         })}
       </div>
     </Card>
+  );
+}
+
+function OfficialAvatar({ src, firstName, lastName, size }: { src?: string; firstName: string; lastName: string; size: number }) {
+  const [err, setErr] = useState(false);
+  if (!src || err) {
+    return (
+      <div
+        className="rounded-full bg-surface flex items-center justify-center text-xs font-bold text-muted-foreground shrink-0"
+        style={{ width: size, height: size }}
+      >
+        {firstName.charAt(0)}{lastName.charAt(0)}
+      </div>
+    );
+  }
+  return (
+    <img
+      src={src}
+      alt={`${firstName} ${lastName}`}
+      onError={() => setErr(true)}
+      className="rounded-full object-cover bg-surface shrink-0"
+      style={{ width: size, height: size }}
+      loading="lazy"
+    />
   );
 }
 

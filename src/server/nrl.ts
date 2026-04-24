@@ -257,3 +257,59 @@ export async function fetchMatchDetails(matchId: string): Promise<NrlMatchDetail
     officials,
   };
 }
+
+// ---------- Past match recap (score + tryscorers) ----------
+export type NrlMatchRecap = {
+  url: string;
+  homeNick: string;
+  awayNick: string;
+  homeThemeKey: string;
+  awayThemeKey: string;
+  homeScore: number | null;
+  awayScore: number | null;
+  homeTryscorers: { name: string; count: number }[];
+  awayTryscorers: { name: string; count: number }[];
+};
+
+export async function fetchMatchRecap(matchUrl: string): Promise<NrlMatchRecap | null> {
+  // Accepts the public match URL ending with `/`. The JSON feed is `${url}data`.
+  const u = matchUrl.endsWith("/") ? matchUrl : `${matchUrl}/`;
+  const res = await fetch(`${u}data`, { headers: { "User-Agent": UA, "Accept": "application/json" } });
+  if (!res.ok) return null;
+  const d = await res.json() as any;
+  const ht = d.homeTeam ?? {};
+  const at = d.awayTeam ?? {};
+  // Build playerId -> name map across both squads
+  const idToName = new Map<number, string>();
+  for (const t of [ht, at]) {
+    for (const p of (t.players ?? [])) {
+      const id = p.playerId;
+      if (id != null) idToName.set(id, `${p.firstName ?? ""} ${p.lastName ?? ""}`.trim());
+    }
+  }
+  // playerId -> teamId from timeline tries
+  const tries: { playerId: number; teamId: number }[] = [];
+  for (const ev of (d.timeline ?? [])) {
+    if ((ev?.type ?? ev?.title) === "Try" && ev.playerId != null && ev.teamId != null) {
+      tries.push({ playerId: ev.playerId, teamId: ev.teamId });
+    }
+  }
+  const tally = (teamId: number) => {
+    const counts = new Map<number, number>();
+    for (const t of tries) if (t.teamId === teamId) counts.set(t.playerId, (counts.get(t.playerId) ?? 0) + 1);
+    return [...counts.entries()]
+      .map(([pid, count]) => ({ name: idToName.get(pid) ?? `#${pid}`, count }))
+      .sort((a, b) => b.count - a.count);
+  };
+  return {
+    url: matchUrl,
+    homeNick: ht.nickName ?? "",
+    awayNick: at.nickName ?? "",
+    homeThemeKey: ht.theme?.key ?? "",
+    awayThemeKey: at.theme?.key ?? "",
+    homeScore: ht.score ?? null,
+    awayScore: at.score ?? null,
+    homeTryscorers: tally(ht.teamId),
+    awayTryscorers: tally(at.teamId),
+  };
+}

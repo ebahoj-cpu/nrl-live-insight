@@ -469,6 +469,94 @@ function SeasonStats({ team, row }: { team: any; row?: any }) {
   );
 }
 
+function RecentRecapsCard({ home, away, homeRecaps, awayRecaps }: {
+  home: { nickName: string; themeKey: string };
+  away: { nickName: string; themeKey: string };
+  homeRecaps: any[];
+  awayRecaps: any[];
+}) {
+  const blocks: { teamName: string; teamThemeKey: string; recaps: any[] }[] = [
+    { teamName: home.nickName, teamThemeKey: home.themeKey, recaps: homeRecaps },
+    { teamName: away.nickName, teamThemeKey: away.themeKey, recaps: awayRecaps },
+  ];
+  return (
+    <Card title="Last 2 fixtures · scores & tryscorers" icon={Activity}>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {blocks.map((b, bi) => (
+          <div key={bi} className="bg-surface-2 rounded-xl p-3 space-y-3">
+            <div className="flex items-center gap-2 mb-1">
+              <TeamLogo themeKey={b.teamThemeKey} name={b.teamName} size={24} />
+              <div className="text-xs font-bold uppercase tracking-wider">{b.teamName}</div>
+            </div>
+            {b.recaps.length === 0 ? (
+              <div className="text-xs text-muted-foreground">Recap unavailable.</div>
+            ) : (
+              b.recaps.map((r: any, ri: number) => {
+                const isHome = r.homeNick?.toLowerCase().includes(b.teamName.toLowerCase());
+                const teamScore = isHome ? r.homeScore : r.awayScore;
+                const oppScore = isHome ? r.awayScore : r.homeScore;
+                const oppNick = isHome ? r.awayNick : r.homeNick;
+                const oppThemeKey = isHome ? r.awayThemeKey : r.homeThemeKey;
+                const teamTries = isHome ? r.homeTryscorers : r.awayTryscorers;
+                const oppTries = isHome ? r.awayTryscorers : r.homeTryscorers;
+                const won = (teamScore ?? 0) > (oppScore ?? 0);
+                const draw = teamScore != null && oppScore != null && teamScore === oppScore;
+                const resultBadge = draw ? "D" : won ? "W" : "L";
+                const resultCls = draw
+                  ? "bg-surface text-muted-foreground"
+                  : won
+                  ? "bg-accent text-accent-foreground"
+                  : "bg-danger/15 text-danger border border-danger/30";
+                return (
+                  <div key={ri} className="bg-surface rounded-lg p-3">
+                    <div className="flex items-center justify-between gap-3 mb-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className={`h-5 w-5 rounded flex items-center justify-center text-[10px] font-black shrink-0 ${resultCls}`}>{resultBadge}</span>
+                        <span className="text-[11px] uppercase tracking-wider text-muted-foreground truncate">vs</span>
+                        <TeamLogo themeKey={oppThemeKey} name={oppNick} size={18} />
+                        <span className="text-xs font-semibold truncate">{oppNick}</span>
+                      </div>
+                      <div className="kbd font-black text-sm shrink-0">
+                        <span className={won ? "text-accent" : draw ? "" : "text-danger"}>{teamScore ?? "-"}</span>
+                        <span className="text-muted-foreground">–</span>
+                        <span>{oppScore ?? "-"}</span>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <TryscorerList label={b.teamName} tries={teamTries ?? []} accent />
+                      <TryscorerList label={oppNick} tries={oppTries ?? []} />
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+function TryscorerList({ label, tries, accent }: { label: string; tries: { name: string; count: number }[]; accent?: boolean }) {
+  return (
+    <div>
+      <div className={`text-[9px] uppercase tracking-wider mb-1 truncate ${accent ? "text-accent font-bold" : "text-muted-foreground"}`}>{label}</div>
+      {tries.length === 0 ? (
+        <div className="text-[11px] text-muted-foreground">No tries</div>
+      ) : (
+        <ul className="space-y-0.5">
+          {tries.map((t, i) => (
+            <li key={i} className="text-[11px] flex items-center justify-between gap-1">
+              <span className="truncate">{t.name}</span>
+              {t.count > 1 && <span className="kbd text-[9px] px-1 text-accent shrink-0">×{t.count}</span>}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 function Stat({ label, value, accent, danger }: { label: string; value: string; accent?: boolean; danger?: boolean }) {
   return (
     <div className="bg-surface-2 rounded-lg p-2 text-center">

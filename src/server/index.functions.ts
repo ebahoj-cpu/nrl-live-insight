@@ -113,9 +113,11 @@ export const getMatchPage = createServerFn({ method: "GET" })
     const homeNick = findTeam(details.homeTeam.nickName)?.nickname ?? details.homeTeam.nickName;
     const awayNick = findTeam(details.awayTeam.nickName)?.nickname ?? details.awayTeam.nickName;
 
-    const [oddsResult, weather] = await Promise.all([
+    const [oddsResult, weather, homeRecaps, awayRecaps] = await Promise.all([
       safeOdds(data.refresh),
       safeWeather(data.matchId, details.venue, details.venueCity, details.kickoffUtc, data.refresh),
+      safeRecaps(details.homeTeam.recentForm, data.refresh),
+      safeRecaps(details.awayTeam.recentForm, data.refresh),
     ]);
 
     const odds: OddsEvent | null = oddsResult.data.find((e) => {
@@ -173,6 +175,7 @@ export const getMatchPage = createServerFn({ method: "GET" })
       ladder,
       insights,
       insightsError,
+      recentRecaps: { home: homeRecaps, away: awayRecaps },
       generatedAt: new Date().toISOString(),
     };
   });

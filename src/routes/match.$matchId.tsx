@@ -343,6 +343,12 @@ function InsightsTab({ insights, insightsError, home, away, tryscorers, tryscore
 
   return (
     <div className="space-y-4">
+      {(oddsError || oddsStale) && (
+        <div className="glass p-3 text-xs text-muted-foreground inline-flex items-center gap-2 w-full">
+          <AlertCircle className="h-3.5 w-3.5 text-accent" />
+          {oddsStale ? "Showing last cached odds — live feed temporarily unavailable." : "Live odds temporarily unavailable. Insights still based on form & ladder."}
+        </div>
+      )}
       {/* Predicted result hero */}
       <Card title="Predicted result" icon={Sparkles} className="accent-glow">
         <div className="grid grid-cols-3 gap-4 items-center">

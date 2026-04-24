@@ -40,8 +40,8 @@ async function safeTryscorers(eventId: string, refresh?: boolean): Promise<{ dat
     return { data, error: null };
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Tryscorer odds unavailable";
-    const cached = lastGoodTryscorers.get(eventId);
-    if (cached) return { data: cached.data, error: msg };
+    const prev = lastGoodTryscorers.get(eventId);
+    if (prev) return { data: prev.data, error: msg };
     return { data: null, error: msg };
   }
 }

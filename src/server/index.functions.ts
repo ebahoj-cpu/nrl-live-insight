@@ -1,4 +1,12 @@
 // All server functions exposed to the client. Server-only secrets stay here.
+//
+// FAILSAFE ARCHITECTURE: External services are split by tier.
+//   Tier 1 (REQUIRED): NRL.com fixtures, ladder, match details. If these fail,
+//     the page can't render and we surface the error.
+//   Tier 2 (OPTIONAL): Odds, tryscorer markets, AI insights, weather. Each is
+//     wrapped so a failure NEVER throws — we return null + a per-service error
+//     string the UI can render as a soft warning. Last-good snapshots are kept
+//     in memory so we degrade to cached data instead of empty state.
 
 import { createServerFn } from "@tanstack/react-start";
 import { cached, TTL } from "./cache";
@@ -7,6 +15,44 @@ import { fetchNrlOdds, fetchEventOdds, fetchTryscorerOdds, type OddsEvent, type 
 import { generateInsights } from "./ai-insights";
 import { fetchVenueWeather, type WeatherSnapshot } from "./weather";
 import { findTeam } from "@/lib/teams";
+
+// ---------- Last-good snapshots (graceful degradation) ----------
+// Survive across requests within a worker; replaced only on success.
+let lastGoodOdds: { at: number; data: OddsEvent[] } | null = null;
+const lastGoodTryscorers = new Map<string, { at: number; data: TryscorerMarkets }>();
+
+async function safeOdds(refresh?: boolean): Promise<{ data: OddsEvent[]; error: string | null; stale: boolean }> {
+  try {
+    const data = await cached(`odds:nrl`, TTL.odds, () => fetchNrlOdds(), { bypass: refresh });
+    lastGoodOdds = { at: Date.now(), data };
+    return { data, error: null, stale: false };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Odds unavailable";
+    if (lastGoodOdds) return { data: lastGoodOdds.data, error: msg, stale: true };
+    return { data: [], error: msg, stale: false };
+  }
+}
+
+async function safeTryscorers(eventId: string, refresh?: boolean): Promise<{ data: TryscorerMarkets | null; error: string | null }> {
+  try {
+    const data = await cached(`tryscorers:${eventId}`, TTL.odds, () => fetchTryscorerOdds(eventId), { bypass: refresh });
+    lastGoodTryscorers.set(eventId, { at: Date.now(), data });
+    return { data, error: null };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Tryscorer odds unavailable";
+    const cached = lastGoodTryscorers.get(eventId);
+    if (cached) return { data: cached.data, error: msg };
+    return { data: null, error: msg };
+  }
+}
+
+async function safeWeather(matchId: string, venue: string, city: string, kickoffUtc: string, refresh?: boolean): Promise<WeatherSnapshot | null> {
+  try {
+    return await cached(`weather:${matchId}`, TTL.weather, () => fetchVenueWeather(venue, city, kickoffUtc), { bypass: refresh });
+  } catch {
+    return null;
+  }
+}
 
 // ---------- Fixtures + current round ----------
 export const getCurrentRoundFixtures = createServerFn({ method: "GET" })
@@ -21,12 +67,7 @@ export const getCurrentRoundFixtures = createServerFn({ method: "GET" })
         const currentRound = all.find((f) => f.isCurrentRound)?.roundNumber ?? all[0]?.roundNumber ?? 1;
         const fixtures = all.filter((f) => f.roundNumber === currentRound);
         const enriched = await Promise.all(fixtures.map(async (f) => {
-          const weather = await cached(
-            `weather:${f.matchId}`,
-            TTL.weather,
-            () => fetchVenueWeather(f.venue, f.venueCity, f.kickoffUtc),
-            { bypass: data.refresh },
-          );
+          const weather = await safeWeather(f.matchId, f.venue, f.venueCity, f.kickoffUtc, data.refresh);
           return { ...f, weather };
         }));
         return { season, round: currentRound, fixtures: enriched };
@@ -43,14 +84,17 @@ export const getLadder = createServerFn({ method: "GET" })
     return cached(`ladder:${season}`, TTL.ladder, () => fetchLadder(season), { bypass: data.refresh });
   });
 
-// ---------- Live odds ----------
+// ---------- Live odds (NEVER throws — Tier 2) ----------
 export const getOdds = createServerFn({ method: "GET" })
   .inputValidator((i: { refresh?: boolean } | undefined) => i ?? {})
   .handler(async ({ data }) => {
-    return cached(`odds:nrl`, TTL.odds, () => fetchNrlOdds(), { bypass: data.refresh });
+    const result = await safeOdds(data.refresh);
+    return result.data; // empty array if unavailable; UI handles gracefully
   });
 
 // ---------- Match details + odds + ladder + AI ----------
+// Tier 1 (must succeed): match details, ladder.
+// Tier 2 (optional, never throws): odds, tryscorers, weather, AI insights.
 export const getMatchPage = createServerFn({ method: "GET" })
   .inputValidator((i: { matchId: string; refresh?: boolean }) => {
     if (!i?.matchId) throw new Error("matchId required");
@@ -59,39 +103,38 @@ export const getMatchPage = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     const season = currentSeason();
 
-    const [details, ladder, allOdds] = await Promise.all([
+    // ----- Tier 1 (parallel, throws if either fails) -----
+    const [details, ladder] = await Promise.all([
       cached(`match:${data.matchId}`, TTL.match, () => fetchMatchDetails(data.matchId), { bypass: data.refresh }),
       cached(`ladder:${season}`, TTL.ladder, () => fetchLadder(season), { bypass: data.refresh }),
-      cached(`odds:nrl`, TTL.odds, () => fetchNrlOdds(), { bypass: data.refresh }),
     ]);
 
-    const weather: WeatherSnapshot | null = await cached(
-      `weather:${data.matchId}`,
-      TTL.weather,
-      () => fetchVenueWeather(details.venue, details.venueCity, details.kickoffUtc),
-      { bypass: data.refresh },
-    );
-
-    // Match this fixture to an OddsEvent by team nicknames + kickoff date
+    // ----- Tier 2 (parallel, each isolated — never blocks the page) -----
     const homeNick = findTeam(details.homeTeam.nickName)?.nickname ?? details.homeTeam.nickName;
     const awayNick = findTeam(details.awayTeam.nickName)?.nickname ?? details.awayTeam.nickName;
-    const odds: OddsEvent | null = allOdds.find((e) => {
+
+    const [oddsResult, weather] = await Promise.all([
+      safeOdds(data.refresh),
+      safeWeather(data.matchId, details.venue, details.venueCity, details.kickoffUtc, data.refresh),
+    ]);
+
+    const odds: OddsEvent | null = oddsResult.data.find((e) => {
       const eh = e.homeNickname; const ea = e.awayNickname;
       return (eh === homeNick && ea === awayNick) || (eh === awayNick && ea === homeNick);
     }) ?? null;
+    const oddsError = oddsResult.error;
+    const oddsStale = oddsResult.stale;
 
-    // Try-scorer markets — bookies release these once team lists drop (~24h pre-game).
-    // Cache short so it auto-fills as soon as bookies post lines.
-    const tryscorers: TryscorerMarkets | null = odds
-      ? await cached(
-          `tryscorers:${odds.id}`,
-          TTL.odds,
-          () => fetchTryscorerOdds(odds.id),
-          { bypass: data.refresh },
-        ).catch(() => null)
-      : null;
+    // Tryscorer markets — only attempt if we have an odds event matched.
+    let tryscorers: TryscorerMarkets | null = null;
+    let tryscorersError: string | null = null;
+    if (odds) {
+      const r = await safeTryscorers(odds.id, data.refresh);
+      tryscorers = r.data;
+      tryscorersError = r.error;
+    }
 
-    // AI insights (cached per match for an hour)
+    // AI insights (cached per match for an hour) — never blocks.
     let insights: any = null; let insightsError: string | null = null;
     try {
       insights = await cached(
@@ -120,7 +163,18 @@ export const getMatchPage = createServerFn({ method: "GET" })
       insightsError = e instanceof Error ? e.message : "AI insights unavailable";
     }
 
-    return { details: { ...details, weather }, odds, tryscorers, ladder, insights, insightsError, generatedAt: new Date().toISOString() };
+    return {
+      details: { ...details, weather },
+      odds,
+      oddsError,
+      oddsStale,
+      tryscorers,
+      tryscorersError,
+      ladder,
+      insights,
+      insightsError,
+      generatedAt: new Date().toISOString(),
+    };
   });
 
 function currentSeason(): number {

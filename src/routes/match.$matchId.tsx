@@ -26,8 +26,11 @@ export const Route = createFileRoute("/match/$matchId")({
     const router = useRouter();
     return (
       <div className="py-16 text-center">
-        <p className="text-danger font-semibold">Match data unavailable</p>
-        <p className="mt-2 text-sm text-muted-foreground">{error.message}</p>
+        <p className="text-danger font-semibold">Couldn't load match details</p>
+        <p className="mt-2 text-sm text-muted-foreground max-w-md mx-auto">
+          The NRL fixture feed didn't respond. This is usually temporary — try again in a moment.
+        </p>
+        <p className="mt-2 text-[11px] text-muted-foreground">{error.message}</p>
         <button onClick={() => router.invalidate()} className="mt-4 px-4 py-2 bg-accent text-accent-foreground rounded-full font-semibold">
           Retry
         </button>

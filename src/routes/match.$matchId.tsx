@@ -7,7 +7,7 @@ import { Suspense, useState } from "react";
 import {
   ArrowLeft, Clock, MapPin, Users, BarChart3, Sparkles, ScrollText,
   Trophy, Target, Flag, Crown, TrendingUp, AlertCircle, CloudSun, Calendar, Zap, Hourglass,
-  Coins, ThumbsUp, ThumbsDown, Wallet, Activity, Shield,
+  Coins, ThumbsUp, ThumbsDown, Wallet, Activity, Shield, Brain,
 } from "lucide-react";
 
 const matchQO = (matchId: string) => queryOptions({

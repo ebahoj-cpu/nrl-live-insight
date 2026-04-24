@@ -54,6 +54,18 @@ async function safeWeather(matchId: string, venue: string, city: string, kickoff
   }
 }
 
+async function safeRecaps(recentForm: { url?: string }[], refresh?: boolean): Promise<NrlMatchRecap[]> {
+  const urls = recentForm.map((r) => r.url).filter((u): u is string => !!u).slice(0, 2);
+  const results = await Promise.all(urls.map(async (u) => {
+    try {
+      return await cached(`recap:${u}`, TTL.match, () => fetchMatchRecap(u), { bypass: refresh });
+    } catch {
+      return null;
+    }
+  }));
+  return results.filter((r): r is NrlMatchRecap => !!r);
+}
+
 // ---------- Fixtures + current round ----------
 export const getCurrentRoundFixtures = createServerFn({ method: "GET" })
   .inputValidator((i: { refresh?: boolean } | undefined) => i ?? {})

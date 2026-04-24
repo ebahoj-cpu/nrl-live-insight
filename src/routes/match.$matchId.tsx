@@ -804,19 +804,20 @@ function BetsTab({ insights, insightsError }: { insights: any; insightsError: st
   if (insightsError && !insights) return <Empty msg={insightsError} />;
   if (!insights?.betSuggestions?.length) return <Empty msg="Bet suggestions unavailable." />;
 
-  const riskMeta: Record<string, { label: string; cls: string; desc: string }> = {
-    low: { label: "Low risk", cls: "border-accent/40 bg-accent/5", desc: "Safer combo, modest return" },
-    medium: { label: "Medium risk", cls: "border-yellow-500/40 bg-yellow-500/5", desc: "Balanced risk vs reward" },
-    high: { label: "High risk", cls: "border-danger/40 bg-danger/5", desc: "Long shot — biggest payout" },
+  const riskMeta: Record<string, { label: string; cls: string; desc: string; payout: string }> = {
+    low:    { label: "Low risk",    cls: "border-accent/40 bg-accent/5",        desc: "Safer combo, modest return",       payout: "$100" },
+    medium: { label: "Medium risk", cls: "border-yellow-500/40 bg-yellow-500/5", desc: "Balanced risk vs reward",           payout: "$1,000" },
+    high:   { label: "High risk",   cls: "border-danger/40 bg-danger/5",        desc: "Long shot — biggest payout",        payout: "$10,000" },
   };
+
+  const tierOrder: Record<string, number> = { low: 0, medium: 1, high: 2 };
+  const sorted = [...insights.betSuggestions].sort((a: any, b: any) => (tierOrder[a.risk] ?? 99) - (tierOrder[b.risk] ?? 99));
 
   return (
     <div className="space-y-4">
-      <div className="glass p-4 text-xs text-muted-foreground">
-        AI-generated suggestions based on form, ladder, home/away splits and live odds. Always bet responsibly · 18+
-      </div>
-      {insights.betSuggestions.map((b: any, i: number) => {
+      {sorted.map((b: any, i: number) => {
         const meta = riskMeta[b.risk] ?? riskMeta.medium;
+        const target = b.targetPayout ? `$${Number(b.targetPayout).toLocaleString()}` : meta.payout;
         return (
           <div key={i} className={`glass p-5 border-2 ${meta.cls}`}>
             <div className="flex items-center justify-between mb-3 gap-3">
@@ -824,7 +825,10 @@ function BetsTab({ insights, insightsError }: { insights: any; insightsError: st
                 <div className="text-[10px] uppercase tracking-widest font-bold text-accent">{meta.label}</div>
                 <div className="text-[11px] text-muted-foreground">{meta.desc}</div>
               </div>
-              <Wallet className="h-5 w-5 text-accent shrink-0" />
+              <div className="flex flex-col items-end">
+                <div className="text-[9px] uppercase tracking-wider text-muted-foreground">Target payout</div>
+                <div className="kbd text-base font-black text-accent leading-none">{target}</div>
+              </div>
             </div>
 
             <h3 className="font-bold text-base mb-3">{b.title}</h3>

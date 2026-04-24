@@ -39,7 +39,7 @@ export const Route = createFileRoute("/match/$matchId")({
   },
 });
 
-type TabKey = "lineup" | "stats" | "insights" | "script";
+type TabKey = "lineup" | "stats" | "insights" | "script" | "bets";
 
 function MatchPage() {
   return (
@@ -66,11 +66,30 @@ function MatchInner() {
 
       {/* Header */}
       <section className="glass p-6 sm:p-8">
-        <div className="text-[11px] uppercase tracking-widest text-accent font-bold">Round {details.roundNumber}</div>
+        <div className="flex items-center justify-between gap-3">
+          <div className="text-[11px] uppercase tracking-widest text-accent font-bold">Round {details.roundNumber}</div>
+          {(() => {
+            const hs = details.homeTeam.score;
+            const as = details.awayTeam.score;
+            const finished = typeof hs === "number" && typeof as === "number" && /^(FullTime|Final|Completed)$/i.test(details.matchState);
+            const live = typeof hs === "number" && typeof as === "number" && /^(InProgress|Live|HalfTime)$/i.test(details.matchState);
+            if (finished) return <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-md bg-surface-2 text-muted-foreground">Full Time</span>;
+            if (live) return <span className="inline-flex items-center gap-1 text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-md bg-danger/15 text-danger"><span className="h-1.5 w-1.5 rounded-full bg-danger animate-pulse" />Live</span>;
+            return null;
+          })()}
+        </div>
         <div className="grid grid-cols-3 items-center mt-4 gap-4">
           <TeamColumn name={details.homeTeam.nickName} themeKey={details.homeTeam.themeKey} position={details.homeTeam.position} />
           <div className="text-center">
-            <div className="text-2xl sm:text-3xl font-extrabold">vs</div>
+            {(typeof details.homeTeam.score === "number" && typeof details.awayTeam.score === "number") ? (
+              <div className="kbd flex items-center justify-center gap-3">
+                <span className={`text-4xl sm:text-5xl font-black tabular-nums ${details.homeTeam.score > details.awayTeam.score ? "text-accent" : ""}`}>{details.homeTeam.score}</span>
+                <span className="text-muted-foreground text-lg font-bold">–</span>
+                <span className={`text-4xl sm:text-5xl font-black tabular-nums ${details.awayTeam.score > details.homeTeam.score ? "text-accent" : ""}`}>{details.awayTeam.score}</span>
+              </div>
+            ) : (
+              <div className="text-2xl sm:text-3xl font-extrabold">vs</div>
+            )}
           </div>
           <TeamColumn name={details.awayTeam.nickName} themeKey={details.awayTeam.themeKey} position={details.awayTeam.position} />
         </div>

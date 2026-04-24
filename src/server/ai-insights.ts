@@ -179,19 +179,23 @@ export async function generateInsights(payload: {
                 required: ["home", "away"], additionalProperties: false,
               },
               keyFactors: { type: "array", items: { type: "string" }, minItems: 3, maxItems: 6 },
-              bettingAngles: {
+              betSuggestions: {
                 type: "array",
+                minItems: 3, maxItems: 3,
                 items: {
                   type: "object",
                   properties: {
-                    market: { type: "string" },
-                    pick: { type: "string" },
-                    reasoning: { type: "string" },
-                    confidence: { type: "number", minimum: 0, maximum: 100 },
+                    risk: { type: "string", enum: ["low", "medium", "high"] },
+                    title: { type: "string", description: "Short headline of the multi" },
+                    legs: { type: "array", minItems: 2, maxItems: 4, items: { type: "string", description: "One leg of the multi, e.g. 'Roosters to win', 'Tedesco anytime tryscorer'" } },
+                    estimatedOdds: { type: "string", description: "Combined decimal odds, e.g. '$4.20'" },
+                    stake: { type: "string", description: "Suggested stake, e.g. '$20'" },
+                    potentialReturn: { type: "string", description: "Estimated total return on stake, e.g. '$84'" },
+                    reasoning: { type: "string", description: "Why this combo wins — 1-2 sentences" },
                   },
-                  required: ["market", "pick", "reasoning", "confidence"], additionalProperties: false,
+                  required: ["risk", "title", "legs", "estimatedOdds", "stake", "potentialReturn", "reasoning"],
+                  additionalProperties: false,
                 },
-                minItems: 2, maxItems: 4,
               },
               script: {
                 type: "object",
@@ -220,7 +224,7 @@ export async function generateInsights(payload: {
             required: [
               "predictedScore","winner","margin","total","htft",
               "firstTryscorer","anytimeTryscorers","multiTryscorer",
-              "keysToVictory","keyFactors","bettingAngles","script",
+              "keysToVictory","keyFactors","betSuggestions","script",
             ],
             additionalProperties: false,
           },

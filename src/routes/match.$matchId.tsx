@@ -26,8 +26,11 @@ export const Route = createFileRoute("/match/$matchId")({
     const router = useRouter();
     return (
       <div className="py-16 text-center">
-        <p className="text-danger font-semibold">Match data unavailable</p>
-        <p className="mt-2 text-sm text-muted-foreground">{error.message}</p>
+        <p className="text-danger font-semibold">Couldn't load match details</p>
+        <p className="mt-2 text-sm text-muted-foreground max-w-md mx-auto">
+          The NRL fixture feed didn't respond. This is usually temporary — try again in a moment.
+        </p>
+        <p className="mt-2 text-[11px] text-muted-foreground">{error.message}</p>
         <button onClick={() => router.invalidate()} className="mt-4 px-4 py-2 bg-accent text-accent-foreground rounded-full font-semibold">
           Retry
         </button>
@@ -49,7 +52,7 @@ function MatchPage() {
 function MatchInner() {
   const { matchId } = Route.useParams();
   const { data } = useSuspenseQuery(matchQO(matchId));
-  const { details, ladder, insights, insightsError, tryscorers } = data;
+  const { details, ladder, insights, insightsError, tryscorers, oddsError, oddsStale, tryscorersError } = data;
   const [tab, setTab] = useState<TabKey>("lineup");
 
   const homeRow = ladder.find((r) => r.nickname === details.homeTeam.nickName);
@@ -115,6 +118,9 @@ function MatchInner() {
             home={details.homeTeam.nickName}
             away={details.awayTeam.nickName}
             tryscorers={tryscorers}
+            tryscorersError={tryscorersError}
+            oddsError={oddsError}
+            oddsStale={oddsStale}
             kickoffUtc={details.kickoffUtc}
           />
         )}
@@ -331,15 +337,21 @@ function Stat({ label, value, accent, danger }: { label: string; value: string; 
 
 /* ================= INSIGHTS TAB ================= */
 
-function InsightsTab({ insights, insightsError, home, away, tryscorers, kickoffUtc }:
-  { insights: any; insightsError: string | null; home: string; away: string; tryscorers: TryscorerMarkets | null; kickoffUtc: string }) {
-  if (insightsError) return <Empty msg={insightsError} />;
+function InsightsTab({ insights, insightsError, home, away, tryscorers, tryscorersError, oddsError, oddsStale, kickoffUtc }:
+  { insights: any; insightsError: string | null; home: string; away: string; tryscorers: TryscorerMarkets | null; tryscorersError: string | null; oddsError: string | null; oddsStale: boolean; kickoffUtc: string }) {
+  if (insightsError && !insights) return <Empty msg={insightsError} />;
   if (!insights) return <Empty msg="Insights unavailable." />;
 
   const winnerName = insights.winner.team === "home" ? home : away;
 
   return (
     <div className="space-y-4">
+      {(oddsError || oddsStale) && (
+        <div className="glass p-3 text-xs text-muted-foreground inline-flex items-center gap-2 w-full">
+          <AlertCircle className="h-3.5 w-3.5 text-accent" />
+          {oddsStale ? "Showing last cached odds — live feed temporarily unavailable." : "Live odds temporarily unavailable. Insights still based on form & ladder."}
+        </div>
+      )}
       {/* Predicted result hero */}
       <Card title="Predicted result" icon={Sparkles} className="accent-glow">
         <div className="grid grid-cols-3 gap-4 items-center">

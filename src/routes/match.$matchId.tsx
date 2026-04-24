@@ -279,7 +279,7 @@ function SeasonStats({ team, row }: { team: any; row?: any }) {
           <Stat label="Diff" value={fmtSigned(row.diff)} accent={row.diff > 0} danger={row.diff < 0} />
         </div>
       ) : (
-        <div className="text-xs text-muted-foreground mb-4">Ladder data unavailable.</div>
+        <div className="text-xs text-muted-foreground mb-4">No 2026 ladder data yet.</div>
       )}
 
       <div className="flex items-center justify-between mb-3">

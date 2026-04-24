@@ -10,7 +10,7 @@
 
 import { createServerFn } from "@tanstack/react-start";
 import { cached, TTL } from "./cache";
-import { fetchDraw, fetchLadder, fetchMatchDetails } from "./nrl";
+import { fetchDraw, fetchLadder, fetchMatchDetails, fetchMatchRecap, type NrlMatchRecap } from "./nrl";
 import { fetchNrlOdds, fetchEventOdds, fetchTryscorerOdds, type OddsEvent, type TryscorerMarkets } from "./odds";
 import { generateInsights } from "./ai-insights";
 import { fetchVenueWeather, type WeatherSnapshot } from "./weather";
@@ -52,6 +52,18 @@ async function safeWeather(matchId: string, venue: string, city: string, kickoff
   } catch {
     return null;
   }
+}
+
+async function safeRecaps(recentForm: { url?: string }[], refresh?: boolean): Promise<NrlMatchRecap[]> {
+  const urls = recentForm.map((r) => r.url).filter((u): u is string => !!u).slice(0, 2);
+  const results = await Promise.all(urls.map(async (u) => {
+    try {
+      return await cached(`recap:${u}`, TTL.match, () => fetchMatchRecap(u), { bypass: refresh });
+    } catch {
+      return null;
+    }
+  }));
+  return results.filter((r): r is NrlMatchRecap => !!r);
 }
 
 // ---------- Fixtures + current round ----------
@@ -113,9 +125,11 @@ export const getMatchPage = createServerFn({ method: "GET" })
     const homeNick = findTeam(details.homeTeam.nickName)?.nickname ?? details.homeTeam.nickName;
     const awayNick = findTeam(details.awayTeam.nickName)?.nickname ?? details.awayTeam.nickName;
 
-    const [oddsResult, weather] = await Promise.all([
+    const [oddsResult, weather, homeRecaps, awayRecaps] = await Promise.all([
       safeOdds(data.refresh),
       safeWeather(data.matchId, details.venue, details.venueCity, details.kickoffUtc, data.refresh),
+      safeRecaps(details.homeTeam.recentForm, data.refresh),
+      safeRecaps(details.awayTeam.recentForm, data.refresh),
     ]);
 
     const odds: OddsEvent | null = oddsResult.data.find((e) => {
@@ -173,6 +187,7 @@ export const getMatchPage = createServerFn({ method: "GET" })
       ladder,
       insights,
       insightsError,
+      recentRecaps: { home: homeRecaps, away: awayRecaps },
       generatedAt: new Date().toISOString(),
     };
   });

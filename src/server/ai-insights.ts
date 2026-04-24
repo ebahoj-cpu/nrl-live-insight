@@ -19,7 +19,7 @@ export type BetSuggestion = {
   estimatedOdds: string;  // e.g. "$5.00"
   stake: string;          // e.g. "$20"
   potentialReturn: string;// e.g. "$100"
-  targetPayout: 100 | 1000 | 10000; // tier this bet is sized to deliver
+  targetPayout: "100" | "1000" | "10000"; // tier this bet is sized to deliver
   reasoning: string;      // why this combo
 };
 
@@ -223,7 +223,7 @@ CRITICAL betting rules:
                     estimatedOdds: { type: "string", description: "Combined decimal odds, e.g. '$5.00', '$50.00', '$500.00'" },
                     stake: { type: "string", description: "Suggested stake, usually $10–$50, e.g. '$20'" },
                     potentialReturn: { type: "string", description: "Estimated total return ≈ target payout tier, e.g. '$100', '$1,000', '$10,000'" },
-                    targetPayout: { type: "number", enum: [100, 1000, 10000], description: "Which payout tier this bet is sized for" },
+                    targetPayout: { type: "string", enum: ["100", "1000", "10000"], description: "Which payout tier this bet is sized for: '100', '1000', or '10000'" },
                     reasoning: { type: "string", description: "Why this combo wins — 1-2 sentences" },
                   },
                   required: ["risk", "title", "legs", "estimatedOdds", "stake", "potentialReturn", "targetPayout", "reasoning"],

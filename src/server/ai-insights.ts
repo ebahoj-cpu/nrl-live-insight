@@ -142,13 +142,15 @@ export async function generateInsights(payload: {
     payload.weatherSummary ? `Forecast at venue at kickoff: ${payload.weatherSummary}` : "",
     "",
     "Produce sharp, professional NRL match intelligence:",
-    "1. Winner / margin / total / HT-FT / first / anytime / multi tryscorer picks (use ONLY named-squad players).",
+    "1. Winner / margin / total / HT-FT / first / anytime / multi / first-second-third / double tryscorer picks. Use ONLY named-squad players. Tryscorer picks must reason about positioning, edge mismatches, defensive weaknesses and player role — NOT just pick the biggest names.",
     "2. 3 specific keys to victory per team — concrete tactical/structural points referencing real players, recent form, opposition weakness, or weather.",
-    "3. bettingIntelligence: 2-4 markets where data signal differs from market price. For each, state what the market is pricing, what the model thinks, and lean (value/fade/with_market/neutral). Avoid generic statements.",
-    "4. edgeNuggets: 3-5 high-impact bullets (late changes implied by squad, milestone games, momentum signals, revenge/narrative, travel, weather-driven tactics). Each has a short label, detail, and impact rating.",
-    "5. weatherImpact: how forecast affects style and which side benefits.",
-    "6. script: full game script — formNarrative (momentum vs decline), ladderContext (pressure / top 8 race), psychologicalFactors (3 bullets), matchStyleProjection (tempo / grind vs fast), statDrivenScript (3-5 if/then chains, e.g. 'If A wins early run-metres → territory → late scoring'), plus headToHead, milestones, xFactor and bookieScript (wantToWin / wantToLose / liability).",
-    "Avoid generic claims. Every insight must answer WHY it matters and HOW it impacts the result.",
+    "3. bettingIntelligence: 2-4 markets where data signal differs from market price. State market price, model view, lean (value/fade/with_market/neutral). Be specific.",
+    "4. edgeNuggets: 3-5 high-impact bullets (late changes, milestones, momentum, revenge, travel, weather). Label + detail + impact.",
+    "5. leftEdge AND rightEdge analysis: pick which team is more likely to attack that edge and which team is vulnerable on the opposite defensive edge. Name 2-4 attackers, 2-3 defenders being targeted, 1-3 tryscorer leans tied to that edge, attacking shape (shifts, overlaps, second-rower involvement, kicks in behind), and a 2-3 sentence script of how that edge unfolds.",
+    "6. tieredBets: exactly 3 multi bets — one low risk, one medium risk, one high risk. Each combines an anytime tryscorer + match result + total points line. Provide rationale.",
+    "7. weatherImpact: how forecast affects style and which side benefits.",
+    "8. script: full game script — formNarrative, ladderContext, psychologicalFactors, matchStyleProjection, statDrivenScript (3-5 if/then chains), headToHead, milestones, xFactor, bookieScript (wantToWin / wantToLose / liability).",
+    "Avoid generic claims. Every insight must answer WHY it matters and HOW it impacts the result. When picking tryscorers, lean on edge mismatch and positional matchup data.",
   ].filter(Boolean).join("\n");
 
   const res = await fetch(GATEWAY, {

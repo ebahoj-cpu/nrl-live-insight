@@ -82,7 +82,29 @@ export async function generateInsights(payload: {
     `Away recent form: ${payload.awayRecentForm.map((f) => `${f.result} ${f.summary} ${f.score}`).join("; ") || "n/a"}`,
     `Live AU bookie odds summary: ${payload.oddsSummary}`,
     payload.weatherSummary ? `Forecast at venue at kickoff: ${payload.weatherSummary}` : "",
-    `Provide a sharp, complete NRL betting analysis covering: winner, margin, HT/FT double, total points, first/anytime tryscorers, and multi-tryscorer angles. Also produce 3 specific "keys to victory" for EACH team (concrete tactical/structural points referencing real squad players, recent form, opposition weakness, or weather/ground impact). Plus a "script" — head-to-head context, form analysis, notable upcoming milestones, and a "bookie script": from a sharp Australian bookmaker's perspective, which result/outcome do they WANT to land (limits liability, public is on the other side), which result they want to AVOID (heavy public liability), and a one-sentence summary of where their book is most exposed. FINALLY, generate exactly 3 betSuggestions targeting low/medium/high risk. Each suggestion is a small multi (2-4 legs) combining real squad players, head-to-head winner, margin, totals or tryscorer markets that — based on the live odds shown — could plausibly return strong value on a $20 stake. Estimate the combined decimal odds and the potential return. Make them sharp, specific (e.g. "Roosters win + Tedesco anytime + 13+ Tupou tries"), and explain in 1-2 sentences why each combo wins. NEVER invent players — only use named squad members above.`,
+    `Provide a sharp, complete NRL betting analysis covering: winner, margin, HT/FT double, total points, first/anytime tryscorers, and multi-tryscorer angles. Also produce 3 specific "keys to victory" for EACH team (concrete tactical/structural points referencing real squad players, recent form, opposition weakness, or weather/ground impact).
+
+Then produce a deep "script" with these distinct sections:
+- headToHead: 3-5 sentences. Recent H2H meetings, score trends, venue history at THIS ground, who has owned the rivalry lately, and any tactical pattern that has decided recent matchups.
+- formAnalysis: 3-5 sentences. Compare last-5 trajectories (improving / sliding / patchy), attack vs defence ratings, points-for and points-against trend, quality of opposition faced, and whether form is real or schedule-inflated.
+- xFactor: the single biggest swing variable — usually one player, one matchup, or one tactical lever — and what specifically tips the game when it fires.
+- psychological: 4-6 sentences. Cover ladder positioning pressure (top-4 chase, finals must-win, wooden-spoon avoidance), occasion (Anzac Round, Magic Round, Heritage Round, grand-final rematch, derby, retirement game), expected sell-out / crowd energy, recent emotional peaks (big wins, blow-out losses, coach pressure, off-field drama), home vs away mentality of each side this season, and stadium "voodoo" (sides that don't win at this venue, sides that can't lose at this venue, weather omens).
+- milestones: 1-4 individual milestones approaching for either side (games, tries, points, coaching games).
+
+Also produce a "bookieScript": from a sharp Australian bookmaker's perspective, which result/outcome they WANT to land (limits liability, public is on the other side), which result they want to AVOID (heavy public liability), and a one-sentence summary of where their book is most exposed.
+
+FINALLY, generate exactly 3 betSuggestions — one for EACH target payout tier: $100, $1,000, and $10,000. Each suggestion is a small multi (2-4 legs) combining real squad players, head-to-head winner, margin BUCKETS, totals or tryscorer markets.
+
+CRITICAL betting rules:
+- DO NOT use handicap / line / spread markets like "Roosters -12.5". Lovable users do not bet handicap. Use winning-margin BUCKETS only: "1-12", "13+", "1-6", "7-12", "13-24", "25+".
+- Player try markets must use either "anytime tryscorer", "first tryscorer", or try-count buckets "1-2 tries" or "3+ tries". NEVER use a try line like "0.5".
+- Set "risk" to low for the $100 tier, medium for the $1,000 tier, high for the $10,000 tier.
+- Set "targetPayout" to exactly 100, 1000, or 10000 to match.
+- Pick a stake that, multiplied by combined estimated decimal odds, returns approximately the target payout (e.g. $20 stake @ $5.00 odds = $100; $20 stake @ $50 odds = $1,000; $20 stake @ $500 odds = $10,000). Stake should usually be $10–$50.
+- Estimate combined decimal odds by roughly multiplying the implied odds of each leg from the live odds shown.
+- Make legs sharp and specific (e.g. "Roosters to win", "Margin 13+", "Tedesco anytime tryscorer", "Tupou 1-2 tries"). NEVER invent players — only use named squad members above.
+- Explain in 1-2 sentences why each combo wins.`,
+
   ].filter(Boolean).join("\n");
 
   const res = await fetch(GATEWAY, {

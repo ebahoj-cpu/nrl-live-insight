@@ -1,16 +1,18 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useSuspenseQuery, queryOptions } from "@tanstack/react-query";
-import { getCurrentRoundFixtures, getOdds } from "@/server/index.functions";
+import { useSuspenseQuery, queryOptions, useQueryClient } from "@tanstack/react-query";
+import { getCurrentRoundFixtures, getOdds, getMatchPage } from "@/server/index.functions";
 import { MatchCard } from "@/components/MatchCard";
-import { Suspense } from "react";
+import { Suspense, useEffect } from "react";
 
 const fixturesQO = () => queryOptions({
   queryKey: ["fixtures", "current"],
   queryFn: () => getCurrentRoundFixtures({ data: {} }),
+  staleTime: 5 * 60_000,
 });
 const oddsQO = () => queryOptions({
   queryKey: ["odds"],
   queryFn: () => getOdds({ data: {} }),
+  staleTime: 2 * 60_000,
 });
 
 export const Route = createFileRoute("/")({
@@ -38,6 +40,33 @@ function HomePage() {
 function Fixtures() {
   const fx = useSuspenseQuery(fixturesQO()).data;
   const oddsList = useSuspenseQuery(oddsQO()).data;
+  const qc = useQueryClient();
+
+  // Background prefetch every fixture's match page so opening one feels instant.
+  useEffect(() => {
+    const ids = fx.fixtures.map((f) => f.matchId);
+    const idle = (cb: () => void) =>
+      typeof (window as any).requestIdleCallback === "function"
+        ? (window as any).requestIdleCallback(cb)
+        : setTimeout(cb, 800);
+    const cancel = (h: any) =>
+      typeof (window as any).cancelIdleCallback === "function"
+        ? (window as any).cancelIdleCallback(h)
+        : clearTimeout(h);
+    const handles: any[] = [];
+    ids.forEach((id, i) => {
+      handles.push(idle(() => {
+        setTimeout(() => {
+          void qc.prefetchQuery({
+            queryKey: ["match", id],
+            queryFn: () => getMatchPage({ data: { matchId: id } }),
+            staleTime: 5 * 60_000,
+          });
+        }, i * 250);
+      }));
+    });
+    return () => handles.forEach(cancel);
+  }, [fx.fixtures, qc]);
 
   return (
     <div className="pt-8">

@@ -19,6 +19,24 @@ export type EdgeNugget = {
   impact: "high" | "medium" | "low";
 };
 
+export type EdgeAnalysis = {
+  attackingTeam: "home" | "away";
+  attackingShape: string;       // e.g. "shifts wide off scrums, second-row involvement"
+  vulnerableTeam: "home" | "away";
+  vulnerability: string;        // e.g. "right-edge centre rushes out of line"
+  keyAttackers: string[];       // 2-4 names
+  keyDefenders: string[];       // 2-3 names being targeted
+  tryscorerLeans: string[];     // 1-3 names tied to this edge
+  gameScript: string;           // 2-3 sentences of how it unfolds
+};
+
+export type TieredBet = {
+  tier: "low" | "medium" | "high";
+  legs: { market: string; pick: string }[];   // anytime tryscorer + match result + total
+  rationale: string;
+  estimatedOdds?: string;
+};
+
 export type BettingCompare = {
   market: string;          // e.g. "Head to head"
   marketSays: string;      // what bookies are pricing
@@ -36,18 +54,23 @@ export type Insights = {
   firstTryscorer: { pick: string; reasoning: string };
   anytimeTryscorers: { pick: string; reasoning: string }[];
   multiTryscorer: { pick: string; reasoning: string; confidence: number };
+  firstSecondThird: { picks: string[]; reasoning: string };
+  doubleTryscorer: { pick: string; reasoning: string };
   keysToVictory: { home: string[]; away: string[] };
   keyFactors: string[];
   bettingAngles: BettingAngle[];
   bettingIntelligence: BettingCompare[];
   edgeNuggets: EdgeNugget[];
+  leftEdge: EdgeAnalysis;
+  rightEdge: EdgeAnalysis;
+  tieredBets: TieredBet[];
   weatherImpact: { summary: string; favours: "home" | "away" | "neither"; tacticalNote: string };
   script: {
-    formNarrative: string;          // momentum vs decline
-    ladderContext: string;          // pressure, must-win, top 8 race
-    psychologicalFactors: string[]; // milestones, revenge, media
-    matchStyleProjection: string;   // tempo, attacking vs grind
-    statDrivenScript: string[];     // if X then Y chain (3-5)
+    formNarrative: string;
+    ladderContext: string;
+    psychologicalFactors: string[];
+    matchStyleProjection: string;
+    statDrivenScript: string[];
     headToHead: string;
     milestones: string[];
     xFactor: string;
@@ -119,13 +142,15 @@ export async function generateInsights(payload: {
     payload.weatherSummary ? `Forecast at venue at kickoff: ${payload.weatherSummary}` : "",
     "",
     "Produce sharp, professional NRL match intelligence:",
-    "1. Winner / margin / total / HT-FT / first / anytime / multi tryscorer picks (use ONLY named-squad players).",
+    "1. Winner / margin / total / HT-FT / first / anytime / multi / first-second-third / double tryscorer picks. Use ONLY named-squad players. Tryscorer picks must reason about positioning, edge mismatches, defensive weaknesses and player role — NOT just pick the biggest names.",
     "2. 3 specific keys to victory per team — concrete tactical/structural points referencing real players, recent form, opposition weakness, or weather.",
-    "3. bettingIntelligence: 2-4 markets where data signal differs from market price. For each, state what the market is pricing, what the model thinks, and lean (value/fade/with_market/neutral). Avoid generic statements.",
-    "4. edgeNuggets: 3-5 high-impact bullets (late changes implied by squad, milestone games, momentum signals, revenge/narrative, travel, weather-driven tactics). Each has a short label, detail, and impact rating.",
-    "5. weatherImpact: how forecast affects style and which side benefits.",
-    "6. script: full game script — formNarrative (momentum vs decline), ladderContext (pressure / top 8 race), psychologicalFactors (3 bullets), matchStyleProjection (tempo / grind vs fast), statDrivenScript (3-5 if/then chains, e.g. 'If A wins early run-metres → territory → late scoring'), plus headToHead, milestones, xFactor and bookieScript (wantToWin / wantToLose / liability).",
-    "Avoid generic claims. Every insight must answer WHY it matters and HOW it impacts the result.",
+    "3. bettingIntelligence: 2-4 markets where data signal differs from market price. State market price, model view, lean (value/fade/with_market/neutral). Be specific.",
+    "4. edgeNuggets: 3-5 high-impact bullets (late changes, milestones, momentum, revenge, travel, weather). Label + detail + impact.",
+    "5. leftEdge AND rightEdge analysis: pick which team is more likely to attack that edge and which team is vulnerable on the opposite defensive edge. Name 2-4 attackers, 2-3 defenders being targeted, 1-3 tryscorer leans tied to that edge, attacking shape (shifts, overlaps, second-rower involvement, kicks in behind), and a 2-3 sentence script of how that edge unfolds.",
+    "6. tieredBets: exactly 3 multi bets — one low risk, one medium risk, one high risk. Each combines an anytime tryscorer + match result + total points line. Provide rationale.",
+    "7. weatherImpact: how forecast affects style and which side benefits.",
+    "8. script: full game script — formNarrative, ladderContext, psychologicalFactors, matchStyleProjection, statDrivenScript (3-5 if/then chains), headToHead, milestones, xFactor, bookieScript (wantToWin / wantToLose / liability).",
+    "Avoid generic claims. Every insight must answer WHY it matters and HOW it impacts the result. When picking tryscorers, lean on edge mismatch and positional matchup data.",
   ].filter(Boolean).join("\n");
 
   const res = await fetch(GATEWAY, {
@@ -153,6 +178,16 @@ export async function generateInsights(payload: {
               firstTryscorer: { type: "object", properties: { pick: { type: "string" }, reasoning: { type: "string" } }, required: ["pick","reasoning"], additionalProperties: false },
               anytimeTryscorers: { type: "array", minItems: 3, maxItems: 5, items: { type: "object", properties: { pick: { type: "string" }, reasoning: { type: "string" } }, required: ["pick","reasoning"], additionalProperties: false } },
               multiTryscorer: { type: "object", properties: { pick: { type: "string" }, reasoning: { type: "string" }, confidence: { type: "number" } }, required: ["pick","reasoning","confidence"], additionalProperties: false },
+              firstSecondThird: {
+                type: "object",
+                properties: {
+                  picks: { type: "array", minItems: 3, maxItems: 3, items: { type: "string" }, description: "Three player names — first, second, third tryscorer in order." },
+                  reasoning: { type: "string" },
+                },
+                required: ["picks","reasoning"],
+                additionalProperties: false,
+              },
+              doubleTryscorer: { type: "object", properties: { pick: { type: "string", description: "Single best 2+ tries pick." }, reasoning: { type: "string" } }, required: ["pick","reasoning"], additionalProperties: false },
               keysToVictory: { type: "object", properties: { home: { type: "array", minItems: 3, maxItems: 3, items: { type: "string" } }, away: { type: "array", minItems: 3, maxItems: 3, items: { type: "string" } } }, required: ["home","away"], additionalProperties: false },
               keyFactors: { type: "array", items: { type: "string" }, minItems: 3, maxItems: 6 },
               bettingAngles: { type: "array", minItems: 2, maxItems: 4, items: { type: "object", properties: { market: { type: "string" }, pick: { type: "string" }, reasoning: { type: "string" }, confidence: { type: "number" } }, required: ["market","pick","reasoning","confidence"], additionalProperties: false } },
@@ -181,6 +216,61 @@ export async function generateInsights(payload: {
                     impact: { type: "string", enum: ["high","medium","low"] },
                   },
                   required: ["label","detail","impact"],
+                  additionalProperties: false,
+                },
+              },
+              leftEdge: {
+                type: "object",
+                properties: {
+                  attackingTeam: { type: "string", enum: ["home","away"] },
+                  attackingShape: { type: "string", description: "How the attack unfolds — shifts, overlaps, second-row hit-ups, kicks in behind, etc." },
+                  vulnerableTeam: { type: "string", enum: ["home","away"] },
+                  vulnerability: { type: "string", description: "What's broken on the opposing right edge defence." },
+                  keyAttackers: { type: "array", minItems: 2, maxItems: 4, items: { type: "string" } },
+                  keyDefenders: { type: "array", minItems: 2, maxItems: 3, items: { type: "string" } },
+                  tryscorerLeans: { type: "array", minItems: 1, maxItems: 3, items: { type: "string" } },
+                  gameScript: { type: "string", description: "2-3 sentence script of how the left-edge attack plays out and produces points." },
+                },
+                required: ["attackingTeam","attackingShape","vulnerableTeam","vulnerability","keyAttackers","keyDefenders","tryscorerLeans","gameScript"],
+                additionalProperties: false,
+              },
+              rightEdge: {
+                type: "object",
+                properties: {
+                  attackingTeam: { type: "string", enum: ["home","away"] },
+                  attackingShape: { type: "string" },
+                  vulnerableTeam: { type: "string", enum: ["home","away"] },
+                  vulnerability: { type: "string" },
+                  keyAttackers: { type: "array", minItems: 2, maxItems: 4, items: { type: "string" } },
+                  keyDefenders: { type: "array", minItems: 2, maxItems: 3, items: { type: "string" } },
+                  tryscorerLeans: { type: "array", minItems: 1, maxItems: 3, items: { type: "string" } },
+                  gameScript: { type: "string" },
+                },
+                required: ["attackingTeam","attackingShape","vulnerableTeam","vulnerability","keyAttackers","keyDefenders","tryscorerLeans","gameScript"],
+                additionalProperties: false,
+              },
+              tieredBets: {
+                type: "array", minItems: 3, maxItems: 3,
+                items: {
+                  type: "object",
+                  properties: {
+                    tier: { type: "string", enum: ["low","medium","high"] },
+                    legs: {
+                      type: "array", minItems: 3, maxItems: 3,
+                      items: {
+                        type: "object",
+                        properties: {
+                          market: { type: "string", description: "e.g. Anytime tryscorer, Match result, Total points" },
+                          pick: { type: "string" },
+                        },
+                        required: ["market","pick"],
+                        additionalProperties: false,
+                      },
+                    },
+                    rationale: { type: "string", description: "Why these legs combine logically into a coherent scenario." },
+                    estimatedOdds: { type: "string", description: "Optional rough $ price guess." },
+                  },
+                  required: ["tier","legs","rationale"],
                   additionalProperties: false,
                 },
               },
@@ -221,8 +311,11 @@ export async function generateInsights(payload: {
             required: [
               "predictedScore","winner","margin","total","htft",
               "firstTryscorer","anytimeTryscorers","multiTryscorer",
+              "firstSecondThird","doubleTryscorer",
               "keysToVictory","keyFactors","bettingAngles",
-              "bettingIntelligence","edgeNuggets","weatherImpact","script",
+              "bettingIntelligence","edgeNuggets",
+              "leftEdge","rightEdge","tieredBets",
+              "weatherImpact","script",
             ],
             additionalProperties: false,
           },

@@ -311,8 +311,11 @@ export async function generateInsights(payload: {
             required: [
               "predictedScore","winner","margin","total","htft",
               "firstTryscorer","anytimeTryscorers","multiTryscorer",
+              "firstSecondThird","doubleTryscorer",
               "keysToVictory","keyFactors","bettingAngles",
-              "bettingIntelligence","edgeNuggets","weatherImpact","script",
+              "bettingIntelligence","edgeNuggets",
+              "leftEdge","rightEdge","tieredBets",
+              "weatherImpact","script",
             ],
             additionalProperties: false,
           },

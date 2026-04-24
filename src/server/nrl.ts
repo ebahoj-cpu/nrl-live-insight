@@ -13,7 +13,7 @@ export type NrlFixture = {
   roundNumber: number;
   roundTitle: string;
   isCurrentRound: boolean;
-  matchState: string;
+  matchState: string;         // "Upcoming" | "FullTime" | "InProgress" | etc.
   venue: string;
   venueCity: string;
   kickoffUtc: string;
@@ -27,6 +27,7 @@ export type NrlTeamRef = {
   themeKey: string;
   teamPosition?: string;
   odds?: string;
+  score?: number | null;
 };
 
 export type NrlLadderRow = {
@@ -80,12 +81,14 @@ export async function fetchDraw(season: number, round?: number): Promise<NrlFixt
         nickName: f.homeTeam.nickName,
         themeKey: f.homeTeam.theme?.key,
         teamPosition: f.homeTeam.teamPosition,
+        score: f.homeTeam.score ?? null,
       },
       awayTeam: {
         teamId: f.awayTeam.teamId,
         nickName: f.awayTeam.nickName,
         themeKey: f.awayTeam.theme?.key,
         teamPosition: f.awayTeam.teamPosition,
+        score: f.awayTeam.score ?? null,
       },
     }));
   return fixtures;

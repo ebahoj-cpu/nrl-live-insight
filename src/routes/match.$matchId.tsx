@@ -305,15 +305,66 @@ function SquadPanel({ team }: { team: { nickName: string; themeKey: string; play
 
 /* ================= STATS TAB ================= */
 
-function StatsTab({ home, away, homeRow, awayRow }: { home: any; away: any; homeRow?: any; awayRow?: any }) {
+type StatValue = { value: number; isLeader: boolean; numerator?: number; denominator?: number };
+type TeamStat = { title: string; type: string; units?: string; homeValue: StatValue; awayValue: StatValue; maxValue?: number };
+type StatGroup = { title: string; stats: TeamStat[] };
+
+function fmtStatValue(v: StatValue, type: string, units?: string): string {
+  if (type === "Percentage") return `${v.value.toFixed(0)}%`;
+  if (type === "PercentageAndFraction") {
+    return v.numerator != null && v.denominator != null
+      ? `${v.value.toFixed(0)}% (${v.numerator}/${v.denominator})`
+      : `${v.value.toFixed(0)}%`;
+  }
+  if (type === "Range") return `${v.value.toFixed(2)}${units ? ` ${units.toLowerCase()}` : ""}`;
+  return `${v.value % 1 === 0 ? v.value.toFixed(0) : v.value.toFixed(1)}`;
+}
+
+function StatsTab({ home, away, homeRow, awayRow, statGroups }:
+  { home: any; away: any; homeRow?: any; awayRow?: any; statGroups: StatGroup[] }) {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <SeasonStats team={home} row={homeRow} />
         <SeasonStats team={away} row={awayRow} />
       </div>
+
+      {statGroups && statGroups.length > 0 && statGroups.map((g, gi) => (
+        <Card key={gi} title={g.title} icon={Activity}>
+          <div className="grid grid-cols-3 gap-2 mb-3 text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
+            <div className="text-right">{home.nickName}</div>
+            <div className="text-center">Stat</div>
+            <div className="text-left">{away.nickName}</div>
+          </div>
+          <div className="space-y-2.5">
+            {g.stats.map((s, si) => {
+              const total = s.homeValue.value + s.awayValue.value || 1;
+              const homePct = (s.homeValue.value / total) * 100;
+              return (
+                <div key={si}>
+                  <div className="grid grid-cols-3 items-center gap-2 text-sm mb-1">
+                    <div className={`text-right kbd font-bold ${s.homeValue.isLeader ? "text-accent" : "text-foreground"}`}>
+                      {fmtStatValue(s.homeValue, s.type, s.units)}
+                    </div>
+                    <div className="text-center text-[10px] uppercase tracking-wider text-muted-foreground leading-tight">{s.title}</div>
+                    <div className={`text-left kbd font-bold ${s.awayValue.isLeader ? "text-accent" : "text-foreground"}`}>
+                      {fmtStatValue(s.awayValue, s.type, s.units)}
+                    </div>
+                  </div>
+                  {/* dual bar */}
+                  <div className="flex h-1.5 rounded-full overflow-hidden bg-surface-2">
+                    <div className={`${s.homeValue.isLeader ? "bg-accent" : "bg-muted-foreground/40"} transition-all`} style={{ width: `${homePct}%` }} />
+                    <div className={`${s.awayValue.isLeader ? "bg-accent" : "bg-muted-foreground/40"} transition-all`} style={{ width: `${100 - homePct}%` }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      ))}
+
       {(homeRow && awayRow) && (
-        <Card title="Side by side" icon={BarChart3}>
+        <Card title="Ladder side by side" icon={BarChart3}>
           <CompareRow label="Ladder position" h={`#${homeRow.position}`} a={`#${awayRow.position}`} />
           <CompareRow label="Wins" h={homeRow.wins} a={awayRow.wins} betterHigh higherWins={homeRow.wins > awayRow.wins} />
           <CompareRow label="Points for" h={homeRow.for} a={awayRow.for} betterHigh higherWins={homeRow.for > awayRow.for} />

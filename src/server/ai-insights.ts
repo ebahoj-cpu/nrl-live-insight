@@ -19,7 +19,7 @@ export type BetSuggestion = {
   estimatedOdds: string;  // e.g. "$5.00"
   stake: string;          // e.g. "$20"
   potentialReturn: string;// e.g. "$100"
-  targetPayout: 100 | 1000 | 10000; // tier this bet is sized to deliver
+  targetPayout: "100" | "1000" | "10000"; // tier this bet is sized to deliver
   reasoning: string;      // why this combo
 };
 

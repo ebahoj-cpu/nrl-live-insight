@@ -178,6 +178,16 @@ export async function generateInsights(payload: {
               firstTryscorer: { type: "object", properties: { pick: { type: "string" }, reasoning: { type: "string" } }, required: ["pick","reasoning"], additionalProperties: false },
               anytimeTryscorers: { type: "array", minItems: 3, maxItems: 5, items: { type: "object", properties: { pick: { type: "string" }, reasoning: { type: "string" } }, required: ["pick","reasoning"], additionalProperties: false } },
               multiTryscorer: { type: "object", properties: { pick: { type: "string" }, reasoning: { type: "string" }, confidence: { type: "number" } }, required: ["pick","reasoning","confidence"], additionalProperties: false },
+              firstSecondThird: {
+                type: "object",
+                properties: {
+                  picks: { type: "array", minItems: 3, maxItems: 3, items: { type: "string" }, description: "Three player names — first, second, third tryscorer in order." },
+                  reasoning: { type: "string" },
+                },
+                required: ["picks","reasoning"],
+                additionalProperties: false,
+              },
+              doubleTryscorer: { type: "object", properties: { pick: { type: "string", description: "Single best 2+ tries pick." }, reasoning: { type: "string" } }, required: ["pick","reasoning"], additionalProperties: false },
               keysToVictory: { type: "object", properties: { home: { type: "array", minItems: 3, maxItems: 3, items: { type: "string" } }, away: { type: "array", minItems: 3, maxItems: 3, items: { type: "string" } } }, required: ["home","away"], additionalProperties: false },
               keyFactors: { type: "array", items: { type: "string" }, minItems: 3, maxItems: 6 },
               bettingAngles: { type: "array", minItems: 2, maxItems: 4, items: { type: "object", properties: { market: { type: "string" }, pick: { type: "string" }, reasoning: { type: "string" }, confidence: { type: "number" } }, required: ["market","pick","reasoning","confidence"], additionalProperties: false } },

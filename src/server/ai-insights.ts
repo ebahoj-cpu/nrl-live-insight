@@ -54,18 +54,23 @@ export type Insights = {
   firstTryscorer: { pick: string; reasoning: string };
   anytimeTryscorers: { pick: string; reasoning: string }[];
   multiTryscorer: { pick: string; reasoning: string; confidence: number };
+  firstSecondThird: { picks: string[]; reasoning: string };
+  doubleTryscorer: { pick: string; reasoning: string };
   keysToVictory: { home: string[]; away: string[] };
   keyFactors: string[];
   bettingAngles: BettingAngle[];
   bettingIntelligence: BettingCompare[];
   edgeNuggets: EdgeNugget[];
+  leftEdge: EdgeAnalysis;
+  rightEdge: EdgeAnalysis;
+  tieredBets: TieredBet[];
   weatherImpact: { summary: string; favours: "home" | "away" | "neither"; tacticalNote: string };
   script: {
-    formNarrative: string;          // momentum vs decline
-    ladderContext: string;          // pressure, must-win, top 8 race
-    psychologicalFactors: string[]; // milestones, revenge, media
-    matchStyleProjection: string;   // tempo, attacking vs grind
-    statDrivenScript: string[];     // if X then Y chain (3-5)
+    formNarrative: string;
+    ladderContext: string;
+    psychologicalFactors: string[];
+    matchStyleProjection: string;
+    statDrivenScript: string[];
     headToHead: string;
     milestones: string[];
     xFactor: string;

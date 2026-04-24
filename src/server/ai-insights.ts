@@ -14,11 +14,12 @@ export type BettingAngle = {
 
 export type BetSuggestion = {
   risk: "low" | "medium" | "high";
-  title: string;          // e.g. "Roosters -12.5 + Tedesco anytime tryscorer"
+  title: string;          // e.g. "Roosters win + Tedesco anytime + Tupou 1-2 tries"
   legs: string[];         // each leg of the multi
-  estimatedOdds: string;  // e.g. "$4.20"
+  estimatedOdds: string;  // e.g. "$5.00"
   stake: string;          // e.g. "$20"
-  potentialReturn: string;// e.g. "$84"
+  potentialReturn: string;// e.g. "$100"
+  targetPayout: 100 | 1000 | 10000; // tier this bet is sized to deliver
   reasoning: string;      // why this combo
 };
 
@@ -37,8 +38,9 @@ export type Insights = {
   script: {
     headToHead: string;
     formAnalysis: string;
-    milestones: string[];
     xFactor: string;
+    psychological: string;
+    milestones: string[];
     bookieScript: {
       wantToWin: string;
       wantToLose: string;

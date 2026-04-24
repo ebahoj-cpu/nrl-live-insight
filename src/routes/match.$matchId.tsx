@@ -770,6 +770,70 @@ function ScriptTab({ insights, insightsError, home, away }:
   );
 }
 
+/* ================= BETS TAB ================= */
+
+function BetsTab({ insights, insightsError }: { insights: any; insightsError: string | null }) {
+  if (insightsError && !insights) return <Empty msg={insightsError} />;
+  if (!insights?.betSuggestions?.length) return <Empty msg="Bet suggestions unavailable." />;
+
+  const riskMeta: Record<string, { label: string; cls: string; desc: string }> = {
+    low: { label: "Low risk", cls: "border-accent/40 bg-accent/5", desc: "Safer combo, modest return" },
+    medium: { label: "Medium risk", cls: "border-yellow-500/40 bg-yellow-500/5", desc: "Balanced risk vs reward" },
+    high: { label: "High risk", cls: "border-danger/40 bg-danger/5", desc: "Long shot — biggest payout" },
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="glass p-4 text-xs text-muted-foreground">
+        AI-generated suggestions based on form, ladder, home/away splits and live odds. Always bet responsibly · 18+
+      </div>
+      {insights.betSuggestions.map((b: any, i: number) => {
+        const meta = riskMeta[b.risk] ?? riskMeta.medium;
+        return (
+          <div key={i} className={`glass p-5 border-2 ${meta.cls}`}>
+            <div className="flex items-center justify-between mb-3 gap-3">
+              <div>
+                <div className="text-[10px] uppercase tracking-widest font-bold text-accent">{meta.label}</div>
+                <div className="text-[11px] text-muted-foreground">{meta.desc}</div>
+              </div>
+              <Wallet className="h-5 w-5 text-accent shrink-0" />
+            </div>
+
+            <h3 className="font-bold text-base mb-3">{b.title}</h3>
+
+            <ul className="space-y-1.5 mb-4">
+              {b.legs.map((leg: string, li: number) => (
+                <li key={li} className="flex gap-2 text-sm">
+                  <span className="text-accent shrink-0">✓</span>
+                  <span>{leg}</span>
+                </li>
+              ))}
+            </ul>
+
+            <div className="grid grid-cols-3 gap-2 mb-3 pt-3 border-t border-border">
+              <div className="text-center">
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Odds</div>
+                <div className="text-lg font-black kbd text-accent">{b.estimatedOdds}</div>
+              </div>
+              <div className="text-center">
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Stake</div>
+                <div className="text-lg font-black kbd">{b.stake}</div>
+              </div>
+              <div className="text-center">
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Return</div>
+                <div className="text-lg font-black kbd text-accent">{b.potentialReturn}</div>
+              </div>
+            </div>
+
+            <p className="text-xs text-muted-foreground leading-relaxed">{b.reasoning}</p>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+
 function formatDate(utc: string) {
   if (!utc) return "TBC";
   const d = new Date(utc);

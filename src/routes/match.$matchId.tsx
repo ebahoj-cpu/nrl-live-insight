@@ -472,33 +472,39 @@ function InsightsTab({ insights, insightsError, home, away, tryscorers, tryscore
           {oddsStale ? "Showing last cached odds — live feed temporarily unavailable." : "Live odds temporarily unavailable. Insights still based on form & ladder."}
         </div>
       )}
-      {/* Predicted result hero */}
-      <Card title="Predicted result" icon={Sparkles} className="accent-glow">
+
+      {/* 1. Winning team + 2. Winning margin */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Card title="Winning team" icon={Trophy} className="accent-glow">
+          <div className="text-2xl font-black mb-2">{winnerName}</div>
+          <p className="text-xs text-muted-foreground">{insights.winner.reasoning}</p>
+        </Card>
+        <Card title="Winning margin" icon={Target}>
+          <div className="text-2xl font-black mb-2">{winnerName} by {insights.margin.bucket}</div>
+          <p className="text-xs text-muted-foreground">{insights.margin.reasoning}</p>
+        </Card>
+      </div>
+
+      {/* 3. Predicted result */}
+      <Card title="Predicted result" icon={Sparkles}>
         <div className="grid grid-cols-3 gap-4 items-center">
           <div className="text-center">
             <div className="text-xs text-muted-foreground">{home}</div>
             <div className="text-4xl font-black kbd">{insights.predictedScore.home}</div>
           </div>
           <div className="text-center">
-            <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Winner</div>
-            <div className="text-sm font-bold mt-1">{winnerName}</div>
+            <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Final score</div>
+            <div className="text-sm font-bold mt-1 text-accent">{winnerName}</div>
           </div>
           <div className="text-center">
             <div className="text-xs text-muted-foreground">{away}</div>
             <div className="text-4xl font-black kbd">{insights.predictedScore.away}</div>
           </div>
         </div>
-        <p className="mt-4 text-xs text-muted-foreground">{insights.winner.reasoning}</p>
       </Card>
 
-      {/* Pick grid — no confidence percentages */}
+      {/* 4. Total points + 5. HT/FT */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <PickCard
-          icon={Target}
-          market="Winning margin"
-          pick={`${winnerName} by ${insights.margin.bucket}`}
-          reasoning={insights.margin.reasoning}
-        />
         <PickCard
           icon={TrendingUp}
           market={`Total points ${insights.total.line}`}
@@ -511,28 +517,9 @@ function InsightsTab({ insights, insightsError, home, away, tryscorers, tryscore
           pick={insights.htft.pick}
           reasoning={insights.htft.reasoning}
         />
-        {insights.bettingAngles
-          .filter((a: any) => !/try\s*scorer|tryscorer|first\s*try|anytime\s*try/i.test(`${a.market} ${a.pick}`))
-          .map((a: any, i: number) => (
-            <PickCard
-              key={i}
-              icon={Sparkles}
-              market={a.market}
-              pick={a.pick}
-              reasoning={a.reasoning}
-            />
-          ))}
       </div>
 
-      {/* Keys to victory — both teams */}
-      {insights.keysToVictory && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <KeysCard team={home} keys={insights.keysToVictory.home} />
-          <KeysCard team={away} keys={insights.keysToVictory.away} />
-        </div>
-      )}
-
-      {/* Real bookie tryscorer odds, with placeholder until markets release */}
+      {/* 6. First tryscorer + 7. Top 5 anytime + 8. Multi tryscorer */}
       <TryscorersSection
         tryscorers={tryscorers}
         aiAnytime={insights.anytimeTryscorers}
@@ -540,6 +527,14 @@ function InsightsTab({ insights, insightsError, home, away, tryscorers, tryscore
         aiMulti={insights.multiTryscorer}
         kickoffUtc={kickoffUtc}
       />
+
+      {/* 9. Keys to victory — both teams */}
+      {insights.keysToVictory && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <KeysCard team={home} keys={insights.keysToVictory.home} />
+          <KeysCard team={away} keys={insights.keysToVictory.away} />
+        </div>
+      )}
 
       {/* Key factors */}
       <Card title="Key factors" icon={TrendingUp}>

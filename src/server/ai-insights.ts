@@ -19,6 +19,24 @@ export type EdgeNugget = {
   impact: "high" | "medium" | "low";
 };
 
+export type EdgeAnalysis = {
+  attackingTeam: "home" | "away";
+  attackingShape: string;       // e.g. "shifts wide off scrums, second-row involvement"
+  vulnerableTeam: "home" | "away";
+  vulnerability: string;        // e.g. "right-edge centre rushes out of line"
+  keyAttackers: string[];       // 2-4 names
+  keyDefenders: string[];       // 2-3 names being targeted
+  tryscorerLeans: string[];     // 1-3 names tied to this edge
+  gameScript: string;           // 2-3 sentences of how it unfolds
+};
+
+export type TieredBet = {
+  tier: "low" | "medium" | "high";
+  legs: { market: string; pick: string }[];   // anytime tryscorer + match result + total
+  rationale: string;
+  estimatedOdds?: string;
+};
+
 export type BettingCompare = {
   market: string;          // e.g. "Head to head"
   marketSays: string;      // what bookies are pricing

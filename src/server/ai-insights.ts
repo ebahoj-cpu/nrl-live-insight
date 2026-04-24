@@ -206,32 +206,42 @@ CRITICAL betting rules:
               betSuggestions: {
                 type: "array",
                 minItems: 3, maxItems: 3,
+                description: "Exactly three multis: one targeting $100 payout (low risk), one targeting $1,000 payout (medium risk), one targeting $10,000 payout (high risk).",
                 items: {
                   type: "object",
                   properties: {
                     risk: { type: "string", enum: ["low", "medium", "high"] },
-                    title: { type: "string", description: "Short headline of the multi" },
-                    legs: { type: "array", minItems: 2, maxItems: 4, items: { type: "string", description: "One leg of the multi, e.g. 'Roosters to win', 'Tedesco anytime tryscorer'" } },
-                    estimatedOdds: { type: "string", description: "Combined decimal odds, e.g. '$4.20'" },
-                    stake: { type: "string", description: "Suggested stake, e.g. '$20'" },
-                    potentialReturn: { type: "string", description: "Estimated total return on stake, e.g. '$84'" },
+                    title: { type: "string", description: "Short headline of the multi. NEVER use handicap markets like 'Roosters -12.5'." },
+                    legs: {
+                      type: "array",
+                      minItems: 2, maxItems: 4,
+                      items: {
+                        type: "string",
+                        description: "One leg of the multi. Allowed: head-to-head winner, margin BUCKETS ('1-12', '13+', '1-6', '7-12', '13-24', '25+'), total points over/under, HT/FT, anytime/first tryscorer, try-count buckets ('1-2 tries', '3+ tries'). NEVER handicap/spread/line markets. NEVER 'over 0.5 tries' style.",
+                      },
+                    },
+                    estimatedOdds: { type: "string", description: "Combined decimal odds, e.g. '$5.00', '$50.00', '$500.00'" },
+                    stake: { type: "string", description: "Suggested stake, usually $10–$50, e.g. '$20'" },
+                    potentialReturn: { type: "string", description: "Estimated total return ≈ target payout tier, e.g. '$100', '$1,000', '$10,000'" },
+                    targetPayout: { type: "number", enum: [100, 1000, 10000], description: "Which payout tier this bet is sized for" },
                     reasoning: { type: "string", description: "Why this combo wins — 1-2 sentences" },
                   },
-                  required: ["risk", "title", "legs", "estimatedOdds", "stake", "potentialReturn", "reasoning"],
+                  required: ["risk", "title", "legs", "estimatedOdds", "stake", "potentialReturn", "targetPayout", "reasoning"],
                   additionalProperties: false,
                 },
               },
               script: {
                 type: "object",
                 properties: {
-                  headToHead: { type: "string", description: "Recent head-to-head context, trends, venue history" },
-                  formAnalysis: { type: "string", description: "Comparative form, attack vs defence, trajectories" },
+                  headToHead: { type: "string", description: "3-5 sentences: recent H2H meetings, score trends, venue history at this ground, who has owned the rivalry, tactical patterns deciding recent matchups." },
+                  formAnalysis: { type: "string", description: "3-5 sentences: last-5 trajectories, attack vs defence, points-for/against trend, quality of opposition, whether form is real or schedule-inflated." },
+                  xFactor: { type: "string", description: "Single biggest swing variable — one player, matchup, or tactical lever — and what tips the game when it fires." },
+                  psychological: { type: "string", description: "4-6 sentences covering ladder positioning pressure, occasion (Anzac, Magic, Heritage, derby, retirement game), expected sell-out / crowd, recent emotional peaks, home vs away mentality, and stadium voodoo / hoodoos." },
                   milestones: {
                     type: "array",
                     minItems: 1, maxItems: 4,
                     items: { type: "string", description: "Notable milestone for player/coach/club" },
                   },
-                  xFactor: { type: "string", description: "Single biggest swing factor" },
                   bookieScript: {
                     type: "object",
                     properties: {
@@ -242,7 +252,7 @@ CRITICAL betting rules:
                     required: ["wantToWin", "wantToLose", "liability"], additionalProperties: false,
                   },
                 },
-                required: ["headToHead", "formAnalysis", "milestones", "xFactor", "bookieScript"], additionalProperties: false,
+                required: ["headToHead", "formAnalysis", "xFactor", "psychological", "milestones", "bookieScript"], additionalProperties: false,
               },
             },
             required: [

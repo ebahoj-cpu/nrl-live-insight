@@ -179,7 +179,7 @@ export type NrlMatchTeam = {
   odds?: string;
   position?: string;
   score?: number | null;
-  recentForm: { result: string; summary: string; score: string }[];
+  recentForm: { result: string; summary: string; score: string; url?: string }[];
   nextOpponent?: string;
   players: NrlPlayer[];
   captainPlayerId?: number;
@@ -209,7 +209,7 @@ export async function fetchMatchDetails(matchId: string): Promise<NrlMatchDetail
       position: t.teamPosition,
       score: t.score ?? null,
       recentForm: (t.recentForm ?? []).map((r: any) => ({
-        result: r.result, summary: r.summary, score: r.score,
+        result: r.result, summary: r.summary, score: r.score, url: r.url,
       })),
       nextOpponent: t.nextOpponent?.fullName,
       players,

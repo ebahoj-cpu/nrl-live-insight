@@ -55,8 +55,8 @@ function MatchInner() {
   const { details, ladder, insights, insightsError, tryscorers, oddsError, oddsStale, tryscorersError, recentRecaps } = data as any;
   const [tab, setTab] = useState<TabKey>("lineup");
 
-  const homeRow = ladder.find((r) => r.nickname === details.homeTeam.nickName);
-  const awayRow = ladder.find((r) => r.nickname === details.awayTeam.nickName);
+  const homeRow = ladder.find((r: any) => r.nickname === details.homeTeam.nickName);
+  const awayRow = ladder.find((r: any) => r.nickname === details.awayTeam.nickName);
 
   return (
     <div className="pt-6">
@@ -339,8 +339,8 @@ function fmtStatValue(v: StatValue, type: string, units?: string): string {
   return `${v.value % 1 === 0 ? v.value.toFixed(0) : v.value.toFixed(1)}`;
 }
 
-function StatsTab({ home, away, homeRow, awayRow, statGroups }:
-  { home: any; away: any; homeRow?: any; awayRow?: any; statGroups: StatGroup[] }) {
+function StatsTab({ home, away, homeRow, awayRow, statGroups, recentRecaps }:
+  { home: any; away: any; homeRow?: any; awayRow?: any; statGroups: StatGroup[]; recentRecaps?: { home: any[]; away: any[] } }) {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

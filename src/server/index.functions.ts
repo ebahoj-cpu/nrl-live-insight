@@ -61,18 +61,12 @@ export const getMatchPage = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     const season = currentSeason();
 
+    // Phase 1 — fastest possible: details, ladder, odds in parallel
     const [details, ladder, allOdds] = await Promise.all([
       cached(`match:${data.matchId}`, TTL.match, () => fetchMatchDetails(data.matchId), { bypass: data.refresh }),
       cached(`ladder:${season}`, TTL.ladder, () => fetchLadder(season), { bypass: data.refresh }),
-      cached(`odds:nrl`, TTL.odds, () => fetchNrlOdds(), { bypass: data.refresh }),
+      cached(`odds:nrl`, TTL.odds, () => fetchNrlOdds(), { bypass: data.refresh }).catch(() => [] as OddsEvent[]),
     ]);
-
-    const weather: WeatherSnapshot | null = await cached(
-      `weather:${data.matchId}`,
-      TTL.weather,
-      () => fetchVenueWeather(details.venue, details.venueCity, details.kickoffUtc),
-      { bypass: data.refresh },
-    );
 
     const homeNick = findTeam(details.homeTeam.nickName)?.nickname ?? details.homeTeam.nickName;
     const awayNick = findTeam(details.awayTeam.nickName)?.nickname ?? details.awayTeam.nickName;
@@ -81,36 +75,22 @@ export const getMatchPage = createServerFn({ method: "GET" })
       return (eh === homeNick && ea === awayNick) || (eh === awayNick && ea === homeNick);
     }) ?? null;
 
-    // Tryscorer markets (~24h before kickoff)
-    const tryscorers: TryscorerMarkets | null = odds
-      ? await cached(`tryscorers:${odds.id}`, TTL.odds, () => fetchTryscorerOdds(odds.id), { bypass: data.refresh }).catch(() => null)
-      : null;
-
-    // Per-game stats bundle from each team's recent played matches
+    // Phase 2 — heavier data in parallel
     const homeRecentUrls = (details.homeTeam.recentForm ?? []).map((f: any) => f.url).filter(Boolean);
     const awayRecentUrls = (details.awayTeam.recentForm ?? []).map((f: any) => f.url).filter(Boolean);
 
-    let statsBundle: StatsBundle | null = null;
-    let statEdges: StatEdge[] = [];
-    let homePlayerForms: PlayerForm[] = [];
-    let awayPlayerForms: PlayerForm[] = [];
-
-    try {
-      statsBundle = await cached(
-        `statsbundle:${data.matchId}`,
-        TTL.match,
+    const [weather, statsBundle, homePlayerForms, awayPlayerForms, tryscorers] = await Promise.all([
+      cached(`weather:${data.matchId}`, TTL.weather,
+        () => fetchVenueWeather(details.venue, details.venueCity, details.kickoffUtc), { bypass: data.refresh }).catch(() => null),
+      cached(`statsbundle:${data.matchId}`, TTL.match,
         () => buildStatsBundle(details.homeTeam.nickName, homeRecentUrls, details.awayTeam.nickName, awayRecentUrls),
-        { bypass: data.refresh },
-      );
-      statEdges = compareStats(statsBundle.home, statsBundle.away);
-    } catch { /* stats optional */ }
+        { bypass: data.refresh }).catch(() => null as StatsBundle | null),
+      buildPlayerForms(details.homeTeam.nickName, details.homeTeam.players, homeRecentUrls).catch(() => [] as PlayerForm[]),
+      buildPlayerForms(details.awayTeam.nickName, details.awayTeam.players, awayRecentUrls).catch(() => [] as PlayerForm[]),
+      odds ? cached(`tryscorers:${odds.id}`, TTL.odds, () => fetchTryscorerOdds(odds.id), { bypass: data.refresh }).catch(() => null) : Promise.resolve(null),
+    ]);
 
-    try {
-      [homePlayerForms, awayPlayerForms] = await Promise.all([
-        buildPlayerForms(details.homeTeam.nickName, details.homeTeam.players, homeRecentUrls),
-        buildPlayerForms(details.awayTeam.nickName, details.awayTeam.players, awayRecentUrls),
-      ]);
-    } catch { /* player forms optional */ }
+    const statEdges: StatEdge[] = statsBundle ? compareStats(statsBundle.home, statsBundle.away) : [];
 
     // Distill top 6 players per team for AI prompt
     const topFor = (forms: PlayerForm[]) => forms

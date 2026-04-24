@@ -11,6 +11,17 @@ export type BettingAngle = {
   confidence: number;
 };
 
+
+export type BetSuggestion = {
+  risk: "low" | "medium" | "high";
+  title: string;          // e.g. "Roosters -12.5 + Tedesco anytime tryscorer"
+  legs: string[];         // each leg of the multi
+  estimatedOdds: string;  // e.g. "$4.20"
+  stake: string;          // e.g. "$20"
+  potentialReturn: string;// e.g. "$84"
+  reasoning: string;      // why this combo
+};
+
 export type Insights = {
   predictedScore: { home: number; away: number };
   winner: { team: "home" | "away"; confidence: number; reasoning: string };
@@ -22,7 +33,7 @@ export type Insights = {
   multiTryscorer: { pick: string; reasoning: string; confidence: number };
   keysToVictory: { home: string[]; away: string[] };
   keyFactors: string[];
-  bettingAngles: BettingAngle[];
+  betSuggestions: BetSuggestion[];
   script: {
     headToHead: string;
     formAnalysis: string;
@@ -69,7 +80,7 @@ export async function generateInsights(payload: {
     `Away recent form: ${payload.awayRecentForm.map((f) => `${f.result} ${f.summary} ${f.score}`).join("; ") || "n/a"}`,
     `Live AU bookie odds summary: ${payload.oddsSummary}`,
     payload.weatherSummary ? `Forecast at venue at kickoff: ${payload.weatherSummary}` : "",
-    `Provide a sharp, complete NRL betting analysis covering: winner, margin, HT/FT double, total points, first/anytime tryscorers, and multi-tryscorer angles. Also produce 3 specific "keys to victory" for EACH team (concrete tactical/structural points referencing real squad players, recent form, opposition weakness, or weather/ground impact). Plus a "script" — head-to-head context, form analysis, notable upcoming milestones, and a "bookie script": from a sharp Australian bookmaker's perspective, which result/outcome do they WANT to land (limits liability, public is on the other side), which result they want to AVOID (heavy public liability), and a one-sentence summary of where their book is most exposed. When citing players, only use names from the named squads above — never invent players.`,
+    `Provide a sharp, complete NRL betting analysis covering: winner, margin, HT/FT double, total points, first/anytime tryscorers, and multi-tryscorer angles. Also produce 3 specific "keys to victory" for EACH team (concrete tactical/structural points referencing real squad players, recent form, opposition weakness, or weather/ground impact). Plus a "script" — head-to-head context, form analysis, notable upcoming milestones, and a "bookie script": from a sharp Australian bookmaker's perspective, which result/outcome do they WANT to land (limits liability, public is on the other side), which result they want to AVOID (heavy public liability), and a one-sentence summary of where their book is most exposed. FINALLY, generate exactly 3 betSuggestions targeting low/medium/high risk. Each suggestion is a small multi (2-4 legs) combining real squad players, head-to-head winner, margin, totals or tryscorer markets that — based on the live odds shown — could plausibly return strong value on a $20 stake. Estimate the combined decimal odds and the potential return. Make them sharp, specific (e.g. "Roosters win + Tedesco anytime + 13+ Tupou tries"), and explain in 1-2 sentences why each combo wins. NEVER invent players — only use named squad members above.`,
   ].filter(Boolean).join("\n");
 
   const res = await fetch(GATEWAY, {
@@ -168,19 +179,23 @@ export async function generateInsights(payload: {
                 required: ["home", "away"], additionalProperties: false,
               },
               keyFactors: { type: "array", items: { type: "string" }, minItems: 3, maxItems: 6 },
-              bettingAngles: {
+              betSuggestions: {
                 type: "array",
+                minItems: 3, maxItems: 3,
                 items: {
                   type: "object",
                   properties: {
-                    market: { type: "string" },
-                    pick: { type: "string" },
-                    reasoning: { type: "string" },
-                    confidence: { type: "number", minimum: 0, maximum: 100 },
+                    risk: { type: "string", enum: ["low", "medium", "high"] },
+                    title: { type: "string", description: "Short headline of the multi" },
+                    legs: { type: "array", minItems: 2, maxItems: 4, items: { type: "string", description: "One leg of the multi, e.g. 'Roosters to win', 'Tedesco anytime tryscorer'" } },
+                    estimatedOdds: { type: "string", description: "Combined decimal odds, e.g. '$4.20'" },
+                    stake: { type: "string", description: "Suggested stake, e.g. '$20'" },
+                    potentialReturn: { type: "string", description: "Estimated total return on stake, e.g. '$84'" },
+                    reasoning: { type: "string", description: "Why this combo wins — 1-2 sentences" },
                   },
-                  required: ["market", "pick", "reasoning", "confidence"], additionalProperties: false,
+                  required: ["risk", "title", "legs", "estimatedOdds", "stake", "potentialReturn", "reasoning"],
+                  additionalProperties: false,
                 },
-                minItems: 2, maxItems: 4,
               },
               script: {
                 type: "object",
@@ -209,7 +224,7 @@ export async function generateInsights(payload: {
             required: [
               "predictedScore","winner","margin","total","htft",
               "firstTryscorer","anytimeTryscorers","multiTryscorer",
-              "keysToVictory","keyFactors","bettingAngles","script",
+              "keysToVictory","keyFactors","betSuggestions","script",
             ],
             additionalProperties: false,
           },

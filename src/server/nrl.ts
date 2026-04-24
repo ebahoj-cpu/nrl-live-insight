@@ -13,7 +13,7 @@ export type NrlFixture = {
   roundNumber: number;
   roundTitle: string;
   isCurrentRound: boolean;
-  matchState: string;
+  matchState: string;         // "Upcoming" | "FullTime" | "InProgress" | etc.
   venue: string;
   venueCity: string;
   kickoffUtc: string;
@@ -27,6 +27,7 @@ export type NrlTeamRef = {
   themeKey: string;
   teamPosition?: string;
   odds?: string;
+  score?: number | null;
 };
 
 export type NrlLadderRow = {
@@ -80,12 +81,14 @@ export async function fetchDraw(season: number, round?: number): Promise<NrlFixt
         nickName: f.homeTeam.nickName,
         themeKey: f.homeTeam.theme?.key,
         teamPosition: f.homeTeam.teamPosition,
+        score: f.homeTeam.score ?? null,
       },
       awayTeam: {
         teamId: f.awayTeam.teamId,
         nickName: f.awayTeam.nickName,
         themeKey: f.awayTeam.theme?.key,
         teamPosition: f.awayTeam.teamPosition,
+        score: f.awayTeam.score ?? null,
       },
     }));
   return fixtures;
@@ -117,6 +120,34 @@ export async function fetchLadder(season: number): Promise<NrlLadderRow[]> {
   });
 }
 
+export type NrlOfficial = {
+  position: string;
+  firstName: string;
+  lastName: string;
+  headImage?: string;
+};
+
+export type NrlStatValue = {
+  value: number;
+  isLeader: boolean;
+  numerator?: number;
+  denominator?: number;
+};
+
+export type NrlStat = {
+  title: string;
+  type: string;        // "Number" | "Percentage" | "Range" | "PercentageAndFraction"
+  units?: string;
+  homeValue: NrlStatValue;
+  awayValue: NrlStatValue;
+  maxValue?: number;
+};
+
+export type NrlStatGroup = {
+  title: string;
+  stats: NrlStat[];
+};
+
 export type NrlMatchDetails = {
   matchId: string;
   matchState: string;
@@ -127,7 +158,8 @@ export type NrlMatchDetails = {
   homeTeam: NrlMatchTeam;
   awayTeam: NrlMatchTeam;
   history: any;
-  statGroups: any[];
+  statGroups: NrlStatGroup[];
+  officials: NrlOfficial[];
 };
 
 export type NrlPlayer = {
@@ -146,6 +178,7 @@ export type NrlMatchTeam = {
   themeKey: string;
   odds?: string;
   position?: string;
+  score?: number | null;
   recentForm: { result: string; summary: string; score: string }[];
   nextOpponent?: string;
   players: NrlPlayer[];
@@ -174,6 +207,7 @@ export async function fetchMatchDetails(matchId: string): Promise<NrlMatchDetail
       themeKey: t.theme?.key,
       odds: t.odds,
       position: t.teamPosition,
+      score: t.score ?? null,
       recentForm: (t.recentForm ?? []).map((r: any) => ({
         result: r.result, summary: r.summary, score: r.score,
       })),
@@ -182,6 +216,33 @@ export async function fetchMatchDetails(matchId: string): Promise<NrlMatchDetail
       captainPlayerId: captainId,
     };
   };
+  const officials: NrlOfficial[] = (d.officials ?? []).map((o: any) => ({
+    position: o.position ?? "",
+    firstName: o.firstName ?? "",
+    lastName: o.lastName ?? "",
+    headImage: o.headImage,
+  }));
+  const statGroups: NrlStatGroup[] = (d.stats?.groups ?? []).map((g: any) => ({
+    title: g.title ?? "",
+    stats: (g.stats ?? []).map((s: any) => ({
+      title: s.title ?? "",
+      type: s.type ?? "Number",
+      units: s.units,
+      homeValue: {
+        value: Number(s.homeValue?.value ?? 0),
+        isLeader: !!s.homeValue?.isLeader,
+        numerator: s.homeValue?.numerator,
+        denominator: s.homeValue?.denominator,
+      },
+      awayValue: {
+        value: Number(s.awayValue?.value ?? 0),
+        isLeader: !!s.awayValue?.isLeader,
+        numerator: s.awayValue?.numerator,
+        denominator: s.awayValue?.denominator,
+      },
+      maxValue: s.maxValue,
+    })),
+  }));
   return {
     matchId,
     matchState: d.matchState,
@@ -192,6 +253,7 @@ export async function fetchMatchDetails(matchId: string): Promise<NrlMatchDetail
     homeTeam: mapTeam(d.homeTeam),
     awayTeam: mapTeam(d.awayTeam),
     history: d.stats?.history ?? null,
-    statGroups: d.stats?.groups ?? [],
+    statGroups,
+    officials,
   };
 }

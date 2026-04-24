@@ -48,6 +48,20 @@ export function MatchCard({ fixture, odds }: { fixture: NrlFixture & { weather?:
   const fav = homeOdds && awayOdds ? (homeOdds.price < awayOdds.price ? "home" : "away") : null;
   const w = fixture.weather ?? null;
 
+  // Match is finished if matchState indicates it AND we have a numeric score
+  const homeScore = fixture.homeTeam.score;
+  const awayScore = fixture.awayTeam.score;
+  const isFinished =
+    typeof homeScore === "number" &&
+    typeof awayScore === "number" &&
+    /^(FullTime|Final|Completed)$/i.test(fixture.matchState);
+  const isLive = /^(InProgress|Live|HalfTime)$/i.test(fixture.matchState) &&
+    typeof homeScore === "number" && typeof awayScore === "number";
+
+  const winner: "home" | "away" | "draw" | null = isFinished
+    ? homeScore! > awayScore! ? "home" : homeScore! < awayScore! ? "away" : "draw"
+    : null;
+
   return (
     <Link
       to="/match/$matchId"
@@ -68,9 +82,17 @@ export function MatchCard({ fixture, odds }: { fixture: NrlFixture & { weather?:
           <MapPin className="h-3.5 w-3.5 shrink-0 text-accent" />
           <span className="truncate">{fixture.venue}</span>
         </span>
+        {(isFinished || isLive) && (
+          <span className={`inline-flex items-center gap-1 font-bold uppercase tracking-wider text-[10px] px-2 py-0.5 rounded-md ${
+            isLive ? "bg-danger/15 text-danger" : "bg-surface-2 text-muted-foreground"
+          }`}>
+            {isLive && <span className="h-1.5 w-1.5 rounded-full bg-danger animate-pulse" />}
+            {isLive ? "Live" : "Full Time"}
+          </span>
+        )}
       </div>
 
-      {/* Teams + odds */}
+      {/* Teams + odds OR scores */}
       <div className="grid grid-cols-3 items-center gap-3 flex-1">
         <div className="flex flex-col items-center text-center">
           <TeamLogo themeKey={fixture.homeTeam.themeKey} name={fixture.homeTeam.nickName} size={56} />
@@ -78,16 +100,35 @@ export function MatchCard({ fixture, odds }: { fixture: NrlFixture & { weather?:
         </div>
 
         <div className="flex flex-col items-center justify-center">
-          <div className="text-[10px] uppercase tracking-widest text-muted-foreground">H2H</div>
-          <div className="flex items-center gap-1.5 mt-1.5 kbd">
-            <span className={`px-2 py-1 rounded-md text-sm font-semibold ${fav === "home" ? "bg-accent text-accent-foreground" : "bg-surface-2"}`}>
-              {homeOdds ? homeOdds.price.toFixed(2) : "—"}
-            </span>
-            <span className="text-muted-foreground text-xs">v</span>
-            <span className={`px-2 py-1 rounded-md text-sm font-semibold ${fav === "away" ? "bg-accent text-accent-foreground" : "bg-surface-2"}`}>
-              {awayOdds ? awayOdds.price.toFixed(2) : "—"}
-            </span>
-          </div>
+          {(isFinished || isLive) ? (
+            <>
+              <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                {isLive ? "Score" : "Final"}
+              </div>
+              <div className="flex items-center gap-2 mt-1.5 kbd">
+                <span className={`text-2xl font-black tabular-nums ${winner === "home" ? "text-accent" : "text-foreground"}`}>
+                  {homeScore}
+                </span>
+                <span className="text-muted-foreground text-xs font-bold">–</span>
+                <span className={`text-2xl font-black tabular-nums ${winner === "away" ? "text-accent" : "text-foreground"}`}>
+                  {awayScore}
+                </span>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="text-[10px] uppercase tracking-widest text-muted-foreground">H2H</div>
+              <div className="flex items-center gap-1.5 mt-1.5 kbd">
+                <span className={`px-2 py-1 rounded-md text-sm font-semibold ${fav === "home" ? "bg-accent text-accent-foreground" : "bg-surface-2"}`}>
+                  {homeOdds ? homeOdds.price.toFixed(2) : "—"}
+                </span>
+                <span className="text-muted-foreground text-xs">v</span>
+                <span className={`px-2 py-1 rounded-md text-sm font-semibold ${fav === "away" ? "bg-accent text-accent-foreground" : "bg-surface-2"}`}>
+                  {awayOdds ? awayOdds.price.toFixed(2) : "—"}
+                </span>
+              </div>
+            </>
+          )}
         </div>
 
         <div className="flex flex-col items-center text-center">

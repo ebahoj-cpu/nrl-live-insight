@@ -52,7 +52,7 @@ function MatchPage() {
 function MatchInner() {
   const { matchId } = Route.useParams();
   const { data } = useSuspenseQuery(matchQO(matchId));
-  const { details, ladder, insights, insightsError, tryscorers, oddsError, oddsStale, tryscorersError } = data;
+  const { details, ladder, insights, insightsError, tryscorers, oddsError, oddsStale, tryscorersError, recentRecaps } = data as any;
   const [tab, setTab] = useState<TabKey>("lineup");
 
   const homeRow = ladder.find((r) => r.nickname === details.homeTeam.nickName);
@@ -130,7 +130,7 @@ function MatchInner() {
 
       <div className="mt-6">
         {tab === "lineup" && <LineupTab home={details.homeTeam} away={details.awayTeam} officials={details.officials} />}
-        {tab === "stats" && <StatsTab home={details.homeTeam} away={details.awayTeam} homeRow={homeRow} awayRow={awayRow} statGroups={details.statGroups} />}
+        {tab === "stats" && <StatsTab home={details.homeTeam} away={details.awayTeam} homeRow={homeRow} awayRow={awayRow} statGroups={details.statGroups} recentRecaps={recentRecaps} />}
         {tab === "insights" && (
           <InsightsTab
             insights={insights}

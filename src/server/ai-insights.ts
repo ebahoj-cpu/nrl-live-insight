@@ -219,6 +219,61 @@ export async function generateInsights(payload: {
                   additionalProperties: false,
                 },
               },
+              leftEdge: {
+                type: "object",
+                properties: {
+                  attackingTeam: { type: "string", enum: ["home","away"] },
+                  attackingShape: { type: "string", description: "How the attack unfolds — shifts, overlaps, second-row hit-ups, kicks in behind, etc." },
+                  vulnerableTeam: { type: "string", enum: ["home","away"] },
+                  vulnerability: { type: "string", description: "What's broken on the opposing right edge defence." },
+                  keyAttackers: { type: "array", minItems: 2, maxItems: 4, items: { type: "string" } },
+                  keyDefenders: { type: "array", minItems: 2, maxItems: 3, items: { type: "string" } },
+                  tryscorerLeans: { type: "array", minItems: 1, maxItems: 3, items: { type: "string" } },
+                  gameScript: { type: "string", description: "2-3 sentence script of how the left-edge attack plays out and produces points." },
+                },
+                required: ["attackingTeam","attackingShape","vulnerableTeam","vulnerability","keyAttackers","keyDefenders","tryscorerLeans","gameScript"],
+                additionalProperties: false,
+              },
+              rightEdge: {
+                type: "object",
+                properties: {
+                  attackingTeam: { type: "string", enum: ["home","away"] },
+                  attackingShape: { type: "string" },
+                  vulnerableTeam: { type: "string", enum: ["home","away"] },
+                  vulnerability: { type: "string" },
+                  keyAttackers: { type: "array", minItems: 2, maxItems: 4, items: { type: "string" } },
+                  keyDefenders: { type: "array", minItems: 2, maxItems: 3, items: { type: "string" } },
+                  tryscorerLeans: { type: "array", minItems: 1, maxItems: 3, items: { type: "string" } },
+                  gameScript: { type: "string" },
+                },
+                required: ["attackingTeam","attackingShape","vulnerableTeam","vulnerability","keyAttackers","keyDefenders","tryscorerLeans","gameScript"],
+                additionalProperties: false,
+              },
+              tieredBets: {
+                type: "array", minItems: 3, maxItems: 3,
+                items: {
+                  type: "object",
+                  properties: {
+                    tier: { type: "string", enum: ["low","medium","high"] },
+                    legs: {
+                      type: "array", minItems: 3, maxItems: 3,
+                      items: {
+                        type: "object",
+                        properties: {
+                          market: { type: "string", description: "e.g. Anytime tryscorer, Match result, Total points" },
+                          pick: { type: "string" },
+                        },
+                        required: ["market","pick"],
+                        additionalProperties: false,
+                      },
+                    },
+                    rationale: { type: "string", description: "Why these legs combine logically into a coherent scenario." },
+                    estimatedOdds: { type: "string", description: "Optional rough $ price guess." },
+                  },
+                  required: ["tier","legs","rationale"],
+                  additionalProperties: false,
+                },
+              },
               weatherImpact: {
                 type: "object",
                 properties: {

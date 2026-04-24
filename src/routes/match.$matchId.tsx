@@ -334,9 +334,9 @@ function Stat({ label, value, accent, danger }: { label: string; value: string; 
 
 /* ================= INSIGHTS TAB ================= */
 
-function InsightsTab({ insights, insightsError, home, away, tryscorers, kickoffUtc }:
-  { insights: any; insightsError: string | null; home: string; away: string; tryscorers: TryscorerMarkets | null; kickoffUtc: string }) {
-  if (insightsError) return <Empty msg={insightsError} />;
+function InsightsTab({ insights, insightsError, home, away, tryscorers, tryscorersError, oddsError, oddsStale, kickoffUtc }:
+  { insights: any; insightsError: string | null; home: string; away: string; tryscorers: TryscorerMarkets | null; tryscorersError: string | null; oddsError: string | null; oddsStale: boolean; kickoffUtc: string }) {
+  if (insightsError && !insights) return <Empty msg={insightsError} />;
   if (!insights) return <Empty msg="Insights unavailable." />;
 
   const winnerName = insights.winner.team === "home" ? home : away;

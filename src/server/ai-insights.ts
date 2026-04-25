@@ -3,7 +3,7 @@
 
 const GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
 const MODEL = "google/gemini-2.5-pro";
-const FALLBACK_MODEL = "google/gemini-2.5-flash";
+const FALLBACK_MODEL = "google/gemini-3-flash-preview";
 const TIMEOUT_MS = 90_000; // pro model with large schema needs more headroom
 
 export type BettingAngle = {
@@ -238,7 +238,7 @@ CRITICAL betting & ODDS-MATH rules — READ CAREFULLY:
 
   const toolDef = buildToolDef();
   const messages = [
-    { role: "system", content: "You are a professional NRL analyst and betting tipster. Use only the data provided. Never invent stats, players, or odds. When real bookie odds are provided for a market, quote them EXACTLY — do not estimate. You MUST respond by calling the emit_insights tool with ALL required fields. Be concise in prose fields to stay within token limits." },
+    { role: "system", content: "You are a professional NRL analyst and betting tipster. Use only the data provided. Never invent stats, players, or odds. When real bookie odds are provided for a market, quote them EXACTLY — do not estimate. You MUST respond by calling the emit_insights tool exactly once with a single argument named payload, where payload is a raw JSON string containing the full insights object requested by the user prompt. No markdown, no code fences, no extra wrapper fields inside payload. Be concise in prose fields to stay within token limits." },
     { role: "user", content: prompt },
   ];
 
@@ -397,12 +397,7 @@ async function callGateway(
     console.error(`AI insights: no tool_call from ${model}`, { finish, content: choice?.message?.content?.slice(0, 300) });
     throw new Error(`no structured output from ${model} (finish: ${finish})`);
   }
-  try {
-    return JSON.parse(argStr) as Insights;
-  } catch (e) {
-    console.error(`AI insights: JSON.parse failed on ${model}`, { len: argStr.length, tail: argStr.slice(-200) });
-    throw new Error(`malformed JSON from ${model}`);
-  }
+  return parseInsightsFromToolArgs(argStr, model);
 }
 
 function buildToolDef() {
@@ -410,332 +405,42 @@ function buildToolDef() {
     type: "function",
     function: {
       name: "emit_insights",
-      description: "Return structured NRL match insights",
+      description: "Return structured NRL match insights inside one JSON string field named payload.",
       parameters: {
         type: "object",
         properties: {
-          predictedScore: {
-            type: "object",
-            properties: { home: { type: "number" }, away: { type: "number" } },
-            required: ["home", "away"], additionalProperties: false,
-          },
-          winner: {
-            type: "object",
-            properties: {
-              team: { type: "string", enum: ["home", "away"] },
-              confidence: { type: "number", minimum: 0, maximum: 100 },
-              reasoning: { type: "string" },
-            },
-            required: ["team", "confidence", "reasoning"], additionalProperties: false,
-          },
-          margin: {
-            type: "object",
-            properties: {
-              value: { type: "number" },
-              bucket: { type: "string", description: "e.g. 1-12, 13+, 1-6" },
-              reasoning: { type: "string" },
-            },
-            required: ["value", "bucket", "reasoning"], additionalProperties: false,
-          },
-          total: {
-            type: "object",
-            properties: {
-              line: { type: "number" },
-              pick: { type: "string", enum: ["over", "under"] },
-              reasoning: { type: "string" },
-            },
-            required: ["line", "pick", "reasoning"], additionalProperties: false,
-          },
-          htft: {
-            type: "object",
-            properties: {
-              pick: { type: "string", description: "e.g. 'Storm / Storm' or 'Draw / Storm'" },
-              reasoning: { type: "string" },
-              confidence: { type: "number", minimum: 0, maximum: 100 },
-            },
-            required: ["pick", "reasoning", "confidence"], additionalProperties: false,
-          },
-          firstTryscorer: {
-            type: "object",
-            properties: {
-              pick: { type: "string", description: "Player full name from named squads" },
-              reasoning: { type: "string" },
-            },
-            required: ["pick", "reasoning"], additionalProperties: false,
-          },
-          anytimeTryscorers: {
-            type: "array",
-            minItems: 3, maxItems: 5,
-            items: {
-              type: "object",
-              properties: {
-                pick: { type: "string" },
-                reasoning: { type: "string" },
-              },
-              required: ["pick", "reasoning"], additionalProperties: false,
-            },
-          },
-          multiTryscorer: {
-            type: "object",
-            properties: {
-              pick: { type: "string", description: "Player + 'double' or 'hat-trick'" },
-              reasoning: { type: "string" },
-              confidence: { type: "number", minimum: 0, maximum: 100 },
-            },
-            required: ["pick", "reasoning", "confidence"], additionalProperties: false,
-          },
-          keysToVictory: {
-            type: "object",
-            properties: {
-              home: { type: "array", minItems: 3, maxItems: 3, items: { type: "string", description: "Specific tactical key for home team to win" } },
-              away: { type: "array", minItems: 3, maxItems: 3, items: { type: "string", description: "Specific tactical key for away team to win" } },
-            },
-            required: ["home", "away"], additionalProperties: false,
-          },
-          keyFactors: { type: "array", items: { type: "string" }, minItems: 3, maxItems: 6 },
-          weaknessExploit: {
-            type: "object",
-            properties: {
-              home: {
-                type: "object",
-                properties: {
-                  opponentWeaknesses: {
-                    type: "array", minItems: 3, maxItems: 3,
-                    items: { type: "string", description: "Specific defensive flaw in the AWAY team — short concrete phrase" },
-                  },
-                  targetAreas: {
-                    type: "array", minItems: 1, maxItems: 3,
-                    items: { type: "string", description: "Channel / phase / part of the field to attack" },
-                  },
-                  tacticalPlan: { type: "string", description: "2-3 sentences on how to weaponise the weaknesses" },
-                  playersToWatch: {
-                    type: "array", minItems: 3, maxItems: 3,
-                    items: {
-                      type: "object",
-                      properties: {
-                        name: { type: "string", description: "Named squad player from HOME team" },
-                        role: { type: "string", description: "Position / role" },
-                        why: { type: "string", description: "Why they score or influence — 1 sentence" },
-                      },
-                      required: ["name", "role", "why"], additionalProperties: false,
-                    },
-                  },
-                },
-                required: ["opponentWeaknesses", "targetAreas", "tacticalPlan", "playersToWatch"], additionalProperties: false,
-              },
-              away: {
-                type: "object",
-                properties: {
-                  opponentWeaknesses: {
-                    type: "array", minItems: 3, maxItems: 3,
-                    items: { type: "string", description: "Specific defensive flaw in the HOME team — short concrete phrase" },
-                  },
-                  targetAreas: {
-                    type: "array", minItems: 1, maxItems: 3,
-                    items: { type: "string" },
-                  },
-                  tacticalPlan: { type: "string" },
-                  playersToWatch: {
-                    type: "array", minItems: 3, maxItems: 3,
-                    items: {
-                      type: "object",
-                      properties: {
-                        name: { type: "string", description: "Named squad player from AWAY team" },
-                        role: { type: "string" },
-                        why: { type: "string" },
-                      },
-                      required: ["name", "role", "why"], additionalProperties: false,
-                    },
-                  },
-                },
-                required: ["opponentWeaknesses", "targetAreas", "tacticalPlan", "playersToWatch"], additionalProperties: false,
-              },
-            },
-            required: ["home", "away"], additionalProperties: false,
-          },
-          bets: {
-            type: "array",
-            description: "Exactly TEN bet plays — one per category — every one in the same shape so the UI renders identical cards. Reasoning must align with the rest of the analysis.",
-            minItems: 10, maxItems: 10,
-            items: {
-              type: "object",
-              properties: {
-                category: {
-                  type: "string",
-                  enum: ["gameScript","lowRisk","mediumRisk","highRisk","getThea","upset","bookieWant","bookieFear","anytime","firstTryscorer"],
-                  description: "Which category this bet fills. Each category MUST appear exactly once. Sizing rules: gameScript=4-6 legs (aligned multi, $10 stake); lowRisk=2-3 legs (~$100 from $5); mediumRisk=3-4 legs (~$500 from $5); highRisk=4-5 legs (~$1,000 from $5); getThea=4-5 long legs (~$10,000 from $5); upset=1 leg ('<underdog> to win' at real h2h price, $20 stake); bookieWant=1-2 legs aligned with bookieScript.wantToWin ($10); bookieFear=2-3 legs leaning into bookieScript.wantToLose ($10); anytime=3-4 anytime-tryscorer legs ($10); firstTryscorer=1 leg '<player> first tryscorer' ($5).",
-                },
-                title: { type: "string", description: "Short headline. NEVER use handicap markets like 'Roosters -12.5'." },
-                legs: {
-                  type: "array",
-                  minItems: 1, maxItems: 6,
-                  items: {
-                    type: "object",
-                    properties: {
-                      pick: { type: "string", description: "One leg. Allowed: head-to-head winner, margin BUCKETS ('1-12', '13+', '1-6', '7-12', '13-24', '25+'), total over/under, HT/FT, anytime/first tryscorer, try-count buckets ('1-2 tries', '3+ tries'). NEVER handicap/spread/line. NEVER 'over 0.5 tries'." },
-                      decimalOdds: { type: "number", description: "Decimal odds — quote LIVE BOOKIE ODDS exactly when the leg matches." },
-                    },
-                    required: ["pick", "decimalOdds"], additionalProperties: false,
-                  },
-                },
-                combinedOdds: { type: "number", description: "Product of all leg decimalOdds." },
-                stake: { type: "string", description: "Suggested stake string e.g. '$5'." },
-                reasoning: { type: "string", description: "2-3 sentences citing stats / lineups / form / weakness exploit / X-factor — why this bet aligns with the rest of the analysis." },
-              },
-              required: ["category", "title", "legs", "combinedOdds", "stake", "reasoning"],
-              additionalProperties: false,
-            },
-          },
-          gameFlow: {
-            type: "object",
-            description: "Quarter-by-quarter script: how the game likely unfolds with HT score, momentum swings and HT/FT double pick.",
-            properties: {
-              openingTen: { type: "string", description: "1-2 sentences on the first 10 minutes — who starts hot, early field position." },
-              firstHalf: { type: "string", description: "2-3 sentences on how the first 40 plays out." },
-              halftimeScore: {
-                type: "object",
-                properties: { home: { type: "number" }, away: { type: "number" } },
-                required: ["home", "away"], additionalProperties: false,
-              },
-              halftimeLeader: { type: "string", enum: ["home", "away", "draw"] },
-              secondHalf: { type: "string", description: "2-3 sentences on the second 40." },
-              momentumSwings: {
-                type: "array", minItems: 2, maxItems: 4,
-                items: { type: "string", description: "Time-stamped swing e.g. '10-20min: Storm grab early lead'." },
-              },
-              halftimeDouble: {
-                type: "object",
-                properties: {
-                  pick: { type: "string", description: "HT/FT pick e.g. 'Storm / Storm' or 'Draw / Storm'." },
-                  reasoning: { type: "string" },
-                  confidence: { type: "number", minimum: 0, maximum: 100 },
-                },
-                required: ["pick", "reasoning", "confidence"], additionalProperties: false,
-              },
-              closing: { type: "string", description: "1-2 sentences on the final 10." },
-            },
-            required: ["openingTen", "firstHalf", "halftimeScore", "halftimeLeader", "secondHalf", "momentumSwings", "halftimeDouble", "closing"],
-            additionalProperties: false,
-          },
-          tryscorerScript: {
-            type: "object",
-            description: "Tryscoring script — 3-4 picks per team with real prices when available, plus 1-2 trap players to avoid.",
-            properties: {
-              home: {
-                type: "object",
-                properties: {
-                  picks: {
-                    type: "array", minItems: 3, maxItems: 4,
-                    items: {
-                      type: "object",
-                      properties: {
-                        name: { type: "string", description: "Named home squad player." },
-                        market: { type: "string", enum: ["first", "anytime", "2+"] },
-                        price: { type: ["number", "null"], description: "Exact price from LIVE BOOKIE ODDS, else null." },
-                        reasoning: { type: "string", description: "1-2 sentences on form, matchup, role." },
-                      },
-                      required: ["name", "market", "price", "reasoning"], additionalProperties: false,
-                    },
-                  },
-                  avoid: {
-                    type: "array", minItems: 1, maxItems: 2,
-                    items: {
-                      type: "object",
-                      properties: {
-                        name: { type: "string" },
-                        reasoning: { type: "string", description: "Why fade this name this week — 1 sentence." },
-                      },
-                      required: ["name", "reasoning"], additionalProperties: false,
-                    },
-                  },
-                },
-                required: ["picks", "avoid"], additionalProperties: false,
-              },
-              away: {
-                type: "object",
-                properties: {
-                  picks: {
-                    type: "array", minItems: 3, maxItems: 4,
-                    items: {
-                      type: "object",
-                      properties: {
-                        name: { type: "string", description: "Named away squad player." },
-                        market: { type: "string", enum: ["first", "anytime", "2+"] },
-                        price: { type: ["number", "null"] },
-                        reasoning: { type: "string" },
-                      },
-                      required: ["name", "market", "price", "reasoning"], additionalProperties: false,
-                    },
-                  },
-                  avoid: {
-                    type: "array", minItems: 1, maxItems: 2,
-                    items: {
-                      type: "object",
-                      properties: {
-                        name: { type: "string" },
-                        reasoning: { type: "string" },
-                      },
-                      required: ["name", "reasoning"], additionalProperties: false,
-                    },
-                  },
-                },
-                required: ["picks", "avoid"], additionalProperties: false,
-              },
-              summary: { type: "string", description: "2-3 sentences on the overall tryscoring picture." },
-            },
-            required: ["home", "away", "summary"], additionalProperties: false,
-          },
-          script: {
-            type: "object",
-            properties: {
-              headToHead: { type: "string", description: "3-5 sentences: recent H2H meetings, score trends, venue history at this ground, who has owned the rivalry, tactical patterns deciding recent matchups." },
-              formAnalysis: { type: "string", description: "3-5 sentences: last-5 trajectories, attack vs defence, points-for/against trend, quality of opposition, whether form is real or schedule-inflated." },
-              xFactor: { type: "string", description: "Single biggest swing variable — one player, matchup, or tactical lever — and what tips the game when it fires." },
-              psychological: { type: "string", description: "4-6 sentences covering ladder positioning pressure, occasion, expected sell-out / crowd, recent emotional peaks, home vs away mentality, and stadium voodoo / hoodoos." },
-              milestones: {
-                type: "array",
-                minItems: 1, maxItems: 4,
-                items: { type: "string", description: "Notable milestone for player/coach/club" },
-              },
-              bookieScript: {
-                type: "object",
-                properties: {
-                  wantToWin: { type: "string", description: "The result/outcome bookmakers want — public is on the other side, low liability" },
-                  wantToLose: { type: "string", description: "The result/outcome bookmakers fear — heavy public money, big payout exposure" },
-                  liability: { type: "string", description: "One-sentence summary of where the book is most exposed" },
-                },
-                required: ["wantToWin", "wantToLose", "liability"], additionalProperties: false,
-              },
-              matchFix: {
-                type: "object",
-                description: "Tongue-in-cheek 'how the NRL would script this for ratings/money' read. Satirical, never an actual accusation.",
-                properties: {
-                  preferredWinner: { type: "string", description: "Which side V'landys / the broadcast would quietly prefer to win, with the commercial reason." },
-                  ratingsAngle: { type: "string", description: "2-3 sentences on the broadcast's dream script tied to ratings." },
-                  refereeNudges: {
-                    type: "array", minItems: 3, maxItems: 5,
-                    items: { type: "string", description: "Cheeky bullet on the 'lean' — penalty count, captain's challenge, bunker, six-again, late obstruction call." },
-                  },
-                  narrativeMoment: { type: "string", description: "The single storyline the NRL is engineering." },
-                  conspiracyRating: { type: "number", minimum: 0, maximum: 100, description: "0-100 'how scripted does this feel?' meter." },
-                },
-                required: ["preferredWinner", "ratingsAngle", "refereeNudges", "narrativeMoment", "conspiracyRating"],
-                additionalProperties: false,
-              },
-            },
-            required: ["headToHead", "formAnalysis", "xFactor", "psychological", "milestones", "bookieScript", "matchFix"], additionalProperties: false,
+          payload: {
+            type: "string",
+            description: "A raw JSON string for the FULL insights object requested in the prompt. No markdown fences. The JSON inside payload must include: predictedScore, winner, margin, total, htft, firstTryscorer, anytimeTryscorers, multiTryscorer, keysToVictory, keyFactors, weaknessExploit, bets, gameFlow, tryscorerScript, and script."
           },
         },
-        required: [
-          "predictedScore","winner","margin","total","htft",
-          "firstTryscorer","anytimeTryscorers","multiTryscorer",
-          "keysToVictory","keyFactors","weaknessExploit","bets",
-          "gameFlow","tryscorerScript","script",
-        ],
+        required: ["payload"],
         additionalProperties: false,
       },
     },
   };
+}
+
+function parseInsightsFromToolArgs(argStr: string, model: string): Insights {
+  const stripCodeFences = (value: string) => value
+    .trim()
+    .replace(/^```json\s*/i, "")
+    .replace(/^```\s*/i, "")
+    .replace(/```$/i, "")
+    .trim();
+
+  try {
+    const parsedArgs = JSON.parse(argStr) as { payload?: unknown } | Insights;
+
+    if (parsedArgs && typeof parsedArgs === "object" && "payload" in parsedArgs && typeof parsedArgs.payload === "string") {
+      return JSON.parse(stripCodeFences(parsedArgs.payload)) as Insights;
+    }
+
+    return parsedArgs as Insights;
+  } catch (e) {
+    console.error(`AI insights: JSON.parse failed on ${model}`, { len: argStr.length, tail: argStr.slice(-200) });
+    throw new Error(`malformed JSON from ${model}`);
+  }
 }
 
 // Recompute combinedOdds = product(legs) and potentialReturn = stake × combinedOdds.

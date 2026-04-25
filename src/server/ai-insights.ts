@@ -2,7 +2,7 @@
 // Uses tool-calling for structured output. Receives ONLY real data summaries.
 
 const GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
-const MODEL = "google/gemini-2.5-flash";
+const MODEL = "google/gemini-2.5-pro";
 
 export type BettingAngle = {
   market: string;

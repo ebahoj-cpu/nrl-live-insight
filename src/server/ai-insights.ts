@@ -19,36 +19,29 @@ export type BetLeg = {
   decimalOdds: number;   // e.g. 1.45
 };
 
-export type BetSuggestion = {
-  risk: "low" | "medium" | "high";
-  title: string;          // e.g. "Roosters win + Tedesco anytime + Tupou 1-2 tries"
-  legs: BetLeg[];         // each leg with its own decimal odds
-  combinedOdds: number;   // computed product of leg odds (server-recomputed for safety)
-  estimatedOdds: string;  // formatted, e.g. "$5.00"
-  stake: string;          // e.g. "$20"
-  potentialReturn: string;// e.g. "$100" (server-recomputed)
-  targetPayout: "100" | "1000" | "10000"; // tier this bet is sized to deliver
-  reasoning: string;      // why this combo
+// Unified shape used by EVERY bet card on the Bets tab.
+// Each bet has 1-5 legs with real prices, server-computed math, and a "why".
+export type BetPlay = {
+  title: string;            // headline e.g. "Storm win + Munster anytime + 13+ margin"
+  legs: BetLeg[];           // 1-5 legs with real bookie prices
+  combinedOdds: number;     // server-recomputed product of leg odds
+  estimatedOdds: string;    // formatted "$5.00"
+  stake: string;            // "$5", "$20", etc.
+  potentialReturn: string;  // server-recomputed stake × combinedOdds
+  reasoning: string;        // 2-3 sentences citing stats, lineups, script, form
 };
 
-export type GetTheaSpecial = {
-  title: string;          // headline e.g. "GET THEA: Storm win + 13+ + Munster anytime + over 39.5"
-  legs: BetLeg[];         // 3-5 legs that multiply to ~200x
-  combinedOdds: number;   // ~200 to deliver $1,000 from $5
-  stake: string;          // "$5"
-  potentialReturn: string;// "$1,000"
-  reasoning: string;      // why this is THE bet of the slate (uses stats, form, weakness, weather)
-  confidence: number;     // 0-100 how confident the AI is
-};
-
-export type UpsetPlay = {
-  underdog: string;        // team nickname tipped to upset
-  upsetOdds: number;       // real h2h price for the underdog
-  probability: number;     // 0-100 honest read
-  reasoning: string;       // 3-5 sentences why it could land
-  keyFactors: string[];    // 2-4 bullet reasons (form, injuries, matchup, weather, motivation)
-  suggestedPlay: { pick: string; decimalOdds: number; stake: string; potentialReturn: string };
-};
+export type BetCategoryKey =
+  | "gameScript"      // aligns with stats: winner + margin + total + HT/FT + 2 tryscorers
+  | "lowRisk"         // ~$100 return on $5 stake (~20x)
+  | "mediumRisk"      // ~$500 return on $5 stake (~100x)
+  | "highRisk"        // ~$1,000 return on $5 stake (~200x)
+  | "getThea"         // ~$10,000 return on $5 stake (~2000x)
+  | "upset"           // against the market — underdog wins
+  | "bookieWant"      // result the bookies WANT to land (low liability)
+  | "bookieFear"      // result the bookies FEAR (heavy public exposure)
+  | "anytime"         // pure anytime tryscorer multi
+  | "firstTryscorer"; // standalone single first-tryscorer bet
 
 export type GameFlow = {
   openingTen: string;          // who starts hot, who is slow out the blocks

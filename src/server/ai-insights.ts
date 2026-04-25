@@ -178,6 +178,14 @@ Then produce a deep "script" with these distinct sections:
 
 Also produce a "bookieScript": from a sharp Australian bookmaker's perspective, which result/outcome they WANT to land (limits liability, public is on the other side), which result they want to AVOID (heavy public liability), and a one-sentence summary of where their book is most exposed.
 
+ALSO produce a "matchFix" — a tongue-in-cheek "how the NRL would script this game for ratings/money" read. Be playful and clearly satirical (not a real accusation), but anchor it in genuine commercial logic — TV ratings, prime-time market (Sydney/Brisbane/Melbourne), finals race implications, marquee player storylines, sponsor angle, attendance, and the league office's preferred narrative.
+- preferredWinner: which side V'landys / the broadcast would quietly prefer to win, and the commercial reason (e.g. "Storm — keeps Melbourne market engaged for finals push").
+- ratingsAngle: 2-3 sentences on the broadcast's dream script — close margin into the last 10? blowout for a marquee? a comeback? Tie it to ratings.
+- refereeNudges: 3-5 cheeky bullets on the "lean" — penalty count direction, captain's-challenge timing, bunker leniency on a marquee scorer, six-again calls in key sets, late-game obstruction call. Keep it cheeky / wink-wink, not malicious.
+- narrativeMoment: the single storyline the NRL is engineering — return game, milestone try, coach-on-the-brink, retiring legend, debutant fairytale.
+- conspiracyRating: 0-100 "how scripted does this feel?" meter (most matches sit 30-60 — a marquee finals race or grand-final rematch can sit higher).
+
+
 ALSO produce a "weaknessExploit" for EACH team. For each side identify:
 - opponentWeaknesses: an array of EXACTLY 3 distinct, specific defensive flaws in the OPPOSITION based on recent form / known matchup data. Each one a concrete short phrase, e.g. "Right-edge defence leaking tries — missed tackle % at left centre", "Ruck speed drops sharply in second half", "Vulnerable under high bombs on left wing", "Slow line-speed against shape plays from scrum".
 - targetAreas: an array of 1-3 specific channels / phases / parts of the field to attack — e.g. "Right edge 20m channel", "Inside ball off the ruck", "Bomb contests on the left wing", "Short side from scrum".

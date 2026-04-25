@@ -141,14 +141,14 @@ export function MatchCard({ fixture, odds }: { fixture: NrlFixture & { weather?:
 
       {/* Footer — weather/ground left, view analysis right */}
       <div className="mt-5 pt-4 border-t border-border flex items-center justify-between gap-3 text-xs">
-        <div className="inline-flex items-center gap-1.5 text-muted-foreground min-w-0">
+        <div className="inline-flex items-center gap-1.5 text-muted-foreground min-w-0" suppressHydrationWarning>
           <CloudSun className="h-3.5 w-3.5 shrink-0 text-accent" />
           {w ? (
-            <span className="truncate">
+            <span className="truncate" suppressHydrationWarning>
               {w.tempC}° {shortCondition(w.condition)}
             </span>
           ) : (
-            <span className="truncate">Forecast pending</span>
+            <span className="truncate" suppressHydrationWarning>Forecast pending</span>
           )}
         </div>
         <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-accent !text-white font-bold text-xs tracking-wide group-hover:gap-2.5 transition-all shrink-0 shadow-[0_4px_14px_-4px_color-mix(in_oklab,var(--accent)_60%,transparent)]">

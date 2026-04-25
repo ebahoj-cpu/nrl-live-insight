@@ -1,6 +1,8 @@
 // AI-generated betting insights via Lovable AI Gateway.
 // Uses tool-calling for structured output. Receives ONLY real data summaries.
 
+import { dedupeInsights } from "./dedupe-insights";
+
 const GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
 // Use the strongest reasoning model — insights are generated ONCE per match
 // and cached until ~1h before kickoff, so the extra latency/cost is paid once

@@ -151,7 +151,7 @@ export function MatchCard({ fixture, odds }: { fixture: NrlFixture & { weather?:
             <span className="truncate">Forecast pending</span>
           )}
         </div>
-        <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-accent !text-white font-bold text-[11px] uppercase tracking-wider group-hover:gap-2.5 transition-all shrink-0 shadow-[0_4px_14px_-4px_color-mix(in_oklab,var(--accent)_60%,transparent)]">
+        <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-accent !text-white font-bold text-xs tracking-wide group-hover:gap-2.5 transition-all shrink-0 shadow-[0_4px_14px_-4px_color-mix(in_oklab,var(--accent)_60%,transparent)]">
           View Analysis <ArrowRight className="h-3.5 w-3.5" />
         </span>
       </div>

@@ -50,6 +50,29 @@ export type UpsetPlay = {
   suggestedPlay: { pick: string; decimalOdds: number; stake: string; potentialReturn: string };
 };
 
+export type GameFlow = {
+  openingTen: string;          // who starts hot, who is slow out the blocks
+  firstHalf: string;           // 2-3 sentences on how first half plays out
+  halftimeScore: { home: number; away: number };
+  halftimeLeader: "home" | "away" | "draw";
+  secondHalf: string;          // 2-3 sentences on how second half plays out
+  momentumSwings: string[];    // 2-4 short bullets: "10-20min: Storm grab early lead", "55min: away comeback"
+  halftimeDouble: { pick: string; reasoning: string; confidence: number }; // e.g. "Storm / Storm"
+  closing: string;             // final 10 minutes — likely close game, blowout, late try?
+};
+
+export type TryscorerScript = {
+  home: {
+    picks: { name: string; market: "first" | "anytime" | "2+"; price: number | null; reasoning: string }[]; // 3-4
+    avoid: { name: string; reasoning: string }[]; // 1-2 trap players to fade this week
+  };
+  away: {
+    picks: { name: string; market: "first" | "anytime" | "2+"; price: number | null; reasoning: string }[]; // 3-4
+    avoid: { name: string; reasoning: string }[];
+  };
+  summary: string; // 2-3 sentences: overall tryscoring read for the match
+};
+
 
 export type Insights = {
   predictedScore: { home: number; away: number };
@@ -79,6 +102,8 @@ export type Insights = {
   betSuggestions: BetSuggestion[];
   getTheaSpecial: GetTheaSpecial;
   upset: UpsetPlay;
+  gameFlow: GameFlow;
+  tryscorerScript: TryscorerScript;
   script: {
     headToHead: string;
     formAnalysis: string;

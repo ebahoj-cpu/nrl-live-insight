@@ -177,14 +177,6 @@ ALSO produce a "weaknessExploit" for EACH team. For each side identify:
 - tacticalPlan: 2-3 sentences on HOW this team weaponises those weaknesses — shape, ball-runners, kicking game, set-piece.
 - playersToWatch: exactly 3 NAMED squad players from THIS team most likely to score or directly influence scoring against those weaknesses — for each give role and a one-sentence why. Use only players from the named squad above.
 
-ALSO produce ONE "upset" object — the most credible underdog scenario:
-- underdog: the team nickname currently priced as the underdog in the head-to-head (longer h2h price). If the match is essentially even, pick the side with the longer price.
-- upsetOdds: the EXACT real h2h price for that underdog from the LIVE BOOKIE ODDS block above. Do NOT invent.
-- probability: an honest 0-100 read of how likely the upset is. Be realistic — most upsets sit 25-40%.
-- reasoning: 3-5 sentences citing form trajectory, key match-up, weather, travel, motivation, or X-factor.
-- keyFactors: 2-4 short bullets — concrete reasons the upset can land.
-- suggestedPlay: a single straight bet — pick = "<underdog> to win", decimalOdds = the real h2h underdog price, stake "$20", potentialReturn = stake × odds rounded to whole dollars (e.g. "$60").
-
 ALSO produce a "gameFlow" object — a quarter-by-quarter script of how the match likely unfolds:
 - openingTen: 1-2 sentences. Who starts hot, who is slow out the blocks, early field-position battle, opening kick chase.
 - firstHalf: 2-3 sentences on how the first 40 mins plays out — completion battle, who scores first, set-piece tries, defensive lapses.

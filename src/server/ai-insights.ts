@@ -1339,6 +1339,139 @@ function buildFallbackInsights(payload: {
         conspiracyRating: clamp(42 + (marginValue <= 6 ? 12 : 4) + (payload.realOdds ? 4 : 0), 25, 72),
       },
     },
+    scriptAnalyst: buildFallbackScriptAnalyst({
+      homeName: payload.homeName,
+      awayName: payload.awayName,
+      venue: payload.venue,
+      winnerTeam,
+      winnerName,
+      loserName,
+      homeScore,
+      awayScore,
+      marginValue,
+      marginBucket,
+      totalLine,
+      totalPick,
+      htftPick,
+      firstTryName,
+      anytimePicks,
+      winnerCore,
+      loserCore,
+      homeFormScore,
+      awayFormScore,
+      wetWeather,
+      windy,
+      homePosition: payload.homePosition,
+      awayPosition: payload.awayPosition,
+    }),
+  };
+}
+
+function buildFallbackScriptAnalyst(input: {
+  homeName: string;
+  awayName: string;
+  venue: string;
+  winnerTeam: "home" | "away";
+  winnerName: string;
+  loserName: string;
+  homeScore: number;
+  awayScore: number;
+  marginValue: number;
+  marginBucket: string;
+  totalLine: number;
+  totalPick: "over" | "under";
+  htftPick: string;
+  firstTryName: string;
+  anytimePicks: RankedPlayer[];
+  winnerCore: RankedPlayer[];
+  loserCore: RankedPlayer[];
+  homeFormScore: number;
+  awayFormScore: number;
+  wetWeather: boolean;
+  windy: boolean;
+  homePosition?: string;
+  awayPosition?: string;
+}): ScriptAnalyst {
+  const { homeName, awayName, winnerTeam, winnerName, loserName } = input;
+  const fav = winnerName;
+  const dog = loserName;
+  const homeIsFav = winnerTeam === "home";
+  const homeDriver = playerName(input.winnerCore[0] ?? input.loserCore[0], homeName);
+  const homeDriver2 = playerName(input.winnerCore[1] ?? input.loserCore[0], homeName);
+  const awayDriver = playerName(input.loserCore[0] ?? input.winnerCore[0], awayName);
+  const awayDriver2 = playerName(input.loserCore[1] ?? input.winnerCore[1], awayName);
+
+  return {
+    overview: {
+      ladderContext: `${homeName} (${input.homePosition ?? "ladder spot pending"}) host ${awayName} (${input.awayPosition ?? "ladder spot pending"}) with both sides chasing differential points.`,
+      formContext: `Recent form reads ${formTag(input.homeFormScore)} for ${homeName} and ${formTag(input.awayFormScore)} for ${awayName} across the last five.`,
+      headToHead: `${homeName} carry the venue edge at ${input.venue}; recent meetings have leaned tight rather than blow-out.`,
+      stylisticContrast: `${fav} project as the more structured, set-piece-heavy side, while ${dog} need to manufacture chances off broken-play moments and edge shape.`,
+      contestSummary: `Expect a territory-led contest decided in the third quarter rather than a free-flowing shootout.`,
+    },
+    stakes: {
+      home: {
+        implications: `A win lifts ${homeName} up the ladder differential and tightens their finals positioning.`,
+        pressure: homeIsFav ? `Favourites at home — anything less than two points reads as a missed opportunity.` : `Underdog upset window — a result here changes the run-home conversation.`,
+        narrative: `${homeName} need to back up the early-week noise with a composed home performance.`,
+        psychology: homeIsFav ? `Confidence side — they expect to win, so the test is handling the chase if ${awayName} hang around late.` : `Desperation side — they have to play loose enough to take chances but tight enough to avoid blowing them.`,
+      },
+      away: {
+        implications: `A road win for ${awayName} swings ladder momentum and applies pressure on the sides above them.`,
+        pressure: homeIsFav ? `Underdog opportunity on the road — nothing to lose, everything to gain.` : `Travelling favourite — the expectation is they handle the venue and the noise.`,
+        narrative: `${awayName} can flip the storyline of the round with a controlled away result.`,
+        psychology: homeIsFav ? `Free swing — they can play with confidence because the market has already priced them out.` : `Burden of being the favourite on the road — composure under crowd pressure is the test.`,
+      },
+    },
+    homeWinningScript: {
+      opening: `${homeName} start with sharp kick-pressure to pin ${awayName} deep, defending hard for the first two sets to set the tone${input.wetWeather ? " in greasy conditions" : ""}.`,
+      tacticalFocus: `Dominate the middle third with quick play-the-balls, then use the dominant edge to attack ${awayName}'s slide once their forwards tire after 25 minutes.`,
+      keyDrivers: [homeDriver, homeDriver2].filter(Boolean),
+      closingOut: `Once in front, ${homeName} kill the game with possession through the middle and exit kicks that flip ${awayName} back into their own half — a 60-80 minute possession lock-down.`,
+    },
+    awayWinningScript: {
+      opening: `${awayName} weather the early storm, prioritise completion in their own half, and force ${homeName} into low-percentage long-range attempts.`,
+      tacticalFocus: `Pick the right moments to inject pace — quick taps, second-phase ball off the edge — and tilt the territory by hitting one bomb-and-chase win.`,
+      keyMatchups: [
+        `${awayDriver} vs ${homeName}'s spine — winning the ruck speed battle.`,
+        `${awayDriver2} vs ${homeName}'s edge defence — exploiting the slide on second-phase ball.`,
+      ],
+      endgame: `If ${awayName} are within a score with 15 to play, they back themselves to manufacture one late piece of brilliance${homeIsFav ? "; chasing is harder if they fall more than 12 down." : "; protecting a lead means winning the kick exchange in the final 10."}`,
+    },
+    idealNarrative: {
+      storyline: `The most compelling version of this match is a tight, momentum-swinging contest with the lead changing hands at least twice and the result undecided inside the last 10.`,
+      starMoments: [
+        `${homeDriver} producing a piece of brilliance to put ${homeName} in front mid-second half.`,
+        `${awayDriver} answering with a try-saver or game-breaker to reset the contest.`,
+        `A late-game kick or scramble defence sequence that decides the result.`,
+      ],
+      finishType: `A one-score finish inside the final five — either a clutch field goal, a chase-down try, or a goal-line stand — keeps the broadcast peaking until the siren.`,
+      fanAngle: `A close result with star moments protects the round narrative, drives social media engagement and keeps both fanbases invested for next week.`,
+    },
+    marketLean: {
+      favouriteVsUnderdog: `${fav} priced as the favourite — the market reads them as the structurally more reliable side, with ${dog} priced for the upset shot.`,
+      coverLikelihood: input.marginValue <= 6
+        ? `The line is tight enough that ${fav} covering is no certainty — recent form points to a one-score finish.`
+        : `${fav} have the profile to cover comfortably if the script lands; ${dog} need an early swing to keep the spread live.`,
+      totalsAngle: `Total sits around ${input.totalLine} — recent scoring trends ${input.totalPick === "over" ? "lean over the line, especially if both spines fire." : "lean under the line, especially if the kicking exchange dominates."}`,
+      valueOrRisk: `Value sits in ${fav}-correlated plays (winner + margin + headline tryscorer) when the script lands; the risk is a script flip from an early sin bin or weather change.`,
+    },
+    predictions: {
+      winner: { team: winnerTeam, reasoning: `${winnerName} rate higher on form, structure and territory profile, with ${homeIsFav ? "home advantage" : "the stronger market lean"} pushing them to the line.` },
+      margin: { range: input.marginBucket, reasoning: input.marginValue <= 6 ? `Profile favours a one-score finish, not a blowout.` : `${winnerName} project to break the game open in the third quarter.` },
+      predictedScore: { home: input.homeScore, away: input.awayScore, reasoning: `Score reflects the dominant side controlling territory while both sides land structured tries.` },
+      totalPoints: { lean: input.totalPick, line: input.totalLine, reasoning: `${input.wetWeather || input.windy ? "Weather trims fluency, " : "Both sides have enough strike, "}${input.totalPick === "over" ? "so the totals lean over." : "so the safer read is under."}` },
+      htft: { pick: input.htftPick, reasoning: `${winnerName} look the steadier side across both halves; halftime state should track the eventual winner.` },
+      firstTryscorer: { name: input.firstTryName, reasoning: `${input.firstTryName} sits in the cleanest first-strike lane through early shift ball and red-zone usage.` },
+      scoringPool: input.anytimePicks.slice(0, 4).map((p, i) => ({
+        name: playerName(p, i < 2 ? winnerName : loserName),
+        reasoning: `${playerName(p, i < 2 ? winnerName : loserName)} carries early-set involvement and is in the first-three-tryscorer conversation.`,
+      })),
+      anytimeTryscorers: input.anytimePicks.map((p, i) => ({
+        name: playerName(p, i < 2 ? winnerName : loserName),
+        reasoning: `${playerName(p, i < 2 ? winnerName : loserName)} sits in a high-touch scoring lane and matches up well with the edge pressure expected in this game.`,
+      })),
+    },
   };
 }
 

@@ -995,6 +995,7 @@ function BetsTab({ insights, insightsError, insightsLoading }: { insights: any; 
   return (
     <div className="space-y-4">
       {insights.getTheaSpecial && <GetTheaCard special={insights.getTheaSpecial} />}
+      {insights.upset && <UpsetCard upset={insights.upset} /> }
 
       {sorted.map((b: any, i: number) => {
         const meta = riskMeta[b.risk] ?? riskMeta.medium;
@@ -1047,6 +1048,62 @@ function BetsTab({ insights, insightsError, insightsLoading }: { insights: any; 
           </div>
         );
       })}
+    </div>
+  );
+}
+
+function UpsetCard({ upset }: { upset: any }) {
+  const odds = Number(upset.upsetOdds ?? upset.suggestedPlay?.decimalOdds) || 0;
+  const prob = Math.round(Number(upset.probability) || 0);
+  return (
+    <div className="relative overflow-hidden rounded-2xl border-2 border-yellow-500/60 bg-gradient-to-br from-yellow-500/10 via-surface-2/50 to-danger/5 p-5">
+      <div className="absolute top-0 right-0 px-3 py-1 bg-yellow-500 text-yellow-950 text-[10px] font-black uppercase tracking-widest rounded-bl-xl">
+        🚨 Upset
+      </div>
+      <div className="flex items-center gap-2 mb-1">
+        <Zap className="h-5 w-5 text-yellow-500" />
+        <div className="text-[10px] uppercase tracking-[0.25em] font-black text-yellow-500">Upset watch</div>
+      </div>
+      <p className="text-[11px] text-muted-foreground mb-3 italic">
+        The most credible underdog scenario. Real h2h bookie price.
+      </p>
+
+      <div className="flex items-baseline gap-3 mb-3">
+        <h3 className="font-black text-xl leading-tight">{upset.underdog} to win</h3>
+        <span className="kbd font-black text-yellow-500 text-lg">${odds.toFixed(2)}</span>
+      </div>
+
+      {upset.keyFactors?.length > 0 && (
+        <ul className="space-y-1.5 mb-4">
+          {upset.keyFactors.map((f: string, i: number) => (
+            <li key={i} className="flex items-center gap-2 text-sm rounded-md bg-background/40 px-2.5 py-2 border border-yellow-500/20">
+              <span className="text-yellow-500 shrink-0">⚡</span>
+              <span className="font-medium">{f}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <div className="grid grid-cols-4 gap-2 mb-3 pt-3 border-t border-yellow-500/30">
+        <div className="text-center">
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Odds</div>
+          <div className="text-lg font-black kbd text-yellow-500">${odds.toFixed(2)}</div>
+        </div>
+        <div className="text-center">
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Stake</div>
+          <div className="text-lg font-black kbd">{upset.suggestedPlay?.stake || "$20"}</div>
+        </div>
+        <div className="text-center">
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Return</div>
+          <div className="text-lg font-black kbd text-yellow-500">{upset.suggestedPlay?.potentialReturn || "—"}</div>
+        </div>
+        <div className="text-center">
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Chance</div>
+          <div className="text-lg font-black kbd">{prob}%</div>
+        </div>
+      </div>
+
+      <p className="text-xs text-muted-foreground leading-relaxed">{upset.reasoning}</p>
     </div>
   );
 }

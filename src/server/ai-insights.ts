@@ -66,6 +66,7 @@ export type Insights = {
     };
   };
   betSuggestions: BetSuggestion[];
+  getTheaSpecial: GetTheaSpecial;
   script: {
     headToHead: string;
     formAnalysis: string;

@@ -1245,12 +1245,14 @@ function TryscorerTeamBlock({ team, data }: {
 }
 
 type BetCategoryKey =
-  | "gameScript" | "lowRisk" | "mediumRisk" | "highRisk" | "getThea"
-  | "upset" | "bookieWant" | "bookieFear" | "anytime" | "firstTryscorer";
+  | "gameScript" | "smallStake" | "mediumStake" | "bigStake" | "getThea"
+  | "anytimeMulti" | "multiTryStack" | "pointsParty"
+  | "upset" | "bookieFear" | "firstTryscorer";
 
 const BET_ORDER: BetCategoryKey[] = [
-  "gameScript", "lowRisk", "mediumRisk", "highRisk", "getThea",
-  "upset", "bookieWant", "bookieFear", "anytime", "firstTryscorer",
+  "gameScript", "smallStake", "mediumStake", "bigStake", "getThea",
+  "anytimeMulti", "multiTryStack", "pointsParty",
+  "upset", "bookieFear", "firstTryscorer",
 ];
 
 const BET_META: Record<BetCategoryKey, {
@@ -1260,16 +1262,17 @@ const BET_META: Record<BetCategoryKey, {
   Icon: any;
   accent: string; // tailwind colour class fragment for borders/text
 }> = {
-  gameScript:     { label: "Game Script Bet",  tagline: "Aligns with the stats: winner + margin + total + HT/FT + a tryscorer from each team.", target: "Aligned multi", Icon: ScrollText, accent: "accent" },
-  lowRisk:        { label: "Low Risk Bet",     tagline: "Low risk, low return — aiming around $100 from a $5 stake.",                          target: "~$100",         Icon: Shield,    accent: "emerald-500" },
-  mediumRisk:     { label: "Medium Risk Bet",  tagline: "Medium risk, medium return — aiming around $500.",                                    target: "~$500",         Icon: Activity,  accent: "yellow-500" },
-  highRisk:       { label: "High Risk Bet",    tagline: "High risk, high return — aiming around $1,000.",                                      target: "~$1,000",       Icon: Crosshair, accent: "orange-500" },
-  getThea:        { label: "GET THEA Bet",     tagline: "The bet of the slate — aiming around $10,000 from $5.",                               target: "~$10,000",      Icon: Sparkles,  accent: "accent" },
-  upset:          { label: "Upset Bet",        tagline: "Against the market — the underdog gets it done.",                                      target: "Live h2h",      Icon: Zap,       accent: "yellow-500" },
-  bookieWant:     { label: "Bookie Want Bet",  tagline: "The result the bookies want to land — low public liability.",                          target: "Low risk",      Icon: ThumbsUp,  accent: "sky-500" },
-  bookieFear:     { label: "Bookie Fear Bet",  tagline: "The result the bookies fear — heavy public exposure.",                                target: "Bookie pain",   Icon: ThumbsDown, accent: "danger" },
-  anytime:        { label: "Anytime Bet",      tagline: "Pure anytime tryscorer multi — best value names from both sides.",                    target: "Tryscorer multi", Icon: Target,  accent: "accent" },
-  firstTryscorer: { label: "First Tryscorer Bet", tagline: "Standalone single — first try of the match.",                                       target: "Standalone",    Icon: Flag,      accent: "rose-500" },
+  gameScript:     { label: "Game Script Bet",   tagline: "The cleanest read of the match — winner + margin + total + HT/FT + a tryscorer from each team.", target: "$10 → $500",  Icon: ScrollText, accent: "accent" },
+  smallStake:     { label: "$5 → $100",         tagline: "Small stake, solid return — favourite + margin + a strong anytime tryscorer.",                  target: "$5 → ~$100",  Icon: Shield,    accent: "emerald-500" },
+  mediumStake:    { label: "$10 → $500",        tagline: "Medium stake, big swing — favourite + total + two anytime tryscorers do the lifting.",          target: "$10 → ~$500", Icon: Activity,  accent: "yellow-500" },
+  bigStake:       { label: "$20 → $1,000",      tagline: "Bigger stake, cleaner multiplier — five legs leaning the right way.",                            target: "$20 → ~$1,000", Icon: Crosshair, accent: "orange-500" },
+  getThea:        { label: "GET THEA Bet",      tagline: "The bet of the slate — $5 chasing five figures.",                                                target: "$5 → ~$10,000", Icon: Sparkles,  accent: "accent" },
+  anytimeMulti:   { label: "Anytime Try Multi", tagline: "Pure anytime tryscorer 4-leg — best finishing names from both sides.",                          target: "$10 → ~$300+", Icon: Target,    accent: "accent" },
+  multiTryStack:  { label: "Multi-Try Stack",   tagline: "Three players in high-volume scoring lanes — all to bag 2+ tries.",                              target: "$10 → BIG",    Icon: Trophy,    accent: "fuchsia-500" },
+  pointsParty:    { label: "Points + Tries",    tagline: "Total points over + the two finishers most likely to score them.",                              target: "$10 → ~$300",  Icon: TrendingUp, accent: "sky-500" },
+  upset:          { label: "Upset Bet",         tagline: "Against the market — the underdog gets it done.",                                                target: "$20 single",   Icon: Zap,       accent: "yellow-500" },
+  bookieFear:     { label: "Bookie Fear Bet",   tagline: "The result the bookies fear — heavy public exposure with multiple tryscorers.",                  target: "$10 → BIG",    Icon: ThumbsDown, accent: "danger" },
+  firstTryscorer: { label: "First Tryscorer Bet", tagline: "Standalone single — first try of the match.",                                                  target: "$5 single",    Icon: Flag,      accent: "rose-500" },
 };
 
 function BetsTab({ insights, insightsError, insightsLoading }: { insights: any; insightsError: string | null; insightsLoading?: boolean }) {

@@ -462,9 +462,15 @@ function buildToolDef() {
               home: {
                 type: "object",
                 properties: {
-                  opponentWeakness: { type: "string", description: "Specific defensive flaw in the AWAY team" },
-                  targetArea: { type: "string", description: "Channel / phase / part of the field to attack" },
-                  tacticalPlan: { type: "string", description: "2-3 sentences on how to weaponise it" },
+                  opponentWeaknesses: {
+                    type: "array", minItems: 3, maxItems: 3,
+                    items: { type: "string", description: "Specific defensive flaw in the AWAY team — short concrete phrase" },
+                  },
+                  targetAreas: {
+                    type: "array", minItems: 1, maxItems: 3,
+                    items: { type: "string", description: "Channel / phase / part of the field to attack" },
+                  },
+                  tacticalPlan: { type: "string", description: "2-3 sentences on how to weaponise the weaknesses" },
                   playersToWatch: {
                     type: "array", minItems: 3, maxItems: 3,
                     items: {
@@ -478,13 +484,19 @@ function buildToolDef() {
                     },
                   },
                 },
-                required: ["opponentWeakness", "targetArea", "tacticalPlan", "playersToWatch"], additionalProperties: false,
+                required: ["opponentWeaknesses", "targetAreas", "tacticalPlan", "playersToWatch"], additionalProperties: false,
               },
               away: {
                 type: "object",
                 properties: {
-                  opponentWeakness: { type: "string", description: "Specific defensive flaw in the HOME team" },
-                  targetArea: { type: "string" },
+                  opponentWeaknesses: {
+                    type: "array", minItems: 3, maxItems: 3,
+                    items: { type: "string", description: "Specific defensive flaw in the HOME team — short concrete phrase" },
+                  },
+                  targetAreas: {
+                    type: "array", minItems: 1, maxItems: 3,
+                    items: { type: "string" },
+                  },
                   tacticalPlan: { type: "string" },
                   playersToWatch: {
                     type: "array", minItems: 3, maxItems: 3,
@@ -499,7 +511,7 @@ function buildToolDef() {
                     },
                   },
                 },
-                required: ["opponentWeakness", "targetArea", "tacticalPlan", "playersToWatch"], additionalProperties: false,
+                required: ["opponentWeaknesses", "targetAreas", "tacticalPlan", "playersToWatch"], additionalProperties: false,
               },
             },
             required: ["home", "away"], additionalProperties: false,

@@ -155,9 +155,10 @@ export const getMatchPage = createServerFn({ method: "GET" })
     }
 
     // AI insights — DO NOT generate inline (would exceed Worker request timeout
-    // and abort the whole page). Only return cache hits; client calls
-    // getMatchInsights() to lazily generate them in the background.
-    const cachedInsights = peekCache(`insights:${data.matchId}`);
+    // and abort the whole page). Read the shared DB cache so every visitor sees
+    // the same payload; if no fresh row exists, the client lazily calls
+    // getMatchInsights() to generate (single-flight) and persist it.
+    const stored = await readSharedInsights(data.matchId);
 
     return {
       details: { ...details, weather },
@@ -167,7 +168,7 @@ export const getMatchPage = createServerFn({ method: "GET" })
       tryscorers,
       tryscorersError,
       ladder,
-      insights: cachedInsights ?? null,
+      insights: stored?.payload ?? null,
       insightsError: null,
       recentRecaps: { home: homeRecaps, away: awayRecaps },
       generatedAt: new Date().toISOString(),

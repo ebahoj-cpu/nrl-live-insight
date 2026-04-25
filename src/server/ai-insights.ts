@@ -723,8 +723,24 @@ function buildToolDef() {
                 },
                 required: ["wantToWin", "wantToLose", "liability"], additionalProperties: false,
               },
+              matchFix: {
+                type: "object",
+                description: "Tongue-in-cheek 'how the NRL would script this for ratings/money' read. Satirical, never an actual accusation.",
+                properties: {
+                  preferredWinner: { type: "string", description: "Which side V'landys / the broadcast would quietly prefer to win, with the commercial reason." },
+                  ratingsAngle: { type: "string", description: "2-3 sentences on the broadcast's dream script tied to ratings." },
+                  refereeNudges: {
+                    type: "array", minItems: 3, maxItems: 5,
+                    items: { type: "string", description: "Cheeky bullet on the 'lean' — penalty count, captain's challenge, bunker, six-again, late obstruction call." },
+                  },
+                  narrativeMoment: { type: "string", description: "The single storyline the NRL is engineering." },
+                  conspiracyRating: { type: "number", minimum: 0, maximum: 100, description: "0-100 'how scripted does this feel?' meter." },
+                },
+                required: ["preferredWinner", "ratingsAngle", "refereeNudges", "narrativeMoment", "conspiracyRating"],
+                additionalProperties: false,
+              },
             },
-            required: ["headToHead", "formAnalysis", "xFactor", "psychological", "milestones", "bookieScript"], additionalProperties: false,
+            required: ["headToHead", "formAnalysis", "xFactor", "psychological", "milestones", "bookieScript", "matchFix"], additionalProperties: false,
           },
         },
         required: [

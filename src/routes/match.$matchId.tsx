@@ -226,6 +226,18 @@ function Empty({ msg }: { msg: string }) {
   );
 }
 
+function InsightsLoading() {
+  return (
+    <div className="glass p-8 text-center text-sm text-muted-foreground">
+      <div className="inline-flex items-center gap-3">
+        <Sparkles className="h-5 w-5 text-accent animate-pulse" />
+        <span>Generating AI insights — this can take 20–40 seconds…</span>
+      </div>
+      <p className="text-[11px] mt-2 opacity-70">Cached for an hour after first load.</p>
+    </div>
+  );
+}
+
 /* ================= LINEUP TAB ================= */
 
 const POSITION_ORDER = [

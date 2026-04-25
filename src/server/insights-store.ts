@@ -10,6 +10,15 @@ import type { Insights } from "./ai-insights";
 
 const TABLE = "match_insights";
 
+// Bump when the AI prompt / schema changes so stale repetitive payloads
+// generated under the old prompt are bypassed automatically. Old rows simply
+// expire normally; new rows are written under the new key.
+const PROMPT_VERSION = "v2-sharp";
+
+function key(matchId: string): string {
+  return `${matchId}::${PROMPT_VERSION}`;
+}
+
 export type StoredInsights = {
   payload: Insights;
   generatedAt: string;

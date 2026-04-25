@@ -148,10 +148,50 @@ export const getMatchPage = createServerFn({ method: "GET" })
       tryscorersError = r.error;
     }
 
-    // AI insights (cached per match for an hour) — never blocks.
-    let insights: any = null; let insightsError: string | null = null;
+    // AI insights — DO NOT generate inline (would exceed Worker request timeout
+    // and abort the whole page). Only return cache hits; client calls
+    // getMatchInsights() to lazily generate them in the background.
+    const cachedInsights = peekCache(`insights:${data.matchId}`);
+
+    return {
+      details: { ...details, weather },
+      odds,
+      oddsError,
+      oddsStale,
+      tryscorers,
+      tryscorersError,
+      ladder,
+      insights: cachedInsights ?? null,
+      insightsError: null,
+      recentRecaps: { home: homeRecaps, away: awayRecaps },
+      generatedAt: new Date().toISOString(),
+    };
+  });
+
+// Lazily generate AI insights — called by the client AFTER the match page renders.
+// Has its own request budget so it can take 30+ seconds without aborting the page.
+export const getMatchInsights = createServerFn({ method: "GET" })
+  .inputValidator((i: { matchId: string; refresh?: boolean }) => {
+    if (!i?.matchId) throw new Error("matchId required");
+    return i;
+  })
+  .handler(async ({ data }) => {
+    const season = currentSeason();
     try {
-      insights = await cached(
+      const [details, ladder] = await Promise.all([
+        cached(`match:${data.matchId}`, TTL.match, () => fetchMatchDetails(data.matchId)),
+        cached(`ladder:${season}`, TTL.ladder, () => fetchLadder(season)),
+      ]);
+      const homeNick = findTeam(details.homeTeam.nickName)?.nickname ?? details.homeTeam.nickName;
+      const awayNick = findTeam(details.awayTeam.nickName)?.nickname ?? details.awayTeam.nickName;
+      const oddsResult = await safeOdds();
+      const odds = oddsResult.data.find((e) => {
+        const eh = e.homeNickname; const ea = e.awayNickname;
+        return (eh === homeNick && ea === awayNick) || (eh === awayNick && ea === homeNick);
+      }) ?? null;
+      const weather = await safeWeather(data.matchId, details.venue, details.venueCity, details.kickoffUtc);
+
+      const insights = await cached(
         `insights:${data.matchId}`,
         TTL.insights,
         () => generateInsights({
@@ -173,23 +213,10 @@ export const getMatchPage = createServerFn({ method: "GET" })
         }),
         { bypass: data.refresh },
       );
+      return { insights, insightsError: null as string | null };
     } catch (e) {
-      insightsError = e instanceof Error ? e.message : "AI insights unavailable";
+      return { insights: null, insightsError: e instanceof Error ? e.message : "AI insights unavailable" };
     }
-
-    return {
-      details: { ...details, weather },
-      odds,
-      oddsError,
-      oddsStale,
-      tryscorers,
-      tryscorersError,
-      ladder,
-      insights,
-      insightsError,
-      recentRecaps: { home: homeRecaps, away: awayRecaps },
-      generatedAt: new Date().toISOString(),
-    };
   });
 
 function currentSeason(): number {

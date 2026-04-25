@@ -107,6 +107,13 @@ export type Insights = {
       wantToLose: string;
       liability: string;
     };
+    matchFix: {
+      preferredWinner: string;     // team the NRL "wants" to win and why (ratings, finals race, marquee market)
+      ratingsAngle: string;        // 2-3 sentences: how the broadcast script wants the game to flow
+      refereeNudges: string[];     // 3-5 cheeky bullets — penalty counts, captain's challenges, bunker calls
+      narrativeMoment: string;     // the storyline beat the NRL is engineering (return game, milestone try, comeback)
+      conspiracyRating: number;    // 0-100 tongue-in-cheek "how scripted does this feel?" meter
+    };
   };
 };
 
@@ -170,6 +177,14 @@ Then produce a deep "script" with these distinct sections:
 - milestones: 1-4 individual milestones approaching for either side (games, tries, points, coaching games).
 
 Also produce a "bookieScript": from a sharp Australian bookmaker's perspective, which result/outcome they WANT to land (limits liability, public is on the other side), which result they want to AVOID (heavy public liability), and a one-sentence summary of where their book is most exposed.
+
+ALSO produce a "matchFix" — a tongue-in-cheek "how the NRL would script this game for ratings/money" read. Be playful and clearly satirical (not a real accusation), but anchor it in genuine commercial logic — TV ratings, prime-time market (Sydney/Brisbane/Melbourne), finals race implications, marquee player storylines, sponsor angle, attendance, and the league office's preferred narrative.
+- preferredWinner: which side V'landys / the broadcast would quietly prefer to win, and the commercial reason (e.g. "Storm — keeps Melbourne market engaged for finals push").
+- ratingsAngle: 2-3 sentences on the broadcast's dream script — close margin into the last 10? blowout for a marquee? a comeback? Tie it to ratings.
+- refereeNudges: 3-5 cheeky bullets on the "lean" — penalty count direction, captain's-challenge timing, bunker leniency on a marquee scorer, six-again calls in key sets, late-game obstruction call. Keep it cheeky / wink-wink, not malicious.
+- narrativeMoment: the single storyline the NRL is engineering — return game, milestone try, coach-on-the-brink, retiring legend, debutant fairytale.
+- conspiracyRating: 0-100 "how scripted does this feel?" meter (most matches sit 30-60 — a marquee finals race or grand-final rematch can sit higher).
+
 
 ALSO produce a "weaknessExploit" for EACH team. For each side identify:
 - opponentWeaknesses: an array of EXACTLY 3 distinct, specific defensive flaws in the OPPOSITION based on recent form / known matchup data. Each one a concrete short phrase, e.g. "Right-edge defence leaking tries — missed tackle % at left centre", "Ruck speed drops sharply in second half", "Vulnerable under high bombs on left wing", "Slow line-speed against shape plays from scrum".
@@ -708,8 +723,24 @@ function buildToolDef() {
                 },
                 required: ["wantToWin", "wantToLose", "liability"], additionalProperties: false,
               },
+              matchFix: {
+                type: "object",
+                description: "Tongue-in-cheek 'how the NRL would script this for ratings/money' read. Satirical, never an actual accusation.",
+                properties: {
+                  preferredWinner: { type: "string", description: "Which side V'landys / the broadcast would quietly prefer to win, with the commercial reason." },
+                  ratingsAngle: { type: "string", description: "2-3 sentences on the broadcast's dream script tied to ratings." },
+                  refereeNudges: {
+                    type: "array", minItems: 3, maxItems: 5,
+                    items: { type: "string", description: "Cheeky bullet on the 'lean' — penalty count, captain's challenge, bunker, six-again, late obstruction call." },
+                  },
+                  narrativeMoment: { type: "string", description: "The single storyline the NRL is engineering." },
+                  conspiracyRating: { type: "number", minimum: 0, maximum: 100, description: "0-100 'how scripted does this feel?' meter." },
+                },
+                required: ["preferredWinner", "ratingsAngle", "refereeNudges", "narrativeMoment", "conspiracyRating"],
+                additionalProperties: false,
+              },
             },
-            required: ["headToHead", "formAnalysis", "xFactor", "psychological", "milestones", "bookieScript"], additionalProperties: false,
+            required: ["headToHead", "formAnalysis", "xFactor", "psychological", "milestones", "bookieScript", "matchFix"], additionalProperties: false,
           },
         },
         required: [

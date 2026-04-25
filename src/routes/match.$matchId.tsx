@@ -1016,6 +1016,56 @@ function ScriptTab({ insights, insightsError, insightsLoading, home, away }:
           </div>
         </Card>
       )}
+
+      {s.matchFix && (
+        <Card title="Match Fix script" icon={Eye}>
+          <p className="text-[11px] text-muted-foreground mb-4 italic">
+            Tongue-in-cheek: how head office would script this game for ratings, sponsors and the finals race. Strictly for laughs — not an actual accusation 🙃
+          </p>
+
+          <div className="rounded-xl border border-fuchsia-500/40 bg-fuchsia-500/5 p-4 mb-3">
+            <div className="text-[10px] uppercase tracking-wider text-fuchsia-400 font-bold mb-1">Preferred winner</div>
+            <p className="text-sm font-semibold leading-relaxed">{s.matchFix.preferredWinner}</p>
+          </div>
+
+          <div className="rounded-xl border border-border bg-surface-2/40 p-4 mb-3">
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold mb-2">Broadcast / ratings angle</div>
+            <p className="text-sm leading-relaxed">{s.matchFix.ratingsAngle}</p>
+          </div>
+
+          {Array.isArray(s.matchFix.refereeNudges) && s.matchFix.refereeNudges.length > 0 && (
+            <div className="rounded-xl border border-yellow-500/30 bg-yellow-500/5 p-4 mb-3">
+              <div className="text-[10px] uppercase tracking-wider text-yellow-500 font-bold mb-2">Referee nudges 👀</div>
+              <ul className="space-y-1.5">
+                {s.matchFix.refereeNudges.map((n: string, i: number) => (
+                  <li key={i} className="flex gap-2 text-sm">
+                    <span className="text-yellow-500 shrink-0">▸</span>
+                    <span className="leading-relaxed">{n}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <div className="rounded-xl border border-accent/30 bg-accent/5 p-4 mb-3">
+            <div className="text-[10px] uppercase tracking-wider text-accent font-bold mb-1">Narrative moment</div>
+            <p className="text-sm leading-relaxed">{s.matchFix.narrativeMoment}</p>
+          </div>
+
+          <div className="flex items-center gap-3 pt-2 border-t border-border">
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold shrink-0">Conspiracy meter</div>
+            <div className="flex-1 h-2 rounded-full bg-surface-2 overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-accent via-yellow-500 to-fuchsia-500"
+                style={{ width: `${Math.max(0, Math.min(100, Number(s.matchFix.conspiracyRating) || 0))}%` }}
+              />
+            </div>
+            <div className="kbd text-sm font-black text-fuchsia-400 shrink-0">
+              {Math.round(Number(s.matchFix.conspiracyRating) || 0)}%
+            </div>
+          </div>
+        </Card>
+      )}
     </div>
   );
 }

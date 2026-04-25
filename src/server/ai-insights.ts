@@ -651,17 +651,20 @@ function buildFallbackBets(input: {
 }
 
 function buildTryscorerTeamBlock(team: string, players: RankedPlayer[], opponent: string) {
-  const picks = players.slice(0, 4).map((p, index) => ({
+  const picks = players.slice(0, 4).map((p, index) => {
     const market: "first" | "2+" | "anytime" = p.prices.first != null && index === 0
       ? "first"
       : p.prices.multi != null && index === 1
         ? "2+"
         : "anytime";
-    name: playerName(p, team),
-    market,
-    price: market === "first" ? p.prices.first : market === "2+" ? p.prices.multi : p.prices.anytime,
-    reasoning: `${playerName(p, team)} sits in a live ${p.position.toLowerCase()} scoring lane against ${opponent}'s likely edge and kick-pressure issues.`,
-  }));
+
+    return {
+      name: playerName(p, team),
+      market,
+      price: market === "first" ? p.prices.first : market === "2+" ? p.prices.multi : p.prices.anytime,
+      reasoning: `${playerName(p, team)} sits in a live ${p.position.toLowerCase()} scoring lane against ${opponent}'s likely edge and kick-pressure issues.`,
+    };
+  });
 
   const avoid = players.slice(-2).map((p) => ({
     name: playerName(p, team),

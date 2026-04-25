@@ -191,6 +191,15 @@ export const getMatchInsights = createServerFn({ method: "GET" })
       }) ?? null;
       const weather = await safeWeather(data.matchId, details.venue, details.venueCity, details.kickoffUtc);
 
+      // Real tryscorer odds + structured h2h/totals — passed to AI so it
+      // quotes EXACT bookie prices instead of inventing them.
+      let tryscorers: TryscorerMarkets | null = null;
+      if (odds) {
+        const r = await safeTryscorers(odds.id);
+        tryscorers = r.data;
+      }
+      const realOdds = odds ? buildRealOdds(odds, homeNick, awayNick, tryscorers) : undefined;
+
       const insights = await cached(
         `insights:${data.matchId}`,
         TTL.insights,
@@ -209,6 +218,7 @@ export const getMatchInsights = createServerFn({ method: "GET" })
             for: r.for, against: r.against, diff: r.diff, points: r.points,
           })),
           oddsSummary: odds ? summariseOdds(odds, homeNick, awayNick) : "No live odds available",
+          realOdds,
           weatherSummary: weather ? `${weather.tempC}°C, ${weather.condition}, ${weather.windKph} km/h wind, ${weather.precipMm}mm rain (${weather.groundCondition} ground)` : "Weather unavailable",
         }),
         { bypass: data.refresh },

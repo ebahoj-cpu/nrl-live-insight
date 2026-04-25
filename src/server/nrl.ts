@@ -4,6 +4,8 @@
 //   https://www.nrl.com/ladder/data?competition=111&season=YYYY
 //   https://www.nrl.com{matchCentreUrl}data
 
+import { fetchMatchTeamNews, type TeamNews } from "./team-news";
+
 const UA = "Mozilla/5.0 (compatible; LineBreak/1.0)";
 const COMP = 111; // Telstra Premiership
 
@@ -244,6 +246,14 @@ export async function fetchMatchDetails(matchId: string): Promise<NrlMatchDetail
       maxValue: s.maxValue,
     })),
   }));
+  const home = mapTeam(d.homeTeam);
+  const away = mapTeam(d.awayTeam);
+  // Best-effort ins/outs from the official weekly Team Lists article.
+  // Never blocks: failure -> nulls and the UI shows "Not yet announced".
+  const season = Number(String(matchId).slice(0, 4));
+  const round = Number(d.roundNumber) || 0;
+  const teamNews = await fetchMatchTeamNews(season, round, home.nickName, away.nickName)
+    .catch(() => ({ home: null, away: null }));
   return {
     matchId,
     matchState: d.matchState,
@@ -251,11 +261,12 @@ export async function fetchMatchDetails(matchId: string): Promise<NrlMatchDetail
     venueCity: d.venueCity,
     kickoffUtc: d.startTime,
     roundNumber: d.roundNumber,
-    homeTeam: mapTeam(d.homeTeam),
-    awayTeam: mapTeam(d.awayTeam),
+    homeTeam: home,
+    awayTeam: away,
     history: d.stats?.history ?? null,
     statGroups,
     officials,
+    teamNews,
   };
 }
 

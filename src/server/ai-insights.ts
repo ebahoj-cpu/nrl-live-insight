@@ -277,7 +277,104 @@ That is the minimum standard for EVERY string you emit.
 
 Now produce the structured payload below. Be concise: one strong sentence beats three weak ones.
 
-CRITICAL — every insight must serve a BETTOR reading this to land bets. Tie every observation to a specific market: who wins, who covers, who scores, when momentum swings, where the value sits.
+==============================================================================
+TOP PRIORITY — produce an "intelligence" object (the Insights tab core).
+==============================================================================
+This is a MATCH INTELLIGENCE engine. It is NOT a betting tips engine. The
+"intelligence" object is read by users who want to understand HOW the match
+will unfold, WHY it will unfold that way, WHICH players and structures will
+influence the outcome, and WHERE scoring and momentum shifts are most likely
+to occur. Tone = blend of coaching analysis + sports journalism + data-driven
+briefing.
+
+HARD RULES for the entire "intelligence" object:
+- NO betting language ("value", "price", "lean", "fade", "multi", "anytime
+  tryscorer market", "stake", "payout", "covers", "the line", "odds",
+  "favourite/underdog" framing). Talk about teams and structures, not markets.
+- NO confidence scores, percentages, probabilities.
+- NO full squad listings — only NAMED individual influencers when relevant.
+- Every observation must tie back to GAME STRUCTURE (attacking shape,
+  defensive structure, ruck speed, edge connection, kicking game, set-piece,
+  field position, fatigue cycle), not opinion.
+- ASYMMETRIC across the two teams — never mirror content with names swapped.
+- EVIDENCE-BASED — cite real squad players, recent-form scorelines, ladder
+  position, weather signal, venue. Never invent stats.
+
+Produce these intelligence fields:
+
+1. matchOverview: 3-4 sentences. Narrative summary of expected game shape —
+   tempo, who imposes territory, what kind of contest this becomes, scoring
+   environment expected.
+
+2. teamProfile.home and teamProfile.away (each):
+   - identity: 1-2 sentences on who they are this season (e.g. "high-tempo,
+     edge-reliant attack with a fragile right-edge defence").
+   - attackRating: one of "elite" | "strong" | "above average" | "average" |
+     "below average" | "struggling".
+   - defenceRating: same scale.
+   - formRead: 2-3 sentences on trajectory + quality of opposition faced +
+     whether form is real or schedule-inflated.
+   - scoringPattern: 1-2 sentences on HOW their points typically come
+     (set-piece structure, broken-play, kicks, forwards, edges).
+   - consistency: 1 sentence on volatile vs reliable and where variance shows.
+
+3. attackingStructure.home and attackingStructure.away (each):
+   - edgeBalance: 1-2 sentences on left edge vs right edge vs middle distribution.
+   - setPlayVsBroken: 1-2 sentences on structured vs broken-play / second-phase scoring.
+   - redZoneTendency: 1-2 sentences on what they do once inside 20m.
+   - forwardVsBacklineTries: 1 sentence on where the tries come from.
+   - primaryPlaymakers: 2-3 NAMED squad players who shape the attack with
+     {name, role, influence (1 sentence)}.
+
+4. defensiveWeaknesses.home and defensiveWeaknesses.away (each):
+   - missedTackleZones: 1-3 short phrases on where missed tackles cluster.
+   - edgeFragility: 1-2 sentences on which edge leaks and why.
+   - lineSpeedRuckIssues: 1-2 sentences on line speed / ruck defence problems.
+   - positionalMismatches: 1-3 short phrases on specific positional liabilities.
+   - pressurePoints: 1-2 sentences on where structure breaks under sustained pressure.
+
+5. keyMatchups: 3-5 distinct matchups, each with {area, homeSide (1 sentence),
+   awaySide (1 sentence), edge ("home"|"away"|"even"), why (1-2 sentences)}.
+   Cover a mix: edge-vs-edge, forward-pack vs forward-pack, spine-vs-spine,
+   kicking-game-vs-back-three. Each matchup must target a DIFFERENT structural
+   area — no overlap.
+
+6. gameScript: EXACTLY 5 phases, in order, with {window, read (1-2 sentences)}:
+   - "First 20" — opening tempo, early territory battle, initial pressure patterns.
+   - "Second 20" — settling phase, structural dominance begins to appear.
+   - "Halftime" — expected score shape and momentum state.
+   - "40-60" — fatigue phase, defensive breakdown risk increases.
+   - "60-80" — closing phase, game control, momentum swings or consolidation.
+   Each "read" must reference a structural signal (ruck speed, completion
+   battle, bench impact, kicking exchange, edge fatigue) — not generic
+   "team X is better".
+
+7. playerInfluence: 5-8 NAMED influencers across BOTH teams (mix of roles).
+   Each: {name (from the named squad above), team ("home"|"away"), role (one
+   of: "Tempo controller", "Edge finisher", "Forward momentum", "Defensive
+   anchor", "Disruptor", "Momentum shifter"), expectedImpact (1-2 sentences
+   on HOW they will influence THIS specific game)}. Do NOT list full squads
+   — only the genuine influencers.
+
+8. historicalContext: 2-3 sentences ONLY if recent H2H / venue history
+   reveals a repeated tactical pattern. If nothing meaningful, return "".
+
+9. contextualFactors: 2-4 short bullets on venue, travel, weather impact on
+   tempo and scoring, selection changes, and momentum shifts from lineup
+   disruptions. Each bullet 1 sentence.
+
+10. rareEventNote: 1 short sentence acknowledging low-weight scenario
+    modifiers (early injury, sin bin, blowout). Kept brief — these are
+    modifiers, not predictions.
+
+11. insightSummary: 2-3 sentences on the FINAL tactical takeaway — how this
+    game is most likely decided. This is the "if you read nothing else" line.
+
+==============================================================================
+SECONDARY OUTPUTS (kept for the other tabs — Bets, Script, etc.)
+==============================================================================
+
+CRITICAL — every insight in the secondary outputs below must serve a BETTOR reading this to land bets. Tie every observation to a specific market: who wins, who covers, who scores, when momentum swings, where the value sits.
 
 Now produce 3 specific "keys to victory" for EACH team. These MUST be DIFFERENT for each team — NOT mirror images. Each team's keys are based on THEIR OWN strengths and HOW THEY can beat THIS specific opponent. Reference real squad players by name, real recent form trends, real opposition weaknesses, and real weather/ground impact. NEVER produce keys that are literally the same point with team names swapped (e.g. "Win the kick-and-chase so X start sets in their own half" used for both sides — that is forbidden). Each key should pick a different lever: e.g. one about set-piece attack from a specific named player, one about defensive structure exploiting a specific opposition weakness, one about game-management (kicking, ruck speed, completion).
 

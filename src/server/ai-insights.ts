@@ -385,7 +385,7 @@ ON TOP OF THAT, generate ONE standalone "getTheaSpecial" — the GET THEA bet:
             required: [
               "predictedScore","winner","margin","total","htft",
               "firstTryscorer","anytimeTryscorers","multiTryscorer",
-              "keysToVictory","keyFactors","weaknessExploit","betSuggestions","script",
+              "keysToVictory","keyFactors","weaknessExploit","betSuggestions","getTheaSpecial","script",
             ],
             additionalProperties: false,
           },

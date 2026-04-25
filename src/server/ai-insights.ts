@@ -971,6 +971,26 @@ function buildFallbackIntelligence(input: {
 
   return {
     matchOverview: `${input.homeName} host ${input.awayName} at ${input.venue} in a contest that projects as a structural battle through the middle. ${input.winnerName} hold the slightly stronger profile on current form and points-differential, but the gap is not large enough to rule out a tight result. Expect a typical NRL scoring environment with most points coming from set-piece structure rather than broken-play chaos.`,
+    seasonOverview: {
+      home: seasonFor(input.homeName, input.homeRow, input.homeFormScore, "home"),
+      away: seasonFor(input.awayName, input.awayRow, input.awayFormScore, "away"),
+    },
+    keysToVictoryAnalyst: {
+      home: keysFor(input.homeName, input.awayName, input.homeCore),
+      away: keysFor(input.awayName, input.homeName, input.awayCore),
+    },
+    strengths: {
+      home: strengthsFor(input.homeName, input.homeCore, "home"),
+      away: strengthsFor(input.awayName, input.awayCore, "away"),
+    },
+    weaknesses: {
+      home: weaknessesFor(input.homeName, input.awayName, "home"),
+      away: weaknessesFor(input.awayName, input.homeName, "away"),
+    },
+    playersToWatch: {
+      home: watchFor(input.homeName, input.homeCore, input.awayName),
+      away: watchFor(input.awayName, input.awayCore, input.homeName),
+    },
     teamProfile: {
       home: profile(input.homeName, input.homeRow, input.homeFormScore, input.homeCore),
       away: profile(input.awayName, input.awayRow, input.awayFormScore, input.awayCore),

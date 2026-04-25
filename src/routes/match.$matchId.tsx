@@ -1020,21 +1020,6 @@ function PickCard({ icon: Icon, market, pick, reasoning }:
   );
 }
 
-function KeysCard({ team, keys }: { team: string; keys: string[] }) {
-  return (
-    <Card title={`${team} — keys to victory`} icon={Zap}>
-      <ol className="space-y-3">
-        {keys.map((k, i) => (
-          <li key={i} className="flex gap-3 text-sm">
-            <span className="kbd w-6 h-6 shrink-0 rounded-full bg-accent text-accent-foreground text-xs font-bold flex items-center justify-center">{i + 1}</span>
-            <span className="leading-relaxed">{k}</span>
-          </li>
-        ))}
-      </ol>
-    </Card>
-  );
-}
-
 function WeaknessExploitCard({ team, opponent, data }: {
   team: string;
   opponent: string;

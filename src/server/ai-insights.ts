@@ -1165,26 +1165,28 @@ function normaliseBetMath(ins: Insights): Insights {
 
   const defaultStakes: Partial<Record<BetCategoryKey, string>> = {
     gameScript: "$10",
-    lowRisk: "$5",
-    mediumRisk: "$5",
-    highRisk: "$5",
+    smallStake: "$5",
+    mediumStake: "$10",
+    bigStake: "$20",
     getThea: "$5",
+    anytimeMulti: "$10",
+    multiTryStack: "$10",
+    pointsParty: "$10",
     upset: "$20",
-    bookieWant: "$10",
     bookieFear: "$10",
-    anytime: "$10",
     firstTryscorer: "$5",
   };
   const betOrder: BetCategoryKey[] = [
     "gameScript",
-    "lowRisk",
-    "mediumRisk",
-    "highRisk",
+    "smallStake",
+    "mediumStake",
+    "bigStake",
     "getThea",
+    "anytimeMulti",
+    "multiTryStack",
+    "pointsParty",
     "upset",
-    "bookieWant",
     "bookieFear",
-    "anytime",
     "firstTryscorer",
   ];
 
@@ -1192,7 +1194,7 @@ function normaliseBetMath(ins: Insights): Insights {
     ins.bets = ins.bets.map((b, index) => {
       const cat = betOrder.includes(b?.category as BetCategoryKey)
         ? b.category as BetCategoryKey
-        : betOrder[index] ?? "lowRisk";
+        : betOrder[index] ?? "smallStake";
       const stake = b.stake || defaultStakes[cat] || "$5";
       const fixed = fixMulti({ ...b, stake });
       return {

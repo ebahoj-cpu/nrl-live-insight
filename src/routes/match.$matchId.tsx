@@ -1200,13 +1200,9 @@ function buildAnytimeList(
     .sort((a, b) => b.prob - a.prob);
 }
 
-function sumTopProbs(list: AnytimePick[], n: number): number {
-  return list.slice(0, n).reduce((acc, p) => acc + p.prob, 0);
-}
-
-function AnytimeTryscorersCard({ tryscorers, insights, home, away, model }:
+function AnytimeTryscorersCard({ tryscorers, insights, home, away }:
   { tryscorers: TryscorerMarkets | null; insights: any; home: TeamWithPlayers; away: TeamWithPlayers; model: MatchModel }) {
-  const list = buildAnytimeList(tryscorers, home, away, model);
+  const list = buildAnytimeList(tryscorers, home, away);
 
   // AI fallback when no live odds yet
   if (list.length === 0) {

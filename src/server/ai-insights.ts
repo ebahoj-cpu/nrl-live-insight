@@ -107,6 +107,13 @@ export type Insights = {
       wantToLose: string;
       liability: string;
     };
+    matchFix: {
+      preferredWinner: string;     // team the NRL "wants" to win and why (ratings, finals race, marquee market)
+      ratingsAngle: string;        // 2-3 sentences: how the broadcast script wants the game to flow
+      refereeNudges: string[];     // 3-5 cheeky bullets — penalty counts, captain's challenges, bunker calls
+      narrativeMoment: string;     // the storyline beat the NRL is engineering (return game, milestone try, comeback)
+      conspiracyRating: number;    // 0-100 tongue-in-cheek "how scripted does this feel?" meter
+    };
   };
 };
 

@@ -682,8 +682,8 @@ function buildWeaknessExploit(
   side: "home" | "away" = "home",
   teamForm = 0,
   oppForm = 0,
-  teamPos?: number,
-  oppPos?: number,
+  teamPos?: number | string,
+  oppPos?: number | string,
 ) {
   const watch = players.slice(0, 3);
   const isFavoured = teamForm >= oppForm;

@@ -1308,170 +1308,97 @@ function buildFallbackBets(input: {
   multiTryPrice: number;
 }): BetPlay[] {
   const totalPickLabel = `${input.totalPick === "over" ? "Over" : "Under"} ${input.totalLine} total points`;
+  const totalOddsApprox = 1.9;
   const marginOdds = input.marginBucket === "1-6" ? 3.4 : input.marginBucket === "7-12" ? 3.8 : 2.1;
   const winnerPrice = input.winnerPrice ?? 1.72;
   const loserPrice = input.loserPrice ?? 2.35;
-  const anytimeA = input.anytimePlayers[0];
-  const anytimeB = input.anytimePlayers[1] ?? input.anytimePlayers[0];
-  const anytimeC = input.anytimePlayers[2] ?? input.anytimePlayers[0];
-  const anytimeD = input.anytimePlayers[3] ?? input.anytimePlayers[1] ?? input.anytimePlayers[0];
+  const a0 = input.anytimePlayers[0];
+  const a1 = input.anytimePlayers[1] ?? a0;
+  const a2 = input.anytimePlayers[2] ?? a0;
+  const a3 = input.anytimePlayers[3] ?? a1;
+  const safeAnytime = (p?: { name: string; price: number }, fallbackPrice = 2.4) => p ?? { name: input.gameScriptAnytimeA, price: fallbackPrice };
+  const aA = safeAnytime(a0, 2.0);
+  const aB = safeAnytime(a1, 2.4);
+  const aC = safeAnytime(a2, 2.8);
+  const aD = safeAnytime(a3, 3.0);
+  const multiB = Math.max(input.multiTryPrice * 0.9, 4.5);
+  const multiC = Math.max(input.multiTryPrice * 1.15, 6);
+
+  // Convergence — fallback assumes a moderate, even script unless margin tells us otherwise.
+  const scriptStrength = input.marginBucket === "13+" || input.marginBucket === "13-24" || input.marginBucket === "25+" ? "strong" : "moderate";
 
   return [
     {
-      category: "gameScript",
-      title: `${input.winnerName} script multi`,
+      category: "low",
+      title: `${input.winnerName} — safe build`,
       legs: [
         { pick: `${input.winnerName} to win`, decimalOdds: winnerPrice },
-        { pick: `${input.winnerName} winning margin ${input.marginBucket}`, decimalOdds: marginOdds },
-        { pick: totalPickLabel, decimalOdds: 1.9 },
-        { pick: input.htftPick, decimalOdds: 2.45 },
-        { pick: `${input.gameScriptAnytimeA} anytime tryscorer`, decimalOdds: anytimeA.price },
-        { pick: `${input.gameScriptAnytimeB} anytime tryscorer`, decimalOdds: anytimeC.price },
+        { pick: totalPickLabel, decimalOdds: totalOddsApprox },
+        { pick: `${aA.name} anytime tryscorer`, decimalOdds: aA.price },
       ],
       combinedOdds: 1,
       estimatedOdds: "$0.00",
       stake: "$10",
       potentialReturn: "$0.00",
-      reasoning: `${input.winnerName} are the cleaner base result and the try angles line up with the same territory script — the multi lands if the headline read plays out.`,
+      reasoning: `${input.winnerName} are the cleanest base read in the simulation, and ${aA.name} sits in the dominant attacking lane. Total leg leans on the projected scoring environment — concentrated on hit-rate over payout.`,
+      hitRateScore: scriptStrength === "strong" ? 78 : 70,
+      scriptAlignment: `dominance + total convergence`,
     },
     {
-      category: "smallStake",
-      title: `$5 → $100 builder`,
+      category: "medium",
+      title: `${input.winnerName} script-aligned 4-leg`,
       legs: [
         { pick: `${input.winnerName} to win`, decimalOdds: winnerPrice },
-        { pick: `${anytimeA.name} anytime tryscorer`, decimalOdds: anytimeA.price },
-        { pick: `${input.winnerName} winning margin ${input.marginBucket}`, decimalOdds: marginOdds },
-      ],
-      combinedOdds: 1,
-      estimatedOdds: "$0.00",
-      stake: "$5",
-      potentialReturn: "$0.00",
-      reasoning: `A $5 stake aiming around $100 — the favourite + a margin bucket gives the multiplier the legs need, with the safest tryscorer locking it in.`,
-    },
-    {
-      category: "mediumStake",
-      title: `$10 → $500 multi`,
-      legs: [
-        { pick: `${input.winnerName} to win`, decimalOdds: winnerPrice },
-        { pick: totalPickLabel, decimalOdds: 1.9 },
-        { pick: `${anytimeA.name} anytime tryscorer`, decimalOdds: anytimeA.price },
-        { pick: `${anytimeB.name} anytime tryscorer`, decimalOdds: anytimeB.price },
+        { pick: totalPickLabel, decimalOdds: totalOddsApprox },
+        { pick: `${aA.name} anytime tryscorer`, decimalOdds: aA.price },
+        { pick: `${aB.name} anytime tryscorer`, decimalOdds: aB.price },
       ],
       combinedOdds: 1,
       estimatedOdds: "$0.00",
       stake: "$10",
       potentialReturn: "$0.00",
-      reasoning: `Two strong tryscorers do the heavy lifting on the multiplier — the favourite and the total are the safety rails.`,
+      reasoning: `Balanced multi: the favourite + total combine for the safety rails, and two anytime tryscorers in the same edge attack lane do the heavy lifting on the multiplier. Drops if ${input.winnerName} can't impose territory.`,
+      hitRateScore: scriptStrength === "strong" ? 62 : 54,
+      scriptAlignment: `dominance + edge attack stack`,
     },
     {
-      category: "bigStake",
-      title: `$20 → $1,000 stack`,
+      category: "high",
+      title: `Correlated stack — ${input.winnerName} dominance`,
       legs: [
         { pick: `${input.winnerName} to win`, decimalOdds: winnerPrice },
         { pick: `${input.winnerName} winning margin ${input.marginBucket}`, decimalOdds: marginOdds },
-        { pick: `${anytimeA.name} anytime tryscorer`, decimalOdds: anytimeA.price },
-        { pick: `${anytimeB.name} anytime tryscorer`, decimalOdds: anytimeB.price },
-        { pick: totalPickLabel, decimalOdds: 1.9 },
-      ],
-      combinedOdds: 1,
-      estimatedOdds: "$0.00",
-      stake: "$20",
-      potentialReturn: "$0.00",
-      reasoning: `$20 to chase a grand — the bigger stake means we don't need a moonshot multiplier, just five clean legs that lean the right way.`,
-    },
-    {
-      category: "getThea",
-      title: `Get Thea mega swing`,
-      legs: [
-        { pick: `${input.winnerName} winning margin ${input.marginBucket}`, decimalOdds: marginOdds },
-        { pick: input.htftPick, decimalOdds: 3.8 },
-        { pick: totalPickLabel, decimalOdds: 1.9 },
-        { pick: `${anytimeA.name} anytime tryscorer`, decimalOdds: anytimeA.price },
+        { pick: totalPickLabel, decimalOdds: totalOddsApprox },
+        { pick: `${aA.name} anytime tryscorer`, decimalOdds: aA.price },
+        { pick: `${aB.name} anytime tryscorer`, decimalOdds: aB.price },
         { pick: `${input.multiTryName} 2+ tries`, decimalOdds: input.multiTryPrice },
       ],
       combinedOdds: 1,
       estimatedOdds: "$0.00",
-      stake: "$5",
-      potentialReturn: "$0.00",
-      reasoning: `This leans hard into the same field-position story and asks the headline finisher to cash in twice — $5 chasing five figures if the script lands.`,
-    },
-    {
-      category: "anytimeMulti",
-      title: `Anytime tryscorer 4-leg`,
-      legs: [
-        { pick: `${anytimeA.name} anytime tryscorer`, decimalOdds: anytimeA.price },
-        { pick: `${anytimeB.name} anytime tryscorer`, decimalOdds: anytimeB.price },
-        { pick: `${anytimeC.name} anytime tryscorer`, decimalOdds: anytimeC.price },
-        { pick: `${anytimeD.name} anytime tryscorer`, decimalOdds: anytimeD.price },
-      ],
-      combinedOdds: 1,
-      estimatedOdds: "$0.00",
       stake: "$10",
       potentialReturn: "$0.00",
-      reasoning: `Pure anytime tryscorer multi — spreads exposure across both sides' best finishing lanes rather than needing a perfect margin read.`,
+      reasoning: `Aggressive same-game stack — every leg points at the same script: ${input.winnerName} controlling territory, hitting the margin bucket, and ${input.multiTryName} cashing in twice when the dominant edge cracks open. Lands together or not at all.`,
+      hitRateScore: scriptStrength === "strong" ? 42 : 32,
+      scriptAlignment: `dominance + margin + try-flow correlation`,
     },
     {
-      category: "multiTryStack",
-      title: `Multi-try stack — 2+ tries`,
+      category: "ultra",
+      title: `Ultra — extreme script outcome`,
       legs: [
+        { pick: `${input.winnerName} winning margin 13+`, decimalOdds: 1.95 },
+        { pick: `${input.winnerName} winning margin ${input.marginBucket === "13+" ? "13-24" : input.marginBucket}`, decimalOdds: marginOdds },
+        { pick: input.htftPick, decimalOdds: 2.6 },
+        { pick: totalPickLabel, decimalOdds: totalOddsApprox },
+        { pick: `${aA.name} 2+ tries`, decimalOdds: multiB },
+        { pick: `${aB.name} 2+ tries`, decimalOdds: multiC },
         { pick: `${input.multiTryName} 2+ tries`, decimalOdds: input.multiTryPrice },
-        { pick: `${anytimeA.name} 2+ tries`, decimalOdds: Math.max(input.multiTryPrice * 0.9, 4) },
-        { pick: `${anytimeB.name} 2+ tries`, decimalOdds: Math.max(input.multiTryPrice * 1.1, 5) },
       ],
       combinedOdds: 1,
       estimatedOdds: "$0.00",
       stake: "$10",
       potentialReturn: "$0.00",
-      reasoning: `Three players in high-volume scoring lanes to bag doubles — needs the favourite to dominate territory but the payout justifies the swing.`,
-    },
-    {
-      category: "pointsParty",
-      title: `Points + tryscorer combo`,
-      legs: [
-        { pick: totalPickLabel, decimalOdds: 1.9 },
-        { pick: `${anytimeA.name} anytime tryscorer`, decimalOdds: anytimeA.price },
-        { pick: `${anytimeB.name} anytime tryscorer`, decimalOdds: anytimeB.price },
-      ],
-      combinedOdds: 1,
-      estimatedOdds: "$0.00",
-      stake: "$10",
-      potentialReturn: "$0.00",
-      reasoning: `If the scoring environment plays out as projected, the over and the two finishers from the team most likely to score it all come together.`,
-    },
-    {
-      category: "upset",
-      title: `${input.loserName} upset single`,
-      legs: [{ pick: `${input.loserName} to win`, decimalOdds: loserPrice }],
-      combinedOdds: 1,
-      estimatedOdds: "$0.00",
-      stake: "$20",
-      potentialReturn: "$0.00",
-      reasoning: `If the favourite coughs up discipline and territory, the underdog price is the clean contrarian angle.`,
-    },
-    {
-      category: "bookieFear",
-      title: `Public pain builder`,
-      legs: [
-        { pick: `${input.winnerName} to win`, decimalOdds: winnerPrice },
-        { pick: `${anytimeA.name} anytime tryscorer`, decimalOdds: anytimeA.price },
-        { pick: `${anytimeB.name} anytime tryscorer`, decimalOdds: anytimeB.price },
-        { pick: `${anytimeC.name} anytime tryscorer`, decimalOdds: anytimeC.price },
-      ],
-      combinedOdds: 1,
-      estimatedOdds: "$0.00",
-      stake: "$10",
-      potentialReturn: "$0.00",
-      reasoning: `The result the books fear — public route plus three of the cleanest try names landing all at once.`,
-    },
-    {
-      category: "firstTryscorer",
-      title: `${input.firstTryName} first try`,
-      legs: [{ pick: `${input.firstTryName} first tryscorer`, decimalOdds: input.firstTryPrice }],
-      combinedOdds: 1,
-      estimatedOdds: "$0.00",
-      stake: "$5",
-      potentialReturn: "$0.00",
-      reasoning: `The early-script angle points to this edge being the first clean strike chance of the night.`,
+      reasoning: `Extreme variance scenario — needs ${input.winnerName} to fully impose the script, with multiple finishers cashing doubles. Big margins + HT/FT + stacked 2+ tries — the rare game where everything aligns.`,
+      hitRateScore: scriptStrength === "strong" ? 14 : 8,
+      scriptAlignment: `extreme dominance + scoring flood`,
     },
   ];
 }

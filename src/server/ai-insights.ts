@@ -347,13 +347,8 @@ function applyRealOdds(ins: Insights, realOdds: RealOdds | undefined, home: stri
       return real ? { ...l, decimalOdds: real } : l;
     });
 
-  if (ins.bets && typeof ins.bets === "object") {
-    const fixed: Record<string, BetPlay> = {};
-    for (const [k, b] of Object.entries(ins.bets)) {
-      if (!b) continue;
-      fixed[k] = { ...(b as BetPlay), legs: fixLegs((b as BetPlay).legs) };
-    }
-    ins.bets = fixed as Insights["bets"];
+  if (Array.isArray(ins.bets)) {
+    ins.bets = ins.bets.map((b) => ({ ...b, legs: fixLegs(b.legs) }));
   }
   return ins;
 }

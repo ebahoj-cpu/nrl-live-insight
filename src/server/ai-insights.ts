@@ -557,52 +557,39 @@ function buildToolDef() {
             },
             required: ["home", "away"], additionalProperties: false,
           },
-          bets: (() => {
-            const betPlay = (desc: string, minLegs: number, maxLegs: number, stakeHint: string) => ({
+          bets: {
+            type: "array",
+            description: "Exactly TEN bet plays — one per category — every one in the same shape so the UI renders identical cards. Reasoning must align with the rest of the analysis.",
+            minItems: 10, maxItems: 10,
+            items: {
               type: "object",
-              description: desc,
               properties: {
+                category: {
+                  type: "string",
+                  enum: ["gameScript","lowRisk","mediumRisk","highRisk","getThea","upset","bookieWant","bookieFear","anytime","firstTryscorer"],
+                  description: "Which category this bet fills. Each category MUST appear exactly once. Sizing rules: gameScript=4-6 legs (aligned multi, $10 stake); lowRisk=2-3 legs (~$100 from $5); mediumRisk=3-4 legs (~$500 from $5); highRisk=4-5 legs (~$1,000 from $5); getThea=4-5 long legs (~$10,000 from $5); upset=1 leg ('<underdog> to win' at real h2h price, $20 stake); bookieWant=1-2 legs aligned with bookieScript.wantToWin ($10); bookieFear=2-3 legs leaning into bookieScript.wantToLose ($10); anytime=3-4 anytime-tryscorer legs ($10); firstTryscorer=1 leg '<player> first tryscorer' ($5).",
+                },
                 title: { type: "string", description: "Short headline. NEVER use handicap markets like 'Roosters -12.5'." },
                 legs: {
                   type: "array",
-                  minItems: minLegs, maxItems: maxLegs,
+                  minItems: 1, maxItems: 6,
                   items: {
                     type: "object",
                     properties: {
-                      pick: { type: "string", description: "One leg. Allowed: head-to-head winner, margin BUCKETS ('1-12', '13+', '1-6', '7-12', '13-24', '25+'), total points over/under, HT/FT, anytime/first tryscorer, try-count buckets ('1-2 tries', '3+ tries'). NEVER handicap/spread/line. NEVER 'over 0.5 tries'." },
-                      decimalOdds: { type: "number", description: "Decimal odds — quote LIVE BOOKIE ODDS exactly when the leg matches. Tryscorer anytime $4-15, first $11-26, margin $3-8, HT/FT $3.5-9, over/under $1.85-2.10, head-to-head $1.20-3.50." },
+                      pick: { type: "string", description: "One leg. Allowed: head-to-head winner, margin BUCKETS ('1-12', '13+', '1-6', '7-12', '13-24', '25+'), total over/under, HT/FT, anytime/first tryscorer, try-count buckets ('1-2 tries', '3+ tries'). NEVER handicap/spread/line. NEVER 'over 0.5 tries'." },
+                      decimalOdds: { type: "number", description: "Decimal odds — quote LIVE BOOKIE ODDS exactly when the leg matches." },
                     },
                     required: ["pick", "decimalOdds"], additionalProperties: false,
                   },
                 },
                 combinedOdds: { type: "number", description: "Product of all leg decimalOdds." },
-                estimatedOdds: { type: "string", description: "Combined decimal odds formatted, e.g. '$5.00'." },
-                stake: { type: "string", description: `Suggested stake (default ${stakeHint}).` },
-                potentialReturn: { type: "string", description: "stake × combinedOdds, formatted, e.g. '$100'." },
+                stake: { type: "string", description: "Suggested stake string e.g. '$5'." },
                 reasoning: { type: "string", description: "2-3 sentences citing stats / lineups / form / weakness exploit / X-factor — why this bet aligns with the rest of the analysis." },
               },
-              required: ["title", "legs", "combinedOdds", "estimatedOdds", "stake", "potentialReturn", "reasoning"],
+              required: ["category", "title", "legs", "combinedOdds", "stake", "reasoning"],
               additionalProperties: false,
-            });
-            return {
-              type: "object",
-              description: "Ten bet plays — every one in the same shape so the UI renders identical cards. Reasoning must align with the rest of the analysis.",
-              properties: {
-                gameScript:     betPlay("Cleanest read of the match: 4-6 legs that match your own predictions (winner + margin bucket + total + HT/FT + 1 tryscorer per team).", 4, 6, "$10"),
-                lowRisk:        betPlay("Low risk / low return — ~$100 from $5 stake (combinedOdds ~20). 2-3 favourite-leaning legs.", 2, 3, "$5"),
-                mediumRisk:     betPlay("Medium risk — ~$500 from $5 stake (combinedOdds ~100). 3-4 legs.", 3, 4, "$5"),
-                highRisk:       betPlay("High risk — ~$1,000 from $5 stake (combinedOdds ~200). 4-5 legs incl. HT/FT and a multi-tryscorer.", 4, 5, "$5"),
-                getThea:        betPlay("GET THEA — ~$10,000 from $5 stake (combinedOdds ~2000). 4-5 long legs built from weakness exploit, X-factor, named players.", 4, 5, "$5"),
-                upset:          betPlay("Single underdog play AGAINST the market: 1 leg = '<underdog> to win' at the EXACT real h2h underdog price.", 1, 1, "$20"),
-                bookieWant:     betPlay("Result the bookies WANT to land (low public liability — matches script.bookieScript.wantToWin). 1-2 aligned legs.", 1, 2, "$10"),
-                bookieFear:     betPlay("Result the bookies FEAR (heavy public exposure — script.bookieScript.wantToLose). 2-3 legs leaning into the bookies' nightmare.", 2, 3, "$10"),
-                anytime:        betPlay("Pure anytime tryscorer multi: 3-4 legs ALL '<player> anytime tryscorer' from tryscorerScript picks (mix both teams). Real anytime prices only.", 3, 4, "$10"),
-                firstTryscorer: betPlay("STANDALONE single bet: 1 leg = '<player> first tryscorer' using the LIVE BOOKIE ODDS first-tryscorer price.", 1, 1, "$5"),
-              },
-              required: ["gameScript","lowRisk","mediumRisk","highRisk","getThea","upset","bookieWant","bookieFear","anytime","firstTryscorer"],
-              additionalProperties: false,
-            };
-          })(),
+            },
+          },
           gameFlow: {
             type: "object",
             description: "Quarter-by-quarter script: how the game likely unfolds with HT score, momentum swings and HT/FT double pick.",

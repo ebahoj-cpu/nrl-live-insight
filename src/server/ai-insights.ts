@@ -171,7 +171,11 @@ export async function generateInsights(payload: {
     `Live AU bookie odds summary: ${payload.oddsSummary}`,
     realOddsBlock,
     payload.weatherSummary ? `Forecast at venue at kickoff: ${payload.weatherSummary}` : "",
-    `Provide a sharp, complete NRL betting analysis covering: winner, margin, HT/FT double, total points, first/anytime tryscorers, and multi-tryscorer angles. Also produce 3 specific "keys to victory" for EACH team (concrete tactical/structural points referencing real squad players, recent form, opposition weakness, or weather/ground impact).
+    `Provide a sharp, complete NRL betting analysis covering: winner, margin, HT/FT double, total points, first/anytime tryscorers, and multi-tryscorer angles.
+
+CRITICAL — every insight must serve a BETTOR reading this to land bets. Tie every observation to a specific market: who wins, who covers, who scores, when momentum swings, where the value sits.
+
+Now produce 3 specific "keys to victory" for EACH team. These MUST be DIFFERENT for each team — NOT mirror images. Each team's keys are based on THEIR OWN strengths and HOW THEY can beat THIS specific opponent. Reference real squad players by name, real recent form trends, real opposition weaknesses, and real weather/ground impact. NEVER produce keys that are literally the same point with team names swapped (e.g. "Win the kick-and-chase so X start sets in their own half" used for both sides — that is forbidden). Each key should pick a different lever: e.g. one about set-piece attack from a specific named player, one about defensive structure exploiting a specific opposition weakness, one about game-management (kicking, ruck speed, completion).
 
 Then produce a deep "script" with these distinct sections:
 - headToHead: 3-5 sentences. Recent H2H meetings, score trends, venue history at THIS ground, who has owned the rivalry lately, and any tactical pattern that has decided recent matchups.

@@ -1142,7 +1142,7 @@ function WeaknessExploitCard({ team, opponent, data }: {
   );
 }
 
-/* ================= SCRIPT TAB ================= */
+/* ================= SCRIPT TAB — UNIFIED MATCH SIMULATION ENGINE ================= */
 
 function ScriptTab({ insights, insightsError, insightsLoading, home, away }:
   { insights: any; insightsError: string | null; insightsLoading?: boolean; home: any; away: any }) {
@@ -1151,32 +1151,20 @@ function ScriptTab({ insights, insightsError, insightsLoading, home, away }:
   if (!insights?.script) return <Empty msg="Script unavailable." />;
 
   const s = insights.script;
+  const sim = insights.simulation;
   const homeName = home.nickName;
   const awayName = away.nickName;
 
   return (
     <div className="space-y-4">
-      <Card title="Head to head" icon={ScrollText}>
-        <div className="flex items-center justify-center gap-10 mb-4">
-          <div className="flex flex-col items-center gap-2">
-            <TeamLogo themeKey={home.themeKey} name={home.nickName} size={56} />
-            <span className="text-xs font-bold uppercase tracking-wider">{home.nickName}</span>
-          </div>
-          <div className="flex flex-col items-center gap-2">
-            <TeamLogo themeKey={away.themeKey} name={away.nickName} size={56} />
-            <span className="text-xs font-bold uppercase tracking-wider">{away.nickName}</span>
-          </div>
-        </div>
-        <p className="text-sm leading-relaxed text-muted-foreground">{s.headToHead}</p>
-      </Card>
-
-      <Card title="Form analysis" icon={TrendingUp}>
-        <p className="text-sm leading-relaxed text-muted-foreground whitespace-pre-line">{s.formAnalysis}</p>
-      </Card>
-
-      <Card title="X-factor" icon={Sparkles} className="accent-glow">
-        <p className="text-sm leading-relaxed">{s.xFactor}</p>
-      </Card>
+      {/* Top of tab: the simulation drives everything below */}
+      {sim && (
+        <>
+          <SimulationProfileCard sim={sim} home={home} away={away} />
+          <RecommendedPlaysCard plays={sim.recommendedPlays || []} correlatedAngle={sim.correlatedAngle} scriptCaveat={sim.scriptCaveat} />
+          <RankedTryscorersCard players={sim.rankedTryscorers || []} home={home} away={away} />
+        </>
+      )}
 
       {insights.gameFlow && (
         <GameFlowCard flow={insights.gameFlow} home={homeName} away={awayName} />
@@ -1189,6 +1177,18 @@ function ScriptTab({ insights, insightsError, insightsLoading, home, away }:
           away={away}
         />
       )}
+
+      <Card title="Head to head" icon={ScrollText}>
+        <p className="text-sm leading-relaxed text-muted-foreground">{s.headToHead}</p>
+      </Card>
+
+      <Card title="Form analysis" icon={TrendingUp}>
+        <p className="text-sm leading-relaxed text-muted-foreground whitespace-pre-line">{s.formAnalysis}</p>
+      </Card>
+
+      <Card title="X-factor" icon={Sparkles} className="accent-glow">
+        <p className="text-sm leading-relaxed">{s.xFactor}</p>
+      </Card>
 
       {s.psychological && (
         <Card title="Psychological" icon={Brain}>
@@ -1235,7 +1235,7 @@ function ScriptTab({ insights, insightsError, insightsLoading, home, away }:
       {s.matchFix && (
         <Card title="Match Fix script" icon={Eye}>
           <p className="text-[11px] text-muted-foreground mb-4 italic">
-            Tongue-in-cheek: how head office would script this game for ratings, sponsors and the finals race. Strictly for laughs — not an actual accusation 🙃
+            Tongue-in-cheek: how head office would script this game for ratings, sponsors and the finals race. Strictly for laughs 🙃
           </p>
 
           <div className="rounded-xl border border-fuchsia-500/40 bg-fuchsia-500/5 p-4 mb-3">
@@ -1281,6 +1281,306 @@ function ScriptTab({ insights, insightsError, insightsLoading, home, away }:
           </div>
         </Card>
       )}
+    </div>
+  );
+}
+
+/* ============ Match Simulation Engine UI cards ============ */
+
+function SimulationProfileCard({ sim, home, away }:
+  { sim: any; home: any; away: any }) {
+  const p = sim.profile || {};
+  const dom = p.dominance === "home" ? home.nickName : p.dominance === "away" ? away.nickName : "Even";
+  const tempo = (p.tempo || "moderate") as string;
+  const tempoTone = tempo === "fast" ? "text-emerald-500" : tempo === "slow" ? "text-sky-500" : "text-yellow-500";
+  const range = p.expectedTotalRange || { low: 0, high: 0, midpoint: 0 };
+
+  return (
+    <section className="card-surface p-5 accent-glow">
+      <div className="flex items-center gap-2 mb-1">
+        <Radar className="h-4 w-4 text-accent" />
+        <h3 className="font-bold text-sm uppercase tracking-wider">Match Simulation</h3>
+      </div>
+      <p className="text-[11px] text-muted-foreground mb-4 italic">
+        One unified simulation drives every market below — winner, margin, total, HT/FT, tryscorers.
+      </p>
+
+      {sim.summary && (
+        <p className="text-sm leading-relaxed mb-4">{sim.summary}</p>
+      )}
+
+      {/* Profile chips */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
+        <ProfileChip label="Tempo" value={tempo} tone={tempoTone} />
+        <ProfileChip label="Dominance" value={dom} tone="text-accent" />
+        <ProfileChip label="Pattern" value={(p.scoringPattern || "spread").replace(/-/g, " ")} tone="text-fuchsia-400" />
+        <ProfileChip label="Total range" value={`${range.low}-${range.high}`} tone="text-emerald-500" />
+      </div>
+
+      {/* Edge attack heatmap */}
+      <div className="rounded-xl bg-surface-2 p-3 mb-4">
+        <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold mb-2">Edge attack heatmap</div>
+        <div className="grid grid-cols-3 gap-2 mb-2">
+          <EdgeBar label="Left" level={p.edgeAttack?.left} />
+          <EdgeBar label="Middle" level={p.edgeAttack?.middle} />
+          <EdgeBar label="Right" level={p.edgeAttack?.right} />
+        </div>
+        {p.edgeAttack?.note && <p className="text-xs text-muted-foreground leading-relaxed">{p.edgeAttack.note}</p>}
+      </div>
+
+      {/* Notes grid */}
+      <div className="space-y-2 text-sm">
+        {p.tempoNote && <NoteRow label="Tempo" text={p.tempoNote} />}
+        {p.dominanceNote && <NoteRow label="Dominance" text={p.dominanceNote} />}
+        {p.territoryBalance && <NoteRow label="Territory" text={p.territoryBalance} />}
+        {p.scoringPatternNote && <NoteRow label="Scoring" text={p.scoringPatternNote} />}
+      </div>
+
+      {/* Defensive zones */}
+      {Array.isArray(p.defensiveZones) && p.defensiveZones.length > 0 && (
+        <div className="mt-4 pt-4 border-t border-border">
+          <div className="text-[10px] uppercase tracking-widest text-danger font-bold mb-2 inline-flex items-center gap-1.5">
+            <Shield className="h-3 w-3" /> Defensive break zones
+          </div>
+          <ul className="space-y-1.5">
+            {p.defensiveZones.map((z: string, i: number) => (
+              <li key={i} className="flex gap-2 text-xs leading-relaxed">
+                <span className="text-danger shrink-0">▸</span>
+                <span className="text-muted-foreground">{z}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function ProfileChip({ label, value, tone }: { label: string; value: string; tone: string }) {
+  return (
+    <div className="rounded-lg bg-surface-2 px-3 py-2">
+      <div className="text-[9px] uppercase tracking-widest text-muted-foreground font-bold">{label}</div>
+      <div className={`text-sm font-black capitalize ${tone} truncate`}>{value}</div>
+    </div>
+  );
+}
+
+function EdgeBar({ label, level }: { label: string; level?: string }) {
+  const lvl = (level || "medium") as "high" | "medium" | "low";
+  const pct = lvl === "high" ? 90 : lvl === "medium" ? 55 : 25;
+  const tone = lvl === "high" ? "bg-accent" : lvl === "medium" ? "bg-yellow-500" : "bg-muted";
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">{label}</span>
+        <span className="text-[10px] font-black uppercase">{lvl}</span>
+      </div>
+      <div className="h-1.5 rounded-full bg-surface overflow-hidden">
+        <div className={`h-full ${tone} transition-all`} style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  );
+}
+
+function NoteRow({ label, text }: { label: string; text: string }) {
+  return (
+    <div className="flex gap-3">
+      <span className="kbd shrink-0 w-20 h-5 rounded-md bg-surface-2 text-[10px] font-bold text-muted-foreground flex items-center justify-center uppercase">
+        {label}
+      </span>
+      <p className="text-sm leading-relaxed text-muted-foreground flex-1">{text}</p>
+    </div>
+  );
+}
+
+function RecommendedPlaysCard({ plays, correlatedAngle, scriptCaveat }:
+  { plays: any[]; correlatedAngle?: string; scriptCaveat?: string }) {
+  if (!plays.length) {
+    return (
+      <Card title="Recommended plays" icon={Crosshair}>
+        <p className="text-sm text-muted-foreground">Plays will populate once the simulation finishes.</p>
+      </Card>
+    );
+  }
+  return (
+    <Card title="Recommended plays" icon={Crosshair}>
+      <p className="text-[11px] text-muted-foreground mb-4 italic">
+        Each play derived from the same simulation — model % vs implied % shows where the edge sits. Ranked by edge.
+      </p>
+      <ul className="space-y-2.5">
+        {plays.map((p, i) => <PlayRow key={i} play={p} />)}
+      </ul>
+      {correlatedAngle && (
+        <div className="mt-4 pt-4 border-t border-border rounded-md bg-accent/5 px-3 py-2.5">
+          <div className="text-[10px] uppercase tracking-widest text-accent font-bold mb-1">Correlated angle</div>
+          <p className="text-xs text-muted-foreground leading-relaxed">{correlatedAngle}</p>
+        </div>
+      )}
+      {scriptCaveat && (
+        <div className="mt-2 px-3 py-2 rounded-md bg-yellow-500/5 border border-yellow-500/20">
+          <div className="text-[10px] uppercase tracking-widest text-yellow-500 font-bold mb-1">Script caveat</div>
+          <p className="text-xs text-muted-foreground leading-relaxed">{scriptCaveat}</p>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+function PlayRow({ play }: { play: any }) {
+  const edge = Number(play.edgePct || 0);
+  const positive = edge > 0;
+  const trap = edge <= -2;
+  const conf = (play.confidence || "medium") as "high" | "medium" | "low";
+  const edgeTone = trap ? "text-danger" : positive ? "text-emerald-500" : "text-muted-foreground";
+  const borderTone = trap ? "border-danger/30 bg-danger/5" : positive && conf === "high" ? "border-accent/40 bg-accent/5" : "border-border bg-surface-2/40";
+
+  const marketLabel = (m: string) => {
+    switch (m) {
+      case "match-winner": return "Winner";
+      case "winning-margin": return "Margin";
+      case "total-points": return "Total";
+      case "ht-ft": return "HT/FT";
+      case "first-tryscorer": return "First Try";
+      case "anytime-tryscorer": return "Anytime";
+      case "2-plus-tries": return "2+ Tries";
+      default: return m;
+    }
+  };
+
+  return (
+    <li className={`rounded-xl border p-3 ${borderTone}`}>
+      <div className="flex items-start justify-between gap-2 mb-2">
+        <div className="flex items-center gap-2 min-w-0 flex-wrap">
+          <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-accent/15 text-accent font-bold">{marketLabel(play.market)}</span>
+          <span className="font-semibold text-sm">{play.pick}</span>
+          {trap && <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-danger/20 text-danger font-bold">FADE</span>}
+        </div>
+        {play.decimalOdds && (
+          <span className="kbd text-sm font-black text-accent shrink-0">${Number(play.decimalOdds).toFixed(2)}</span>
+        )}
+      </div>
+
+      <div className="grid grid-cols-3 gap-2 mb-2">
+        <ProbCell label="Model" value={play.modelProbability} tone="text-foreground" />
+        <ProbCell label="Implied" value={play.impliedProbability} tone="text-muted-foreground" />
+        <div className="text-center">
+          <div className="text-[9px] uppercase tracking-wider text-muted-foreground font-bold">Edge</div>
+          <div className={`text-sm font-black kbd ${edgeTone}`}>{positive ? "+" : ""}{edge.toFixed(1)}%</div>
+        </div>
+      </div>
+
+      <p className="text-xs text-muted-foreground leading-relaxed">{play.rationale}</p>
+
+      <div className="mt-2 pt-2 border-t border-border/40 flex items-center justify-between gap-2 flex-wrap">
+        <span className="text-[10px] text-muted-foreground italic">↳ {play.scriptAlignment}</span>
+        <span className={`text-[9px] uppercase tracking-widest font-black ${conf === "high" ? "text-emerald-500" : conf === "medium" ? "text-yellow-500" : "text-muted-foreground"}`}>
+          {conf} confidence
+        </span>
+      </div>
+    </li>
+  );
+}
+
+function ProbCell({ label, value, tone }: { label: string; value: number; tone: string }) {
+  const v = Number(value || 0);
+  return (
+    <div className="text-center">
+      <div className="text-[9px] uppercase tracking-wider text-muted-foreground font-bold">{label}</div>
+      <div className={`text-sm font-black kbd ${tone}`}>{v.toFixed(1)}%</div>
+    </div>
+  );
+}
+
+function RankedTryscorersCard({ players, home, away }:
+  { players: any[]; home: any; away: any }) {
+  if (!players.length) {
+    return (
+      <Card title="Ranked try scorers" icon={Target}>
+        <p className="text-sm text-muted-foreground">Rankings will populate once the simulation finishes.</p>
+      </Card>
+    );
+  }
+  return (
+    <Card title="Ranked try scorers" icon={Target}>
+      <p className="text-[11px] text-muted-foreground mb-4 italic">
+        Each ranking blends Player Attacking Impact (PAIS), team try-creation fit (TTCP), matchup exploit, script fit and odds value.
+      </p>
+      <ol className="space-y-3">
+        {players.map((p, i) => (
+          <RankedPlayerRow key={i} rank={i + 1} player={p} home={home} away={away} />
+        ))}
+      </ol>
+    </Card>
+  );
+}
+
+function RankedPlayerRow({ rank, player, home, away }: { rank: number; player: any; home: any; away: any }) {
+  const team = player.team === "home" ? home : away;
+  const conf = (player.confidence || "medium") as "high" | "medium" | "low";
+  const confTone = conf === "high" ? "text-emerald-500" : conf === "medium" ? "text-yellow-500" : "text-muted-foreground";
+  const total = Number(player.totalScore || 0);
+  const totalTone = total >= 75 ? "text-accent" : total >= 60 ? "text-yellow-500" : "text-muted-foreground";
+  const marketLabel = player.market === "first" ? "FTS" : player.market === "2+" ? "2+ Tries" : "Anytime";
+
+  return (
+    <li className="rounded-xl bg-surface-2 p-3">
+      <div className="flex items-center gap-3 mb-3">
+        <span className={`kbd shrink-0 w-8 h-8 rounded-full text-xs font-black flex items-center justify-center ${rank === 1 ? "bg-accent text-accent-foreground" : "bg-surface text-foreground"}`}>
+          {rank}
+        </span>
+        <TeamLogo themeKey={team.themeKey} name={team.nickName} size={28} />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="font-bold text-sm truncate">{player.name}</span>
+            {player.stackable && <span className="text-[9px] uppercase tracking-wider px-1 rounded bg-fuchsia-500/15 text-fuchsia-400 font-bold">Stack</span>}
+          </div>
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{player.position}</div>
+        </div>
+        <div className="flex flex-col items-end shrink-0 gap-1">
+          <div className="flex items-center gap-1">
+            <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-accent/15 text-accent font-bold">{marketLabel}</span>
+            {player.decimalOdds && <span className="kbd text-xs font-black text-accent">${Number(player.decimalOdds).toFixed(2)}</span>}
+          </div>
+          <div className={`text-[9px] uppercase tracking-widest font-black ${confTone}`}>{conf}</div>
+        </div>
+      </div>
+
+      {/* Score breakdown bars */}
+      <div className="grid grid-cols-5 gap-2 mb-3">
+        <ScoreBar label="PAIS" value={player.scores?.pais ?? 0} />
+        <ScoreBar label="TTCP" value={player.scores?.ttcp ?? 0} />
+        <ScoreBar label="Match" value={player.scores?.matchupExploit ?? 0} />
+        <ScoreBar label="Script" value={player.scores?.scriptFit ?? 0} />
+        <ScoreBar label="Value" value={player.scores?.value ?? 0} />
+      </div>
+
+      <p className="text-xs text-muted-foreground leading-relaxed mb-2">{player.rationale}</p>
+
+      <div className="flex items-center justify-between gap-2 pt-2 border-t border-border/40">
+        <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">Total score</span>
+        <div className="flex items-center gap-2 flex-1 max-w-[200px]">
+          <div className="flex-1 h-1.5 rounded-full bg-surface overflow-hidden">
+            <div className={`h-full ${total >= 75 ? "bg-accent" : total >= 60 ? "bg-yellow-500" : "bg-muted"}`} style={{ width: `${Math.min(100, total)}%` }} />
+          </div>
+          <span className={`kbd text-sm font-black ${totalTone}`}>{total.toFixed(0)}</span>
+        </div>
+      </div>
+    </li>
+  );
+}
+
+function ScoreBar({ label, value }: { label: string; value: number }) {
+  const v = Number(value || 0);
+  const tone = v >= 75 ? "bg-accent" : v >= 55 ? "bg-yellow-500" : "bg-muted";
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-[8px] uppercase tracking-wider text-muted-foreground font-bold truncate">{label}</span>
+        <span className="text-[9px] font-black tabular-nums">{Math.round(v)}</span>
+      </div>
+      <div className="h-1 rounded-full bg-surface overflow-hidden">
+        <div className={`h-full ${tone}`} style={{ width: `${Math.min(100, v)}%` }} />
+      </div>
     </div>
   );
 }

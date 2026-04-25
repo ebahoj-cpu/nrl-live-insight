@@ -343,8 +343,8 @@ function buildFallbackInsights(payload: {
       : "away";
   const htftPick = `${halftimeLeader === "draw" ? "Draw" : halftimeLeader === "home" ? payload.homeName : payload.awayName} / ${winnerName}`;
 
-  const homeExploit = buildWeaknessExploit(payload.homeName, payload.awayName, homeCore, wetWeather);
-  const awayExploit = buildWeaknessExploit(payload.awayName, payload.homeName, awayCore, wetWeather);
+  const homeExploit = buildWeaknessExploit(payload.homeName, payload.awayName, homeCore, wetWeather, "home", homeFormScore, awayFormScore, payload.homePosition, payload.awayPosition);
+  const awayExploit = buildWeaknessExploit(payload.awayName, payload.homeName, awayCore, wetWeather, "away", awayFormScore, homeFormScore, payload.awayPosition, payload.homePosition);
   const bookieWant = payload.realOdds?.h2h.home && payload.realOdds?.h2h.away
     ? payload.realOdds.h2h.home.price < payload.realOdds.h2h.away.price
       ? `${payload.awayName} to muddy the game up or pinch it late — it breaks up the public favourite multis built around ${payload.homeName}.`

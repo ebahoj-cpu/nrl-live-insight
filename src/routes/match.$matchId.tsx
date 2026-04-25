@@ -941,6 +941,8 @@ function ScriptTab({ insights, insightsError, insightsLoading, home, away }:
   if (!insights?.script) return <Empty msg="Script unavailable." />;
 
   const s = insights.script;
+  const homeName = home.nickName;
+  const awayName = away.nickName;
 
   return (
     <div className="space-y-4">

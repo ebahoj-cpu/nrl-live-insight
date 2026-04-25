@@ -669,5 +669,17 @@ function normaliseBetMath(ins: Insights): Insights {
     };
   }
 
+  if (ins.upset?.suggestedPlay) {
+    const odds = Math.max(1.01, Number(ins.upset.suggestedPlay.decimalOdds) || 1.01);
+    const stakeNum = parseStake(ins.upset.suggestedPlay.stake) || 20;
+    ins.upset.suggestedPlay = {
+      ...ins.upset.suggestedPlay,
+      decimalOdds: odds,
+      stake: ins.upset.suggestedPlay.stake || "$20",
+      potentialReturn: fmtMoney(stakeNum * odds),
+    };
+    ins.upset.upsetOdds = odds;
+  }
+
   return ins;
 }

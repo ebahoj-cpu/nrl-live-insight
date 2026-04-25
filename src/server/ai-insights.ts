@@ -2,7 +2,7 @@
 // Uses tool-calling for structured output. Receives ONLY real data summaries.
 
 const GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
-const MODEL = "google/gemini-2.5-flash";
+const MODEL = "google/gemini-2.5-pro";
 
 export type BettingAngle = {
   market: string;
@@ -160,8 +160,9 @@ ON TOP OF THAT, generate ONE standalone "getTheaSpecial" — the GET THEA bet:
     headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
     body: JSON.stringify({
       model: MODEL,
+      max_tokens: 8000,
       messages: [
-        { role: "system", content: "You are a professional NRL analyst and betting tipster. Use only the data provided. Never invent stats or players. Each pick must include a one-sentence reasoning the user can act on." },
+        { role: "system", content: "You are a professional NRL analyst and betting tipster. Use only the data provided. Never invent stats or players. Each pick must include a one-sentence reasoning the user can act on. You MUST respond by calling the emit_insights tool with ALL required fields. Be concise in prose fields to stay within token limits." },
         { role: "user", content: prompt },
       ],
       tools: [{
@@ -400,9 +401,22 @@ ON TOP OF THAT, generate ONE standalone "getTheaSpecial" — the GET THEA bet:
   if (!res.ok) throw new Error(`AI gateway HTTP ${res.status}: ${await res.text()}`);
 
   const data = await res.json() as any;
-  const call = data.choices?.[0]?.message?.tool_calls?.[0];
-  if (!call?.function?.arguments) throw new Error("AI returned no structured output");
-  const parsed = JSON.parse(call.function.arguments) as Insights;
+  const choice = data.choices?.[0];
+  const call = choice?.message?.tool_calls?.[0];
+  const argStr = call?.function?.arguments;
+  if (!argStr) {
+    const finish = choice?.finish_reason || choice?.native_finish_reason || "unknown";
+    const textFallback = choice?.message?.content;
+    console.error("AI insights: no tool_call returned", { finish, textFallback: textFallback?.slice(0, 500) });
+    throw new Error(`AI returned no structured output (finish: ${finish}). Try Refresh.`);
+  }
+  let parsed: Insights;
+  try {
+    parsed = JSON.parse(argStr) as Insights;
+  } catch (e) {
+    console.error("AI insights: JSON.parse failed", { len: argStr.length, head: argStr.slice(0, 300), tail: argStr.slice(-300) });
+    throw new Error("AI returned malformed JSON. Try Refresh.");
+  }
   return normaliseBetMath(parsed);
 }
 

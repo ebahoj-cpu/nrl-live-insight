@@ -7,7 +7,7 @@ import { Suspense, useState } from "react";
 import {
   ArrowLeft, Clock, MapPin, Users, BarChart3, Sparkles, ScrollText,
   Trophy, Target, Flag, Crown, TrendingUp, AlertCircle, CloudSun, Calendar, Zap, Hourglass,
-  Coins, ThumbsUp, ThumbsDown, Wallet, Activity, Shield, Brain,
+  Coins, ThumbsUp, ThumbsDown, Wallet, Activity, Shield, Brain, Crosshair, Eye,
 } from "lucide-react";
 
 const matchQO = (matchId: string) => queryOptions({
@@ -647,6 +647,14 @@ function InsightsTab({ insights, insightsError, home, away, tryscorers, tryscore
         </div>
       )}
 
+      {/* 9b. Weakness exploit — opposition flaws + 3 players to watch */}
+      {insights.weaknessExploit && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <WeaknessExploitCard team={home} opponent={away} data={insights.weaknessExploit.home} />
+          <WeaknessExploitCard team={away} opponent={home} data={insights.weaknessExploit.away} />
+        </div>
+      )}
+
       {/* Key factors */}
       <Card title="Key factors" icon={TrendingUp}>
         <ul className="space-y-2 text-sm">
@@ -810,6 +818,54 @@ function KeysCard({ team, keys }: { team: string; keys: string[] }) {
           </li>
         ))}
       </ol>
+    </Card>
+  );
+}
+
+function WeaknessExploitCard({ team, opponent, data }: {
+  team: string;
+  opponent: string;
+  data: {
+    opponentWeakness: string;
+    targetArea: string;
+    tacticalPlan: string;
+    playersToWatch: { name: string; role: string; why: string }[];
+  };
+}) {
+  return (
+    <Card title={`${team} — exploit ${opponent}`} icon={Crosshair}>
+      <div className="space-y-3 text-sm">
+        <div>
+          <div className="text-[10px] uppercase tracking-widest text-danger font-bold mb-1">Opposition weakness</div>
+          <p className="leading-relaxed">{data.opponentWeakness}</p>
+        </div>
+        <div>
+          <div className="text-[10px] uppercase tracking-widest text-accent font-bold mb-1">Target area</div>
+          <p className="leading-relaxed">{data.targetArea}</p>
+        </div>
+        <div>
+          <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold mb-1">Tactical plan</div>
+          <p className="leading-relaxed text-muted-foreground">{data.tacticalPlan}</p>
+        </div>
+        <div className="pt-2 border-t border-border/40">
+          <div className="text-[10px] uppercase tracking-widest text-accent font-bold mb-2 flex items-center gap-1.5">
+            <Eye className="h-3 w-3" /> 3 players to watch
+          </div>
+          <ol className="space-y-2">
+            {data.playersToWatch.map((p, i) => (
+              <li key={i} className="flex gap-3">
+                <span className="kbd w-6 h-6 shrink-0 rounded-full bg-accent text-accent-foreground text-xs font-bold flex items-center justify-center">{i + 1}</span>
+                <div className="min-w-0">
+                  <div className="font-semibold leading-tight">
+                    {p.name} <span className="text-[11px] text-muted-foreground font-normal">· {p.role}</span>
+                  </div>
+                  <div className="text-xs text-muted-foreground leading-relaxed mt-0.5">{p.why}</div>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </div>
     </Card>
   );
 }

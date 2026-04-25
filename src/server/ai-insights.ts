@@ -34,6 +34,20 @@ export type Insights = {
   multiTryscorer: { pick: string; reasoning: string; confidence: number };
   keysToVictory: { home: string[]; away: string[] };
   keyFactors: string[];
+  weaknessExploit: {
+    home: {
+      opponentWeakness: string;          // e.g. "Roosters concede right-edge tries — missed tackle % at left centre"
+      targetArea: string;                // e.g. "Right edge attack, 20m channel"
+      tacticalPlan: string;              // 2-3 sentences how home team exploits it
+      playersToWatch: { name: string; role: string; why: string }[]; // 3 players
+    };
+    away: {
+      opponentWeakness: string;
+      targetArea: string;
+      tacticalPlan: string;
+      playersToWatch: { name: string; role: string; why: string }[];
+    };
+  };
   betSuggestions: BetSuggestion[];
   script: {
     headToHead: string;
@@ -92,6 +106,12 @@ Then produce a deep "script" with these distinct sections:
 - milestones: 1-4 individual milestones approaching for either side (games, tries, points, coaching games).
 
 Also produce a "bookieScript": from a sharp Australian bookmaker's perspective, which result/outcome they WANT to land (limits liability, public is on the other side), which result they want to AVOID (heavy public liability), and a one-sentence summary of where their book is most exposed.
+
+ALSO produce a "weaknessExploit" for EACH team. For each side identify:
+- opponentWeakness: a specific defensive flaw in the OPPOSITION based on recent form / known matchup data — e.g. "right-edge defence leaking tries", "high missed-tackle rate at left centre", "ruck speed dropping in second half", "kick-return metres conceded", "pivot's defensive read on shape plays". Cite the side conceding it.
+- targetArea: the part of the field / channel / phase the team should attack — e.g. "Right edge 20m channel", "Inside ball off the ruck", "Bomb contests on the left wing", "Short side attack from scrum".
+- tacticalPlan: 2-3 sentences on HOW this team weaponises that weakness — shape, ball-runners, kicking game, set-piece.
+- playersToWatch: exactly 3 NAMED squad players from THIS team most likely to score or directly influence scoring against that weakness — for each give role (e.g. "fullback", "right centre", "halfback") and a one-sentence why (form, matchup advantage, kick targets, line-running role into that channel). Use only players from the named squad above.
 
 FINALLY, generate exactly 3 betSuggestions — one for EACH target payout tier: $100, $1,000, and $10,000. Each suggestion is a small multi (2-4 legs) combining real squad players, head-to-head winner, margin BUCKETS, totals or tryscorer markets.
 
@@ -203,6 +223,54 @@ CRITICAL betting rules:
                 required: ["home", "away"], additionalProperties: false,
               },
               keyFactors: { type: "array", items: { type: "string" }, minItems: 3, maxItems: 6 },
+              weaknessExploit: {
+                type: "object",
+                properties: {
+                  home: {
+                    type: "object",
+                    properties: {
+                      opponentWeakness: { type: "string", description: "Specific defensive flaw in the AWAY team" },
+                      targetArea: { type: "string", description: "Channel / phase / part of the field to attack" },
+                      tacticalPlan: { type: "string", description: "2-3 sentences on how to weaponise it" },
+                      playersToWatch: {
+                        type: "array", minItems: 3, maxItems: 3,
+                        items: {
+                          type: "object",
+                          properties: {
+                            name: { type: "string", description: "Named squad player from HOME team" },
+                            role: { type: "string", description: "Position / role" },
+                            why: { type: "string", description: "Why they score or influence — 1 sentence" },
+                          },
+                          required: ["name", "role", "why"], additionalProperties: false,
+                        },
+                      },
+                    },
+                    required: ["opponentWeakness", "targetArea", "tacticalPlan", "playersToWatch"], additionalProperties: false,
+                  },
+                  away: {
+                    type: "object",
+                    properties: {
+                      opponentWeakness: { type: "string", description: "Specific defensive flaw in the HOME team" },
+                      targetArea: { type: "string" },
+                      tacticalPlan: { type: "string" },
+                      playersToWatch: {
+                        type: "array", minItems: 3, maxItems: 3,
+                        items: {
+                          type: "object",
+                          properties: {
+                            name: { type: "string", description: "Named squad player from AWAY team" },
+                            role: { type: "string" },
+                            why: { type: "string" },
+                          },
+                          required: ["name", "role", "why"], additionalProperties: false,
+                        },
+                      },
+                    },
+                    required: ["opponentWeakness", "targetArea", "tacticalPlan", "playersToWatch"], additionalProperties: false,
+                  },
+                },
+                required: ["home", "away"], additionalProperties: false,
+              },
               betSuggestions: {
                 type: "array",
                 minItems: 3, maxItems: 3,
@@ -258,7 +326,7 @@ CRITICAL betting rules:
             required: [
               "predictedScore","winner","margin","total","htft",
               "firstTryscorer","anytimeTryscorers","multiTryscorer",
-              "keysToVictory","keyFactors","betSuggestions","script",
+              "keysToVictory","keyFactors","weaknessExploit","betSuggestions","script",
             ],
             additionalProperties: false,
           },

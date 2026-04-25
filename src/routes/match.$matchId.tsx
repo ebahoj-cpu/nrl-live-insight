@@ -858,27 +858,56 @@ function WeaknessExploitCard({ team, opponent, data }: {
   team: string;
   opponent: string;
   data: {
-    opponentWeakness: string;
-    targetArea: string;
+    opponentWeaknesses?: string[];
+    opponentWeakness?: string; // legacy single-string fallback for cached payloads
+    targetAreas?: string[];
+    targetArea?: string;       // legacy fallback
     tacticalPlan: string;
     playersToWatch: { name: string; role: string; why: string }[];
   };
 }) {
+  const weaknesses = data.opponentWeaknesses && data.opponentWeaknesses.length > 0
+    ? data.opponentWeaknesses
+    : data.opponentWeakness ? [data.opponentWeakness] : [];
+  const areas = data.targetAreas && data.targetAreas.length > 0
+    ? data.targetAreas
+    : data.targetArea ? [data.targetArea] : [];
+
   return (
     <Card title={`${team} — exploit ${opponent}`} icon={Crosshair}>
       <div className="space-y-3 text-sm">
         <div>
-          <div className="text-[10px] uppercase tracking-widest text-danger font-bold mb-1">Opposition weakness</div>
-          <p className="leading-relaxed">{data.opponentWeakness}</p>
+          <div className="text-[10px] uppercase tracking-widest text-danger font-bold mb-2">
+            {weaknesses.length} potential exploit{weaknesses.length === 1 ? "" : "s"}
+          </div>
+          <ol className="space-y-1.5">
+            {weaknesses.map((w, i) => (
+              <li key={i} className="flex gap-2 leading-relaxed">
+                <span className="kbd w-5 h-5 shrink-0 rounded-full bg-danger/15 text-danger text-[11px] font-bold flex items-center justify-center">{i + 1}</span>
+                <span>{w}</span>
+              </li>
+            ))}
+          </ol>
         </div>
-        <div>
-          <div className="text-[10px] uppercase tracking-widest text-accent font-bold mb-1">Target area</div>
-          <p className="leading-relaxed">{data.targetArea}</p>
+
+        <div className="pt-1">
+          <div className="text-[10px] uppercase tracking-widest text-accent font-bold mb-2">
+            Target area{areas.length === 1 ? "" : "s"}
+          </div>
+          <ul className="flex flex-wrap gap-1.5">
+            {areas.map((a, i) => (
+              <li key={i} className="text-xs px-2 py-1 rounded-md bg-accent/10 text-accent font-semibold border border-accent/20">
+                {a}
+              </li>
+            ))}
+          </ul>
         </div>
-        <div>
+
+        <div className="pt-1">
           <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold mb-1">Tactical plan</div>
           <p className="leading-relaxed text-muted-foreground">{data.tacticalPlan}</p>
         </div>
+
         <div className="pt-2 border-t border-border/40">
           <div className="text-[10px] uppercase tracking-widest text-accent font-bold mb-2 flex items-center gap-1.5">
             <Eye className="h-3 w-3" /> 3 players to watch

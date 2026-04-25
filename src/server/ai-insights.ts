@@ -64,14 +64,14 @@ export type Insights = {
   keyFactors: string[];
   weaknessExploit: {
     home: {
-      opponentWeakness: string;          // e.g. "Roosters concede right-edge tries — missed tackle % at left centre"
-      targetArea: string;                // e.g. "Right edge attack, 20m channel"
-      tacticalPlan: string;              // 2-3 sentences how home team exploits it
+      opponentWeaknesses: string[];      // exactly 3 specific defensive flaws in the opposition
+      targetAreas: string[];             // 1-3 channels / phases / areas to attack
+      tacticalPlan: string;              // 2-3 sentences how home team exploits them
       playersToWatch: { name: string; role: string; why: string }[]; // 3 players
     };
     away: {
-      opponentWeakness: string;
-      targetArea: string;
+      opponentWeaknesses: string[];
+      targetAreas: string[];
       tacticalPlan: string;
       playersToWatch: { name: string; role: string; why: string }[];
     };
@@ -155,10 +155,10 @@ Then produce a deep "script" with these distinct sections:
 Also produce a "bookieScript": from a sharp Australian bookmaker's perspective, which result/outcome they WANT to land (limits liability, public is on the other side), which result they want to AVOID (heavy public liability), and a one-sentence summary of where their book is most exposed.
 
 ALSO produce a "weaknessExploit" for EACH team. For each side identify:
-- opponentWeakness: a specific defensive flaw in the OPPOSITION based on recent form / known matchup data — e.g. "right-edge defence leaking tries", "high missed-tackle rate at left centre", "ruck speed dropping in second half".
-- targetArea: the part of the field / channel / phase the team should attack.
-- tacticalPlan: 2-3 sentences on HOW this team weaponises that weakness.
-- playersToWatch: exactly 3 NAMED squad players from THIS team most likely to score or directly influence scoring against that weakness — for each give role and a one-sentence why. Use only players from the named squad above.
+- opponentWeaknesses: an array of EXACTLY 3 distinct, specific defensive flaws in the OPPOSITION based on recent form / known matchup data. Each one a concrete short phrase, e.g. "Right-edge defence leaking tries — missed tackle % at left centre", "Ruck speed drops sharply in second half", "Vulnerable under high bombs on left wing", "Slow line-speed against shape plays from scrum".
+- targetAreas: an array of 1-3 specific channels / phases / parts of the field to attack — e.g. "Right edge 20m channel", "Inside ball off the ruck", "Bomb contests on the left wing", "Short side from scrum".
+- tacticalPlan: 2-3 sentences on HOW this team weaponises those weaknesses — shape, ball-runners, kicking game, set-piece.
+- playersToWatch: exactly 3 NAMED squad players from THIS team most likely to score or directly influence scoring against those weaknesses — for each give role and a one-sentence why. Use only players from the named squad above.
 
 ALSO produce ONE "upset" object — the most credible underdog scenario:
 - underdog: the team nickname currently priced as the underdog in the head-to-head (longer h2h price). If the match is essentially even, pick the side with the longer price.
@@ -462,9 +462,15 @@ function buildToolDef() {
               home: {
                 type: "object",
                 properties: {
-                  opponentWeakness: { type: "string", description: "Specific defensive flaw in the AWAY team" },
-                  targetArea: { type: "string", description: "Channel / phase / part of the field to attack" },
-                  tacticalPlan: { type: "string", description: "2-3 sentences on how to weaponise it" },
+                  opponentWeaknesses: {
+                    type: "array", minItems: 3, maxItems: 3,
+                    items: { type: "string", description: "Specific defensive flaw in the AWAY team — short concrete phrase" },
+                  },
+                  targetAreas: {
+                    type: "array", minItems: 1, maxItems: 3,
+                    items: { type: "string", description: "Channel / phase / part of the field to attack" },
+                  },
+                  tacticalPlan: { type: "string", description: "2-3 sentences on how to weaponise the weaknesses" },
                   playersToWatch: {
                     type: "array", minItems: 3, maxItems: 3,
                     items: {
@@ -478,13 +484,19 @@ function buildToolDef() {
                     },
                   },
                 },
-                required: ["opponentWeakness", "targetArea", "tacticalPlan", "playersToWatch"], additionalProperties: false,
+                required: ["opponentWeaknesses", "targetAreas", "tacticalPlan", "playersToWatch"], additionalProperties: false,
               },
               away: {
                 type: "object",
                 properties: {
-                  opponentWeakness: { type: "string", description: "Specific defensive flaw in the HOME team" },
-                  targetArea: { type: "string" },
+                  opponentWeaknesses: {
+                    type: "array", minItems: 3, maxItems: 3,
+                    items: { type: "string", description: "Specific defensive flaw in the HOME team — short concrete phrase" },
+                  },
+                  targetAreas: {
+                    type: "array", minItems: 1, maxItems: 3,
+                    items: { type: "string" },
+                  },
                   tacticalPlan: { type: "string" },
                   playersToWatch: {
                     type: "array", minItems: 3, maxItems: 3,
@@ -499,7 +511,7 @@ function buildToolDef() {
                     },
                   },
                 },
-                required: ["opponentWeakness", "targetArea", "tacticalPlan", "playersToWatch"], additionalProperties: false,
+                required: ["opponentWeaknesses", "targetAreas", "tacticalPlan", "playersToWatch"], additionalProperties: false,
               },
             },
             required: ["home", "away"], additionalProperties: false,

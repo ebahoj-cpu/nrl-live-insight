@@ -775,18 +775,14 @@ function SeasonOverviewCard({ team, data }: { team: string; side: "home" | "away
         <Stat label="Ladder" value={data.ladderPosition} />
         <Stat label="Diff" value={data.pointsDifferential} />
       </div>
-      <div className="mb-3">
+      <div className="flex items-center gap-2 mb-2">
         <span className={`inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-bold px-2 py-1 rounded-md border ${tone}`}>
           <TrendingUp className="h-3 w-3" /> {data.formTrajectory ?? "inconsistent"}
         </span>
-        {data.trajectoryNote && <p className="text-xs text-muted-foreground leading-relaxed mt-2">{data.trajectoryNote}</p>}
       </div>
-      <div className="space-y-2">
-        <ProfileRow label="Stat trends" body={data.statTrends} />
-        <ProfileRow label="Vs top vs bottom" body={data.vsTopVsBottom} />
-        <ProfileRow label="Home / away split" body={data.homeAwaySplit} />
-        <ProfileRow label="Identity" body={data.identity} />
-      </div>
+      {data.identity && (
+        <p className="text-xs text-muted-foreground leading-relaxed">{data.identity}</p>
+      )}
     </Card>
   );
 }
@@ -798,25 +794,11 @@ function KeysCard({ team, keys }: { team: string; opponent: string; keys?: any[]
       {list.length === 0 ? (
         <p className="text-xs text-muted-foreground">Keys regenerating…</p>
       ) : (
-        <ol className="space-y-3">
+        <ol className="space-y-2">
           {list.map((k: any, i: number) => (
-            <li key={i} className="bg-surface-2 rounded-xl p-3">
-              <div className="flex items-start gap-2 mb-2">
-                <span className="text-[10px] font-bold text-accent-foreground bg-accent rounded-md px-1.5 py-0.5 shrink-0 mt-0.5">{i + 1}</span>
-                <p className="text-sm font-bold leading-tight">{k.key}</p>
-              </div>
-              {k.targetsWeakness && (
-                <div className="mb-1.5">
-                  <div className="text-[10px] uppercase tracking-wider text-danger font-bold mb-0.5">Targets</div>
-                  <p className="text-xs text-muted-foreground leading-relaxed">{k.targetsWeakness}</p>
-                </div>
-              )}
-              {k.reasoning && (
-                <div>
-                  <div className="text-[10px] uppercase tracking-wider text-accent font-bold mb-0.5">Why</div>
-                  <p className="text-xs text-muted-foreground leading-relaxed">{k.reasoning}</p>
-                </div>
-              )}
+            <li key={i} className="flex items-start gap-2">
+              <span className="text-[10px] font-bold text-accent-foreground bg-accent rounded-md px-1.5 py-0.5 shrink-0 mt-0.5">{i + 1}</span>
+              <p className="text-sm leading-snug">{k.key}</p>
             </li>
           ))}
         </ol>
@@ -832,20 +814,14 @@ function StrengthsCard({ team, items }: { team: string; items?: any[] }) {
       {list.length === 0 ? (
         <p className="text-xs text-muted-foreground">Strengths regenerating…</p>
       ) : (
-        <ul className="space-y-3">
+        <ul className="space-y-2">
           {list.map((s: any, i: number) => (
-            <li key={i} className="bg-surface-2 rounded-xl p-3">
-              <div className="flex items-start gap-2 mb-2">
-                <Shield className="h-3.5 w-3.5 text-accent shrink-0 mt-0.5" />
-                <p className="text-sm font-bold leading-tight">{s.title}</p>
+            <li key={i} className="flex items-start gap-2">
+              <Shield className="h-3.5 w-3.5 text-accent shrink-0 mt-1" />
+              <div className="min-w-0">
+                <p className="text-sm font-semibold leading-tight">{s.title}</p>
+                {s.detail && <p className="text-xs text-muted-foreground leading-relaxed mt-0.5">{s.detail}</p>}
               </div>
-              {s.detail && <p className="text-xs text-muted-foreground leading-relaxed mb-1.5">{s.detail}</p>}
-              {s.impact && (
-                <div>
-                  <div className="text-[10px] uppercase tracking-wider text-accent font-bold mb-0.5">Impact</div>
-                  <p className="text-xs text-muted-foreground leading-relaxed">{s.impact}</p>
-                </div>
-              )}
             </li>
           ))}
         </ul>
@@ -861,20 +837,14 @@ function WeaknessesCard({ team, items }: { team: string; items?: any[] }) {
       {list.length === 0 ? (
         <p className="text-xs text-muted-foreground">Weaknesses regenerating…</p>
       ) : (
-        <ul className="space-y-3">
+        <ul className="space-y-2">
           {list.map((w: any, i: number) => (
-            <li key={i} className="bg-surface-2 rounded-xl p-3 border border-danger/20">
-              <div className="flex items-start gap-2 mb-2">
-                <AlertCircle className="h-3.5 w-3.5 text-danger shrink-0 mt-0.5" />
-                <p className="text-sm font-bold leading-tight">{w.title}</p>
+            <li key={i} className="flex items-start gap-2">
+              <AlertCircle className="h-3.5 w-3.5 text-danger shrink-0 mt-1" />
+              <div className="min-w-0">
+                <p className="text-sm font-semibold leading-tight">{w.title}</p>
+                {w.detail && <p className="text-xs text-muted-foreground leading-relaxed mt-0.5">{w.detail}</p>}
               </div>
-              {w.detail && <p className="text-xs text-muted-foreground leading-relaxed mb-1.5">{w.detail}</p>}
-              {w.howToTarget && (
-                <div>
-                  <div className="text-[10px] uppercase tracking-wider text-danger font-bold mb-0.5">How to target</div>
-                  <p className="text-xs text-muted-foreground leading-relaxed">{w.howToTarget}</p>
-                </div>
-              )}
             </li>
           ))}
         </ul>
@@ -896,21 +866,18 @@ function PlayersToWatchCard({ team, players }: { team: string; players?: any[] }
       {list.length === 0 ? (
         <p className="text-xs text-muted-foreground">Players to watch regenerating…</p>
       ) : (
-        <ul className="space-y-3">
+        <ul className="space-y-2.5">
           {list.map((p: any, i: number) => {
             const tone = BUCKET_TONE[p.bucket] ?? BUCKET_TONE.back;
             return (
-              <li key={i} className="bg-surface-2 rounded-xl p-3">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className={`h-2 w-2 rounded-full ${tone.dot}`} />
-                  <span className="text-sm font-bold">{p.name}</span>
-                  <span className="text-[10px] uppercase tracking-wider text-muted-foreground">· {p.position}</span>
-                  <span className="ml-auto text-[10px] uppercase tracking-wider font-bold text-muted-foreground">{tone.label}</span>
-                </div>
-                <div className="space-y-1.5">
-                  <ProfileRow label="Form" body={p.form} />
-                  <ProfileRow label="Role this week" body={p.role} />
-                  <ProfileRow label="Matchup" body={p.matchup} />
+              <li key={i} className="flex items-start gap-2">
+                <span className={`h-2 w-2 rounded-full mt-1.5 shrink-0 ${tone.dot}`} />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-sm font-semibold truncate">{p.name}</span>
+                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground shrink-0">{p.position}</span>
+                  </div>
+                  {p.matchup && <p className="text-xs text-muted-foreground leading-relaxed mt-0.5">{p.matchup}</p>}
                 </div>
               </li>
             );

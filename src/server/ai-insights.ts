@@ -137,8 +137,67 @@ export type MatchIntelligence = {
   insightSummary: string;         // 2-3 sentences: final tactical takeaway of how the game is likely decided
 };
 
+// Match Simulation Engine — drives the Script tab. ONE unified simulation
+// produces every market prediction (winner, margin, total, HT/FT, tryscorers).
+// All recommended plays + ranked tryscorers MUST be derived from the same
+// simulated game script — never analysed in isolation.
+export type SimulationProfile = {
+  tempo: "fast" | "moderate" | "slow";
+  tempoNote: string;                // 1 sentence: WHY this tempo (rucks, kicking exchange, weather)
+  dominance: "home" | "away" | "even";
+  dominanceNote: string;            // 1 sentence: WHO controls the contest and how
+  territoryBalance: string;         // 1 sentence: e.g. "55-45 home — repeat sets through right edge"
+  scoringPattern: "early-burst" | "late-burst" | "spread" | "second-half-flood" | "first-half-flood";
+  scoringPatternNote: string;       // 1 sentence: when the points come and why
+  edgeAttack: { left: "high" | "medium" | "low"; right: "high" | "medium" | "low"; middle: "high" | "medium" | "low"; note: string };
+  defensiveZones: string[];         // 2-4 short phrases: where each team's defence is most likely to break
+  expectedTotalRange: { low: number; high: number; midpoint: number };
+};
+
+export type MarketPlay = {
+  market: "match-winner" | "winning-margin" | "total-points" | "ht-ft" | "first-tryscorer" | "anytime-tryscorer" | "2-plus-tries" | "score-anytime-points";
+  pick: string;                     // e.g. "Storm to win", "Storm 13+", "Over 44.5", "Storm/Storm", "Munster anytime"
+  decimalOdds: number | null;       // bookie price (null if not available — UI hides edge)
+  modelProbability: number;         // 0-100 — derived from the simulation
+  impliedProbability: number;       // 0-100 — from the bookie price (100/odds), 0 if no price
+  edgePct: number;                  // modelProbability - impliedProbability (positive = value)
+  confidence: "high" | "medium" | "low";
+  rationale: string;                // 1-2 sentences tying back to the simulation
+  scriptAlignment: string;          // 1 short phrase: which simulation lever this leans on (e.g. "edge attack right", "second-half flood")
+};
+
+export type RankedTryscorer = {
+  name: string;
+  team: "home" | "away";
+  position: string;
+  market: "anytime" | "first" | "2+";
+  decimalOdds: number | null;
+  // Component scores — each 0-100. Final score is weighted blend.
+  scores: {
+    pais: number;            // Player Attacking Impact (line breaks, busts, metres, assists, form)
+    ttcp: number;            // Team Try Creation Profile fit (edge balance, red zone, role)
+    matchupExploit: number;  // Defensive weakness against this player's lane
+    scriptFit: number;       // How well game script supports this scorer
+    value: number;           // Odds inefficiency (model vs implied)
+  };
+  totalScore: number;        // 0-100 weighted total
+  confidence: "high" | "medium" | "low";
+  rationale: string;         // 1-2 sentences citing aligned signals (PAIS + matchup + script)
+  stackable: boolean;        // True if game script supports stacking with team-mates
+};
+
+export type MatchSimulation = {
+  profile: SimulationProfile;
+  summary: string;                  // 2-3 sentences: the match in one read — what the simulation expects
+  recommendedPlays: MarketPlay[];   // 6-10 plays across markets, ranked by edge and script alignment
+  rankedTryscorers: RankedTryscorer[]; // 4-8 ranked players, ordered by totalScore desc
+  correlatedAngle: string;          // 1-2 sentences: which 2-3 plays correlate (one script supports them all)
+  scriptCaveat: string;             // 1 sentence: the scenario that breaks the simulation (sin bin, weather change, key injury)
+};
+
 export type Insights = {
   intelligence: MatchIntelligence;
+  simulation: MatchSimulation;
   predictedScore: { home: number; away: number };
   winner: { team: "home" | "away"; confidence: number; reasoning: string };
   margin: { value: number; bucket: string; reasoning: string };
@@ -453,7 +512,84 @@ CRITICAL betting & ODDS-MATH rules — READ CAREFULLY:
 - HIT THE TARGET COMBINED ODDS for each category — if your draft is too low, swap a short favourite for a longer tryscorer or margin bucket; if too high, swap a long leg for a shorter one. The headline payout vs stake is the whole point of the bets tab.
 - NEVER invent players — only named squad members above. For tryscorer legs, prefer players that appear in the LIVE BOOKIE ODDS block.
 - DO NOT include first-tryscorer legs in any of gameScript / smallStake / mediumStake / bigStake / getThea / anytimeMulti / multiTryStack / pointsParty — first-tryscorer is RESERVED for the standalone "firstTryscorer" bet only.
-- Each bet's reasoning is 2-3 sentences citing specific stats / lineups / form / weakness exploit / X-factor — explain WHY this bet aligns with the rest of the analysis and WHERE the value sits.`,
+- Each bet's reasoning is 2-3 sentences citing specific stats / lineups / form / weakness exploit / X-factor — explain WHY this bet aligns with the rest of the analysis and WHERE the value sits.
+
+==============================================================================
+SCRIPT TAB — UNIFIED MATCH SIMULATION ENGINE (HIGH PRIORITY)
+==============================================================================
+Produce a "simulation" object that powers the Script tab. This is a UNIFIED
+match-simulation engine: you simulate ONE match, then derive EVERY market
+prediction from that same simulation. Markets are NOT analysed in isolation.
+The simulation drives winner, margin, total, HT/FT, anytime tryscorers,
+2+ tries, first tryscorer — all consistent with the same script.
+
+CORE PRINCIPLE — the simulation feeds everything. If your simulated profile
+says "second-half flood, dominant right-edge attack", then the recommended
+plays MUST lean into that (e.g. over the total + right-edge tryscorer +
+HT-away/FT-home if the underdog leads at the break). Every play declares
+WHICH simulation lever it leans on (scriptAlignment).
+
+Produce these simulation fields:
+
+1. profile — the simulated game shape:
+   - tempo: "fast" | "moderate" | "slow" (tied to ruck speed, kicking exchange, weather)
+   - tempoNote: 1 sentence on WHY (cite real signal: weather / squad mobility / recent style)
+   - dominance: "home" | "away" | "even"
+   - dominanceNote: 1 sentence on HOW (cite a specific structural edge)
+   - territoryBalance: 1 sentence e.g. "55-45 home — repeat sets through right edge after 50 mins"
+   - scoringPattern: "early-burst" | "late-burst" | "spread" | "second-half-flood" | "first-half-flood"
+   - scoringPatternNote: 1 sentence on WHEN points come and why (fitness, bench, edge fatigue)
+   - edgeAttack: { left, right, middle each one of "high"|"medium"|"low", note (1 sentence) }
+   - defensiveZones: 2-4 short phrases naming where each side's defence breaks (be team-specific)
+   - expectedTotalRange: { low, high, midpoint } — total points band the simulation expects
+
+2. summary — 2-3 sentences: the match in one analyst read.
+
+3. recommendedPlays — 6-10 cross-market plays, ordered by edgePct desc.
+   Cover a MIX of markets (winner, margin, total, HT/FT, anytime tryscorer,
+   2+ tries, first tryscorer). For EACH play:
+   - market (one of the enum values listed in the schema)
+   - pick (clear human-readable e.g. "Storm to win", "Storm 13+ margin", "Over 44.5 total points", "Storm/Storm HT/FT", "Munster anytime tryscorer", "Hughes 2+ tries", "Coates first tryscorer")
+   - decimalOdds (use the EXACT real bookie price from LIVE BOOKIE ODDS when listed; null if not)
+   - modelProbability (0-100, derived from your simulation — NOT the bookie price)
+   - impliedProbability (0-100 — round(100/decimalOdds, 1); 0 if no price)
+   - edgePct (modelProbability - impliedProbability — positive = value, negative = avoid)
+   - confidence ("high" | "medium" | "low") — based on signal convergence
+   - rationale: 1-2 sentences tying back to the simulation profile
+   - scriptAlignment: 1 short phrase naming the simulation lever (e.g. "second-half flood", "right-edge attack", "underdog dominance window 40-60min")
+   Include at least one negative-edge play marked low confidence (a trap to AVOID), so the user sees which markets the model fades.
+
+4. rankedTryscorers — 4-8 named players (from named squads), ordered by
+   totalScore desc. For EACH player:
+   - name (named squad only)
+   - team ("home" | "away")
+   - position
+   - market ("anytime" | "first" | "2+") — the BEST market for THIS player
+   - decimalOdds (EXACT from LIVE BOOKIE ODDS for that market; null if not)
+   - scores object with each component 0-100:
+     * pais — Player Attacking Impact (line breaks, busts, metres, assists, last 3-5 game form)
+     * ttcp — Team Try Creation Profile fit (edge balance, red-zone usage, role chain)
+     * matchupExploit — opposition defensive weakness against this player's lane
+     * scriptFit — game script alignment (tempo, dominance, scoring pattern)
+     * value — odds inefficiency: model probability vs implied. 100 = huge value, 50 = fair, 0 = badly overbet.
+   - totalScore: 0-100 — weighted blend (PAIS 30%, TTCP 20%, matchup 20%, scriptFit 20%, value 10%)
+   - confidence ("high" | "medium" | "low") — high requires 4-of-5 components above 60
+   - rationale: 1-2 sentences naming convergent signals
+   - stackable: true if script supports multiple scorers from this player's team
+   ONLY include players supported by multiple aligned signals.
+
+5. correlatedAngle — 1-2 sentences identifying which 2-3 of the recommended
+   plays SHARE the same script (e.g. "If the second-half flood lands, over 44.5 + Storm 13+ + Coates anytime all hit together — same simulation").
+
+6. scriptCaveat — 1 sentence on the scenario that breaks the simulation
+   (early sin bin, late weather change, key spine injury, blowout flip).
+
+HARD RULES for the simulation block:
+- All recommendedPlays AND rankedTryscorers MUST be consistent with profile + summary.
+- modelProbability is YOUR number, NOT the implied price.
+- USE EXACT bookie prices from LIVE BOOKIE ODDS where listed.
+- Tryscorer scores must be honest — explicit weak components are fine.
+- Stack only when the simulation supports it (same edge / same scoring window).`,
 
   ].filter(Boolean).join("\n");
 
@@ -798,6 +934,31 @@ function buildFallbackInsights(payload: {
       windy,
       weatherSummary: payload.weatherSummary,
     }),
+    simulation: buildFallbackSimulation({
+      homeName: payload.homeName,
+      awayName: payload.awayName,
+      winnerName,
+      loserName,
+      winnerTeam,
+      homeScore,
+      awayScore,
+      marginValue,
+      marginBucket,
+      totalLine,
+      totalPick,
+      htftPick,
+      winnerCore,
+      loserCore,
+      anytimeBetPlayers,
+      firstPickPlayer,
+      multiPickPlayer,
+      winnerPrice: winnerTeam === "home" ? payload.realOdds?.h2h.home?.price : payload.realOdds?.h2h.away?.price,
+      loserPrice: winnerTeam === "home" ? payload.realOdds?.h2h.away?.price : payload.realOdds?.h2h.home?.price,
+      totalOverPrice: payload.realOdds?.totals[0]?.over,
+      totalUnderPrice: payload.realOdds?.totals[0]?.under,
+      wetWeather,
+      windy,
+    }),
     predictedScore: { home: homeScore, away: awayScore },
     winner: {
       team: winnerTeam,
@@ -918,6 +1079,207 @@ function buildFallbackInsights(payload: {
       },
     },
   };
+}
+
+function buildFallbackSimulation(input: {
+  homeName: string;
+  awayName: string;
+  winnerName: string;
+  loserName: string;
+  winnerTeam: "home" | "away";
+  homeScore: number;
+  awayScore: number;
+  marginValue: number;
+  marginBucket: string;
+  totalLine: number;
+  totalPick: "over" | "under";
+  htftPick: string;
+  winnerCore: RankedPlayer[];
+  loserCore: RankedPlayer[];
+  anytimeBetPlayers: RankedPlayer[];
+  firstPickPlayer: RankedPlayer | undefined;
+  multiPickPlayer: RankedPlayer | undefined;
+  winnerPrice?: number | null;
+  loserPrice?: number | null;
+  totalOverPrice?: number | null;
+  totalUnderPrice?: number | null;
+  wetWeather: boolean;
+  windy: boolean;
+}): MatchSimulation {
+  const totalPoints = input.homeScore + input.awayScore;
+  const tempo: SimulationProfile["tempo"] = input.wetWeather ? "slow" : input.windy ? "moderate" : totalPoints >= 46 ? "fast" : "moderate";
+  const dominance: SimulationProfile["dominance"] = input.marginValue <= 6 ? "even" : input.winnerTeam;
+  const scoringPattern: SimulationProfile["scoringPattern"] = input.marginValue >= 13
+    ? "second-half-flood"
+    : input.marginValue <= 4
+      ? "spread"
+      : "late-burst";
+
+  const totalMid = Math.round(totalPoints);
+  const totalLow = Math.max(20, totalMid - 8);
+  const totalHigh = totalMid + 8;
+
+  const winnerOdds = input.winnerPrice ?? 1.72;
+  const loserOdds = input.loserPrice ?? 2.35;
+  const overOdds = input.totalOverPrice ?? 1.92;
+  const underOdds = input.totalUnderPrice ?? 1.92;
+
+  const winnerImplied = round1(100 / winnerOdds);
+  const loserImplied = round1(100 / loserOdds);
+  const overImplied = round1(100 / overOdds);
+  const underImplied = round1(100 / underOdds);
+
+  const winnerModel = clamp(winnerImplied + (input.marginValue >= 12 ? 6 : 2), 35, 88);
+  const loserModel = 100 - winnerModel;
+  const overModel = input.totalPick === "over" ? clamp(overImplied + 7, 30, 78) : clamp(overImplied - 6, 25, 70);
+  const underModel = 100 - overModel;
+
+  const marginOdds = input.marginBucket === "1-6" ? 3.4 : input.marginBucket === "7-12" ? 3.8 : 2.1;
+  const marginImplied = round1(100 / marginOdds);
+  const marginModel = clamp(marginImplied + 5, 18, 55);
+
+  const htftOdds = input.htftPick.split(" / ")[0] === input.htftPick.split(" / ")[1] ? 2.6 : 9.0;
+  const htftImplied = round1(100 / htftOdds);
+  const htftModel = clamp(htftImplied + 4, 12, 50);
+
+  const a0 = input.anytimeBetPlayers[0];
+  const a1 = input.anytimeBetPlayers[1] ?? a0;
+  const a2 = input.anytimeBetPlayers[2] ?? a0;
+  const winnerName = input.winnerName;
+  const loserName = input.loserName;
+
+  const buildPlay = (
+    market: MarketPlay["market"],
+    pick: string,
+    decimalOdds: number | null,
+    modelProb: number,
+    rationale: string,
+    scriptAlignment: string,
+  ): MarketPlay => {
+    const implied = decimalOdds ? round1(100 / decimalOdds) : 0;
+    const edge = round1(modelProb - implied);
+    const conf: MarketPlay["confidence"] = edge >= 8 ? "high" : edge >= 2 ? "medium" : "low";
+    return { market, pick, decimalOdds, modelProbability: round1(modelProb), impliedProbability: implied, edgePct: edge, confidence: conf, rationale, scriptAlignment };
+  };
+
+  const recommendedPlays: MarketPlay[] = [
+    buildPlay("match-winner", `${winnerName} to win`, winnerOdds, winnerModel,
+      `${winnerName} project to win the territory and completion battle through the middle third — the simulation gives them the dominance lever.`,
+      `dominance: ${input.winnerTeam}`),
+    buildPlay("winning-margin", `${winnerName} ${input.marginBucket} margin`, marginOdds, marginModel,
+      `Margin bucket aligns with the simulated scoreline and the ${scoringPattern.replace(/-/g, " ")} scoring pattern.`,
+      `scoring pattern: ${scoringPattern}`),
+    buildPlay("total-points", `${input.totalPick === "over" ? "Over" : "Under"} ${input.totalLine} total points`,
+      input.totalPick === "over" ? overOdds : underOdds, input.totalPick === "over" ? overModel : underModel,
+      `Simulation expects total points in the ${totalLow}-${totalHigh} band — ${input.totalPick === "over" ? "above" : "below"} the line tilts our way.`,
+      `total band: ${totalLow}-${totalHigh}`),
+    buildPlay("ht-ft", `${input.htftPick} HT/FT`, htftOdds, htftModel,
+      `HT/FT correlates with the simulated halftime split and full-time winner.`,
+      `script: HT shape`),
+    a0 && buildPlay("anytime-tryscorer", `${playerName(a0, winnerName)} anytime tryscorer`,
+      a0.prices.anytime ?? estimateAnytimeOdds(0),
+      clamp(round1(100 / (a0.prices.anytime ?? estimateAnytimeOdds(0))) + 6, 30, 78),
+      `${playerName(a0, winnerName)} sits in the dominant edge attack lane the simulation expects to crack open.`,
+      `edge attack ${input.winnerTeam === "home" ? "right" : "left"}`),
+    a1 && buildPlay("anytime-tryscorer", `${playerName(a1, winnerName)} anytime tryscorer`,
+      a1.prices.anytime ?? estimateAnytimeOdds(1),
+      clamp(round1(100 / (a1.prices.anytime ?? estimateAnytimeOdds(1))) + 4, 30, 75),
+      `Secondary finishing option once ${winnerName}'s structure gets to the edges.`,
+      `script alignment: secondary scoring`),
+    input.multiPickPlayer && buildPlay("2-plus-tries", `${playerName(input.multiPickPlayer, winnerName)} 2+ tries`,
+      input.multiPickPlayer.prices.multi ?? 4.5,
+      clamp(round1(100 / (input.multiPickPlayer.prices.multi ?? 4.5)) + 3, 12, 45),
+      `If the simulated ${scoringPattern.replace(/-/g, " ")} lands, the dominant finisher is in line for a double.`,
+      `scoring pattern: ${scoringPattern}`),
+    input.firstPickPlayer && buildPlay("first-tryscorer", `${playerName(input.firstPickPlayer, winnerName)} first tryscorer`,
+      input.firstPickPlayer.prices.first ?? 9,
+      clamp(round1(100 / (input.firstPickPlayer.prices.first ?? 9)) + 2, 6, 22),
+      `Most likely first-strike candidate based on red-zone usage and simulated early territory.`,
+      `early-script edge`),
+    // A trap to fade — the loser at very short margin
+    buildPlay("winning-margin", `${loserName} 1-12 margin`, 4.5, 15,
+      `Simulation does not support ${loserName} winning by a narrow margin — too many variables need to flip.`,
+      `negative — fade`),
+  ].filter(Boolean) as MarketPlay[];
+
+  recommendedPlays.sort((a, b) => b.edgePct - a.edgePct);
+
+  // Ranked tryscorers
+  const buildRanked = (p: RankedPlayer, team: "home" | "away", teamName: string, idx: number, isWinner: boolean): RankedTryscorer => {
+    const market: RankedTryscorer["market"] = p.prices.first != null && idx === 0 ? "first" : p.prices.multi != null && idx === 1 && isWinner ? "2+" : "anytime";
+    const price = market === "first" ? p.prices.first : market === "2+" ? p.prices.multi : p.prices.anytime;
+    const positionWeight = p.position === "Winger" ? 88 : p.position === "Fullback" ? 82 : p.position === "Centre" ? 74 : p.position === "2nd Row" ? 68 : 55;
+    const pais = clamp(positionWeight + (idx === 0 ? 8 : 0) - (idx >= 3 ? 8 : 0), 30, 95);
+    const ttcp = clamp(positionWeight - 5 + (isWinner ? 6 : 0), 30, 92);
+    const matchupExploit = clamp(60 + (isWinner ? 12 : -4) - idx * 4, 25, 90);
+    const scriptFit = clamp(55 + (isWinner ? 14 : -2) - idx * 3, 25, 90);
+    const value = price ? clamp(50 + (3 - price) * 8, 20, 90) : 50;
+    const totalScore = round1(pais * 0.30 + ttcp * 0.20 + matchupExploit * 0.20 + scriptFit * 0.20 + value * 0.10);
+    const componentsAbove60 = [pais, ttcp, matchupExploit, scriptFit, value].filter((v) => v >= 60).length;
+    const conf: RankedTryscorer["confidence"] = componentsAbove60 >= 4 ? "high" : componentsAbove60 >= 2 ? "medium" : "low";
+    return {
+      name: playerName(p, teamName),
+      team,
+      position: p.position,
+      market,
+      decimalOdds: price ?? null,
+      scores: { pais, ttcp, matchupExploit, scriptFit, value },
+      totalScore,
+      confidence: conf,
+      rationale: `${playerName(p, teamName)} aligns with the simulated ${input.winnerTeam === team ? "dominant" : "secondary"} attack — ${p.position.toLowerCase()} role fits the ${scoringPattern.replace(/-/g, " ")} script.`,
+      stackable: isWinner && idx <= 2,
+    };
+  };
+
+  const ranked: RankedTryscorer[] = [
+    ...input.winnerCore.slice(0, 3).map((p, i) => buildRanked(p, input.winnerTeam, winnerName, i, true)),
+    ...input.loserCore.slice(0, 2).map((p, i) => buildRanked(p, input.winnerTeam === "home" ? "away" : "home", loserName, i, false)),
+  ].sort((a, b) => b.totalScore - a.totalScore);
+
+  return {
+    profile: {
+      tempo,
+      tempoNote: input.wetWeather
+        ? `Forecast rain compresses the kicking exchange and slows the ruck — expect a low-tempo grind.`
+        : input.windy
+          ? `Wind affects the bombs and forces both halves to vary their kicking game — moderate tempo.`
+          : `Both packs profile to play full-tempo footy with quick play-the-balls if discipline holds.`,
+      dominance,
+      dominanceNote: dominance === "even"
+        ? `Neither side has a clear structural edge — the dominance lever is up for grabs in the third quarter.`
+        : `${winnerName} project to control field position via cleaner completions and a stronger kicking exchange.`,
+      territoryBalance: dominance === "even"
+        ? `Roughly 50-50 — the side that wins the post-halftime restart owns the middle 20.`
+        : `~55-45 ${input.winnerTeam} — repeat sets through the dominant edge after the half-hour mark.`,
+      scoringPattern,
+      scoringPatternNote: scoringPattern === "second-half-flood"
+        ? `Most points arrive after the 50th minute as bench rotations open windows.`
+        : scoringPattern === "spread"
+          ? `Tries spread evenly across both halves — no single dominant scoring window.`
+          : `Late-burst scoring — the closing 20 decide the cover.`,
+      edgeAttack: {
+        left: input.winnerTeam === "away" ? "high" : "medium",
+        right: input.winnerTeam === "home" ? "high" : "medium",
+        middle: "medium",
+        note: `${winnerName} skew their attacking volume to the ${input.winnerTeam === "home" ? "right" : "left"} edge through the lead playmaker.`,
+      },
+      defensiveZones: [
+        `${loserName} fragile on the ${input.winnerTeam === "home" ? "left" : "right"} edge under second-phase pressure.`,
+        `${winnerName} most exposed when forced to defend back-to-back sets in their own 30m.`,
+        input.wetWeather ? `Both back-threes vulnerable on contestable bombs in greasy conditions.` : `Ruck around the markers when fatigue spikes in the third quarter.`,
+      ],
+      expectedTotalRange: { low: totalLow, high: totalHigh, midpoint: totalMid },
+    },
+    summary: `Simulation expects a ${tempo}-tempo contest with ${winnerName} controlling territory and turning that into the cleaner scoring window late. Total points project in the ${totalLow}-${totalHigh} band, and the ${input.winnerTeam === "home" ? "right" : "left"}-edge attack is the lever that unlocks the value tryscorers.`,
+    recommendedPlays,
+    rankedTryscorers: ranked,
+    correlatedAngle: `${winnerName} to win, ${winnerName} ${input.marginBucket} margin, and the top-ranked tryscorer all lean on the same simulated dominance — if the script lands, they hit together.`,
+    scriptCaveat: `An early sin bin or a key spine injury inside the first 20 minutes would flip the dominance lever and reset the simulation.`,
+  };
+}
+
+function round1(n: number): number {
+  return Math.round(n * 10) / 10;
 }
 
 function buildFallbackBets(input: {
@@ -1468,7 +1830,7 @@ function buildToolDef() {
         properties: {
           payload: {
             type: "string",
-            description: "A raw JSON string for the FULL insights object requested in the prompt. No markdown fences. The JSON inside payload must include: intelligence (with matchOverview, teamProfile.home/away, attackingStructure.home/away, defensiveWeaknesses.home/away, keyMatchups, gameScript [5 phases], playerInfluence, historicalContext, contextualFactors, rareEventNote, insightSummary), predictedScore, winner, margin, total, htft, firstTryscorer, anytimeTryscorers, multiTryscorer, keysToVictory, keyFactors, weaknessExploit, bets, gameFlow, tryscorerScript, and script."
+            description: "A raw JSON string for the FULL insights object requested in the prompt. No markdown fences. The JSON inside payload must include: intelligence (matchOverview, teamProfile, attackingStructure, defensiveWeaknesses, keyMatchups, gameScript [5 phases], playerInfluence, historicalContext, contextualFactors, rareEventNote, insightSummary), simulation (profile {tempo, tempoNote, dominance, dominanceNote, territoryBalance, scoringPattern, scoringPatternNote, edgeAttack {left, right, middle, note}, defensiveZones, expectedTotalRange {low, high, midpoint}}, summary, recommendedPlays [6-10 with market, pick, decimalOdds, modelProbability, impliedProbability, edgePct, confidence, rationale, scriptAlignment], rankedTryscorers [4-8 with name, team, position, market, decimalOdds, scores {pais, ttcp, matchupExploit, scriptFit, value}, totalScore, confidence, rationale, stackable], correlatedAngle, scriptCaveat), predictedScore, winner, margin, total, htft, firstTryscorer, anytimeTryscorers, multiTryscorer, keysToVictory, keyFactors, weaknessExploit, bets, gameFlow, tryscorerScript, and script."
           },
         },
         required: ["payload"],

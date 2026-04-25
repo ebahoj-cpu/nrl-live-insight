@@ -2029,25 +2029,58 @@ function fmtMoney(n: number): string {
   return `$${n.toFixed(2)}`;
 }
 
+// Build a stable signature for a leg so we can dedupe duplicates
+// (e.g. AI sometimes generates "Brian To'o 2+ tries" twice in the same slip).
+function legSignature(leg: any): string {
+  const pick = String(typeof leg === "string" ? leg : leg?.pick ?? "")
+    .toLowerCase()
+    .replace(/[’']/g, "'")
+    .replace(/\s+/g, " ")
+    .trim();
+  return pick;
+}
+
+function dedupeLegs(legs: any[]): any[] {
+  const seen = new Set<string>();
+  const out: any[] = [];
+  for (const leg of legs || []) {
+    const sig = legSignature(leg);
+    if (!sig || seen.has(sig)) continue;
+    seen.add(sig);
+    out.push(leg);
+  }
+  return out;
+}
+
 function BetCard({ categoryKey, bet }: { categoryKey: BetCategoryKey; bet: any }) {
   const meta = BET_META[categoryKey];
   const Icon = meta.Icon;
-  const odds = Number(bet.combinedOdds) || 0;
   const accent = meta.accent;
   const borderCls = accentBorder(accent);
   const tintCls = accentTint(accent);
   const textCls = accentText(accent);
+
+  // Dedupe at render time so duplicate legs from the AI never inflate the price.
+  const legs = dedupeLegs(Array.isArray(bet.legs) ? bet.legs : []);
+
+  // Always recompute combined odds from the legs we actually show, so the
+  // displayed payout matches the displayed legs (the AI's own combinedOdds
+  // can drift, especially after we strip duplicates).
+  const computedOdds = legs.reduce((acc, leg) => {
+    const price = typeof leg === "object" ? Number(leg?.decimalOdds) : NaN;
+    return Number.isFinite(price) && price > 1 ? acc * price : acc;
+  }, 1);
+  const fallbackOdds = Number(bet.combinedOdds);
+  const odds = computedOdds > 1
+    ? computedOdds
+    : (Number.isFinite(fallbackOdds) && fallbackOdds > 1 ? fallbackOdds : 0);
 
   const defaultStake = parseStakeNum(bet.stake);
   const [stake, setStake] = useState<string>(String(defaultStake));
   const stakeNum = parseStakeNum(stake);
   const payout = stakeNum * odds;
 
-  const hitRate = typeof bet.hitRateScore === "number" ? Math.max(0, Math.min(100, Math.round(bet.hitRateScore))) : null;
-  const hitRateLabel = hitRate == null
-    ? null
-    : hitRate >= 65 ? "High" : hitRate >= 40 ? "Medium" : "Low";
-  const legCount = Array.isArray(bet.legs) ? bet.legs.length : 0;
+  const legCount = legs.length;
 
   return (
     <div className={`relative overflow-hidden rounded-2xl border-2 ${borderCls} ${tintCls} p-5`}>
@@ -2055,33 +2088,21 @@ function BetCard({ categoryKey, bet }: { categoryKey: BetCategoryKey; bet: any }
         {meta.riskLabel}
       </div>
 
-      <div className="flex items-center gap-2 mb-1">
+      <div className="flex items-center gap-2 mb-2">
         <Icon className={`h-5 w-5 ${textCls}`} />
         <div className={`text-[10px] uppercase tracking-[0.25em] font-black ${textCls}`}>{meta.label}</div>
       </div>
-      <p className="text-[11px] text-muted-foreground mb-3 italic">{meta.tagline}</p>
 
       <h3 className="font-black text-base mb-2 leading-tight">{bet.title}</h3>
 
-      {/* Meta row: leg count + hit-rate + script alignment */}
       <div className="flex flex-wrap items-center gap-2 mb-3">
         <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-background/40 border border-border">
           <Layers className="h-3 w-3" /> {legCount} leg{legCount === 1 ? "" : "s"}
         </span>
-        {hitRate != null && (
-          <span className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-background/40 border border-border ${textCls}`}>
-            <Gauge className="h-3 w-3" /> Hit rate: {hitRateLabel} ({hitRate})
-          </span>
-        )}
-        {bet.scriptAlignment && (
-          <span className="inline-flex items-center gap-1 text-[10px] font-medium uppercase tracking-wider px-2 py-0.5 rounded-md bg-background/40 border border-border text-muted-foreground">
-            <Compass className="h-3 w-3" /> {bet.scriptAlignment}
-          </span>
-        )}
       </div>
 
       <ul className="space-y-1.5 mb-4">
-        {(bet.legs || []).map((leg: any, li: number) => (
+        {legs.map((leg: any, li: number) => (
           <li key={li} className="flex items-center justify-between gap-2 text-sm rounded-md bg-background/40 px-2.5 py-2 border border-border">
             <div className="flex gap-2 min-w-0">
               <span className={`shrink-0 ${textCls}`}>✓</span>
@@ -2094,10 +2115,9 @@ function BetCard({ categoryKey, bet }: { categoryKey: BetCategoryKey; bet: any }
         ))}
       </ul>
 
-      {/* Editable stake + live payout */}
       <div className="grid grid-cols-3 gap-2 mb-3 pt-3 border-t border-border items-end">
         <div className="text-center">
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Combined odds</div>
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Odds</div>
           <div className={`text-lg font-black kbd ${textCls}`}>${odds.toFixed(2)}</div>
         </div>
         <div className="text-center">
@@ -2122,7 +2142,6 @@ function BetCard({ categoryKey, bet }: { categoryKey: BetCategoryKey; bet: any }
         </div>
       </div>
 
-      {/* Quick-stake chips */}
       <div className="flex flex-wrap gap-1.5 mb-3">
         {[5, 10, 20, 50, 100].map((amt) => (
           <button
@@ -2136,7 +2155,9 @@ function BetCard({ categoryKey, bet }: { categoryKey: BetCategoryKey; bet: any }
         ))}
       </div>
 
-      <p className="text-xs text-muted-foreground leading-relaxed">{bet.reasoning}</p>
+      {bet.reasoning && (
+        <p className="text-xs text-muted-foreground leading-relaxed">{bet.reasoning}</p>
+      )}
     </div>
   );
 }

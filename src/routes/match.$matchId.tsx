@@ -892,8 +892,9 @@ function WeaknessExploitCard({ team, opponent, data }: {
 
 /* ================= SCRIPT TAB ================= */
 
-function ScriptTab({ insights, insightsError, home, away }:
-  { insights: any; insightsError: string | null; home: any; away: any }) {
+function ScriptTab({ insights, insightsError, insightsLoading, home, away }:
+  { insights: any; insightsError: string | null; insightsLoading?: boolean; home: any; away: any }) {
+  if (insightsLoading) return <InsightsLoading />;
   if (insightsError) return <Empty msg={insightsError} />;
   if (!insights?.script) return <Empty msg="Script unavailable." />;
 

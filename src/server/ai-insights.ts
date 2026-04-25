@@ -19,36 +19,29 @@ export type BetLeg = {
   decimalOdds: number;   // e.g. 1.45
 };
 
-export type BetSuggestion = {
-  risk: "low" | "medium" | "high";
-  title: string;          // e.g. "Roosters win + Tedesco anytime + Tupou 1-2 tries"
-  legs: BetLeg[];         // each leg with its own decimal odds
-  combinedOdds: number;   // computed product of leg odds (server-recomputed for safety)
-  estimatedOdds: string;  // formatted, e.g. "$5.00"
-  stake: string;          // e.g. "$20"
-  potentialReturn: string;// e.g. "$100" (server-recomputed)
-  targetPayout: "100" | "1000" | "10000"; // tier this bet is sized to deliver
-  reasoning: string;      // why this combo
+// Unified shape used by EVERY bet card on the Bets tab.
+// Each bet has 1-5 legs with real prices, server-computed math, and a "why".
+export type BetPlay = {
+  title: string;            // headline e.g. "Storm win + Munster anytime + 13+ margin"
+  legs: BetLeg[];           // 1-5 legs with real bookie prices
+  combinedOdds: number;     // server-recomputed product of leg odds
+  estimatedOdds: string;    // formatted "$5.00"
+  stake: string;            // "$5", "$20", etc.
+  potentialReturn: string;  // server-recomputed stake × combinedOdds
+  reasoning: string;        // 2-3 sentences citing stats, lineups, script, form
 };
 
-export type GetTheaSpecial = {
-  title: string;          // headline e.g. "GET THEA: Storm win + 13+ + Munster anytime + over 39.5"
-  legs: BetLeg[];         // 3-5 legs that multiply to ~200x
-  combinedOdds: number;   // ~200 to deliver $1,000 from $5
-  stake: string;          // "$5"
-  potentialReturn: string;// "$1,000"
-  reasoning: string;      // why this is THE bet of the slate (uses stats, form, weakness, weather)
-  confidence: number;     // 0-100 how confident the AI is
-};
-
-export type UpsetPlay = {
-  underdog: string;        // team nickname tipped to upset
-  upsetOdds: number;       // real h2h price for the underdog
-  probability: number;     // 0-100 honest read
-  reasoning: string;       // 3-5 sentences why it could land
-  keyFactors: string[];    // 2-4 bullet reasons (form, injuries, matchup, weather, motivation)
-  suggestedPlay: { pick: string; decimalOdds: number; stake: string; potentialReturn: string };
-};
+export type BetCategoryKey =
+  | "gameScript"      // aligns with stats: winner + margin + total + HT/FT + 2 tryscorers
+  | "lowRisk"         // ~$100 return on $5 stake (~20x)
+  | "mediumRisk"      // ~$500 return on $5 stake (~100x)
+  | "highRisk"        // ~$1,000 return on $5 stake (~200x)
+  | "getThea"         // ~$10,000 return on $5 stake (~2000x)
+  | "upset"           // against the market — underdog wins
+  | "bookieWant"      // result the bookies WANT to land (low liability)
+  | "bookieFear"      // result the bookies FEAR (heavy public exposure)
+  | "anytime"         // pure anytime tryscorer multi
+  | "firstTryscorer"; // standalone single first-tryscorer bet
 
 export type GameFlow = {
   openingTen: string;          // who starts hot, who is slow out the blocks
@@ -99,9 +92,8 @@ export type Insights = {
       playersToWatch: { name: string; role: string; why: string }[];
     };
   };
-  betSuggestions: BetSuggestion[];
-  getTheaSpecial: GetTheaSpecial;
-  upset: UpsetPlay;
+  // All bets live here in one consistent shape — rendered as identical cards on the Bets tab.
+  bets: Record<BetCategoryKey, BetPlay>;
   gameFlow: GameFlow;
   tryscorerScript: TryscorerScript;
   script: {
@@ -185,14 +177,6 @@ ALSO produce a "weaknessExploit" for EACH team. For each side identify:
 - tacticalPlan: 2-3 sentences on HOW this team weaponises those weaknesses — shape, ball-runners, kicking game, set-piece.
 - playersToWatch: exactly 3 NAMED squad players from THIS team most likely to score or directly influence scoring against those weaknesses — for each give role and a one-sentence why. Use only players from the named squad above.
 
-ALSO produce ONE "upset" object — the most credible underdog scenario:
-- underdog: the team nickname currently priced as the underdog in the head-to-head (longer h2h price). If the match is essentially even, pick the side with the longer price.
-- upsetOdds: the EXACT real h2h price for that underdog from the LIVE BOOKIE ODDS block above. Do NOT invent.
-- probability: an honest 0-100 read of how likely the upset is. Be realistic — most upsets sit 25-40%.
-- reasoning: 3-5 sentences citing form trajectory, key match-up, weather, travel, motivation, or X-factor.
-- keyFactors: 2-4 short bullets — concrete reasons the upset can land.
-- suggestedPlay: a single straight bet — pick = "<underdog> to win", decimalOdds = the real h2h underdog price, stake "$20", potentialReturn = stake × odds rounded to whole dollars (e.g. "$60").
-
 ALSO produce a "gameFlow" object — a quarter-by-quarter script of how the match likely unfolds:
 - openingTen: 1-2 sentences. Who starts hot, who is slow out the blocks, early field-position battle, opening kick chase.
 - firstHalf: 2-3 sentences on how the first 40 mins plays out — completion battle, who scores first, set-piece tries, defensive lapses.
@@ -208,28 +192,31 @@ ALSO produce a "tryscorerScript" — a focused tryscoring read for both teams:
 - For EACH team also list 1-2 "avoid" players — trap names the public will pile into who are poor value this week (out of form, bad matchup, used as decoy, not getting touches). Each with a 1-sentence reason.
 - summary: 2-3 sentences on the overall tryscoring picture — total tries expected, which edge leaks, who carries the kicking game.
 
-FINALLY, generate exactly 3 betSuggestions — one for EACH target payout tier: $100, $1,000, and $10,000. Each suggestion is a small multi (2-4 legs) combining real squad players, head-to-head winner, margin BUCKETS, totals, HT/FT doubles, or tryscorer markets.
+FINALLY, generate the "bets" object — TEN bet plays, every one with the SAME shape (title, legs[], combinedOdds, estimatedOdds, stake, potentialReturn, reasoning). Each bet must be ground in the data you produced above (winner, margin, total, HT/FT, tryscorerScript, weaknessExploit, gameFlow, bookieScript). Always quote LIVE BOOKIE ODDS prices exactly when a leg matches.
+
+For EACH of the ten categories use the stake/target shown:
+
+1. gameScript — the cleanest read of the match. 4-6 legs that match your own predictions: winning team + winning margin BUCKET + total over/under + HT/FT double + ONE tryscorer from EACH team (anytime, drawn from tryscorerScript picks). Stake "$10". This is the "if the script plays out, this lands" multi.
+2. lowRisk — small safe multi (2-3 legs) aiming ~$100 from $5 stake (combinedOdds ~20). Use favourite-leaning legs: h2h winner of the strong side, total over/under at the most stable line, one strong anytime tryscorer. Stake "$5".
+3. mediumRisk — 3-4 legs aiming ~$500 from $5 stake (combinedOdds ~100). Mix in a margin bucket or a 2+ tryscorer. Stake "$5".
+4. highRisk — 4-5 legs aiming ~$1,000 from $5 stake (combinedOdds ~200). Include a HT/FT double and a multi-tryscorer / longer tryscorer. Stake "$5".
+5. getThea — THE bet of the slate. 4-5 long legs aiming ~$10,000 from $5 stake (combinedOdds ~2000). Include a sharp margin bucket, HT/FT cross or favourite double, two tryscorer legs (mix anytime + 2+), one over/under. Stake "$5". Reasoning must cite weakness exploit, X-factor, and named players.
+6. upset — straight underdog play AGAINST the market. Single leg = "<underdog nickname> to win" at the EXACT real h2h price for the underdog (longer h2h price from LIVE BOOKIE ODDS). Stake "$20". Reasoning explains why the underdog can pull it off (form, key matchup, weather, motivation).
+7. bookieWant — the result the bookies WANT to land (low public liability — this matches script.bookieScript.wantToWin). 1-2 legs that line up with that result. Stake "$10".
+8. bookieFear — the result the bookies FEAR (heavy public exposure — script.bookieScript.wantToLose). 2-3 legs that lean into the bookies' nightmare. Stake "$10".
+9. anytime — pure anytime tryscorer multi. 3-4 legs, ALL "<player> anytime tryscorer", drawn from your tryscorerScript picks (mix both teams). Stake "$10". Use real anytime prices.
+10. firstTryscorer — STANDALONE single bet on first tryscorer. Exactly 1 leg "<player> first tryscorer" using the LIVE BOOKIE ODDS first-tryscorer price. Stake "$5". Pick the most credible value name from tryscorerScript.
 
 CRITICAL betting & ODDS-MATH rules — READ CAREFULLY:
-- USE THE EXACT REAL ODDS PROVIDED ABOVE. The "LIVE BOOKIE ODDS" block contains real prices from AU bookies. When a leg matches a market shown there (h2h winner, anytime tryscorer for a listed player, first tryscorer for a listed player, total over/under at a listed line, or 2+ tries for a listed player), you MUST use that exact decimalOdds value. Do NOT estimate or round. Users will compare against TAB.
+- USE THE EXACT REAL ODDS PROVIDED ABOVE. The "LIVE BOOKIE ODDS" block contains real prices from AU bookies (TAB-aligned). When a leg matches a market shown there (h2h winner, anytime tryscorer for a listed player, first tryscorer for a listed player, total over/under at a listed line, or 2+ tries for a listed player), you MUST use that exact decimalOdds value. Do NOT estimate or round.
 - For markets not in the block (margin buckets, HT/FT, try-count buckets like "1-2 tries"), use realistic AU prices: margin "1-12" ~$1.80-2.20, "13+" ~$1.70-2.10, "1-6" ~$3-4, "7-12" ~$3.50-4.50, "13-24" ~$3-4, "25+" ~$5-9; HT/FT same team ~$2.20-3.50; HT/FT cross ~$8-15; "1-2 tries" ~$2.50-4 (player-dependent), "3+ tries" ~$15-50.
 - DO NOT use handicap / line / spread markets like "Roosters -12.5". Use winning-margin BUCKETS only.
 - Player try markets must use "anytime tryscorer", "first tryscorer", or try-count buckets "1-2 tries" / "3+ tries". NEVER "over 0.5".
-- DO NOT default to first tryscorer in every multi — at most ONE of the three suggestions should include a first-tryscorer leg. Prefer anytime, 2+, or no tryscorer leg at all when value lies elsewhere (margin, HT/FT, totals).
 - combinedOdds MUST equal the PRODUCT of all leg decimalOdds (within ±5%).
-- For the $100 tier aim ~5x; $1,000 tier ~50x; $10,000 tier ~500x.
-- Stake × combinedOdds MUST equal targetPayout (within ±10%). Stake usually $10–$50. Add another booster leg if math doesn't reach the target.
-- Set "risk" low/medium/high to match the $100/$1,000/$10,000 tier. Set "targetPayout" exactly "100"/"1000"/"10000".
+- Stake × combinedOdds must roughly hit the target payout for that category. The server will recompute everything — get the legs and their prices right.
 - NEVER invent players — only named squad members above. For tryscorer legs, prefer players that appear in the LIVE BOOKIE ODDS block.
-- Explain in 1-2 sentences why each combo wins.
-
-ON TOP OF THAT, generate ONE standalone "getTheaSpecial" — the GET THEA bet:
-- THE single best $5 → $1,000 (≈200x) play built from stats, form, weakness exploit, weather, psychology, X-factor, named squad.
-- 3-5 legs combining to ~200x. Mix h2h + margin bucket + HT/FT + multi-tryscorer or first tryscorer + over/under.
-- Stake "$5", potentialReturn "$1,000". combinedOdds ≈ 200 (180-220).
-- Use real odds from the LIVE BOOKIE ODDS block where they exist.
-- reasoning: 3-4 sentences citing weakness exploit, X-factor, weather/ground, psychology, and at least one named squad player.
-- confidence: 0-100 honest read (25-45 is fine — this is a long shot by design).`,
+- DO NOT include first-tryscorer legs in any of gameScript / lowRisk / mediumRisk / highRisk / getThea / anytime — first-tryscorer is RESERVED for the standalone "firstTryscorer" bet only.
+- Each bet's reasoning is 2-3 sentences citing specific stats / lineups / form / weakness exploit / X-factor — explain WHY this bet aligns with the rest of the analysis.`,
 
   ].filter(Boolean).join("\n");
 
@@ -344,15 +331,13 @@ function applyRealOdds(ins: Insights, realOdds: RealOdds | undefined, home: stri
       return real ? { ...l, decimalOdds: real } : l;
     });
 
-  if (Array.isArray(ins.betSuggestions)) {
-    ins.betSuggestions = ins.betSuggestions.map((b) => ({ ...b, legs: fixLegs(b.legs) }));
-  }
-  if (ins.getTheaSpecial) {
-    ins.getTheaSpecial = { ...ins.getTheaSpecial, legs: fixLegs(ins.getTheaSpecial.legs) };
-  }
-  if (ins.upset?.suggestedPlay) {
-    const real = lookup(ins.upset.suggestedPlay.pick);
-    if (real) ins.upset.suggestedPlay = { ...ins.upset.suggestedPlay, decimalOdds: real };
+  if (ins.bets && typeof ins.bets === "object") {
+    const fixed: Record<string, BetPlay> = {};
+    for (const [k, b] of Object.entries(ins.bets)) {
+      if (!b) continue;
+      fixed[k] = { ...(b as BetPlay), legs: fixLegs((b as BetPlay).legs) };
+    }
+    ins.bets = fixed as Insights["bets"];
   }
   return ins;
 }
@@ -557,90 +542,52 @@ function buildToolDef() {
             },
             required: ["home", "away"], additionalProperties: false,
           },
-          betSuggestions: {
-            type: "array",
-            minItems: 3, maxItems: 3,
-            description: "Exactly three multis: $100 (low risk, ~5x odds), $1,000 (medium, ~50x), $10,000 (high, ~500x). Stake × combinedOdds MUST equal targetPayout (±10%).",
-            items: {
+          bets: (() => {
+            const betPlay = (desc: string, minLegs: number, maxLegs: number, stakeHint: string) => ({
               type: "object",
+              description: desc,
               properties: {
-                risk: { type: "string", enum: ["low", "medium", "high"] },
                 title: { type: "string", description: "Short headline. NEVER use handicap markets like 'Roosters -12.5'." },
                 legs: {
                   type: "array",
-                  minItems: 2, maxItems: 5,
+                  minItems: minLegs, maxItems: maxLegs,
                   items: {
                     type: "object",
                     properties: {
                       pick: { type: "string", description: "One leg. Allowed: head-to-head winner, margin BUCKETS ('1-12', '13+', '1-6', '7-12', '13-24', '25+'), total points over/under, HT/FT, anytime/first tryscorer, try-count buckets ('1-2 tries', '3+ tries'). NEVER handicap/spread/line. NEVER 'over 0.5 tries'." },
-                      decimalOdds: { type: "number", description: "Realistic decimal odds for THIS leg. Tryscorer anytime $4-15, first $11-26, margin $3-8, HT/FT $3.5-9, over/under $1.85-2.10, head-to-head $1.20-3.50." },
+                      decimalOdds: { type: "number", description: "Decimal odds — quote LIVE BOOKIE ODDS exactly when the leg matches. Tryscorer anytime $4-15, first $11-26, margin $3-8, HT/FT $3.5-9, over/under $1.85-2.10, head-to-head $1.20-3.50." },
                     },
                     required: ["pick", "decimalOdds"], additionalProperties: false,
                   },
                 },
-                combinedOdds: { type: "number", description: "Product of all leg decimalOdds. MUST equal multiplied legs within ±5%." },
-                estimatedOdds: { type: "string", description: "Combined decimal odds formatted, e.g. '$5.00', '$50.00', '$500.00'" },
-                stake: { type: "string", description: "Suggested stake, usually $10–$50, e.g. '$20'" },
-                potentialReturn: { type: "string", description: "stake × combinedOdds, formatted, e.g. '$100', '$1,000', '$10,000'" },
-                targetPayout: { type: "string", enum: ["100", "1000", "10000"], description: "Which payout tier this bet is sized for" },
-                reasoning: { type: "string", description: "Why this combo wins — 1-2 sentences" },
+                combinedOdds: { type: "number", description: "Product of all leg decimalOdds." },
+                estimatedOdds: { type: "string", description: "Combined decimal odds formatted, e.g. '$5.00'." },
+                stake: { type: "string", description: `Suggested stake (default ${stakeHint}).` },
+                potentialReturn: { type: "string", description: "stake × combinedOdds, formatted, e.g. '$100'." },
+                reasoning: { type: "string", description: "2-3 sentences citing stats / lineups / form / weakness exploit / X-factor — why this bet aligns with the rest of the analysis." },
               },
-              required: ["risk", "title", "legs", "combinedOdds", "estimatedOdds", "stake", "potentialReturn", "targetPayout", "reasoning"],
+              required: ["title", "legs", "combinedOdds", "estimatedOdds", "stake", "potentialReturn", "reasoning"],
               additionalProperties: false,
-            },
-          },
-          getTheaSpecial: {
-            type: "object",
-            description: "THE bet of the slate: $5 stake → $1,000 return (~200x). 3-5 legs constructed from EVERYTHING (stats, weakness exploit, X-factor, weather, psychological).",
-            properties: {
-              title: { type: "string", description: "Headline like 'GET THEA: Storm win + 13+ + Munster anytime + over 39.5'" },
-              legs: {
-                type: "array",
-                minItems: 3, maxItems: 5,
-                items: {
-                  type: "object",
-                  properties: {
-                    pick: { type: "string", description: "Leg pick. Same allowed markets as betSuggestions." },
-                    decimalOdds: { type: "number", description: "Realistic decimal odds for THIS leg." },
-                  },
-                  required: ["pick", "decimalOdds"], additionalProperties: false,
-                },
+            });
+            return {
+              type: "object",
+              description: "Ten bet plays — every one in the same shape so the UI renders identical cards. Reasoning must align with the rest of the analysis.",
+              properties: {
+                gameScript:     betPlay("Cleanest read of the match: 4-6 legs that match your own predictions (winner + margin bucket + total + HT/FT + 1 tryscorer per team).", 4, 6, "$10"),
+                lowRisk:        betPlay("Low risk / low return — ~$100 from $5 stake (combinedOdds ~20). 2-3 favourite-leaning legs.", 2, 3, "$5"),
+                mediumRisk:     betPlay("Medium risk — ~$500 from $5 stake (combinedOdds ~100). 3-4 legs.", 3, 4, "$5"),
+                highRisk:       betPlay("High risk — ~$1,000 from $5 stake (combinedOdds ~200). 4-5 legs incl. HT/FT and a multi-tryscorer.", 4, 5, "$5"),
+                getThea:        betPlay("GET THEA — ~$10,000 from $5 stake (combinedOdds ~2000). 4-5 long legs built from weakness exploit, X-factor, named players.", 4, 5, "$5"),
+                upset:          betPlay("Single underdog play AGAINST the market: 1 leg = '<underdog> to win' at the EXACT real h2h underdog price.", 1, 1, "$20"),
+                bookieWant:     betPlay("Result the bookies WANT to land (low public liability — matches script.bookieScript.wantToWin). 1-2 aligned legs.", 1, 2, "$10"),
+                bookieFear:     betPlay("Result the bookies FEAR (heavy public exposure — script.bookieScript.wantToLose). 2-3 legs leaning into the bookies' nightmare.", 2, 3, "$10"),
+                anytime:        betPlay("Pure anytime tryscorer multi: 3-4 legs ALL '<player> anytime tryscorer' from tryscorerScript picks (mix both teams). Real anytime prices only.", 3, 4, "$10"),
+                firstTryscorer: betPlay("STANDALONE single bet: 1 leg = '<player> first tryscorer' using the LIVE BOOKIE ODDS first-tryscorer price.", 1, 1, "$5"),
               },
-              combinedOdds: { type: "number", description: "Product of legs ≈ 200 (range 180-220)." },
-              stake: { type: "string", description: "Exactly '$5'" },
-              potentialReturn: { type: "string", description: "Exactly '$1,000'" },
-              reasoning: { type: "string", description: "3-4 sentences: why this is the play of the slate, citing weakness exploit, X-factor, weather/ground, psychology, and named players." },
-              confidence: { type: "number", minimum: 0, maximum: 100 },
-            },
-            required: ["title", "legs", "combinedOdds", "stake", "potentialReturn", "reasoning", "confidence"],
-            additionalProperties: false,
-          },
-          upset: {
-            type: "object",
-            description: "The most credible underdog scenario for this match.",
-            properties: {
-              underdog: { type: "string", description: "Underdog team nickname (longer h2h price)." },
-              upsetOdds: { type: "number", description: "EXACT real h2h price for the underdog from the LIVE BOOKIE ODDS block." },
-              probability: { type: "number", minimum: 0, maximum: 100, description: "Honest 0-100 read of upset likelihood." },
-              reasoning: { type: "string", description: "3-5 sentences explaining why the upset can land." },
-              keyFactors: {
-                type: "array", minItems: 2, maxItems: 4,
-                items: { type: "string", description: "Concrete factor — form, injury, matchup, weather, motivation, travel." },
-              },
-              suggestedPlay: {
-                type: "object",
-                properties: {
-                  pick: { type: "string", description: "e.g. 'Eels to win'" },
-                  decimalOdds: { type: "number", description: "Same as upsetOdds." },
-                  stake: { type: "string", description: "e.g. '$20'" },
-                  potentialReturn: { type: "string", description: "stake × decimalOdds, formatted, e.g. '$60'" },
-                },
-                required: ["pick", "decimalOdds", "stake", "potentialReturn"], additionalProperties: false,
-              },
-            },
-            required: ["underdog", "upsetOdds", "probability", "reasoning", "keyFactors", "suggestedPlay"],
-            additionalProperties: false,
-          },
+              required: ["gameScript","lowRisk","mediumRisk","highRisk","getThea","upset","bookieWant","bookieFear","anytime","firstTryscorer"],
+              additionalProperties: false,
+            };
+          })(),
           gameFlow: {
             type: "object",
             description: "Quarter-by-quarter script: how the game likely unfolds with HT score, momentum swings and HT/FT double pick.",
@@ -768,7 +715,7 @@ function buildToolDef() {
         required: [
           "predictedScore","winner","margin","total","htft",
           "firstTryscorer","anytimeTryscorers","multiTryscorer",
-          "keysToVictory","keyFactors","weaknessExploit","betSuggestions","getTheaSpecial","upset",
+          "keysToVictory","keyFactors","weaknessExploit","bets",
           "gameFlow","tryscorerScript","script",
         ],
         additionalProperties: false,
@@ -798,40 +745,36 @@ function normaliseBetMath(ins: Insights): Insights {
     return { ...b, legs, combinedOdds: combined, _return: ret };
   };
 
-  if (Array.isArray(ins.betSuggestions)) {
-    ins.betSuggestions = ins.betSuggestions.map((b) => {
-      const fixed = fixMulti(b);
-      return {
-        ...b,
+  const defaultStakes: Partial<Record<BetCategoryKey, string>> = {
+    gameScript: "$10",
+    lowRisk: "$5",
+    mediumRisk: "$5",
+    highRisk: "$5",
+    getThea: "$5",
+    upset: "$20",
+    bookieWant: "$10",
+    bookieFear: "$10",
+    anytime: "$10",
+    firstTryscorer: "$5",
+  };
+
+  if (ins.bets && typeof ins.bets === "object") {
+    const out: Record<string, BetPlay> = {};
+    for (const [k, b] of Object.entries(ins.bets)) {
+      if (!b) continue;
+      const stake = (b as BetPlay).stake || defaultStakes[k as BetCategoryKey] || "$5";
+      const fixed = fixMulti({ ...(b as BetPlay), stake });
+      out[k] = {
+        title: (b as BetPlay).title || "",
+        reasoning: (b as BetPlay).reasoning || "",
         legs: fixed.legs,
         combinedOdds: fixed.combinedOdds,
         estimatedOdds: fmtOdds(fixed.combinedOdds),
+        stake,
         potentialReturn: fmtMoney(fixed._return),
       };
-    });
-  }
-
-  if (ins.getTheaSpecial) {
-    const fixed = fixMulti(ins.getTheaSpecial);
-    ins.getTheaSpecial = {
-      ...ins.getTheaSpecial,
-      legs: fixed.legs,
-      combinedOdds: fixed.combinedOdds,
-      stake: ins.getTheaSpecial.stake || "$5",
-      potentialReturn: fmtMoney(fixed._return),
-    };
-  }
-
-  if (ins.upset?.suggestedPlay) {
-    const odds = Math.max(1.01, Number(ins.upset.suggestedPlay.decimalOdds) || 1.01);
-    const stakeNum = parseStake(ins.upset.suggestedPlay.stake) || 20;
-    ins.upset.suggestedPlay = {
-      ...ins.upset.suggestedPlay,
-      decimalOdds: odds,
-      stake: ins.upset.suggestedPlay.stake || "$20",
-      potentialReturn: fmtMoney(stakeNum * odds),
-    };
-    ins.upset.upsetOdds = odds;
+    }
+    ins.bets = out as Insights["bets"];
   }
 
   return ins;

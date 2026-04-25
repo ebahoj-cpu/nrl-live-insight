@@ -1184,187 +1184,158 @@ function TryscorerTeamBlock({ team, data }: {
   );
 }
 
+type BetCategoryKey =
+  | "gameScript" | "lowRisk" | "mediumRisk" | "highRisk" | "getThea"
+  | "upset" | "bookieWant" | "bookieFear" | "anytime" | "firstTryscorer";
+
+const BET_ORDER: BetCategoryKey[] = [
+  "gameScript", "lowRisk", "mediumRisk", "highRisk", "getThea",
+  "upset", "bookieWant", "bookieFear", "anytime", "firstTryscorer",
+];
+
+const BET_META: Record<BetCategoryKey, {
+  label: string;
+  tagline: string;
+  target: string;
+  Icon: any;
+  accent: string; // tailwind colour class fragment for borders/text
+}> = {
+  gameScript:     { label: "Game Script Bet",  tagline: "Aligns with the stats: winner + margin + total + HT/FT + a tryscorer from each team.", target: "Aligned multi", Icon: ScrollText, accent: "accent" },
+  lowRisk:        { label: "Low Risk Bet",     tagline: "Low risk, low return — aiming around $100 from a $5 stake.",                          target: "~$100",         Icon: Shield,    accent: "emerald-500" },
+  mediumRisk:     { label: "Medium Risk Bet",  tagline: "Medium risk, medium return — aiming around $500.",                                    target: "~$500",         Icon: Activity,  accent: "yellow-500" },
+  highRisk:       { label: "High Risk Bet",    tagline: "High risk, high return — aiming around $1,000.",                                      target: "~$1,000",       Icon: Crosshair, accent: "orange-500" },
+  getThea:        { label: "GET THEA Bet",     tagline: "The bet of the slate — aiming around $10,000 from $5.",                               target: "~$10,000",      Icon: Sparkles,  accent: "accent" },
+  upset:          { label: "Upset Bet",        tagline: "Against the market — the underdog gets it done.",                                      target: "Live h2h",      Icon: Zap,       accent: "yellow-500" },
+  bookieWant:     { label: "Bookie Want Bet",  tagline: "The result the bookies want to land — low public liability.",                          target: "Low risk",      Icon: ThumbsUp,  accent: "sky-500" },
+  bookieFear:     { label: "Bookie Fear Bet",  tagline: "The result the bookies fear — heavy public exposure.",                                target: "Bookie pain",   Icon: ThumbsDown, accent: "danger" },
+  anytime:        { label: "Anytime Bet",      tagline: "Pure anytime tryscorer multi — best value names from both sides.",                    target: "Tryscorer multi", Icon: Target,  accent: "accent" },
+  firstTryscorer: { label: "First Tryscorer Bet", tagline: "Standalone single — first try of the match.",                                       target: "Standalone",    Icon: Flag,      accent: "rose-500" },
+};
+
 function BetsTab({ insights, insightsError, insightsLoading }: { insights: any; insightsError: string | null; insightsLoading?: boolean }) {
   if (insightsLoading) return <InsightsLoading />;
   if (insightsError && !insights) return <Empty msg={insightsError} />;
-  if (!insights?.betSuggestions?.length && !insights?.getTheaSpecial) return <Empty msg="Bet suggestions unavailable." />;
 
-  const riskMeta: Record<string, { label: string; cls: string; desc: string; payout: string }> = {
-    low:    { label: "Low risk",    cls: "border-accent/40 bg-accent/5",        desc: "Safer combo, modest return",       payout: "$100" },
-    medium: { label: "Medium risk", cls: "border-yellow-500/40 bg-yellow-500/5", desc: "Balanced risk vs reward",           payout: "$1,000" },
-    high:   { label: "High risk",   cls: "border-danger/40 bg-danger/5",        desc: "Long shot — biggest payout",        payout: "$10,000" },
-  };
-
-  const tierOrder: Record<string, number> = { low: 0, medium: 1, high: 2 };
-  const sorted = [...(insights.betSuggestions || [])].sort((a: any, b: any) => (tierOrder[a.risk] ?? 99) - (tierOrder[b.risk] ?? 99));
+  const bets = insights?.bets;
+  if (!bets || typeof bets !== "object") return <Empty msg="Bet suggestions unavailable. Hit Refresh Insights to generate them." />;
 
   return (
     <div className="space-y-4">
-      {insights.getTheaSpecial && <GetTheaCard special={insights.getTheaSpecial} />}
-      {insights.upset && <UpsetCard upset={insights.upset} /> }
-
-      {sorted.map((b: any, i: number) => {
-        const meta = riskMeta[b.risk] ?? riskMeta.medium;
-        const target = b.targetPayout ? `$${Number(b.targetPayout).toLocaleString()}` : meta.payout;
-        return (
-          <div key={i} className={`glass p-5 border-2 ${meta.cls}`}>
-            <div className="flex items-center justify-between mb-3 gap-3">
-              <div>
-                <div className="text-[10px] uppercase tracking-widest font-bold text-accent">{meta.label}</div>
-                <div className="text-[11px] text-muted-foreground">{meta.desc}</div>
-              </div>
-              <div className="flex flex-col items-end">
-                <div className="text-[9px] uppercase tracking-wider text-muted-foreground">Target payout</div>
-                <div className="kbd text-base font-black text-accent leading-none">{target}</div>
-              </div>
-            </div>
-
-            <h3 className="font-bold text-base mb-3">{b.title}</h3>
-
-            <ul className="space-y-1.5 mb-4">
-              {b.legs.map((leg: any, li: number) => (
-                <li key={li} className="flex items-center justify-between gap-2 text-sm rounded-md bg-surface-2/40 px-2 py-1.5">
-                  <div className="flex gap-2 min-w-0">
-                    <span className="text-accent shrink-0">✓</span>
-                    <span className="truncate">{typeof leg === "string" ? leg : leg.pick}</span>
-                  </div>
-                  {typeof leg === "object" && leg.decimalOdds && (
-                    <span className="kbd text-[11px] font-bold text-accent shrink-0">${Number(leg.decimalOdds).toFixed(2)}</span>
-                  )}
-                </li>
-              ))}
-            </ul>
-
-            <div className="grid grid-cols-3 gap-2 mb-3 pt-3 border-t border-border">
-              <div className="text-center">
-                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Odds</div>
-                <div className="text-lg font-black kbd text-accent">{b.estimatedOdds}</div>
-              </div>
-              <div className="text-center">
-                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Stake</div>
-                <div className="text-lg font-black kbd">{b.stake}</div>
-              </div>
-              <div className="text-center">
-                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Return</div>
-                <div className="text-lg font-black kbd text-accent">{b.potentialReturn}</div>
-              </div>
-            </div>
-
-            <p className="text-xs text-muted-foreground leading-relaxed">{b.reasoning}</p>
-          </div>
-        );
+      {BET_ORDER.map((key) => {
+        const bet = bets[key];
+        if (!bet) return null;
+        return <BetCard key={key} categoryKey={key} bet={bet} />;
       })}
     </div>
   );
 }
 
-function UpsetCard({ upset }: { upset: any }) {
-  const odds = Number(upset.upsetOdds ?? upset.suggestedPlay?.decimalOdds) || 0;
-  const prob = Math.round(Number(upset.probability) || 0);
+function BetCard({ categoryKey, bet }: { categoryKey: BetCategoryKey; bet: any }) {
+  const meta = BET_META[categoryKey];
+  const Icon = meta.Icon;
+  const odds = Number(bet.combinedOdds) || 0;
+  const accent = meta.accent;
+  // Build dynamic class strings — kept on a small whitelist so Tailwind picks them up.
+  const borderCls = accentBorder(accent);
+  const tintCls = accentTint(accent);
+  const textCls = accentText(accent);
+
   return (
-    <div className="relative overflow-hidden rounded-2xl border-2 border-yellow-500/60 bg-gradient-to-br from-yellow-500/10 via-surface-2/50 to-danger/5 p-5">
-      <div className="absolute top-0 right-0 px-3 py-1 bg-yellow-500 text-yellow-950 text-[10px] font-black uppercase tracking-widest rounded-bl-xl">
-        🚨 Upset
+    <div className={`relative overflow-hidden rounded-2xl border-2 ${borderCls} ${tintCls} p-5`}>
+      <div className={`absolute top-0 right-0 px-3 py-1 text-[10px] font-black uppercase tracking-widest rounded-bl-xl ${accentBadge(accent)}`}>
+        {meta.target}
       </div>
+
       <div className="flex items-center gap-2 mb-1">
-        <Zap className="h-5 w-5 text-yellow-500" />
-        <div className="text-[10px] uppercase tracking-[0.25em] font-black text-yellow-500">Upset watch</div>
+        <Icon className={`h-5 w-5 ${textCls}`} />
+        <div className={`text-[10px] uppercase tracking-[0.25em] font-black ${textCls}`}>{meta.label}</div>
       </div>
-      <p className="text-[11px] text-muted-foreground mb-3 italic">
-        The most credible underdog scenario. Real h2h bookie price.
-      </p>
+      <p className="text-[11px] text-muted-foreground mb-3 italic">{meta.tagline}</p>
 
-      <div className="flex items-baseline gap-3 mb-3">
-        <h3 className="font-black text-xl leading-tight">{upset.underdog} to win</h3>
-        <span className="kbd font-black text-yellow-500 text-lg">${odds.toFixed(2)}</span>
-      </div>
-
-      {upset.keyFactors?.length > 0 && (
-        <ul className="space-y-1.5 mb-4">
-          {upset.keyFactors.map((f: string, i: number) => (
-            <li key={i} className="flex items-center gap-2 text-sm rounded-md bg-background/40 px-2.5 py-2 border border-yellow-500/20">
-              <span className="text-yellow-500 shrink-0">⚡</span>
-              <span className="font-medium">{f}</span>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      <div className="grid grid-cols-4 gap-2 mb-3 pt-3 border-t border-yellow-500/30">
-        <div className="text-center">
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Odds</div>
-          <div className="text-lg font-black kbd text-yellow-500">${odds.toFixed(2)}</div>
-        </div>
-        <div className="text-center">
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Stake</div>
-          <div className="text-lg font-black kbd">{upset.suggestedPlay?.stake || "$20"}</div>
-        </div>
-        <div className="text-center">
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Return</div>
-          <div className="text-lg font-black kbd text-yellow-500">{upset.suggestedPlay?.potentialReturn || "—"}</div>
-        </div>
-        <div className="text-center">
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Chance</div>
-          <div className="text-lg font-black kbd">{prob}%</div>
-        </div>
-      </div>
-
-      <p className="text-xs text-muted-foreground leading-relaxed">{upset.reasoning}</p>
-    </div>
-  );
-}
-
-function GetTheaCard({ special }: { special: any }) {
-  const odds = Number(special.combinedOdds) || 0;
-  return (
-    <div className="relative overflow-hidden rounded-2xl border-2 border-accent bg-gradient-to-br from-accent/15 via-surface-2/60 to-danger/10 p-5 shadow-[0_0_40px_-10px_hsl(var(--accent))]">
-      <div className="absolute top-0 right-0 px-3 py-1 bg-accent text-accent-foreground text-[10px] font-black uppercase tracking-widest rounded-bl-xl">
-        ⚡ Special
-      </div>
-      <div className="flex items-center gap-2 mb-1">
-        <Sparkles className="h-5 w-5 text-accent" />
-        <div className="text-[10px] uppercase tracking-[0.25em] font-black text-accent">GET THEA</div>
-      </div>
-      <p className="text-[11px] text-muted-foreground mb-3 italic">
-        The single best $5 → $1,000 play of the slate, built from every angle: stats, weakness exploit, X-factor, weather, psychology.
-      </p>
-
-      <h3 className="font-black text-base mb-3 leading-tight">{special.title}</h3>
+      <h3 className="font-black text-base mb-3 leading-tight">{bet.title}</h3>
 
       <ul className="space-y-1.5 mb-4">
-        {(special.legs || []).map((leg: any, li: number) => (
-          <li key={li} className="flex items-center justify-between gap-2 text-sm rounded-md bg-background/40 px-2.5 py-2 border border-accent/20">
+        {(bet.legs || []).map((leg: any, li: number) => (
+          <li key={li} className="flex items-center justify-between gap-2 text-sm rounded-md bg-background/40 px-2.5 py-2 border border-border">
             <div className="flex gap-2 min-w-0">
-              <span className="text-accent shrink-0">⚡</span>
-              <span className="truncate font-semibold">{leg.pick}</span>
+              <span className={`shrink-0 ${textCls}`}>✓</span>
+              <span className="truncate font-medium">{typeof leg === "string" ? leg : leg.pick}</span>
             </div>
-            <span className="kbd text-[11px] font-bold text-accent shrink-0">${Number(leg.decimalOdds).toFixed(2)}</span>
+            {typeof leg === "object" && leg.decimalOdds && (
+              <span className={`kbd text-[11px] font-bold shrink-0 ${textCls}`}>${Number(leg.decimalOdds).toFixed(2)}</span>
+            )}
           </li>
         ))}
       </ul>
 
-      <div className="grid grid-cols-4 gap-2 mb-3 pt-3 border-t border-accent/30">
+      <div className="grid grid-cols-3 gap-2 mb-3 pt-3 border-t border-border">
         <div className="text-center">
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Odds</div>
-          <div className="text-lg font-black kbd text-accent">${odds.toFixed(2)}</div>
+          <div className={`text-lg font-black kbd ${textCls}`}>${odds.toFixed(2)}</div>
         </div>
         <div className="text-center">
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Stake</div>
-          <div className="text-lg font-black kbd">{special.stake}</div>
+          <div className="text-lg font-black kbd">{bet.stake}</div>
         </div>
         <div className="text-center">
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Return</div>
-          <div className="text-lg font-black kbd text-accent">{special.potentialReturn}</div>
-        </div>
-        <div className="text-center">
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Confidence</div>
-          <div className="text-lg font-black kbd">{Math.round(Number(special.confidence) || 0)}%</div>
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Payout</div>
+          <div className={`text-lg font-black kbd ${textCls}`}>{bet.potentialReturn}</div>
         </div>
       </div>
 
-      <p className="text-xs text-muted-foreground leading-relaxed">{special.reasoning}</p>
+      <p className="text-xs text-muted-foreground leading-relaxed">{bet.reasoning}</p>
     </div>
   );
+}
+
+// Accent class helpers — kept verbose so Tailwind doesn't tree-shake them.
+function accentBorder(a: string) {
+  switch (a) {
+    case "accent": return "border-accent/50";
+    case "danger": return "border-danger/50";
+    case "emerald-500": return "border-emerald-500/50";
+    case "yellow-500": return "border-yellow-500/50";
+    case "orange-500": return "border-orange-500/50";
+    case "sky-500": return "border-sky-500/50";
+    case "rose-500": return "border-rose-500/50";
+    default: return "border-border";
+  }
+}
+function accentTint(a: string) {
+  switch (a) {
+    case "accent": return "bg-gradient-to-br from-accent/10 via-surface-2/40 to-transparent";
+    case "danger": return "bg-gradient-to-br from-danger/10 via-surface-2/40 to-transparent";
+    case "emerald-500": return "bg-gradient-to-br from-emerald-500/10 via-surface-2/40 to-transparent";
+    case "yellow-500": return "bg-gradient-to-br from-yellow-500/10 via-surface-2/40 to-transparent";
+    case "orange-500": return "bg-gradient-to-br from-orange-500/10 via-surface-2/40 to-transparent";
+    case "sky-500": return "bg-gradient-to-br from-sky-500/10 via-surface-2/40 to-transparent";
+    case "rose-500": return "bg-gradient-to-br from-rose-500/10 via-surface-2/40 to-transparent";
+    default: return "bg-surface-2/30";
+  }
+}
+function accentText(a: string) {
+  switch (a) {
+    case "accent": return "text-accent";
+    case "danger": return "text-danger";
+    case "emerald-500": return "text-emerald-500";
+    case "yellow-500": return "text-yellow-500";
+    case "orange-500": return "text-orange-500";
+    case "sky-500": return "text-sky-500";
+    case "rose-500": return "text-rose-500";
+    default: return "text-foreground";
+  }
+}
+function accentBadge(a: string) {
+  switch (a) {
+    case "accent": return "bg-accent text-accent-foreground";
+    case "danger": return "bg-danger text-white";
+    case "emerald-500": return "bg-emerald-500 text-white";
+    case "yellow-500": return "bg-yellow-500 text-yellow-950";
+    case "orange-500": return "bg-orange-500 text-white";
+    case "sky-500": return "bg-sky-500 text-white";
+    case "rose-500": return "bg-rose-500 text-white";
+    default: return "bg-muted text-foreground";
+  }
 }
 
 

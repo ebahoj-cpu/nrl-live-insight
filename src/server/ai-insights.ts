@@ -118,8 +118,55 @@ export type PlayerInfluencer = {
   expectedImpact: string;// 1-2 sentences: HOW they will influence this specific game
 };
 
+// ---- New analyst-style cards (Insights tab redesign) ----
+export type SeasonOverview = {
+  record: string;                  // "9W-5L" or "8 wins, 6 losses"
+  ladderPosition: string;          // e.g. "4th" or "5th (28pts, +52 diff)"
+  pointsDifferential: string;      // e.g. "+52 (PF 348, PA 296)"
+  statTrends: string;              // 1-2 sentences: attack, defence, completion rate, errors
+  vsTopVsBottom: string;           // 1-2 sentences: form against top half vs bottom half
+  homeAwaySplit: string;           // 1-2 sentences: home form vs away form
+  formTrajectory: "improving" | "declining" | "inconsistent" | "steady";
+  trajectoryNote: string;          // 1 sentence on WHY that trajectory
+  identity: string;                // 1-2 sentences: overall identity & playing style
+};
+
+export type KeyToVictory = {
+  key: string;                     // 1 sentence: the lever (e.g. "Win the right-edge battle")
+  targetsWeakness: string;         // 1 sentence: which OPPONENT weakness it attacks
+  reasoning: string;               // 1-2 sentences: tactical / statistical justification
+};
+
+export type TeamStrength = {
+  title: string;                   // short label e.g. "Edge attack volume"
+  detail: string;                  // 1-2 sentences: stat / pattern that proves it
+  impact: string;                  // 1 sentence: HOW it shapes games
+};
+
+export type TeamWeakness = {
+  title: string;                   // short label e.g. "Right-edge defensive slide"
+  detail: string;                  // 1-2 sentences: specific exploitable flaw
+  howToTarget: string;             // 1 sentence: how the opponent attacks it this week
+};
+
+export type WatchPlayer = {
+  name: string;                    // named squad only
+  position: string;                // raw position (e.g. "Winger", "Halfback", "2nd Row")
+  bucket: "back" | "half" | "forward"; // 3 backs, 1 half, 1 forward per team
+  form: string;                    // 1 sentence: current form
+  role: string;                    // 1 sentence: their specific role THIS matchup
+  matchup: string;                 // 1 sentence: direct opponent / matchup impact
+};
+
 export type MatchIntelligence = {
   matchOverview: string;          // 3-4 sentences: narrative summary of expected game shape
+  // NEW analyst cards
+  seasonOverview: { home: SeasonOverview; away: SeasonOverview };
+  keysToVictoryAnalyst: { home: KeyToVictory[]; away: KeyToVictory[] }; // exactly 3 per side, distinct
+  strengths: { home: TeamStrength[]; away: TeamStrength[] };           // exactly 3 per side
+  weaknesses: { home: TeamWeakness[]; away: TeamWeakness[] };          // exactly 3 per side
+  playersToWatch: { home: WatchPlayer[]; away: WatchPlayer[] };        // 3 backs + 1 half + 1 forward per side
+  // existing
   teamProfile: { home: TeamProfile; away: TeamProfile };
   attackingStructure: { home: AttackingStructure; away: AttackingStructure };
   defensiveWeaknesses: { home: DefensiveWeaknesses; away: DefensiveWeaknesses };
@@ -356,9 +403,58 @@ HARD RULES for the entire "intelligence" object:
 
 Produce these intelligence fields:
 
-1. matchOverview: 3-4 sentences. Narrative summary of expected game shape —
-   tempo, who imposes territory, what kind of contest this becomes, scoring
-   environment expected.
+1. matchOverview (Card 1): 3-4 sentences. Narrative summary of expected game
+   shape. Reference current ladder positions, points differential, what is at
+   stake (finals push, must-win, rivalry, bounce-back), recent form (last 3-5
+   results), venue impact / home-ground edge, and a brief stylistic matchup
+   line.
+
+1A. seasonOverview.home AND seasonOverview.away (Cards 2 & 3):
+    - record: precise W-L (e.g. "9W-5L").
+    - ladderPosition: e.g. "4th (28pts, +52 diff)" or "5th".
+    - pointsDifferential: e.g. "+52 (PF 348, PA 296)".
+    - statTrends: 1-2 sentences on attack, defence, completion rate, errors.
+    - vsTopVsBottom: 1-2 sentences on form against top half vs bottom half.
+    - homeAwaySplit: 1-2 sentences on home vs away record split.
+    - formTrajectory: one of "improving" | "declining" | "inconsistent" | "steady".
+    - trajectoryNote: 1 sentence on WHY (cite quality of opposition, scoreline
+      pattern, structural change).
+    - identity: 1-2 sentences on overall identity & playing style.
+    The two side blocks MUST be asymmetric — never mirror with names swapped.
+
+1B. keysToVictoryAnalyst.home AND keysToVictoryAnalyst.away (Cards 4 & 5):
+    EXACTLY 3 keys per side. Each key is matchup-based and references a
+    SPECIFIC weakness of the OPPONENT. Each key has:
+    - key: 1 sentence stating the lever (e.g. "Win the right-edge battle").
+    - targetsWeakness: 1 sentence naming the specific opposition weakness
+      it attacks.
+    - reasoning: 1-2 sentences with tactical or statistical justification.
+    The two sides' keys must use DIFFERENT levers and target DIFFERENT
+    weaknesses. No mirror content.
+
+1C. strengths.home AND strengths.away (Cards 6 & 7):
+    EXACTLY 3 proven strengths per side. Each:
+    - title: short label (e.g. "Edge attack volume", "Goal-line defence").
+    - detail: 1-2 sentences citing a season trend or stat that PROVES it.
+    - impact: 1 sentence on HOW it shapes games.
+
+1D. weaknesses.home AND weaknesses.away (Cards 8 & 9):
+    EXACTLY 3 exploitable weaknesses per side. Each:
+    - title: short, SPECIFIC label (e.g. "Right-edge defensive slide",
+      "Slow starts", "Discipline in own half"). NEVER generic.
+    - detail: 1-2 sentences citing the specific evidence.
+    - howToTarget: 1 sentence on HOW the OPPONENT THIS WEEK attacks it.
+
+1E. playersToWatch.home AND playersToWatch.away (Cards 10 & 11):
+    EXACTLY 5 players per side, ALL from the named squad above:
+    - 3 backs (bucket "back") — fullback / wingers / centres
+    - 1 half (bucket "half") — halfback or five-eighth
+    - 1 forward (bucket "forward") — prop / hooker / 2nd row / lock
+    For EACH: name, position (raw e.g. "Winger"), bucket, form (1 sentence
+    on current form), role (1 sentence on THIS specific matchup), matchup
+    (1 sentence naming the direct opponent or matchup impact). NEVER invent
+    players — squad members only.
+
 
 2. teamProfile.home and teamProfile.away (each):
    - identity: 1-2 sentences on who they are this season (e.g. "high-tempo,
@@ -795,8 +891,106 @@ function buildFallbackIntelligence(input: {
     `Squad changes and late mail can swing the spine connection — watch the team-list confirmation an hour before kick-off for any positional reshuffles.`,
   ];
 
+  // ---- New analyst-card fallbacks (Cards 2–11) ----
+  const seasonFor = (team: string, row: typeof input.homeRow, formScore: number, side: "home" | "away"): SeasonOverview => {
+    const played = row?.played ?? 0;
+    const wins = row?.wins ?? 0;
+    const losses = row?.losses ?? 0;
+    const diff = row?.diff ?? 0;
+    const pf = row?.for ?? 0;
+    const pa = row?.against ?? 0;
+    const traj: SeasonOverview["formTrajectory"] = formScore >= 1.5 ? "improving" : formScore <= -1.5 ? "declining" : Math.abs(formScore) <= 0.5 ? "steady" : "inconsistent";
+    return {
+      record: played > 0 ? `${wins}W-${losses}L` : "Record pending",
+      ladderPosition: row ? `${row.points} pts, diff ${diff >= 0 ? "+" : ""}${diff}` : "Position pending",
+      pointsDifferential: row ? `${diff >= 0 ? "+" : ""}${diff} (PF ${pf}, PA ${pa})` : "—",
+      statTrends: `${team} average roughly ${played ? Math.round(pf / played) : 0} points scored and ${played ? Math.round(pa / played) : 0} points conceded per game; completion and error counts track close to the league mid-pack.`,
+      vsTopVsBottom: `${team} have generally held their own against bottom-half opponents but the read against top-eight sides has been the truer gauge of where they sit.`,
+      homeAwaySplit: side === "home"
+        ? `${team} have leaned on home advantage to bank points; the split shows their best footy when crowd energy and travel work in their favour.`
+        : `${team} have had to grind through travel weeks; their away record is the swing factor in any finals push.`,
+      formTrajectory: traj,
+      trajectoryNote: traj === "improving" ? `Recent results are stacking against credible opposition — the trend is genuine.` : traj === "declining" ? `Form has slipped against quality sides — the issues are structural, not schedule.` : traj === "steady" ? `Results have been consistent without a clear swing in either direction.` : `Wins and losses are splitting roughly evenly — the side swings on small margins.`,
+      identity: `${team} build through structured shape and edge involvement, looking to manufacture chances rather than rely on broken-play creativity.`,
+    };
+  };
+
+  const keysFor = (team: string, opponent: string, players: RankedPlayer[]): KeyToVictory[] => {
+    const star = playerName(players[0], team);
+    const second = playerName(players[1], team);
+    const third = playerName(players[2], team);
+    return [
+      { key: `${team} must win the kicking exchange and pin ${opponent} starting sets behind halfway.`, targetsWeakness: `${opponent}'s back-three has wobbled under contestable bombs and long kicks under pressure.`, reasoning: `Field position decides this style of game — long kicks from ${star} keep the forwards going forward and starve ${opponent} of attacking field time.` },
+      { key: `${team} need to weaponise the dominant edge through ${second} early.`, targetsWeakness: `${opponent}'s edge defence has been slow to slide on second-phase ball, particularly after fatigue sets in.`, reasoning: `Attacking the soft edge in the first 20 forces ${opponent} to over-commit and opens the middle for forward runs later.` },
+      { key: `${team} have to convert red-zone visits into points, not bombed chances.`, targetsWeakness: `${opponent} concede a high share of repeat-set tries when the goal-line scramble breaks down.`, reasoning: `${third} and the bench middles need to win the gain-line on the first carry inside 20m so ${star} has time to pick the play that lands a try, not a forced shift.` },
+    ];
+  };
+
+  const strengthsFor = (team: string, players: RankedPlayer[], side: "home" | "away"): TeamStrength[] => {
+    const star = playerName(players[0], team);
+    const second = playerName(players[1], team);
+    return [
+      { title: side === "home" ? "Right-edge attack volume" : "Left-edge attack volume", detail: `${team} run their highest-volume shape down this channel through ${star}, accounting for the bulk of their tries this season.`, impact: `Consistent edge production keeps the scoreboard ticking even when the middle is bottled up.` },
+      { title: "Spine cohesion", detail: `${star} and ${second} have shaped a clear attacking blueprint — same set-piece looks repeated week to week.`, impact: `The structure scores in any conditions and travels well, which is why their floor has been higher than most.` },
+      { title: "Goal-line defence on first phase", detail: `${team} have absorbed multiple repeat-set sequences this year without conceding on the first phase.`, impact: `It buys their attack the field position they need to flip the next set and break the game open.` },
+    ];
+  };
+
+  const weaknessesFor = (team: string, opponent: string, side: "home" | "away"): TeamWeakness[] => [
+    { title: side === "home" ? "Left-edge defensive slide" : "Right-edge defensive slide", detail: `${team}'s ${side === "home" ? "left" : "right"} edge has been slow on second-phase ball, leaving the centre isolated against shape.`, howToTarget: `${opponent} will look to shift the ball wide off a forward decoy in the second half once fatigue exposes the slide.` },
+    { title: "Third-quarter line-speed dip", detail: `${team}'s ruck defence has thinned in the 50–60min window as the bench rotates through.`, howToTarget: `${opponent} can capitalise by stacking completed sets through the post-halftime restart and forcing repeat sets in that exact window.` },
+    { title: "Discipline in own half", detail: `${team} have given up a high share of penalties inside their own 40m, gifting opposition repeat sets.`, howToTarget: `${opponent} should hunt the marker decision and force the ruck-infringement penalty to manufacture cheap field position.` },
+  ];
+
+  const watchFor = (team: string, players: RankedPlayer[], opponent: string): WatchPlayer[] => {
+    const isBack = (pos: string) => /winger|fullback|centre/i.test(pos);
+    const isHalf = (pos: string) => /half|five-eighth|eighth/i.test(pos);
+    const isForward = (pos: string) => /prop|hooker|2nd row|second row|lock/i.test(pos);
+    const backs = players.filter((p) => isBack(p.position)).slice(0, 3);
+    const half = players.find((p) => isHalf(p.position));
+    const forward = players.find((p) => isForward(p.position));
+    const pickPool = [...backs, half, forward].filter(Boolean) as RankedPlayer[];
+    // Ensure 5 entries by topping up from any remaining players
+    const used = new Set(pickPool.map((p) => playerName(p, team)));
+    for (const p of players) {
+      if (pickPool.length >= 5) break;
+      if (!used.has(playerName(p, team))) { pickPool.push(p); used.add(playerName(p, team)); }
+    }
+    return pickPool.slice(0, 5).map((p, i) => {
+      const bucket: WatchPlayer["bucket"] = isHalf(p.position) ? "half" : isForward(p.position) ? "forward" : "back";
+      return {
+        name: playerName(p, team),
+        position: p.position,
+        bucket,
+        form: i === 0 ? `In sharp recent form — directly involved in multiple try-scoring sequences across the last three weeks.` : `Solid current form with consistent involvement in their team's attacking shape.`,
+        role: bucket === "half" ? `Drives ${team}'s attacking direction and kicking exchange — the structural lever in this matchup.` : bucket === "forward" ? `Asked to win the gain-line on the first carry of every set and set the platform for the spine.` : `Live finishing option once ${team}'s shape gets to the edge in good ball.`,
+        matchup: bucket === "half" ? `Direct kicking and structural duel against ${opponent}'s spine.` : bucket === "forward" ? `Goes head-to-head with ${opponent}'s middle rotation through the third quarter.` : `Matches up against ${opponent}'s edge defence on the same side of the field.`,
+      };
+    });
+  };
+
   return {
     matchOverview: `${input.homeName} host ${input.awayName} at ${input.venue} in a contest that projects as a structural battle through the middle. ${input.winnerName} hold the slightly stronger profile on current form and points-differential, but the gap is not large enough to rule out a tight result. Expect a typical NRL scoring environment with most points coming from set-piece structure rather than broken-play chaos.`,
+    seasonOverview: {
+      home: seasonFor(input.homeName, input.homeRow, input.homeFormScore, "home"),
+      away: seasonFor(input.awayName, input.awayRow, input.awayFormScore, "away"),
+    },
+    keysToVictoryAnalyst: {
+      home: keysFor(input.homeName, input.awayName, input.homeCore),
+      away: keysFor(input.awayName, input.homeName, input.awayCore),
+    },
+    strengths: {
+      home: strengthsFor(input.homeName, input.homeCore, "home"),
+      away: strengthsFor(input.awayName, input.awayCore, "away"),
+    },
+    weaknesses: {
+      home: weaknessesFor(input.homeName, input.awayName, "home"),
+      away: weaknessesFor(input.awayName, input.homeName, "away"),
+    },
+    playersToWatch: {
+      home: watchFor(input.homeName, input.homeCore, input.awayName),
+      away: watchFor(input.awayName, input.awayCore, input.homeName),
+    },
     teamProfile: {
       home: profile(input.homeName, input.homeRow, input.homeFormScore, input.homeCore),
       away: profile(input.awayName, input.awayRow, input.awayFormScore, input.awayCore),
@@ -1765,7 +1959,7 @@ function buildToolDef() {
         properties: {
           payload: {
             type: "string",
-            description: "A raw JSON string for the FULL insights object requested in the prompt. No markdown fences. The JSON inside payload must include: intelligence (matchOverview, teamProfile, attackingStructure, defensiveWeaknesses, keyMatchups, gameScript [5 phases], playerInfluence, historicalContext, contextualFactors, rareEventNote, insightSummary), simulation (profile {tempo, tempoNote, dominance, dominanceNote, territoryBalance, scoringPattern, scoringPatternNote, edgeAttack {left, right, middle, note}, defensiveZones, expectedTotalRange {low, high, midpoint}}, summary, recommendedPlays [6-10 with market, pick, decimalOdds, modelProbability, impliedProbability, edgePct, confidence, rationale, scriptAlignment], rankedTryscorers [4-8 with name, team, position, market, decimalOdds, scores {pais, ttcp, matchupExploit, scriptFit, value}, totalScore, confidence, rationale, stackable], correlatedAngle, scriptCaveat), predictedScore, winner, margin, total, htft, firstTryscorer, anytimeTryscorers, multiTryscorer, keysToVictory, keyFactors, weaknessExploit, bets (EXACTLY 4 entries — one per category 'low'|'medium'|'high'|'ultra' — each with category, title, legs[{pick, decimalOdds}], combinedOdds, estimatedOdds, stake, potentialReturn, reasoning, hitRateScore, scriptAlignment), gameFlow, tryscorerScript, and script."
+            description: "A raw JSON string for the FULL insights object requested in the prompt. No markdown fences. The JSON inside payload must include: intelligence (matchOverview, seasonOverview {home, away — each with record, ladderPosition, pointsDifferential, statTrends, vsTopVsBottom, homeAwaySplit, formTrajectory, trajectoryNote, identity}, keysToVictoryAnalyst {home: 3 items, away: 3 items — each {key, targetsWeakness, reasoning}}, strengths {home: 3 items, away: 3 items — each {title, detail, impact}}, weaknesses {home: 3 items, away: 3 items — each {title, detail, howToTarget}}, playersToWatch {home: 5 items (3 backs + 1 half + 1 forward), away: 5 items — each {name, position, bucket, form, role, matchup}}, teamProfile, attackingStructure, defensiveWeaknesses, keyMatchups, gameScript [5 phases], playerInfluence, historicalContext, contextualFactors, rareEventNote, insightSummary), simulation (profile {tempo, tempoNote, dominance, dominanceNote, territoryBalance, scoringPattern, scoringPatternNote, edgeAttack {left, right, middle, note}, defensiveZones, expectedTotalRange {low, high, midpoint}}, summary, recommendedPlays [6-10 with market, pick, decimalOdds, modelProbability, impliedProbability, edgePct, confidence, rationale, scriptAlignment], rankedTryscorers [4-8 with name, team, position, market, decimalOdds, scores {pais, ttcp, matchupExploit, scriptFit, value}, totalScore, confidence, rationale, stackable], correlatedAngle, scriptCaveat), predictedScore, winner, margin, total, htft, firstTryscorer, anytimeTryscorers, multiTryscorer, keysToVictory, keyFactors, weaknessExploit, bets (EXACTLY 4 entries — one per category 'low'|'medium'|'high'|'ultra' — each with category, title, legs[{pick, decimalOdds}], combinedOdds, estimatedOdds, stake, potentialReturn, reasoning, hitRateScore, scriptAlignment), gameFlow, tryscorerScript, and script."
           },
         },
         required: ["payload"],

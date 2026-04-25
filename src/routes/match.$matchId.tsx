@@ -611,16 +611,8 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
   if (insightsError && !insights) return <Empty msg={insightsError} />;
   if (!insights) return <Empty msg="Insights unavailable." />;
 
-  // The Insights tab is the MATCH INTELLIGENCE engine — pure tactical /
-  // structural read. Betting picks live on the Bets tab; narrative / script
-  // lives on the Script tab. We render strictly the intelligence object here.
   const intel = insights.intelligence;
-
-  if (!intel) {
-    return (
-      <Empty msg="Match intelligence regenerating — check back in a moment." />
-    );
-  }
+  if (!intel) return <Empty msg="Match intelligence regenerating — check back in a moment." />;
 
   return (
     <div className="space-y-4">
@@ -631,80 +623,52 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
         </div>
       )}
 
-      {/* 1. MATCH OVERVIEW */}
+      {/* Card 1 — Match Overview */}
       <Card title="Match overview" icon={BookOpen} className="accent-glow">
         <p className="text-sm leading-relaxed">{intel.matchOverview}</p>
       </Card>
 
-      {/* 2. TEAM PROFILE — both sides */}
+      {/* Cards 2 & 3 — Season Overview (Home + Away) */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <TeamProfileCard team={home} profile={intel.teamProfile?.home} />
-        <TeamProfileCard team={away} profile={intel.teamProfile?.away} />
+        <SeasonOverviewCard team={home} side="home" data={intel.seasonOverview?.home} />
+        <SeasonOverviewCard team={away} side="away" data={intel.seasonOverview?.away} />
       </div>
 
-      {/* 3. ATTACKING STRUCTURE */}
+      {/* Cards 4 & 5 — Keys to Victory (Home + Away) */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <AttackingStructureCard team={home} data={intel.attackingStructure?.home} />
-        <AttackingStructureCard team={away} data={intel.attackingStructure?.away} />
+        <KeysCard team={home} opponent={away} keys={intel.keysToVictoryAnalyst?.home} />
+        <KeysCard team={away} opponent={home} keys={intel.keysToVictoryAnalyst?.away} />
       </div>
 
-      {/* 4. DEFENSIVE WEAKNESSES */}
+      {/* Cards 6 & 7 — Strengths */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <DefensiveWeaknessCard team={home} data={intel.defensiveWeaknesses?.home} />
-        <DefensiveWeaknessCard team={away} data={intel.defensiveWeaknesses?.away} />
+        <StrengthsCard team={home} items={intel.strengths?.home} />
+        <StrengthsCard team={away} items={intel.strengths?.away} />
       </div>
 
-      {/* 5. KEY MATCHUPS */}
-      {Array.isArray(intel.keyMatchups) && intel.keyMatchups.length > 0 && (
-        <KeyMatchupsCard matchups={intel.keyMatchups} home={home} away={away} />
-      )}
+      {/* Cards 8 & 9 — Weaknesses */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <WeaknessesCard team={home} items={intel.weaknesses?.home} />
+        <WeaknessesCard team={away} items={intel.weaknesses?.away} />
+      </div>
 
-      {/* 6. GAME SCRIPT — 5 phases */}
-      <GameScriptPhasesCard phases={intel.gameScript ?? []} />
+      {/* Cards 10 & 11 — Players to Watch */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <PlayersToWatchCard team={home} players={intel.playersToWatch?.home} />
+        <PlayersToWatchCard team={away} players={intel.playersToWatch?.away} />
+      </div>
 
-      {/* 7. PLAYER INFLUENCE MAPPING */}
-      {Array.isArray(intel.playerInfluence) && intel.playerInfluence.length > 0 && (
-        <PlayerInfluenceCard influencers={intel.playerInfluence} home={home} away={away} />
-      )}
+      {/* Card 12 — Potential Game Script */}
+      <PotentialGameScriptCard phases={intel.gameScript ?? []} />
 
-      {/* 8. HISTORICAL CONTEXT (only if meaningful) */}
-      {typeof intel.historicalContext === "string" && intel.historicalContext.trim().length > 0 && (
-        <Card title="Historical context" icon={ScrollText}>
-          <p className="text-sm leading-relaxed text-muted-foreground">{intel.historicalContext}</p>
-        </Card>
-      )}
-
-      {/* 9. CONTEXTUAL FACTORS */}
-      {Array.isArray(intel.contextualFactors) && intel.contextualFactors.length > 0 && (
-        <Card title="Contextual factors" icon={Compass}>
-          <ul className="space-y-2 text-sm">
-            {intel.contextualFactors.map((c: string, i: number) => (
-              <li key={i} className="flex gap-2">
-                <span className="text-accent shrink-0">›</span>
-                <span className="leading-relaxed">{c}</span>
-              </li>
-            ))}
-          </ul>
-        </Card>
-      )}
-
-      {/* 10. RARE EVENT NOTE — kept brief, low-weight modifier */}
-      {typeof intel.rareEventNote === "string" && intel.rareEventNote.trim().length > 0 && (
-        <div className="glass p-3 text-xs text-muted-foreground inline-flex items-start gap-2 w-full">
-          <AlertCircle className="h-3.5 w-3.5 text-accent shrink-0 mt-0.5" />
-          <span className="leading-relaxed">{intel.rareEventNote}</span>
-        </div>
-      )}
-
-      {/* 11. INSIGHT SUMMARY — final tactical takeaway */}
+      {/* Closing tactical takeaway (kept) */}
       {typeof intel.insightSummary === "string" && intel.insightSummary.trim().length > 0 && (
         <Card title="Insight summary" icon={Sparkles} className="accent-glow">
           <p className="text-sm leading-relaxed">{intel.insightSummary}</p>
         </Card>
       )}
 
-      {/* Live tryscorer markets — kept as a real-data widget when team lists are out.
-          Pure read of bookie tryscorer pricing; not betting analysis or picks. */}
+      {/* Live tryscorer markets — kept as a real-data widget when team lists are out. */}
       <TryscorersSection
         tryscorers={tryscorers}
         aiAnytime={insights.anytimeTryscorers ?? []}
@@ -716,45 +680,7 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
   );
 }
 
-/* ---------- Match-intelligence card components ---------- */
-
-const RATING_TONE: Record<string, string> = {
-  elite: "text-accent",
-  strong: "text-accent",
-  "above average": "text-foreground",
-  average: "text-muted-foreground",
-  "below average": "text-danger",
-  struggling: "text-danger",
-};
-
-function RatingPill({ label, value }: { label: string; value?: string }) {
-  const v = (value ?? "average").toLowerCase();
-  const tone = RATING_TONE[v] ?? "text-muted-foreground";
-  return (
-    <div className="bg-surface-2 rounded-lg px-3 py-2 flex items-center justify-between gap-3">
-      <span className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</span>
-      <span className={`text-xs font-bold uppercase tracking-wider ${tone}`}>{value || "average"}</span>
-    </div>
-  );
-}
-
-function TeamProfileCard({ team, profile }: { team: string; profile: any }) {
-  if (!profile) return null;
-  return (
-    <Card title={`${team} — profile`} icon={Gauge}>
-      <p className="text-sm leading-relaxed mb-3">{profile.identity}</p>
-      <div className="grid grid-cols-2 gap-2 mb-3">
-        <RatingPill label="Attack" value={profile.attackRating} />
-        <RatingPill label="Defence" value={profile.defenceRating} />
-      </div>
-      <div className="space-y-2">
-        <ProfileRow label="Form read" body={profile.formRead} />
-        <ProfileRow label="Scoring pattern" body={profile.scoringPattern} />
-        <ProfileRow label="Consistency" body={profile.consistency} />
-      </div>
-    </Card>
-  );
-}
+/* ---------- Insights tab analyst cards ---------- */
 
 function ProfileRow({ label, body }: { label: string; body?: string }) {
   if (!body) return null;
@@ -766,111 +692,187 @@ function ProfileRow({ label, body }: { label: string; body?: string }) {
   );
 }
 
-function AttackingStructureCard({ team, data }: { team: string; data: any }) {
+const TRAJECTORY_TONE: Record<string, string> = {
+  improving: "bg-accent/15 text-accent border-accent/30",
+  declining: "bg-danger/15 text-danger border-danger/30",
+  inconsistent: "bg-surface-2 text-muted-foreground border-border",
+  steady: "bg-surface-2 text-foreground border-border",
+};
+
+function SeasonOverviewCard({ team, data }: { team: string; side: "home" | "away"; data: any }) {
   if (!data) return null;
+  const tone = TRAJECTORY_TONE[data.formTrajectory ?? "inconsistent"] ?? TRAJECTORY_TONE.inconsistent;
   return (
-    <Card title={`${team} — attacking structure`} icon={Swords}>
-      <div className="space-y-3 text-sm">
-        <ProfileRow label="Edge balance" body={data.edgeBalance} />
-        <ProfileRow label="Set-play vs broken-play" body={data.setPlayVsBroken} />
-        <ProfileRow label="Red zone tendency" body={data.redZoneTendency} />
-        <ProfileRow label="Where the tries come from" body={data.forwardVsBacklineTries} />
-        {Array.isArray(data.primaryPlaymakers) && data.primaryPlaymakers.length > 0 && (
-          <div className="pt-1 border-t border-border/40">
-            <div className="text-[10px] uppercase tracking-wider text-accent font-bold mb-2">Primary playmakers</div>
-            <ul className="space-y-2">
-              {data.primaryPlaymakers.map((p: any, i: number) => (
-                <li key={i} className="text-xs">
-                  <div className="font-semibold">
-                    {p.name} <span className="text-muted-foreground font-normal">· {p.role}</span>
-                  </div>
-                  <div className="text-muted-foreground leading-relaxed mt-0.5">{p.influence}</div>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
+    <Card title={`${team} — season overview`} icon={Activity}>
+      <div className="grid grid-cols-3 gap-2 mb-3">
+        <Stat label="Record" value={data.record} />
+        <Stat label="Ladder" value={data.ladderPosition} />
+        <Stat label="Diff" value={data.pointsDifferential} />
+      </div>
+      <div className="mb-3">
+        <span className={`inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-bold px-2 py-1 rounded-md border ${tone}`}>
+          <TrendingUp className="h-3 w-3" /> {data.formTrajectory ?? "inconsistent"}
+        </span>
+        {data.trajectoryNote && <p className="text-xs text-muted-foreground leading-relaxed mt-2">{data.trajectoryNote}</p>}
+      </div>
+      <div className="space-y-2">
+        <ProfileRow label="Stat trends" body={data.statTrends} />
+        <ProfileRow label="Vs top vs bottom" body={data.vsTopVsBottom} />
+        <ProfileRow label="Home / away split" body={data.homeAwaySplit} />
+        <ProfileRow label="Identity" body={data.identity} />
       </div>
     </Card>
   );
 }
 
-function DefensiveWeaknessCard({ team, data }: { team: string; data: any }) {
-  if (!data) return null;
+function KeysCard({ team, keys }: { team: string; opponent: string; keys?: any[] }) {
+  const list = Array.isArray(keys) ? keys.slice(0, 3) : [];
   return (
-    <Card title={`${team} — defensive weaknesses`} icon={Radar}>
-      <div className="space-y-3 text-sm">
-        {Array.isArray(data.missedTackleZones) && data.missedTackleZones.length > 0 && (
-          <div>
-            <div className="text-[10px] uppercase tracking-wider text-danger font-bold mb-2">Missed tackle zones</div>
-            <ul className="flex flex-wrap gap-1.5">
-              {data.missedTackleZones.map((z: string, i: number) => (
-                <li key={i} className="text-xs px-2 py-1 rounded-md bg-danger/10 text-danger font-semibold border border-danger/20">{z}</li>
-              ))}
-            </ul>
-          </div>
-        )}
-        <ProfileRow label="Edge fragility" body={data.edgeFragility} />
-        <ProfileRow label="Line speed & ruck issues" body={data.lineSpeedRuckIssues} />
-        {Array.isArray(data.positionalMismatches) && data.positionalMismatches.length > 0 && (
-          <div>
-            <div className="text-[10px] uppercase tracking-wider text-danger font-bold mb-2">Positional mismatches</div>
-            <ul className="flex flex-wrap gap-1.5">
-              {data.positionalMismatches.map((m: string, i: number) => (
-                <li key={i} className="text-xs px-2 py-1 rounded-md bg-danger/10 text-danger font-semibold border border-danger/20">{m}</li>
-              ))}
-            </ul>
-          </div>
-        )}
-        <ProfileRow label="Pressure points" body={data.pressurePoints} />
-      </div>
-    </Card>
-  );
-}
-
-function KeyMatchupsCard({ matchups, home, away }: { matchups: any[]; home: string; away: string }) {
-  return (
-    <Card title="Key matchups" icon={Crosshair}>
-      <ol className="space-y-4">
-        {matchups.map((m: any, i: number) => {
-          const edgeLabel = m.edge === "home" ? home : m.edge === "away" ? away : "Even";
-          const edgeTone = m.edge === "even" ? "bg-surface-2 text-muted-foreground" : "bg-accent text-accent-foreground";
-          return (
+    <Card title={`${team} — keys to victory`} icon={Target}>
+      {list.length === 0 ? (
+        <p className="text-xs text-muted-foreground">Keys regenerating…</p>
+      ) : (
+        <ol className="space-y-3">
+          {list.map((k: any, i: number) => (
             <li key={i} className="bg-surface-2 rounded-xl p-3">
-              <div className="flex items-start justify-between gap-3 mb-2">
-                <div className="text-sm font-bold leading-tight">{m.area}</div>
-                <span className={`text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-md shrink-0 ${edgeTone}`}>
-                  Edge: {edgeLabel}
-                </span>
+              <div className="flex items-start gap-2 mb-2">
+                <span className="text-[10px] font-bold text-accent-foreground bg-accent rounded-md px-1.5 py-0.5 shrink-0 mt-0.5">{i + 1}</span>
+                <p className="text-sm font-bold leading-tight">{k.key}</p>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
-                <div className="bg-surface rounded-lg p-2">
-                  <div className="text-[10px] uppercase tracking-wider text-accent font-bold mb-1">{home}</div>
-                  <p className="text-xs text-muted-foreground leading-relaxed">{m.homeSide}</p>
+              {k.targetsWeakness && (
+                <div className="mb-1.5">
+                  <div className="text-[10px] uppercase tracking-wider text-danger font-bold mb-0.5">Targets</div>
+                  <p className="text-xs text-muted-foreground leading-relaxed">{k.targetsWeakness}</p>
                 </div>
-                <div className="bg-surface rounded-lg p-2">
-                  <div className="text-[10px] uppercase tracking-wider text-accent font-bold mb-1">{away}</div>
-                  <p className="text-xs text-muted-foreground leading-relaxed">{m.awaySide}</p>
+              )}
+              {k.reasoning && (
+                <div>
+                  <div className="text-[10px] uppercase tracking-wider text-accent font-bold mb-0.5">Why</div>
+                  <p className="text-xs text-muted-foreground leading-relaxed">{k.reasoning}</p>
                 </div>
-              </div>
-              {m.why && <p className="text-xs leading-relaxed">{m.why}</p>}
+              )}
             </li>
-          );
-        })}
-      </ol>
+          ))}
+        </ol>
+      )}
     </Card>
   );
 }
 
-function GameScriptPhasesCard({ phases }: { phases: any[] }) {
-  if (!phases || phases.length === 0) return null;
+function StrengthsCard({ team, items }: { team: string; items?: any[] }) {
+  const list = Array.isArray(items) ? items.slice(0, 3) : [];
   return (
-    <Card title="Game script — phase by phase" icon={Hourglass}>
+    <Card title={`${team} — strengths`} icon={ThumbsUp}>
+      {list.length === 0 ? (
+        <p className="text-xs text-muted-foreground">Strengths regenerating…</p>
+      ) : (
+        <ul className="space-y-3">
+          {list.map((s: any, i: number) => (
+            <li key={i} className="bg-surface-2 rounded-xl p-3">
+              <div className="flex items-start gap-2 mb-2">
+                <Shield className="h-3.5 w-3.5 text-accent shrink-0 mt-0.5" />
+                <p className="text-sm font-bold leading-tight">{s.title}</p>
+              </div>
+              {s.detail && <p className="text-xs text-muted-foreground leading-relaxed mb-1.5">{s.detail}</p>}
+              {s.impact && (
+                <div>
+                  <div className="text-[10px] uppercase tracking-wider text-accent font-bold mb-0.5">Impact</div>
+                  <p className="text-xs text-muted-foreground leading-relaxed">{s.impact}</p>
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
+  );
+}
+
+function WeaknessesCard({ team, items }: { team: string; items?: any[] }) {
+  const list = Array.isArray(items) ? items.slice(0, 3) : [];
+  return (
+    <Card title={`${team} — weaknesses`} icon={ThumbsDown}>
+      {list.length === 0 ? (
+        <p className="text-xs text-muted-foreground">Weaknesses regenerating…</p>
+      ) : (
+        <ul className="space-y-3">
+          {list.map((w: any, i: number) => (
+            <li key={i} className="bg-surface-2 rounded-xl p-3 border border-danger/20">
+              <div className="flex items-start gap-2 mb-2">
+                <AlertCircle className="h-3.5 w-3.5 text-danger shrink-0 mt-0.5" />
+                <p className="text-sm font-bold leading-tight">{w.title}</p>
+              </div>
+              {w.detail && <p className="text-xs text-muted-foreground leading-relaxed mb-1.5">{w.detail}</p>}
+              {w.howToTarget && (
+                <div>
+                  <div className="text-[10px] uppercase tracking-wider text-danger font-bold mb-0.5">How to target</div>
+                  <p className="text-xs text-muted-foreground leading-relaxed">{w.howToTarget}</p>
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
+  );
+}
+
+const BUCKET_TONE: Record<string, { dot: string; label: string }> = {
+  back: { dot: "bg-accent", label: "Back" },
+  half: { dot: "bg-foreground", label: "Half" },
+  forward: { dot: "bg-danger", label: "Forward" },
+};
+
+function PlayersToWatchCard({ team, players }: { team: string; players?: any[] }) {
+  const list = Array.isArray(players) ? players.slice(0, 5) : [];
+  return (
+    <Card title={`${team} — players to watch`} icon={Eye}>
+      {list.length === 0 ? (
+        <p className="text-xs text-muted-foreground">Players to watch regenerating…</p>
+      ) : (
+        <ul className="space-y-3">
+          {list.map((p: any, i: number) => {
+            const tone = BUCKET_TONE[p.bucket] ?? BUCKET_TONE.back;
+            return (
+              <li key={i} className="bg-surface-2 rounded-xl p-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className={`h-2 w-2 rounded-full ${tone.dot}`} />
+                  <span className="text-sm font-bold">{p.name}</span>
+                  <span className="text-[10px] uppercase tracking-wider text-muted-foreground">· {p.position}</span>
+                  <span className="ml-auto text-[10px] uppercase tracking-wider font-bold text-muted-foreground">{tone.label}</span>
+                </div>
+                <div className="space-y-1.5">
+                  <ProfileRow label="Form" body={p.form} />
+                  <ProfileRow label="Role this week" body={p.role} />
+                  <ProfileRow label="Matchup" body={p.matchup} />
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </Card>
+  );
+}
+
+function PotentialGameScriptCard({ phases }: { phases: any[] }) {
+  if (!phases || phases.length === 0) return null;
+  // Map the 5 phases produced by the engine onto the 4 windows in the brief.
+  const remap = (window: string): string => {
+    if (/first 20/i.test(window)) return "0–20 mins";
+    if (/second 20/i.test(window)) return "20–40 mins";
+    if (/halftime/i.test(window)) return "Halftime read";
+    if (/40-60|40–60/i.test(window)) return "40–60 mins";
+    if (/60-80|60–80/i.test(window)) return "60–80 mins";
+    return window;
+  };
+  return (
+    <Card title="Potential game script" icon={Hourglass}>
       <ol className="relative border-l border-border pl-4 space-y-4">
         {phases.map((p: any, i: number) => (
           <li key={i} className="relative">
             <span className="absolute -left-[22px] top-1 h-3 w-3 rounded-full bg-accent ring-4 ring-background" />
-            <div className="text-[10px] uppercase tracking-widest text-accent font-bold mb-1">{p.window}</div>
+            <div className="text-[10px] uppercase tracking-widest text-accent font-bold mb-1">{remap(p.window)}</div>
             <p className="text-sm leading-relaxed text-muted-foreground">{p.read}</p>
           </li>
         ))}
@@ -879,38 +881,6 @@ function GameScriptPhasesCard({ phases }: { phases: any[] }) {
   );
 }
 
-const ROLE_TONE: Record<string, { dot: string; text: string }> = {
-  "Tempo controller": { dot: "bg-accent", text: "text-accent" },
-  "Edge finisher": { dot: "bg-accent", text: "text-accent" },
-  "Forward momentum": { dot: "bg-foreground/60", text: "text-foreground" },
-  "Defensive anchor": { dot: "bg-foreground/60", text: "text-foreground" },
-  "Disruptor": { dot: "bg-danger", text: "text-danger" },
-  "Momentum shifter": { dot: "bg-danger", text: "text-danger" },
-};
-
-function PlayerInfluenceCard({ influencers, home, away }: { influencers: any[]; home: string; away: string }) {
-  return (
-    <Card title="Player influence" icon={Layers}>
-      <ul className="space-y-3">
-        {influencers.map((p: any, i: number) => {
-          const tone = ROLE_TONE[p.role] ?? { dot: "bg-muted-foreground", text: "text-muted-foreground" };
-          const teamLabel = p.team === "home" ? home : away;
-          return (
-            <li key={i} className="bg-surface-2 rounded-lg p-3">
-              <div className="flex items-center gap-2 mb-1.5">
-                <span className={`h-2 w-2 rounded-full ${tone.dot}`} />
-                <span className="text-sm font-bold">{p.name}</span>
-                <span className="text-[10px] uppercase tracking-wider text-muted-foreground">· {teamLabel}</span>
-                <span className={`ml-auto text-[10px] uppercase tracking-wider font-bold ${tone.text}`}>{p.role}</span>
-              </div>
-              <p className="text-xs text-muted-foreground leading-relaxed">{p.expectedImpact}</p>
-            </li>
-          );
-        })}
-      </ul>
-    </Card>
-  );
-}
 
 
 function TryscorersSection({ tryscorers, aiAnytime, aiFirst, aiMulti, kickoffUtc }: {
@@ -1047,21 +1017,6 @@ function PickCard({ icon: Icon, market, pick, reasoning }:
       <div className="font-bold mb-1.5">{pick}</div>
       <div className="text-xs text-muted-foreground">{reasoning}</div>
     </div>
-  );
-}
-
-function KeysCard({ team, keys }: { team: string; keys: string[] }) {
-  return (
-    <Card title={`${team} — keys to victory`} icon={Zap}>
-      <ol className="space-y-3">
-        {keys.map((k, i) => (
-          <li key={i} className="flex gap-3 text-sm">
-            <span className="kbd w-6 h-6 shrink-0 rounded-full bg-accent text-accent-foreground text-xs font-bold flex items-center justify-center">{i + 1}</span>
-            <span className="leading-relaxed">{k}</span>
-          </li>
-        ))}
-      </ol>
-    </Card>
   );
 }
 

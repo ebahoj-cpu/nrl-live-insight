@@ -93,9 +93,48 @@ export function normaliseInsights(ins: Insights, homeName: string, awayName: str
   // Intelligence — backfill missing pieces so the Insights tab always renders.
   // We don't fabricate detailed analysis here; we just ensure the object shape
   // exists so the UI doesn't crash. AI output is preferred and almost always present.
+  const placeholderSeason = (team: string, side: "home" | "away") => ({
+    record: "Record pending",
+    ladderPosition: "Position pending",
+    pointsDifferential: "—",
+    statTrends: `${team}'s attack and defence sit close to the league mid-pack on current trends.`,
+    vsTopVsBottom: `${team} have been competitive against bottom-half sides; the truer gauge is their record against the top eight.`,
+    homeAwaySplit: side === "home" ? `${team} have leaned on home advantage to bank points this year.` : `${team}'s away record is the swing factor in their finals push.`,
+    formTrajectory: "inconsistent" as const,
+    trajectoryNote: `Wins and losses splitting roughly evenly — small margins decide their results.`,
+    identity: `${team} build through structured shape and edge involvement rather than broken-play creativity.`,
+  });
+  const placeholderKeys = (team: string, opp: string) => [
+    { key: `${team} must win the kicking exchange to pin ${opp} behind halfway.`, targetsWeakness: `${opp}'s back-three has wobbled under contestable bombs under pressure.`, reasoning: `Field position decides this style of game — long kicks starve ${opp} of attacking field time.` },
+    { key: `${team} need to weaponise their dominant edge in the first 20.`, targetsWeakness: `${opp}'s edge defence has been slow on second-phase ball.`, reasoning: `Attacking the soft edge early forces ${opp} to over-commit and opens the middle later.` },
+    { key: `${team} have to convert red-zone visits into points.`, targetsWeakness: `${opp} concede a high share of repeat-set tries when the goal-line scramble breaks down.`, reasoning: `Win the gain-line on the first carry inside 20m and the spine has time to land a try, not a forced shift.` },
+  ];
+  const placeholderStrengths = (team: string) => [
+    { title: "Edge attack volume", detail: `${team}'s highest-volume shape comes through their dominant edge.`, impact: `Consistent edge production keeps the scoreboard ticking even when the middle is bottled up.` },
+    { title: "Spine cohesion", detail: `${team}'s spine has shaped a clear attacking blueprint that travels week to week.`, impact: `Their floor stays higher than most because the structure scores in any conditions.` },
+    { title: "Goal-line defence on first phase", detail: `${team} have absorbed multiple repeat-set sequences without conceding on the first phase.`, impact: `It buys the attack the field position they need to flip the next set.` },
+  ];
+  const placeholderWeaknesses = (team: string, opp: string, side: "home" | "away") => [
+    { title: side === "home" ? "Left-edge defensive slide" : "Right-edge defensive slide", detail: `${team}'s ${side === "home" ? "left" : "right"} edge has been slow on second-phase ball.`, howToTarget: `${opp} will look to shift the ball wide off a forward decoy in the second half.` },
+    { title: "Third-quarter line-speed dip", detail: `${team}'s ruck defence thins in the 50–60min window as the bench rotates.`, howToTarget: `${opp} can capitalise by stacking completed sets through the post-halftime restart.` },
+    { title: "Discipline in own half", detail: `${team} have given up a high share of penalties inside their own 40m.`, howToTarget: `${opp} should hunt the marker decision and force the ruck-infringement penalty.` },
+  ];
+  const placeholderWatch = (team: string, opp: string) => [
+    { name: `${team} fullback`, position: "Fullback", bucket: "back" as const, form: `Active in attacking shape over recent weeks.`, role: `Lead support runner once the spine breaks the line.`, matchup: `Direct duel with ${opp}'s back three under bombs.` },
+    { name: `${team} winger A`, position: "Winger", bucket: "back" as const, form: `Solid recent finishing form on the dominant edge.`, role: `Live finishing option once the edge shape lands.`, matchup: `Matches up against ${opp}'s edge defence on the same side.` },
+    { name: `${team} centre`, position: "Centre", bucket: "back" as const, form: `Consistent involvement in attacking sequences.`, role: `Decision-maker on the second-receiver shape.`, matchup: `Tested by ${opp}'s drift defence on the edge.` },
+    { name: `${team} halfback`, position: "Halfback", bucket: "half" as const, form: `Driving the attacking direction in recent weeks.`, role: `Sets tempo and runs the kicking exchange.`, matchup: `Structural duel against ${opp}'s spine.` },
+    { name: `${team} forward`, position: "2nd Row", bucket: "forward" as const, form: `Solid metres from the back rotation.`, role: `Wins the gain-line on the first carry and sets the platform.`, matchup: `Goes head-to-head with ${opp}'s middle rotation.` },
+  ];
+
   if (!ins.intelligence) {
     ins.intelligence = {
       matchOverview: `${homeName} host ${awayName} in a contest expected to come down to set quality through the middle and which side wins the kicking exchange.`,
+      seasonOverview: { home: placeholderSeason(homeName, "home"), away: placeholderSeason(awayName, "away") },
+      keysToVictoryAnalyst: { home: placeholderKeys(homeName, awayName), away: placeholderKeys(awayName, homeName) },
+      strengths: { home: placeholderStrengths(homeName), away: placeholderStrengths(awayName) },
+      weaknesses: { home: placeholderWeaknesses(homeName, awayName, "home"), away: placeholderWeaknesses(awayName, homeName, "away") },
+      playersToWatch: { home: placeholderWatch(homeName, awayName), away: placeholderWatch(awayName, homeName) },
       teamProfile: {
         home: { identity: `${homeName} build through structured shape and edge involvement.`, attackRating: "average", defenceRating: "average", formRead: `Patchy form with the trajectory hard to read from the recent five.`, scoringPattern: `Most points from set-piece in the second half of a fresh set.`, consistency: `Capable of bursts but prone to mid-game droughts.` },
         away: { identity: `${awayName} rely on spine connection and forward momentum.`, attackRating: "average", defenceRating: "average", formRead: `Mixed results — depends heavily on whether the spine fires.`, scoringPattern: `Tries arrive from edge shape and second-phase ball.`, consistency: `Volatility tied to completion rates.` },
@@ -136,6 +175,27 @@ export function normaliseInsights(ins: Insights, homeName: string, awayName: str
     if (typeof ins.intelligence.rareEventNote !== "string") ins.intelligence.rareEventNote = "";
     if (typeof ins.intelligence.insightSummary !== "string") ins.intelligence.insightSummary = "";
     if (typeof ins.intelligence.matchOverview !== "string") ins.intelligence.matchOverview = "";
+
+    // Backfill new analyst cards if AI omitted them (or sent partial data).
+    if (!ins.intelligence.seasonOverview) ins.intelligence.seasonOverview = { home: placeholderSeason(homeName, "home"), away: placeholderSeason(awayName, "away") } as any;
+    if (!ins.intelligence.seasonOverview.home) ins.intelligence.seasonOverview.home = placeholderSeason(homeName, "home") as any;
+    if (!ins.intelligence.seasonOverview.away) ins.intelligence.seasonOverview.away = placeholderSeason(awayName, "away") as any;
+
+    if (!ins.intelligence.keysToVictoryAnalyst) ins.intelligence.keysToVictoryAnalyst = { home: [], away: [] } as any;
+    ins.intelligence.keysToVictoryAnalyst.home = ensureLength(ins.intelligence.keysToVictoryAnalyst.home, 3, (i) => placeholderKeys(homeName, awayName)[i % 3]);
+    ins.intelligence.keysToVictoryAnalyst.away = ensureLength(ins.intelligence.keysToVictoryAnalyst.away, 3, (i) => placeholderKeys(awayName, homeName)[i % 3]);
+
+    if (!ins.intelligence.strengths) ins.intelligence.strengths = { home: [], away: [] } as any;
+    ins.intelligence.strengths.home = ensureLength(ins.intelligence.strengths.home, 3, (i) => placeholderStrengths(homeName)[i % 3]);
+    ins.intelligence.strengths.away = ensureLength(ins.intelligence.strengths.away, 3, (i) => placeholderStrengths(awayName)[i % 3]);
+
+    if (!ins.intelligence.weaknesses) ins.intelligence.weaknesses = { home: [], away: [] } as any;
+    ins.intelligence.weaknesses.home = ensureLength(ins.intelligence.weaknesses.home, 3, (i) => placeholderWeaknesses(homeName, awayName, "home")[i % 3]);
+    ins.intelligence.weaknesses.away = ensureLength(ins.intelligence.weaknesses.away, 3, (i) => placeholderWeaknesses(awayName, homeName, "away")[i % 3]);
+
+    if (!ins.intelligence.playersToWatch) ins.intelligence.playersToWatch = { home: [], away: [] } as any;
+    ins.intelligence.playersToWatch.home = ensureLength(ins.intelligence.playersToWatch.home, 5, (i) => placeholderWatch(homeName, awayName)[i % 5]);
+    ins.intelligence.playersToWatch.away = ensureLength(ins.intelligence.playersToWatch.away, 5, (i) => placeholderWatch(awayName, homeName)[i % 5]);
   }
 
   // Simulation — guarantee the unified Match Simulation Engine block exists

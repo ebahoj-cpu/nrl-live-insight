@@ -449,7 +449,7 @@ function parseInsightsFromToolArgs(argStr: string, model: string): Insights {
 // Recompute combinedOdds = product(legs) and potentialReturn = stake × combinedOdds.
 // Guards against AI arithmetic mistakes — what we render always adds up.
 function normaliseBetMath(ins: Insights): Insights {
-  const parseStake = (s: string) => Number((s || "").replace(/[^0-9.]/g, "")) || 0;
+  const parseStake = (s: unknown) => Number(String(s ?? "").replace(/[^0-9.]/g, "")) || 0;
   const fmtOdds = (n: number) => `$${n.toFixed(2)}`;
   const fmtMoney = (n: number) => {
     if (n >= 1000) return `$${Math.round(n).toLocaleString("en-AU")}`;
@@ -479,10 +479,24 @@ function normaliseBetMath(ins: Insights): Insights {
     anytime: "$10",
     firstTryscorer: "$5",
   };
+  const betOrder: BetCategoryKey[] = [
+    "gameScript",
+    "lowRisk",
+    "mediumRisk",
+    "highRisk",
+    "getThea",
+    "upset",
+    "bookieWant",
+    "bookieFear",
+    "anytime",
+    "firstTryscorer",
+  ];
 
   if (Array.isArray(ins.bets)) {
-    ins.bets = ins.bets.map((b) => {
-      const cat = b.category as BetCategoryKey;
+    ins.bets = ins.bets.map((b, index) => {
+      const cat = betOrder.includes(b?.category as BetCategoryKey)
+        ? b.category as BetCategoryKey
+        : betOrder[index] ?? "lowRisk";
       const stake = b.stake || defaultStakes[cat] || "$5";
       const fixed = fixMulti({ ...b, stake });
       return {

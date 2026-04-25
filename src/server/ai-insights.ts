@@ -20,28 +20,29 @@ export type BetLeg = {
 };
 
 // Unified shape used by EVERY bet card on the Bets tab.
-// Each bet has 1-5 legs with real prices, server-computed math, and a "why".
+// Each bet has 1-6 legs with real prices, server-computed math, and a "why".
 export type BetPlay = {
-  title: string;            // headline e.g. "Storm win + Munster anytime + 13+ margin"
-  legs: BetLeg[];           // 1-5 legs with real bookie prices
-  combinedOdds: number;     // server-recomputed product of leg odds
-  estimatedOdds: string;    // formatted "$5.00"
-  stake: string;            // "$5", "$20", etc.
-  potentialReturn: string;  // server-recomputed stake × combinedOdds
-  reasoning: string;        // 2-3 sentences citing stats, lineups, script, form
+  category: BetCategoryKey;
+  title: string;
+  legs: BetLeg[];
+  combinedOdds: number;
+  estimatedOdds: string;
+  stake: string;
+  potentialReturn: string;
+  reasoning: string;
 };
 
 export type BetCategoryKey =
-  | "gameScript"      // aligns with stats: winner + margin + total + HT/FT + 2 tryscorers
-  | "lowRisk"         // ~$100 return on $5 stake (~20x)
-  | "mediumRisk"      // ~$500 return on $5 stake (~100x)
-  | "highRisk"        // ~$1,000 return on $5 stake (~200x)
-  | "getThea"         // ~$10,000 return on $5 stake (~2000x)
-  | "upset"           // against the market — underdog wins
-  | "bookieWant"      // result the bookies WANT to land (low liability)
-  | "bookieFear"      // result the bookies FEAR (heavy public exposure)
-  | "anytime"         // pure anytime tryscorer multi
-  | "firstTryscorer"; // standalone single first-tryscorer bet
+  | "gameScript"
+  | "lowRisk"
+  | "mediumRisk"
+  | "highRisk"
+  | "getThea"
+  | "upset"
+  | "bookieWant"
+  | "bookieFear"
+  | "anytime"
+  | "firstTryscorer";
 
 export type GameFlow = {
   openingTen: string;          // who starts hot, who is slow out the blocks

@@ -284,7 +284,7 @@ function buildRealOddsBlock(realOdds: RealOdds | undefined, home: string, away: 
 function applyRealOdds(ins: Insights, realOdds: RealOdds | undefined, home: string, away: string): Insights {
   if (!realOdds) return ins;
 
-  const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
+  const norm = (s: unknown) => String(s ?? "").toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
   const tryMap = new Map<string, { first?: number; anytime?: number; multi?: number }>();
   for (const p of realOdds.tryscorers.first) {
     const k = norm(p.player); tryMap.set(k, { ...(tryMap.get(k) ?? {}), first: p.price });
@@ -302,8 +302,9 @@ function applyRealOdds(ins: Insights, realOdds: RealOdds | undefined, home: stri
   const h2hAway = realOdds.h2h.away?.price;
   const bestTotal = realOdds.totals[0];
 
-  const lookup = (pickRaw: string): number | null => {
+  const lookup = (pickRaw: unknown): number | null => {
     const pick = norm(pickRaw);
+    if (!pick) return null;
 
     // h2h winner
     if (/\b(to win|win( the match)?|h2h|head to head|moneyline)\b/.test(pick) || /^[a-z ]+ win$/i.test(pick.trim())) {
@@ -343,8 +344,10 @@ function applyRealOdds(ins: Insights, realOdds: RealOdds | undefined, home: stri
 
   const fixLegs = (legs: BetLeg[]): BetLeg[] =>
     (legs ?? []).map((l) => {
-      const real = lookup(l.pick);
-      return real ? { ...l, decimalOdds: real } : l;
+      const safePick = String(l?.pick ?? "");
+      const safeOdds = Math.max(1.01, Number(l?.decimalOdds) || 1.01);
+      const real = lookup(safePick);
+      return { pick: safePick, decimalOdds: real ?? safeOdds };
     });
 
   if (Array.isArray(ins.bets)) {

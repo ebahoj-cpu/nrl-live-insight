@@ -1819,40 +1819,24 @@ function normaliseBetMath(ins: Insights): Insights {
   };
 
   const defaultStakes: Partial<Record<BetCategoryKey, string>> = {
-    gameScript: "$10",
-    smallStake: "$5",
-    mediumStake: "$10",
-    bigStake: "$20",
-    getThea: "$5",
-    anytimeMulti: "$10",
-    multiTryStack: "$10",
-    pointsParty: "$10",
-    upset: "$20",
-    bookieFear: "$10",
-    firstTryscorer: "$5",
+    low: "$10",
+    medium: "$10",
+    high: "$10",
+    ultra: "$10",
   };
-  const betOrder: BetCategoryKey[] = [
-    "gameScript",
-    "smallStake",
-    "mediumStake",
-    "bigStake",
-    "getThea",
-    "anytimeMulti",
-    "multiTryStack",
-    "pointsParty",
-    "upset",
-    "bookieFear",
-    "firstTryscorer",
-  ];
+  const betOrder: BetCategoryKey[] = ["low", "medium", "high", "ultra"];
 
   if (Array.isArray(ins.bets)) {
-    ins.bets = ins.bets.map((b, index) => {
+    // Group by category — keep ONE slip per tier (the first valid one).
+    const byCat = new Map<BetCategoryKey, BetPlay>();
+    ins.bets.forEach((b, index) => {
       const cat = betOrder.includes(b?.category as BetCategoryKey)
-        ? b.category as BetCategoryKey
-        : betOrder[index] ?? "smallStake";
-      const stake = b.stake || defaultStakes[cat] || "$5";
+        ? (b.category as BetCategoryKey)
+        : betOrder[index] ?? "medium";
+      if (byCat.has(cat)) return; // first one wins
+      const stake = b.stake || defaultStakes[cat] || "$10";
       const fixed = fixMulti({ ...b, stake });
-      return {
+      byCat.set(cat, {
         category: cat,
         title: b.title || "",
         reasoning: b.reasoning || "",
@@ -1861,8 +1845,12 @@ function normaliseBetMath(ins: Insights): Insights {
         estimatedOdds: fmtOdds(fixed.combinedOdds),
         stake,
         potentialReturn: fmtMoney(fixed._return),
-      };
+        hitRateScore: typeof b.hitRateScore === "number" ? Math.max(0, Math.min(100, Math.round(b.hitRateScore))) : undefined,
+        scriptAlignment: typeof b.scriptAlignment === "string" ? b.scriptAlignment : undefined,
+        legCount: fixed.legs.length,
+      });
     });
+    ins.bets = betOrder.map((c) => byCat.get(c)).filter(Boolean) as BetPlay[];
   }
 
   return ins;

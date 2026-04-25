@@ -1999,12 +1999,12 @@ function BetsTab({ insights, insightsError, insightsLoading }: { insights: any; 
   return (
     <div className="space-y-4">
       <div className="glass p-4 sm:p-5">
-        <div className="flex items-center gap-2 mb-2">
+        <div className="flex items-center gap-2 mb-1">
           <Wallet className="h-4 w-4 text-accent" />
           <h2 className="text-sm font-black uppercase tracking-widest">Slip engine</h2>
         </div>
         <p className="text-[12px] text-muted-foreground leading-relaxed">
-          Four slips, one per risk tier — all derived from the same match simulation. Adjust your stake to see live payout. Higher tiers add legs and variance; lower tiers prioritise hit rate over headline payout.
+          Four slips, one per risk tier. Same match script, different appetite. Edit stake to update payout.
         </p>
       </div>
 

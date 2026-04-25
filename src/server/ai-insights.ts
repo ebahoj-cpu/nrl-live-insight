@@ -118,8 +118,55 @@ export type PlayerInfluencer = {
   expectedImpact: string;// 1-2 sentences: HOW they will influence this specific game
 };
 
+// ---- New analyst-style cards (Insights tab redesign) ----
+export type SeasonOverview = {
+  record: string;                  // "9W-5L" or "8 wins, 6 losses"
+  ladderPosition: string;          // e.g. "4th" or "5th (28pts, +52 diff)"
+  pointsDifferential: string;      // e.g. "+52 (PF 348, PA 296)"
+  statTrends: string;              // 1-2 sentences: attack, defence, completion rate, errors
+  vsTopVsBottom: string;           // 1-2 sentences: form against top half vs bottom half
+  homeAwaySplit: string;           // 1-2 sentences: home form vs away form
+  formTrajectory: "improving" | "declining" | "inconsistent" | "steady";
+  trajectoryNote: string;          // 1 sentence on WHY that trajectory
+  identity: string;                // 1-2 sentences: overall identity & playing style
+};
+
+export type KeyToVictory = {
+  key: string;                     // 1 sentence: the lever (e.g. "Win the right-edge battle")
+  targetsWeakness: string;         // 1 sentence: which OPPONENT weakness it attacks
+  reasoning: string;               // 1-2 sentences: tactical / statistical justification
+};
+
+export type TeamStrength = {
+  title: string;                   // short label e.g. "Edge attack volume"
+  detail: string;                  // 1-2 sentences: stat / pattern that proves it
+  impact: string;                  // 1 sentence: HOW it shapes games
+};
+
+export type TeamWeakness = {
+  title: string;                   // short label e.g. "Right-edge defensive slide"
+  detail: string;                  // 1-2 sentences: specific exploitable flaw
+  howToTarget: string;             // 1 sentence: how the opponent attacks it this week
+};
+
+export type WatchPlayer = {
+  name: string;                    // named squad only
+  position: string;                // raw position (e.g. "Winger", "Halfback", "2nd Row")
+  bucket: "back" | "half" | "forward"; // 3 backs, 1 half, 1 forward per team
+  form: string;                    // 1 sentence: current form
+  role: string;                    // 1 sentence: their specific role THIS matchup
+  matchup: string;                 // 1 sentence: direct opponent / matchup impact
+};
+
 export type MatchIntelligence = {
   matchOverview: string;          // 3-4 sentences: narrative summary of expected game shape
+  // NEW analyst cards
+  seasonOverview: { home: SeasonOverview; away: SeasonOverview };
+  keysToVictoryAnalyst: { home: KeyToVictory[]; away: KeyToVictory[] }; // exactly 3 per side, distinct
+  strengths: { home: TeamStrength[]; away: TeamStrength[] };           // exactly 3 per side
+  weaknesses: { home: TeamWeakness[]; away: TeamWeakness[] };          // exactly 3 per side
+  playersToWatch: { home: WatchPlayer[]; away: WatchPlayer[] };        // 3 backs + 1 half + 1 forward per side
+  // existing
   teamProfile: { home: TeamProfile; away: TeamProfile };
   attackingStructure: { home: AttackingStructure; away: AttackingStructure };
   defensiveWeaknesses: { home: DefensiveWeaknesses; away: DefensiveWeaknesses };

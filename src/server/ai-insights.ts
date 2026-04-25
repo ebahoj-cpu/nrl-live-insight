@@ -403,9 +403,58 @@ HARD RULES for the entire "intelligence" object:
 
 Produce these intelligence fields:
 
-1. matchOverview: 3-4 sentences. Narrative summary of expected game shape —
-   tempo, who imposes territory, what kind of contest this becomes, scoring
-   environment expected.
+1. matchOverview (Card 1): 3-4 sentences. Narrative summary of expected game
+   shape. Reference current ladder positions, points differential, what is at
+   stake (finals push, must-win, rivalry, bounce-back), recent form (last 3-5
+   results), venue impact / home-ground edge, and a brief stylistic matchup
+   line.
+
+1A. seasonOverview.home AND seasonOverview.away (Cards 2 & 3):
+    - record: precise W-L (e.g. "9W-5L").
+    - ladderPosition: e.g. "4th (28pts, +52 diff)" or "5th".
+    - pointsDifferential: e.g. "+52 (PF 348, PA 296)".
+    - statTrends: 1-2 sentences on attack, defence, completion rate, errors.
+    - vsTopVsBottom: 1-2 sentences on form against top half vs bottom half.
+    - homeAwaySplit: 1-2 sentences on home vs away record split.
+    - formTrajectory: one of "improving" | "declining" | "inconsistent" | "steady".
+    - trajectoryNote: 1 sentence on WHY (cite quality of opposition, scoreline
+      pattern, structural change).
+    - identity: 1-2 sentences on overall identity & playing style.
+    The two side blocks MUST be asymmetric — never mirror with names swapped.
+
+1B. keysToVictoryAnalyst.home AND keysToVictoryAnalyst.away (Cards 4 & 5):
+    EXACTLY 3 keys per side. Each key is matchup-based and references a
+    SPECIFIC weakness of the OPPONENT. Each key has:
+    - key: 1 sentence stating the lever (e.g. "Win the right-edge battle").
+    - targetsWeakness: 1 sentence naming the specific opposition weakness
+      it attacks.
+    - reasoning: 1-2 sentences with tactical or statistical justification.
+    The two sides' keys must use DIFFERENT levers and target DIFFERENT
+    weaknesses. No mirror content.
+
+1C. strengths.home AND strengths.away (Cards 6 & 7):
+    EXACTLY 3 proven strengths per side. Each:
+    - title: short label (e.g. "Edge attack volume", "Goal-line defence").
+    - detail: 1-2 sentences citing a season trend or stat that PROVES it.
+    - impact: 1 sentence on HOW it shapes games.
+
+1D. weaknesses.home AND weaknesses.away (Cards 8 & 9):
+    EXACTLY 3 exploitable weaknesses per side. Each:
+    - title: short, SPECIFIC label (e.g. "Right-edge defensive slide",
+      "Slow starts", "Discipline in own half"). NEVER generic.
+    - detail: 1-2 sentences citing the specific evidence.
+    - howToTarget: 1 sentence on HOW the OPPONENT THIS WEEK attacks it.
+
+1E. playersToWatch.home AND playersToWatch.away (Cards 10 & 11):
+    EXACTLY 5 players per side, ALL from the named squad above:
+    - 3 backs (bucket "back") — fullback / wingers / centres
+    - 1 half (bucket "half") — halfback or five-eighth
+    - 1 forward (bucket "forward") — prop / hooker / 2nd row / lock
+    For EACH: name, position (raw e.g. "Winger"), bucket, form (1 sentence
+    on current form), role (1 sentence on THIS specific matchup), matchup
+    (1 sentence naming the direct opponent or matchup impact). NEVER invent
+    players — squad members only.
+
 
 2. teamProfile.home and teamProfile.away (each):
    - identity: 1-2 sentences on who they are this season (e.g. "high-tempo,

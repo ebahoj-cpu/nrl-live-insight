@@ -1266,13 +1266,20 @@ function BetsTab({ insights, insightsError, insightsLoading }: { insights: any; 
   if (insightsLoading) return <InsightsLoading />;
   if (insightsError && !insights) return <Empty msg={insightsError} />;
 
-  const bets = insights?.bets;
-  if (!bets || typeof bets !== "object") return <Empty msg="Bet suggestions unavailable. Hit Refresh Insights to generate them." />;
+  const rawBets = insights?.bets;
+  // Support both shapes: legacy Record<key, BetPlay> and new BetPlay[] with `category`.
+  const byKey: Record<string, any> = {};
+  if (Array.isArray(rawBets)) {
+    for (const b of rawBets) if (b?.category) byKey[b.category] = b;
+  } else if (rawBets && typeof rawBets === "object") {
+    Object.assign(byKey, rawBets);
+  }
+  if (Object.keys(byKey).length === 0) return <Empty msg="Bet suggestions unavailable. Hit Refresh Insights to generate them." />;
 
   return (
     <div className="space-y-4">
       {BET_ORDER.map((key) => {
-        const bet = bets[key];
+        const bet = byKey[key];
         if (!bet) return null;
         return <BetCard key={key} categoryKey={key} bet={bet} />;
       })}

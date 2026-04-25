@@ -399,9 +399,7 @@ function StatsTab({ home, away, homeRow, awayRow, statGroups, recentRecaps }:
         <SeasonStats team={away} row={awayRow} />
       </div>
 
-      {recentRecaps && (recentRecaps.home?.length || recentRecaps.away?.length) ? (
-        <RecentRecapsCard home={home} away={away} homeRecaps={recentRecaps.home ?? []} awayRecaps={recentRecaps.away ?? []} />
-      ) : null}
+      {/* Recent recaps section removed per request */}
 
       {statGroups && statGroups.length > 0 && statGroups.map((g, gi) => (
         <Card key={gi} title={g.title} icon={Activity}>

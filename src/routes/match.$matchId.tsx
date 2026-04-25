@@ -154,7 +154,7 @@ function MatchInner() {
       </nav>
 
       <div className="mt-6">
-        {tab === "lineup" && <LineupTab home={details.homeTeam} away={details.awayTeam} officials={details.officials} />}
+        {tab === "lineup" && <LineupTab home={details.homeTeam} away={details.awayTeam} officials={details.officials} teamNews={details.teamNews} />}
         {tab === "stats" && <StatsTab home={details.homeTeam} away={details.awayTeam} homeRow={homeRow} awayRow={awayRow} statGroups={details.statGroups} recentRecaps={recentRecaps} />}
         {tab === "insights" && (
           <InsightsTab
@@ -259,36 +259,102 @@ const POSITION_ORDER = [
   "Prop","Hooker","2nd Row","Lock","Interchange","Reserve",
 ];
 
-function LineupTab({ home, away, officials }: { home: any; away: any; officials: { position: string; firstName: string; lastName: string; headImage?: string }[] }) {
+type TeamNews = { ins: string[]; outs: string[]; blurb: string; sourceUrl: string } | null;
+
+function LineupTab({ home, away, officials, teamNews }: { home: any; away: any; officials: { position: string; firstName: string; lastName: string; headImage?: string }[]; teamNews?: { home: TeamNews; away: TeamNews } }) {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <SquadPanel team={home} />
-        <SquadPanel team={away} />
+        <div className="space-y-4">
+          <SquadPanel team={home} />
+          <InjuryCard team={home} news={teamNews?.home ?? null} />
+        </div>
+        <div className="space-y-4">
+          <SquadPanel team={away} />
+          <InjuryCard team={away} news={teamNews?.away ?? null} />
+        </div>
       </div>
       <OfficialsCard officials={officials} />
     </div>
   );
 }
 
+function InjuryCard({ team, news }: { team: { nickName: string }; news: TeamNews }) {
+  return (
+    <section className="card-surface p-5">
+      <div className="flex items-center gap-2 mb-3">
+        <AlertCircle className="h-4 w-4 text-accent shrink-0" />
+        <h3 className="font-bold text-sm uppercase tracking-wider truncate">{team.nickName} · Ins & Outs</h3>
+      </div>
+      {!news || (news.ins.length === 0 && news.outs.length === 0 && !news.blurb) ? (
+        <p className="text-xs text-muted-foreground">Late mail not yet published. Updates land Tuesday/Thursday on NRL.com.</p>
+      ) : (
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <div className="text-[10px] uppercase tracking-wider font-bold text-success mb-1.5 flex items-center gap-1">
+                <ThumbsUp className="h-3 w-3" /> Ins
+              </div>
+              {news.ins.length === 0 ? (
+                <div className="text-xs text-muted-foreground">—</div>
+              ) : (
+                <ul className="space-y-1">
+                  {news.ins.map((n, i) => (
+                    <li key={i} className="text-xs font-medium">{n}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <div>
+              <div className="text-[10px] uppercase tracking-wider font-bold text-danger mb-1.5 flex items-center gap-1">
+                <ThumbsDown className="h-3 w-3" /> Outs
+              </div>
+              {news.outs.length === 0 ? (
+                <div className="text-xs text-muted-foreground">—</div>
+              ) : (
+                <ul className="space-y-1">
+                  {news.outs.map((n, i) => (
+                    <li key={i} className="text-xs font-medium">{n}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+          {news.blurb && (
+            <p className="text-[11px] leading-relaxed text-muted-foreground border-t border-border pt-3">
+              {news.blurb}
+            </p>
+          )}
+          {news.sourceUrl && (
+            <a href={news.sourceUrl} target="_blank" rel="noreferrer" className="text-[10px] uppercase tracking-wider text-accent hover:underline">
+              Source: NRL.com team lists ↗
+            </a>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function OfficialsCard({ officials }: { officials: { position: string; firstName: string; lastName: string; headImage?: string }[] }) {
-  if (!officials || officials.length === 0) {
+  // We only display the on-field Referee and the Senior Review / Bunker Official.
+  const filtered = (officials ?? []).filter((o) => /^Referee$/i.test(o.position) || /Senior Review|Bunker/i.test(o.position));
+  if (filtered.length === 0) {
     return (
       <Card title="Match officials" icon={Shield}>
         <p className="text-xs text-muted-foreground">Officials not yet announced.</p>
       </Card>
     );
   }
-  // Order: Referee, Senior Review Official (TMO/Bunker), Touch Judge, Pocket Referee, others
-  const order = ["Referee", "Senior Review Official", "Bunker Official", "Touch Judge", "Pocket Referee"];
-  const sorted = [...officials].sort((a, b) => {
+  const order = ["Referee", "Senior Review Official", "Bunker Official"];
+  const sorted = [...filtered].sort((a, b) => {
     const ai = order.findIndex((o) => a.position.toLowerCase().includes(o.toLowerCase()));
     const bi = order.findIndex((o) => b.position.toLowerCase().includes(o.toLowerCase()));
     return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
   });
   return (
     <Card title="Match officials" icon={Shield}>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 gap-3">
         {sorted.map((o, i) => {
           const isTMO = /Senior Review|Bunker/i.test(o.position);
           const isRef = /^Referee$/i.test(o.position);

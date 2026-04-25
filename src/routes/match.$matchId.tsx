@@ -1368,6 +1368,7 @@ function accentBorder(a: string) {
     case "orange-500": return "border-orange-500/50";
     case "sky-500": return "border-sky-500/50";
     case "rose-500": return "border-rose-500/50";
+    case "fuchsia-500": return "border-fuchsia-500/50";
     default: return "border-border";
   }
 }
@@ -1380,6 +1381,7 @@ function accentTint(a: string) {
     case "orange-500": return "bg-gradient-to-br from-orange-500/10 via-surface-2/40 to-transparent";
     case "sky-500": return "bg-gradient-to-br from-sky-500/10 via-surface-2/40 to-transparent";
     case "rose-500": return "bg-gradient-to-br from-rose-500/10 via-surface-2/40 to-transparent";
+    case "fuchsia-500": return "bg-gradient-to-br from-fuchsia-500/10 via-surface-2/40 to-transparent";
     default: return "bg-surface-2/30";
   }
 }
@@ -1392,6 +1394,7 @@ function accentText(a: string) {
     case "orange-500": return "text-orange-500";
     case "sky-500": return "text-sky-500";
     case "rose-500": return "text-rose-500";
+    case "fuchsia-500": return "text-fuchsia-500";
     default: return "text-foreground";
   }
 }
@@ -1404,6 +1407,7 @@ function accentBadge(a: string) {
     case "orange-500": return "bg-orange-500 text-white";
     case "sky-500": return "bg-sky-500 text-white";
     case "rose-500": return "bg-rose-500 text-white";
+    case "fuchsia-500": return "bg-fuchsia-500 text-white";
     default: return "bg-muted text-foreground";
   }
 }

@@ -2,6 +2,7 @@
 // Uses tool-calling for structured output. Receives ONLY real data summaries.
 
 import { dedupeInsights } from "./dedupe-insights";
+import { normaliseInsights } from "./normalise-insights";
 
 const GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
 // Use the strongest reasoning model — insights are generated ONCE per match
@@ -292,9 +293,16 @@ CRITICAL betting & ODDS-MATH rules — READ CAREFULLY:
   // limit, parse error), retry once with the fast Flash model. Only after both
   // miss do we fall back to the deterministic local summary.
   // Pipeline: AI -> applyRealOdds (real prices) -> dedupeInsights (anti-repetition)
-  // -> normaliseBetMath (recompute combined odds + payouts).
+  // -> normaliseInsights (backfill missing fields to fixed counts so cards never
+  // render half-empty) -> normaliseBetMath (recompute combined odds + payouts).
   const finish = (parsed: Insights) =>
-    normaliseBetMath(dedupeInsights(applyRealOdds(parsed, payload.realOdds, payload.homeName, payload.awayName)));
+    normaliseBetMath(
+      normaliseInsights(
+        dedupeInsights(applyRealOdds(parsed, payload.realOdds, payload.homeName, payload.awayName)),
+        payload.homeName,
+        payload.awayName,
+      ),
+    );
   try {
     const parsed = await callGateway(key, MODEL, messages, toolDef, TIMEOUT_MS);
     return finish(parsed);

@@ -1749,35 +1749,21 @@ function TryscorerTeamBlock({ team, data }: {
   );
 }
 
-type BetCategoryKey =
-  | "gameScript" | "smallStake" | "mediumStake" | "bigStake" | "getThea"
-  | "anytimeMulti" | "multiTryStack" | "pointsParty"
-  | "upset" | "bookieFear" | "firstTryscorer";
+type BetCategoryKey = "low" | "medium" | "high" | "ultra";
 
-const BET_ORDER: BetCategoryKey[] = [
-  "gameScript", "smallStake", "mediumStake", "bigStake", "getThea",
-  "anytimeMulti", "multiTryStack", "pointsParty",
-  "upset", "bookieFear", "firstTryscorer",
-];
+const BET_ORDER: BetCategoryKey[] = ["low", "medium", "high", "ultra"];
 
 const BET_META: Record<BetCategoryKey, {
   label: string;
+  riskLabel: string;
   tagline: string;
-  target: string;
   Icon: any;
-  accent: string; // tailwind colour class fragment for borders/text
+  accent: string;
 }> = {
-  gameScript:     { label: "Game Script Bet",   tagline: "The cleanest read of the match — winner + margin + total + HT/FT + a tryscorer from each team.", target: "$10 → $500",  Icon: ScrollText, accent: "accent" },
-  smallStake:     { label: "$5 → $100",         tagline: "Small stake, solid return — favourite + margin + a strong anytime tryscorer.",                  target: "$5 → ~$100",  Icon: Shield,    accent: "emerald-500" },
-  mediumStake:    { label: "$10 → $500",        tagline: "Medium stake, big swing — favourite + total + two anytime tryscorers do the lifting.",          target: "$10 → ~$500", Icon: Activity,  accent: "yellow-500" },
-  bigStake:       { label: "$20 → $1,000",      tagline: "Bigger stake, cleaner multiplier — five legs leaning the right way.",                            target: "$20 → ~$1,000", Icon: Crosshair, accent: "orange-500" },
-  getThea:        { label: "GET THEA Bet",      tagline: "The bet of the slate — $5 chasing five figures.",                                                target: "$5 → ~$10,000", Icon: Sparkles,  accent: "accent" },
-  anytimeMulti:   { label: "Anytime Try Multi", tagline: "Pure anytime tryscorer 4-leg — best finishing names from both sides.",                          target: "$10 → ~$300+", Icon: Target,    accent: "accent" },
-  multiTryStack:  { label: "Multi-Try Stack",   tagline: "Three players in high-volume scoring lanes — all to bag 2+ tries.",                              target: "$10 → BIG",    Icon: Trophy,    accent: "fuchsia-500" },
-  pointsParty:    { label: "Points + Tries",    tagline: "Total points over + the two finishers most likely to score them.",                              target: "$10 → ~$300",  Icon: TrendingUp, accent: "sky-500" },
-  upset:          { label: "Upset Bet",         tagline: "Against the market — the underdog gets it done.",                                                target: "$20 single",   Icon: Zap,       accent: "yellow-500" },
-  bookieFear:     { label: "Bookie Fear Bet",   tagline: "The result the bookies fear — heavy public exposure with multiple tryscorers.",                  target: "$10 → BIG",    Icon: ThumbsDown, accent: "danger" },
-  firstTryscorer: { label: "First Tryscorer Bet", tagline: "Standalone single — first try of the match.",                                                  target: "$5 single",    Icon: Flag,      accent: "rose-500" },
+  low:    { label: "Low Risk",         riskLabel: "Hit-rate first", tagline: "2–3 legs. Safe favourites + total. The slip built to LAND.", Icon: Shield,    accent: "emerald-500" },
+  medium: { label: "Medium Risk",      riskLabel: "Balanced value", tagline: "3–6 legs. Match outcomes + props converging on the same script.", Icon: Activity,  accent: "sky-500" },
+  high:   { label: "High Risk",        riskLabel: "Correlated push", tagline: "4–7 legs. Aggressive same-script stack — every leg leans the SAME way.", Icon: Crosshair, accent: "orange-500" },
+  ultra:  { label: "Ultra High Risk",  riskLabel: "Extreme variance", tagline: "6+ legs. Big margins, scoring floods, multi-try stacks. Rare hit, huge payout.", Icon: Zap,       accent: "fuchsia-500" },
 };
 
 function BetsTab({ insights, insightsError, insightsLoading }: { insights: any; insightsError: string | null; insightsLoading?: boolean }) {
@@ -1785,7 +1771,6 @@ function BetsTab({ insights, insightsError, insightsLoading }: { insights: any; 
   if (insightsError && !insights) return <Empty msg={insightsError} />;
 
   const rawBets = insights?.bets;
-  // Support both shapes: legacy Record<key, BetPlay> and new BetPlay[] with `category`.
   const byKey: Record<string, any> = {};
   if (Array.isArray(rawBets)) {
     for (const b of rawBets) if (b?.category) byKey[b.category] = b;
@@ -1796,6 +1781,16 @@ function BetsTab({ insights, insightsError, insightsLoading }: { insights: any; 
 
   return (
     <div className="space-y-4">
+      <div className="glass p-4 sm:p-5">
+        <div className="flex items-center gap-2 mb-2">
+          <Wallet className="h-4 w-4 text-accent" />
+          <h2 className="text-sm font-black uppercase tracking-widest">Slip engine</h2>
+        </div>
+        <p className="text-[12px] text-muted-foreground leading-relaxed">
+          Four slips, one per risk tier — all derived from the same match simulation. Adjust your stake to see live payout. Higher tiers add legs and variance; lower tiers prioritise hit rate over headline payout.
+        </p>
+      </div>
+
       {BET_ORDER.map((key) => {
         const bet = byKey[key];
         if (!bet) return null;
@@ -1805,20 +1800,42 @@ function BetsTab({ insights, insightsError, insightsLoading }: { insights: any; 
   );
 }
 
+function parseStakeNum(s: unknown): number {
+  const n = Number(String(s ?? "").replace(/[^0-9.]/g, ""));
+  return Number.isFinite(n) && n > 0 ? n : 10;
+}
+
+function fmtMoney(n: number): string {
+  if (!Number.isFinite(n)) return "$0";
+  if (n >= 1000) return `$${Math.round(n).toLocaleString("en-AU")}`;
+  if (n >= 100) return `$${n.toFixed(0)}`;
+  return `$${n.toFixed(2)}`;
+}
+
 function BetCard({ categoryKey, bet }: { categoryKey: BetCategoryKey; bet: any }) {
   const meta = BET_META[categoryKey];
   const Icon = meta.Icon;
   const odds = Number(bet.combinedOdds) || 0;
   const accent = meta.accent;
-  // Build dynamic class strings — kept on a small whitelist so Tailwind picks them up.
   const borderCls = accentBorder(accent);
   const tintCls = accentTint(accent);
   const textCls = accentText(accent);
 
+  const defaultStake = parseStakeNum(bet.stake);
+  const [stake, setStake] = useState<string>(String(defaultStake));
+  const stakeNum = parseStakeNum(stake);
+  const payout = stakeNum * odds;
+
+  const hitRate = typeof bet.hitRateScore === "number" ? Math.max(0, Math.min(100, Math.round(bet.hitRateScore))) : null;
+  const hitRateLabel = hitRate == null
+    ? null
+    : hitRate >= 65 ? "High" : hitRate >= 40 ? "Medium" : "Low";
+  const legCount = Array.isArray(bet.legs) ? bet.legs.length : 0;
+
   return (
     <div className={`relative overflow-hidden rounded-2xl border-2 ${borderCls} ${tintCls} p-5`}>
       <div className={`absolute top-0 right-0 px-3 py-1 text-[10px] font-black uppercase tracking-widest rounded-bl-xl ${accentBadge(accent)}`}>
-        {meta.target}
+        {meta.riskLabel}
       </div>
 
       <div className="flex items-center gap-2 mb-1">
@@ -1827,7 +1844,24 @@ function BetCard({ categoryKey, bet }: { categoryKey: BetCategoryKey; bet: any }
       </div>
       <p className="text-[11px] text-muted-foreground mb-3 italic">{meta.tagline}</p>
 
-      <h3 className="font-black text-base mb-3 leading-tight">{bet.title}</h3>
+      <h3 className="font-black text-base mb-2 leading-tight">{bet.title}</h3>
+
+      {/* Meta row: leg count + hit-rate + script alignment */}
+      <div className="flex flex-wrap items-center gap-2 mb-3">
+        <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-background/40 border border-border">
+          <Layers className="h-3 w-3" /> {legCount} leg{legCount === 1 ? "" : "s"}
+        </span>
+        {hitRate != null && (
+          <span className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-background/40 border border-border ${textCls}`}>
+            <Gauge className="h-3 w-3" /> Hit rate: {hitRateLabel} ({hitRate})
+          </span>
+        )}
+        {bet.scriptAlignment && (
+          <span className="inline-flex items-center gap-1 text-[10px] font-medium uppercase tracking-wider px-2 py-0.5 rounded-md bg-background/40 border border-border text-muted-foreground">
+            <Compass className="h-3 w-3" /> {bet.scriptAlignment}
+          </span>
+        )}
+      </div>
 
       <ul className="space-y-1.5 mb-4">
         {(bet.legs || []).map((leg: any, li: number) => (
@@ -1843,26 +1877,52 @@ function BetCard({ categoryKey, bet }: { categoryKey: BetCategoryKey; bet: any }
         ))}
       </ul>
 
-      <div className="grid grid-cols-3 gap-2 mb-3 pt-3 border-t border-border">
+      {/* Editable stake + live payout */}
+      <div className="grid grid-cols-3 gap-2 mb-3 pt-3 border-t border-border items-end">
         <div className="text-center">
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Odds</div>
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Combined odds</div>
           <div className={`text-lg font-black kbd ${textCls}`}>${odds.toFixed(2)}</div>
         </div>
         <div className="text-center">
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Stake</div>
-          <div className="text-lg font-black kbd">{bet.stake}</div>
+          <label className="text-[10px] uppercase tracking-wider text-muted-foreground block mb-1">Stake</label>
+          <div className="relative mx-auto max-w-[110px]">
+            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-bold">$</span>
+            <input
+              type="number"
+              inputMode="decimal"
+              min={1}
+              step={1}
+              value={stake}
+              onChange={(e) => setStake(e.target.value)}
+              className={`w-full text-center text-base font-black kbd bg-background/60 border border-border rounded-md py-1 pl-5 pr-1 focus:outline-none focus:ring-2 focus:ring-accent`}
+              aria-label={`${meta.label} stake`}
+            />
+          </div>
         </div>
         <div className="text-center">
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Payout</div>
-          <div className={`text-lg font-black kbd ${textCls}`}>{bet.potentialReturn}</div>
+          <div className={`text-lg font-black kbd ${textCls}`}>{fmtMoney(payout)}</div>
         </div>
+      </div>
+
+      {/* Quick-stake chips */}
+      <div className="flex flex-wrap gap-1.5 mb-3">
+        {[5, 10, 20, 50, 100].map((amt) => (
+          <button
+            key={amt}
+            type="button"
+            onClick={() => setStake(String(amt))}
+            className={`text-[11px] font-bold px-2 py-1 rounded-md border ${stakeNum === amt ? `${accentBadge(accent)} border-transparent` : "bg-background/40 border-border text-muted-foreground hover:text-foreground"}`}
+          >
+            ${amt}
+          </button>
+        ))}
       </div>
 
       <p className="text-xs text-muted-foreground leading-relaxed">{bet.reasoning}</p>
     </div>
   );
 }
-
 // Accent class helpers — kept verbose so Tailwind doesn't tree-shake them.
 function accentBorder(a: string) {
   switch (a) {
@@ -1916,7 +1976,6 @@ function accentBadge(a: string) {
     default: return "bg-muted text-foreground";
   }
 }
-
 
 function formatDate(utc: string) {
   if (!utc) return "TBC";

@@ -33,23 +33,18 @@ export type BetPlay = {
   legs: BetLeg[];
   combinedOdds: number;
   estimatedOdds: string;
-  stake: string;
-  potentialReturn: string;
+  stake: string;             // default suggested stake (e.g. "$10") — UI allows override
+  potentialReturn: string;   // computed from default stake — UI recomputes on change
   reasoning: string;
+  // New fields for the risk-tier slip engine
+  hitRateScore?: number;     // 0-100 — how likely the slip is to land (script convergence)
+  scriptAlignment?: string;  // 1 short phrase: which simulation lever the slip leans on
+  legCount?: number;         // convenience — server-set
 };
 
-export type BetCategoryKey =
-  | "gameScript"
-  | "smallStake"
-  | "mediumStake"
-  | "bigStake"
-  | "getThea"
-  | "anytimeMulti"
-  | "multiTryStack"
-  | "pointsParty"
-  | "upset"
-  | "bookieFear"
-  | "firstTryscorer";
+// Risk tiers — replaces the legacy 11-category bet system.
+// Every match produces ONE slip per tier, derived from the unified simulation.
+export type BetCategoryKey = "low" | "medium" | "high" | "ultra";
 
 export type GameFlow = {
   openingTen: string;          // who starts hot, who is slow out the blocks
@@ -475,44 +470,57 @@ ALSO produce a "tryscorerScript" — a focused tryscoring read for both teams:
 - For EACH team also list 1-2 "avoid" players — trap names the public will pile into who are poor value this week (out of form, bad matchup, used as decoy, not getting touches). Each with a 1-sentence reason.
 - summary: 2-3 sentences on the overall tryscoring picture — total tries expected, which edge leaks, who carries the kicking game.
 
-FINALLY, generate the "bets" object — ELEVEN bet plays, every one with the SAME shape (category, title, legs[], combinedOdds, estimatedOdds, stake, potentialReturn, reasoning). Each bet must be grounded in the data you produced above. Always quote LIVE BOOKIE ODDS prices exactly when a leg matches.
+FINALLY, generate the "bets" object — EXACTLY FOUR betting slips, one per risk tier (low, medium, high, ultra). Every slip MUST be a same-game multi derived from the SAME unified match simulation you produced for the simulation block. The slip engine prioritises HIT RATE (win frequency) — not maximum payout optimisation. Slips are converged consensus picks across script + PAIS + TTCP + matchup + value, NOT padded for fake odds.
 
-The bets tab is the most important part of this app. Every bet must offer a meaningful payout — small stakes pulling big returns. NO low-paying favourite-only multis. We want SOLID PICKS that pull money: anytime tryscorer multis, points overs combos, multi-tryscorer stacks. Build them like a sharp punter would.
+CORE RULES — every tier:
+- Each leg must be supported by AT LEAST one of: the simulation profile, a ranked tryscorer (PAIS/TTCP/matchupExploit/scriptFit), a recommendedPlay with positive edge, or the weaknessExploit / gameFlow analysis.
+- Same-game multi correlation must be moderate (not strict, not loose). Stronger script = tighter correlation; weaker script = slightly more diversified legs.
+- NEVER include contradictory legs (e.g. "home to win" + "away leads at half" without supporting HT/FT). NEVER duplicate logical markets (e.g. winner + winning-margin where the margin already implies the winner — pick ONE).
+- Quote LIVE BOOKIE ODDS prices EXACTLY for any leg that matches a listed market.
+- combinedOdds MUST equal product(legs) within ±5%.
+- Default stake is "$10" per slip — the user can override in the UI.
+- Each slip records 'hitRateScore' (0-100, where 100 = simulation strongly converges on every leg) and 'scriptAlignment' (one short phrase naming the simulation lever, e.g. "second-half flood + dominant right-edge").
+- NEVER force bets in low-confidence games — if the simulation does not support the tier, drop a leg rather than reach. Lower legCount + cleaner picks > more legs + weak picks.
+- Build the slips so the implied combined odds make sense for the tier (LOW lands often / smaller payout, ULTRA rare hit / large payout). Do NOT artificially inflate odds.
 
-For EACH of the eleven categories use the exact stake/target shown — the combined odds MUST be in the target ballpark for the payout to land:
+TIER SPECIFICATIONS:
 
-1. gameScript — the cleanest read of the match, aligned with your stats. 5-6 legs: winning team + winning margin BUCKET + total over/under + HT/FT double + 2 anytime tryscorers (one each team, drawn from tryscorerScript). Stake "$10". Target combined odds ~50, payout ~$500. This is the "if the script plays out, this lands" multi.
+1. low (LOW RISK — high hit rate, modest payout):
+   - 2-3 legs total.
+   - Match outcomes + totals only. Optionally ONE high-confidence player prop max (anytime tryscorer with strong PAIS/TTCP/matchup convergence, price ~1.60-2.30).
+   - Focus: safe favourites, high-probability outcomes, concentrated convergence.
+   - Target combined odds: roughly 2.5-6.
 
-2. smallStake — Stake "$5", target payout ~$100, combined odds ~20. 3 legs total. Pick legs that combine to ~20: e.g. one h2h favourite (~1.40-1.70), one strong anytime tryscorer (~2.00-2.50), one points over/under or a margin bucket (~3.50-4.50). Avoid stacking 3 short favourites — that won't get to 20. Lean on tryscorer prices to get the multiplier.
+2. medium (MEDIUM RISK — balanced):
+   - 3-6 legs (script-adjusted: drop a leg if the script is weak).
+   - Balanced mix: match outcome + 1-2 totals/margins + 1-2 player props (anytime tryscorers).
+   - Focus: structured value with moderate upside — every leg passes the convergence test.
+   - Target combined odds: roughly 6-25.
 
-3. mediumStake — Stake "$10", target payout ~$500, combined odds ~50. 4 legs. Mix: h2h winner + total over/under + 2 anytime tryscorers. Or: h2h + margin bucket + 2 anytime tryscorers. The two tryscorer legs do the heavy lifting on the multiplier.
+3. high (HIGH RISK — correlated aggression):
+   - 4-7 legs (script-adjusted).
+   - Even mix of match outcomes and player props (including anytime tryscorers, optionally one 2+ tries leg if script supports stacking).
+   - Focus: aggressive correlation — every leg points to the SAME script (e.g. dominant team + their margin bucket + their edge tryscorer + their forward-pack 2+ tries when script is "second-half flood").
+   - Target combined odds: roughly 25-150.
 
-4. bigStake — Stake "$20", target payout ~$1,000, combined odds ~50. 4-5 legs. Build similarly to mediumStake but with one extra leg or one slightly longer tryscorer (lean toward 2.50-3.50 anytime prices) to push odds toward ~50. The bigger stake means smaller multiplier needed for the same headline payout.
+4. ultra (ULTRA HIGH RISK — extreme variance):
+   - 6-10+ legs (script-adjusted; minimum 6).
+   - Match-outcome focused: big margins, upsets, extreme totals, HT/FT crosses, multiple 2+ tries legs.
+   - Minimal or no reliance on standard anytime tryscorer props — lean on rarer, longer-priced outcomes.
+   - Focus: high variance, extreme scenario alignment.
+   - Target combined odds: 150+ (no hard cap — let the script dictate).
 
-5. getThea — THE bet of the slate. 4-5 long legs aiming ~$10,000 from $5 stake (combined odds ~2000). Include a margin bucket (~3-4), HT/FT cross or favourite double (~3-12), TWO tryscorer legs (mix one anytime ~2.50 + one 2+ tries ~5-15), one over/under (~1.90). Reasoning must cite weakness exploit, X-factor, and named players.
-
-6. anytimeMulti — Pure anytime tryscorer multi. Stake "$10", target payout ~$300-500, combined odds ~30-50. 4 legs ALL "<player> anytime tryscorer", drawn from your tryscorerScript picks (mix BOTH teams, lean to outside backs and back-row crash options). Use real anytime prices from LIVE BOOKIE ODDS. Pick higher-value names (~2.30+) so the multiplier lands.
-
-7. multiTryStack — Multi-tryscorer stack. Stake "$10", target payout ~$1,000+, combined odds ~100+. 3 legs all "<player> 2+ tries" — sharp 2+ try picks. Use the real 2+ tries prices from LIVE BOOKIE ODDS where available. This is the "double-double" play for serious payouts. Reasoning must explain why each named player is in a high-volume scoring lane.
-
-8. pointsParty — Points + tryscorer combo. Stake "$10", target payout ~$200-400, combined odds ~20-40. 3 legs: one points OVER (use real total line + over price), plus 2 anytime tryscorers from the team(s) most likely to score the points the over needs. Frame the reasoning around the scoring environment.
-
-9. upset — Straight underdog play AGAINST the market. Single leg = "<underdog nickname> to win" at the EXACT real h2h price for the underdog (longer h2h price from LIVE BOOKIE ODDS). Stake "$20". Reasoning explains why the underdog can pull it off (form, key matchup, weather, motivation).
-
-10. bookieFear — The result bookies FEAR (heavy public exposure). Stake "$10", target payout ~$300-600, combined odds ~30-60. 3-4 legs that lean into the bookies' nightmare result — usually the chalk winning + the headline tryscorers landing. Use real prices.
-
-11. firstTryscorer — STANDALONE single bet on first tryscorer. Exactly 1 leg "<player> first tryscorer" using the LIVE BOOKIE ODDS first-tryscorer price. Stake "$5". Pick the most credible value name from tryscorerScript (price ~9-15 for ~$50-75 payout).
-
-CRITICAL betting & ODDS-MATH rules — READ CAREFULLY:
-- USE THE EXACT REAL ODDS PROVIDED ABOVE. The "LIVE BOOKIE ODDS" block contains real prices from AU bookies (TAB-aligned). When a leg matches a market shown there (h2h winner, anytime tryscorer for a listed player, first tryscorer for a listed player, total over/under at a listed line, or 2+ tries for a listed player), you MUST use that exact decimalOdds value. Do NOT estimate or round.
-- For markets not in the block (margin buckets, HT/FT, try-count buckets like "1-2 tries"), use realistic AU prices: margin "1-12" ~$1.80-2.20, "13+" ~$1.70-2.10, "1-6" ~$3-4, "7-12" ~$3.50-4.50, "13-24" ~$3-4, "25+" ~$5-9; HT/FT same team ~$2.20-3.50; HT/FT cross ~$8-15; "1-2 tries" ~$2.50-4 (player-dependent), "3+ tries" ~$15-50.
-- DO NOT use handicap / line / spread markets like "Roosters -12.5". Use winning-margin BUCKETS only.
-- Player try markets must use "anytime tryscorer", "first tryscorer", or "2+ tries" / "3+ tries". NEVER "over 0.5".
+CRITICAL betting & ODDS-MATH rules:
+- USE THE EXACT REAL ODDS PROVIDED ABOVE for h2h, totals, anytime/first/2+ tryscorer markets when the leg matches.
+- For markets not in the block (margin buckets, HT/FT, try-count buckets), use realistic AU prices: margin "1-12" ~$1.80-2.20, "13+" ~$1.70-2.10, "1-6" ~$3-4, "7-12" ~$3.50-4.50, "13-24" ~$3-4, "25+" ~$5-9; HT/FT same team ~$2.20-3.50; HT/FT cross ~$8-15; "2+ tries" player-dependent ~$4-15; "3+ tries" ~$15-50.
+- DO NOT use handicap / line / spread markets — use winning-margin BUCKETS only.
+- Player try markets must use "anytime tryscorer", "first tryscorer", or "2+ tries" / "3+ tries" — NEVER "over 0.5".
 - combinedOdds MUST equal the PRODUCT of all leg decimalOdds (within ±5%).
-- HIT THE TARGET COMBINED ODDS for each category — if your draft is too low, swap a short favourite for a longer tryscorer or margin bucket; if too high, swap a long leg for a shorter one. The headline payout vs stake is the whole point of the bets tab.
-- NEVER invent players — only named squad members above. For tryscorer legs, prefer players that appear in the LIVE BOOKIE ODDS block.
-- DO NOT include first-tryscorer legs in any of gameScript / smallStake / mediumStake / bigStake / getThea / anytimeMulti / multiTryStack / pointsParty — first-tryscorer is RESERVED for the standalone "firstTryscorer" bet only.
-- Each bet's reasoning is 2-3 sentences citing specific stats / lineups / form / weakness exploit / X-factor — explain WHY this bet aligns with the rest of the analysis and WHERE the value sits.
+- NEVER invent players — only named squad members above. Prefer players that appear in LIVE BOOKIE ODDS.
+- Each slip's 'reasoning' is 2-3 sentences citing the simulation lever, named players, and which markets converge — explain WHY the slip lands AND what would break it.
+- Each slip's 'title' is short and informative: e.g. "Storm dominance — 3-leg safe build", "High-correlation right-edge stack", "Ultra: scoring-flood scenario".
+
+The four bets MUST share script DNA — they are different RISK appetites on the SAME match simulation, not four unrelated slip ideas.
 
 ==============================================================================
 SCRIPT TAB — UNIFIED MATCH SIMULATION ENGINE (HIGH PRIORITY)
@@ -1300,170 +1308,97 @@ function buildFallbackBets(input: {
   multiTryPrice: number;
 }): BetPlay[] {
   const totalPickLabel = `${input.totalPick === "over" ? "Over" : "Under"} ${input.totalLine} total points`;
+  const totalOddsApprox = 1.9;
   const marginOdds = input.marginBucket === "1-6" ? 3.4 : input.marginBucket === "7-12" ? 3.8 : 2.1;
   const winnerPrice = input.winnerPrice ?? 1.72;
   const loserPrice = input.loserPrice ?? 2.35;
-  const anytimeA = input.anytimePlayers[0];
-  const anytimeB = input.anytimePlayers[1] ?? input.anytimePlayers[0];
-  const anytimeC = input.anytimePlayers[2] ?? input.anytimePlayers[0];
-  const anytimeD = input.anytimePlayers[3] ?? input.anytimePlayers[1] ?? input.anytimePlayers[0];
+  const a0 = input.anytimePlayers[0];
+  const a1 = input.anytimePlayers[1] ?? a0;
+  const a2 = input.anytimePlayers[2] ?? a0;
+  const a3 = input.anytimePlayers[3] ?? a1;
+  const safeAnytime = (p?: { name: string; price: number }, fallbackPrice = 2.4) => p ?? { name: input.gameScriptAnytimeA, price: fallbackPrice };
+  const aA = safeAnytime(a0, 2.0);
+  const aB = safeAnytime(a1, 2.4);
+  const aC = safeAnytime(a2, 2.8);
+  const aD = safeAnytime(a3, 3.0);
+  const multiB = Math.max(input.multiTryPrice * 0.9, 4.5);
+  const multiC = Math.max(input.multiTryPrice * 1.15, 6);
+
+  // Convergence — fallback assumes a moderate, even script unless margin tells us otherwise.
+  const scriptStrength = input.marginBucket === "13+" || input.marginBucket === "13-24" || input.marginBucket === "25+" ? "strong" : "moderate";
 
   return [
     {
-      category: "gameScript",
-      title: `${input.winnerName} script multi`,
+      category: "low",
+      title: `${input.winnerName} — safe build`,
       legs: [
         { pick: `${input.winnerName} to win`, decimalOdds: winnerPrice },
-        { pick: `${input.winnerName} winning margin ${input.marginBucket}`, decimalOdds: marginOdds },
-        { pick: totalPickLabel, decimalOdds: 1.9 },
-        { pick: input.htftPick, decimalOdds: 2.45 },
-        { pick: `${input.gameScriptAnytimeA} anytime tryscorer`, decimalOdds: anytimeA.price },
-        { pick: `${input.gameScriptAnytimeB} anytime tryscorer`, decimalOdds: anytimeC.price },
+        { pick: totalPickLabel, decimalOdds: totalOddsApprox },
+        { pick: `${aA.name} anytime tryscorer`, decimalOdds: aA.price },
       ],
       combinedOdds: 1,
       estimatedOdds: "$0.00",
       stake: "$10",
       potentialReturn: "$0.00",
-      reasoning: `${input.winnerName} are the cleaner base result and the try angles line up with the same territory script — the multi lands if the headline read plays out.`,
+      reasoning: `${input.winnerName} are the cleanest base read in the simulation, and ${aA.name} sits in the dominant attacking lane. Total leg leans on the projected scoring environment — concentrated on hit-rate over payout.`,
+      hitRateScore: scriptStrength === "strong" ? 78 : 70,
+      scriptAlignment: `dominance + total convergence`,
     },
     {
-      category: "smallStake",
-      title: `$5 → $100 builder`,
+      category: "medium",
+      title: `${input.winnerName} script-aligned 4-leg`,
       legs: [
         { pick: `${input.winnerName} to win`, decimalOdds: winnerPrice },
-        { pick: `${anytimeA.name} anytime tryscorer`, decimalOdds: anytimeA.price },
-        { pick: `${input.winnerName} winning margin ${input.marginBucket}`, decimalOdds: marginOdds },
-      ],
-      combinedOdds: 1,
-      estimatedOdds: "$0.00",
-      stake: "$5",
-      potentialReturn: "$0.00",
-      reasoning: `A $5 stake aiming around $100 — the favourite + a margin bucket gives the multiplier the legs need, with the safest tryscorer locking it in.`,
-    },
-    {
-      category: "mediumStake",
-      title: `$10 → $500 multi`,
-      legs: [
-        { pick: `${input.winnerName} to win`, decimalOdds: winnerPrice },
-        { pick: totalPickLabel, decimalOdds: 1.9 },
-        { pick: `${anytimeA.name} anytime tryscorer`, decimalOdds: anytimeA.price },
-        { pick: `${anytimeB.name} anytime tryscorer`, decimalOdds: anytimeB.price },
+        { pick: totalPickLabel, decimalOdds: totalOddsApprox },
+        { pick: `${aA.name} anytime tryscorer`, decimalOdds: aA.price },
+        { pick: `${aB.name} anytime tryscorer`, decimalOdds: aB.price },
       ],
       combinedOdds: 1,
       estimatedOdds: "$0.00",
       stake: "$10",
       potentialReturn: "$0.00",
-      reasoning: `Two strong tryscorers do the heavy lifting on the multiplier — the favourite and the total are the safety rails.`,
+      reasoning: `Balanced multi: the favourite + total combine for the safety rails, and two anytime tryscorers in the same edge attack lane do the heavy lifting on the multiplier. Drops if ${input.winnerName} can't impose territory.`,
+      hitRateScore: scriptStrength === "strong" ? 62 : 54,
+      scriptAlignment: `dominance + edge attack stack`,
     },
     {
-      category: "bigStake",
-      title: `$20 → $1,000 stack`,
+      category: "high",
+      title: `Correlated stack — ${input.winnerName} dominance`,
       legs: [
         { pick: `${input.winnerName} to win`, decimalOdds: winnerPrice },
         { pick: `${input.winnerName} winning margin ${input.marginBucket}`, decimalOdds: marginOdds },
-        { pick: `${anytimeA.name} anytime tryscorer`, decimalOdds: anytimeA.price },
-        { pick: `${anytimeB.name} anytime tryscorer`, decimalOdds: anytimeB.price },
-        { pick: totalPickLabel, decimalOdds: 1.9 },
-      ],
-      combinedOdds: 1,
-      estimatedOdds: "$0.00",
-      stake: "$20",
-      potentialReturn: "$0.00",
-      reasoning: `$20 to chase a grand — the bigger stake means we don't need a moonshot multiplier, just five clean legs that lean the right way.`,
-    },
-    {
-      category: "getThea",
-      title: `Get Thea mega swing`,
-      legs: [
-        { pick: `${input.winnerName} winning margin ${input.marginBucket}`, decimalOdds: marginOdds },
-        { pick: input.htftPick, decimalOdds: 3.8 },
-        { pick: totalPickLabel, decimalOdds: 1.9 },
-        { pick: `${anytimeA.name} anytime tryscorer`, decimalOdds: anytimeA.price },
+        { pick: totalPickLabel, decimalOdds: totalOddsApprox },
+        { pick: `${aA.name} anytime tryscorer`, decimalOdds: aA.price },
+        { pick: `${aB.name} anytime tryscorer`, decimalOdds: aB.price },
         { pick: `${input.multiTryName} 2+ tries`, decimalOdds: input.multiTryPrice },
       ],
       combinedOdds: 1,
       estimatedOdds: "$0.00",
-      stake: "$5",
-      potentialReturn: "$0.00",
-      reasoning: `This leans hard into the same field-position story and asks the headline finisher to cash in twice — $5 chasing five figures if the script lands.`,
-    },
-    {
-      category: "anytimeMulti",
-      title: `Anytime tryscorer 4-leg`,
-      legs: [
-        { pick: `${anytimeA.name} anytime tryscorer`, decimalOdds: anytimeA.price },
-        { pick: `${anytimeB.name} anytime tryscorer`, decimalOdds: anytimeB.price },
-        { pick: `${anytimeC.name} anytime tryscorer`, decimalOdds: anytimeC.price },
-        { pick: `${anytimeD.name} anytime tryscorer`, decimalOdds: anytimeD.price },
-      ],
-      combinedOdds: 1,
-      estimatedOdds: "$0.00",
       stake: "$10",
       potentialReturn: "$0.00",
-      reasoning: `Pure anytime tryscorer multi — spreads exposure across both sides' best finishing lanes rather than needing a perfect margin read.`,
+      reasoning: `Aggressive same-game stack — every leg points at the same script: ${input.winnerName} controlling territory, hitting the margin bucket, and ${input.multiTryName} cashing in twice when the dominant edge cracks open. Lands together or not at all.`,
+      hitRateScore: scriptStrength === "strong" ? 42 : 32,
+      scriptAlignment: `dominance + margin + try-flow correlation`,
     },
     {
-      category: "multiTryStack",
-      title: `Multi-try stack — 2+ tries`,
+      category: "ultra",
+      title: `Ultra — extreme script outcome`,
       legs: [
+        { pick: `${input.winnerName} winning margin 13+`, decimalOdds: 1.95 },
+        { pick: `${input.winnerName} winning margin ${input.marginBucket === "13+" ? "13-24" : input.marginBucket}`, decimalOdds: marginOdds },
+        { pick: input.htftPick, decimalOdds: 2.6 },
+        { pick: totalPickLabel, decimalOdds: totalOddsApprox },
+        { pick: `${aA.name} 2+ tries`, decimalOdds: multiB },
+        { pick: `${aB.name} 2+ tries`, decimalOdds: multiC },
         { pick: `${input.multiTryName} 2+ tries`, decimalOdds: input.multiTryPrice },
-        { pick: `${anytimeA.name} 2+ tries`, decimalOdds: Math.max(input.multiTryPrice * 0.9, 4) },
-        { pick: `${anytimeB.name} 2+ tries`, decimalOdds: Math.max(input.multiTryPrice * 1.1, 5) },
       ],
       combinedOdds: 1,
       estimatedOdds: "$0.00",
       stake: "$10",
       potentialReturn: "$0.00",
-      reasoning: `Three players in high-volume scoring lanes to bag doubles — needs the favourite to dominate territory but the payout justifies the swing.`,
-    },
-    {
-      category: "pointsParty",
-      title: `Points + tryscorer combo`,
-      legs: [
-        { pick: totalPickLabel, decimalOdds: 1.9 },
-        { pick: `${anytimeA.name} anytime tryscorer`, decimalOdds: anytimeA.price },
-        { pick: `${anytimeB.name} anytime tryscorer`, decimalOdds: anytimeB.price },
-      ],
-      combinedOdds: 1,
-      estimatedOdds: "$0.00",
-      stake: "$10",
-      potentialReturn: "$0.00",
-      reasoning: `If the scoring environment plays out as projected, the over and the two finishers from the team most likely to score it all come together.`,
-    },
-    {
-      category: "upset",
-      title: `${input.loserName} upset single`,
-      legs: [{ pick: `${input.loserName} to win`, decimalOdds: loserPrice }],
-      combinedOdds: 1,
-      estimatedOdds: "$0.00",
-      stake: "$20",
-      potentialReturn: "$0.00",
-      reasoning: `If the favourite coughs up discipline and territory, the underdog price is the clean contrarian angle.`,
-    },
-    {
-      category: "bookieFear",
-      title: `Public pain builder`,
-      legs: [
-        { pick: `${input.winnerName} to win`, decimalOdds: winnerPrice },
-        { pick: `${anytimeA.name} anytime tryscorer`, decimalOdds: anytimeA.price },
-        { pick: `${anytimeB.name} anytime tryscorer`, decimalOdds: anytimeB.price },
-        { pick: `${anytimeC.name} anytime tryscorer`, decimalOdds: anytimeC.price },
-      ],
-      combinedOdds: 1,
-      estimatedOdds: "$0.00",
-      stake: "$10",
-      potentialReturn: "$0.00",
-      reasoning: `The result the books fear — public route plus three of the cleanest try names landing all at once.`,
-    },
-    {
-      category: "firstTryscorer",
-      title: `${input.firstTryName} first try`,
-      legs: [{ pick: `${input.firstTryName} first tryscorer`, decimalOdds: input.firstTryPrice }],
-      combinedOdds: 1,
-      estimatedOdds: "$0.00",
-      stake: "$5",
-      potentialReturn: "$0.00",
-      reasoning: `The early-script angle points to this edge being the first clean strike chance of the night.`,
+      reasoning: `Extreme variance scenario — needs ${input.winnerName} to fully impose the script, with multiple finishers cashing doubles. Big margins + HT/FT + stacked 2+ tries — the rare game where everything aligns.`,
+      hitRateScore: scriptStrength === "strong" ? 14 : 8,
+      scriptAlignment: `extreme dominance + scoring flood`,
     },
   ];
 }
@@ -1830,7 +1765,7 @@ function buildToolDef() {
         properties: {
           payload: {
             type: "string",
-            description: "A raw JSON string for the FULL insights object requested in the prompt. No markdown fences. The JSON inside payload must include: intelligence (matchOverview, teamProfile, attackingStructure, defensiveWeaknesses, keyMatchups, gameScript [5 phases], playerInfluence, historicalContext, contextualFactors, rareEventNote, insightSummary), simulation (profile {tempo, tempoNote, dominance, dominanceNote, territoryBalance, scoringPattern, scoringPatternNote, edgeAttack {left, right, middle, note}, defensiveZones, expectedTotalRange {low, high, midpoint}}, summary, recommendedPlays [6-10 with market, pick, decimalOdds, modelProbability, impliedProbability, edgePct, confidence, rationale, scriptAlignment], rankedTryscorers [4-8 with name, team, position, market, decimalOdds, scores {pais, ttcp, matchupExploit, scriptFit, value}, totalScore, confidence, rationale, stackable], correlatedAngle, scriptCaveat), predictedScore, winner, margin, total, htft, firstTryscorer, anytimeTryscorers, multiTryscorer, keysToVictory, keyFactors, weaknessExploit, bets, gameFlow, tryscorerScript, and script."
+            description: "A raw JSON string for the FULL insights object requested in the prompt. No markdown fences. The JSON inside payload must include: intelligence (matchOverview, teamProfile, attackingStructure, defensiveWeaknesses, keyMatchups, gameScript [5 phases], playerInfluence, historicalContext, contextualFactors, rareEventNote, insightSummary), simulation (profile {tempo, tempoNote, dominance, dominanceNote, territoryBalance, scoringPattern, scoringPatternNote, edgeAttack {left, right, middle, note}, defensiveZones, expectedTotalRange {low, high, midpoint}}, summary, recommendedPlays [6-10 with market, pick, decimalOdds, modelProbability, impliedProbability, edgePct, confidence, rationale, scriptAlignment], rankedTryscorers [4-8 with name, team, position, market, decimalOdds, scores {pais, ttcp, matchupExploit, scriptFit, value}, totalScore, confidence, rationale, stackable], correlatedAngle, scriptCaveat), predictedScore, winner, margin, total, htft, firstTryscorer, anytimeTryscorers, multiTryscorer, keysToVictory, keyFactors, weaknessExploit, bets (EXACTLY 4 entries — one per category 'low'|'medium'|'high'|'ultra' — each with category, title, legs[{pick, decimalOdds}], combinedOdds, estimatedOdds, stake, potentialReturn, reasoning, hitRateScore, scriptAlignment), gameFlow, tryscorerScript, and script."
           },
         },
         required: ["payload"],
@@ -1884,40 +1819,24 @@ function normaliseBetMath(ins: Insights): Insights {
   };
 
   const defaultStakes: Partial<Record<BetCategoryKey, string>> = {
-    gameScript: "$10",
-    smallStake: "$5",
-    mediumStake: "$10",
-    bigStake: "$20",
-    getThea: "$5",
-    anytimeMulti: "$10",
-    multiTryStack: "$10",
-    pointsParty: "$10",
-    upset: "$20",
-    bookieFear: "$10",
-    firstTryscorer: "$5",
+    low: "$10",
+    medium: "$10",
+    high: "$10",
+    ultra: "$10",
   };
-  const betOrder: BetCategoryKey[] = [
-    "gameScript",
-    "smallStake",
-    "mediumStake",
-    "bigStake",
-    "getThea",
-    "anytimeMulti",
-    "multiTryStack",
-    "pointsParty",
-    "upset",
-    "bookieFear",
-    "firstTryscorer",
-  ];
+  const betOrder: BetCategoryKey[] = ["low", "medium", "high", "ultra"];
 
   if (Array.isArray(ins.bets)) {
-    ins.bets = ins.bets.map((b, index) => {
+    // Group by category — keep ONE slip per tier (the first valid one).
+    const byCat = new Map<BetCategoryKey, BetPlay>();
+    ins.bets.forEach((b, index) => {
       const cat = betOrder.includes(b?.category as BetCategoryKey)
-        ? b.category as BetCategoryKey
-        : betOrder[index] ?? "smallStake";
-      const stake = b.stake || defaultStakes[cat] || "$5";
+        ? (b.category as BetCategoryKey)
+        : betOrder[index] ?? "medium";
+      if (byCat.has(cat)) return; // first one wins
+      const stake = b.stake || defaultStakes[cat] || "$10";
       const fixed = fixMulti({ ...b, stake });
-      return {
+      byCat.set(cat, {
         category: cat,
         title: b.title || "",
         reasoning: b.reasoning || "",
@@ -1926,8 +1845,12 @@ function normaliseBetMath(ins: Insights): Insights {
         estimatedOdds: fmtOdds(fixed.combinedOdds),
         stake,
         potentialReturn: fmtMoney(fixed._return),
-      };
+        hitRateScore: typeof b.hitRateScore === "number" ? Math.max(0, Math.min(100, Math.round(b.hitRateScore))) : undefined,
+        scriptAlignment: typeof b.scriptAlignment === "string" ? b.scriptAlignment : undefined,
+        legCount: fixed.legs.length,
+      });
     });
+    ins.bets = betOrder.map((c) => byCat.get(c)).filter(Boolean) as BetPlay[];
   }
 
   return ins;

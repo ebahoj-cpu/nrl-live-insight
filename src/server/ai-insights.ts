@@ -2284,11 +2284,29 @@ function normaliseBetMath(ins: Insights): Insights {
     return `$${n.toFixed(2)}`;
   };
 
+  // Build a normalised signature so duplicate legs (same pick, casing/quote
+  // variants) are dropped before we compute combined odds. This is what made
+  // ultra slips show e.g. "Brian To'o 2+ tries" twice and overstate payouts.
+  const legSig = (pick: string) => pick
+    .toLowerCase()
+    .replace(/[’]/g, "'")
+    .replace(/\s+/g, " ")
+    .trim();
+
   const fixMulti = <T extends { legs: BetLeg[]; stake: string; combinedOdds?: number }>(b: T) => {
-    const legs = (b.legs || []).map((l) => ({
-      pick: String(l.pick || ""),
-      decimalOdds: Math.max(1.01, Number(l.decimalOdds) || 1.01),
-    }));
+    const seen = new Set<string>();
+    const legs: BetLeg[] = [];
+    for (const l of b.legs || []) {
+      const pick = String(l?.pick ?? "").trim();
+      if (!pick) continue;
+      const sig = legSig(pick);
+      if (seen.has(sig)) continue;
+      seen.add(sig);
+      legs.push({
+        pick,
+        decimalOdds: Math.max(1.01, Number(l?.decimalOdds) || 1.01),
+      });
+    }
     const combined = legs.reduce((acc, l) => acc * l.decimalOdds, 1);
     const stakeNum = parseStake(b.stake);
     const ret = stakeNum * combined;

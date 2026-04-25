@@ -2,7 +2,8 @@
 // Uses tool-calling for structured output. Receives ONLY real data summaries.
 
 const GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
-const MODEL = "google/gemini-2.5-pro";
+const MODEL = "google/gemini-2.5-flash";
+const TIMEOUT_MS = 35_000; // hard cap so the whole match page never hangs
 
 export type BettingAngle = {
   market: string;
@@ -155,9 +156,14 @@ ON TOP OF THAT, generate ONE standalone "getTheaSpecial" — the GET THEA bet:
 
   ].filter(Boolean).join("\n");
 
-  const res = await fetch(GATEWAY, {
-    method: "POST",
-    headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
+  const ac = new AbortController();
+  const t = setTimeout(() => ac.abort(), TIMEOUT_MS);
+  let res: Response;
+  try {
+    res = await fetch(GATEWAY, {
+      method: "POST",
+      signal: ac.signal,
+      headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
     body: JSON.stringify({
       model: MODEL,
       max_tokens: 8000,
@@ -394,7 +400,13 @@ ON TOP OF THAT, generate ONE standalone "getTheaSpecial" — the GET THEA bet:
       }],
       tool_choice: { type: "function", function: { name: "emit_insights" } },
     }),
-  });
+    });
+  } catch (e) {
+    clearTimeout(t);
+    if (ac.signal.aborted) throw new Error(`AI insights timed out after ${TIMEOUT_MS / 1000}s`);
+    throw e;
+  }
+  clearTimeout(t);
 
   if (res.status === 429) throw new Error("AI rate limit exceeded; try again shortly");
   if (res.status === 402) throw new Error("AI credits exhausted; add credits in Settings → Workspace → Usage");

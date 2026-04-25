@@ -772,23 +772,22 @@ function normaliseBetMath(ins: Insights): Insights {
     firstTryscorer: "$5",
   };
 
-  if (ins.bets && typeof ins.bets === "object") {
-    const out: Record<string, BetPlay> = {};
-    for (const [k, b] of Object.entries(ins.bets)) {
-      if (!b) continue;
-      const stake = (b as BetPlay).stake || defaultStakes[k as BetCategoryKey] || "$5";
-      const fixed = fixMulti({ ...(b as BetPlay), stake });
-      out[k] = {
-        title: (b as BetPlay).title || "",
-        reasoning: (b as BetPlay).reasoning || "",
+  if (Array.isArray(ins.bets)) {
+    ins.bets = ins.bets.map((b) => {
+      const cat = b.category as BetCategoryKey;
+      const stake = b.stake || defaultStakes[cat] || "$5";
+      const fixed = fixMulti({ ...b, stake });
+      return {
+        category: cat,
+        title: b.title || "",
+        reasoning: b.reasoning || "",
         legs: fixed.legs,
         combinedOdds: fixed.combinedOdds,
         estimatedOdds: fmtOdds(fixed.combinedOdds),
         stake,
         potentialReturn: fmtMoney(fixed._return),
       };
-    }
-    ins.bets = out as Insights["bets"];
+    });
   }
 
   return ins;

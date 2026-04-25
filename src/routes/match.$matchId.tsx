@@ -468,9 +468,9 @@ function SeasonStats({ team, row }: { team: any; row?: any }) {
         <div className="text-xs text-muted-foreground mb-4">No 2026 ladder data yet.</div>
       )}
 
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center justify-between mb-1">
         <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Form · Last 5</div>
-        {team.recentForm.length > 0 && (
+        {team.recentForm.length > 0 ? (
           <div className="flex gap-1">
             {team.recentForm.slice(0, 5).map((f: any, i: number) => (
               <span
@@ -488,20 +488,10 @@ function SeasonStats({ team, row }: { team: any; row?: any }) {
               </span>
             ))}
           </div>
+        ) : (
+          <div className="text-[11px] text-muted-foreground">—</div>
         )}
       </div>
-      {team.recentForm.length === 0 ? (
-        <div className="text-xs text-muted-foreground">No recent matches.</div>
-      ) : (
-        <div className="space-y-1.5">
-          {team.recentForm.slice(0, 5).map((f: any, i: number) => (
-            <div key={i} className="flex items-center justify-between text-xs py-1 border-b border-border last:border-0">
-              <span className="text-muted-foreground truncate pr-2">{f.summary}</span>
-              <span className={`kbd font-bold shrink-0 ${f.result === "Won" ? "text-accent" : f.result === "Lost" ? "text-danger" : ""}`}>{f.score}</span>
-            </div>
-          ))}
-        </div>
-      )}
     </Card>
   );
 }

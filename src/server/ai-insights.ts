@@ -34,6 +34,20 @@ export type Insights = {
   multiTryscorer: { pick: string; reasoning: string; confidence: number };
   keysToVictory: { home: string[]; away: string[] };
   keyFactors: string[];
+  weaknessExploit: {
+    home: {
+      opponentWeakness: string;          // e.g. "Roosters concede right-edge tries — missed tackle % at left centre"
+      targetArea: string;                // e.g. "Right edge attack, 20m channel"
+      tacticalPlan: string;              // 2-3 sentences how home team exploits it
+      playersToWatch: { name: string; role: string; why: string }[]; // 3 players
+    };
+    away: {
+      opponentWeakness: string;
+      targetArea: string;
+      tacticalPlan: string;
+      playersToWatch: { name: string; role: string; why: string }[];
+    };
+  };
   betSuggestions: BetSuggestion[];
   script: {
     headToHead: string;

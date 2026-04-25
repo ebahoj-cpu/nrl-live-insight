@@ -156,9 +156,14 @@ ON TOP OF THAT, generate ONE standalone "getTheaSpecial" — the GET THEA bet:
 
   ].filter(Boolean).join("\n");
 
-  const res = await fetch(GATEWAY, {
-    method: "POST",
-    headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
+  const ac = new AbortController();
+  const t = setTimeout(() => ac.abort(), TIMEOUT_MS);
+  let res: Response;
+  try {
+    res = await fetch(GATEWAY, {
+      method: "POST",
+      signal: ac.signal,
+      headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
     body: JSON.stringify({
       model: MODEL,
       max_tokens: 8000,

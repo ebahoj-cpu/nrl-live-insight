@@ -66,30 +66,32 @@ export function MatchCard({ fixture, odds }: { fixture: NrlFixture & { weather?:
     <Link
       to="/match/$matchId"
       params={{ matchId: fixture.matchId }}
-      className="glass p-5 hover:border-accent/50 transition group block flex flex-col h-full"
+      className="card-surface p-5 hover:border-accent/50 transition group block flex flex-col h-full"
     >
-      {/* Meta row — date · time · venue */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground mb-5">
-        <span className="inline-flex items-center gap-1.5">
-          <Calendar className="h-3.5 w-3.5 shrink-0 text-accent" />
-          <span>{formatDate(fixture.kickoffUtc)}</span>
-        </span>
-        <span className="inline-flex items-center gap-1.5">
-          <Clock className="h-3.5 w-3.5 shrink-0 text-accent" />
-          <span className="kbd">{formatTime(fixture.kickoffUtc)}</span>
-        </span>
-        <span className="inline-flex items-center gap-1.5 min-w-0">
-          <MapPin className="h-3.5 w-3.5 shrink-0 text-accent" />
-          <span className="truncate">{fixture.venue}</span>
-        </span>
-        {(isFinished || isLive) && (
-          <span className={`inline-flex items-center gap-1 font-bold uppercase tracking-wider text-[10px] px-2 py-0.5 rounded-md ${
-            isLive ? "bg-danger/15 text-danger" : "bg-surface-2 text-muted-foreground"
-          }`}>
-            {isLive && <span className="h-1.5 w-1.5 rounded-full bg-danger animate-pulse" />}
-            {isLive ? "Live" : "Full Time"}
+      {/* Meta — day/date/time centered on top, venue below */}
+      <div className="text-xs text-muted-foreground mb-5 space-y-1.5">
+        <div className="flex items-center justify-center flex-wrap gap-x-3 gap-y-1">
+          <span className="inline-flex items-center gap-1.5">
+            <Calendar className="h-3.5 w-3.5 shrink-0 text-accent" />
+            <span>{formatDate(fixture.kickoffUtc)}</span>
           </span>
-        )}
+          <span className="inline-flex items-center gap-1.5">
+            <Clock className="h-3.5 w-3.5 shrink-0 text-accent" />
+            <span className="kbd">{formatTime(fixture.kickoffUtc)}</span>
+          </span>
+          {isLive && (
+            <span className="inline-flex items-center gap-1 font-bold uppercase tracking-wider text-[10px] px-2 py-0.5 rounded-md bg-danger/15 text-danger">
+              <span className="h-1.5 w-1.5 rounded-full bg-danger animate-pulse" />
+              Live
+            </span>
+          )}
+        </div>
+        <div className="flex items-center justify-center min-w-0">
+          <span className="inline-flex items-center gap-1.5 min-w-0">
+            <MapPin className="h-3.5 w-3.5 shrink-0 text-accent" />
+            <span className="truncate">{fixture.venue}</span>
+          </span>
+        </div>
       </div>
 
       {/* Teams + odds OR scores */}

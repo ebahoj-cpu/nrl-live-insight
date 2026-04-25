@@ -912,19 +912,19 @@ function StatsComparePanel({ home, away, homeRow, awayRow, model }:
         <div className="text-[10px] uppercase tracking-wider text-muted-foreground text-center">Metric</div>
         <div className="text-left text-xs font-bold truncate">{away.nickName}</div>
 
-        <CompareRow label="Record" h={homeRow ? `${homeRow.wins}W-${homeRow.losses}L` : "–"} a={awayRow ? `${awayRow.wins}W-${awayRow.losses}L` : "–"} hWin={(homeRow?.wins ?? 0) > (awayRow?.wins ?? 0)} aWin={(awayRow?.wins ?? 0) > (homeRow?.wins ?? 0)} />
-        <CompareRow label="Ladder" h={homeRow?.position ? `${homeRow.position}` : "–"} a={awayRow?.position ? `${awayRow.position}` : "–"} hWin={(homeRow?.position ?? 99) < (awayRow?.position ?? 99)} aWin={(awayRow?.position ?? 99) < (homeRow?.position ?? 99)} />
-        <CompareRow label="Pts / game" h={ppg(homeRow)} a={ppg(awayRow)} hWin={(homeRow?.for ?? 0) > (awayRow?.for ?? 0)} aWin={(awayRow?.for ?? 0) > (homeRow?.for ?? 0)} />
-        <CompareRow label="Conceded / game" h={cpg(homeRow)} a={cpg(awayRow)} hWin={(homeRow?.against ?? 0) < (awayRow?.against ?? 0)} aWin={(awayRow?.against ?? 0) < (homeRow?.against ?? 0)} />
-        <CompareRow label="Win %" h={winPct(homeRow)} a={winPct(awayRow)} hWin={(homeRow?.wins ?? 0) > (awayRow?.wins ?? 0)} aWin={(awayRow?.wins ?? 0) > (homeRow?.wins ?? 0)} />
-        <CompareRow label="Avg margin" h={margin(homeRow)} a={margin(awayRow)} hWin={(homeRow?.diff ?? -99) > (awayRow?.diff ?? -99)} aWin={(awayRow?.diff ?? -99) > (homeRow?.diff ?? -99)} />
-        <CompareRow label="Strength" h={`${model.homeScore}`} a={`${model.awayScore}`} hWin={model.homeScore > model.awayScore} aWin={model.awayScore > model.homeScore} />
+        <InsightCompareRow label="Record" h={homeRow ? `${homeRow.wins}W-${homeRow.losses}L` : "–"} a={awayRow ? `${awayRow.wins}W-${awayRow.losses}L` : "–"} hWin={(homeRow?.wins ?? 0) > (awayRow?.wins ?? 0)} aWin={(awayRow?.wins ?? 0) > (homeRow?.wins ?? 0)} />
+        <InsightCompareRow label="Ladder" h={homeRow?.position ? `${homeRow.position}` : "–"} a={awayRow?.position ? `${awayRow.position}` : "–"} hWin={(homeRow?.position ?? 99) < (awayRow?.position ?? 99)} aWin={(awayRow?.position ?? 99) < (homeRow?.position ?? 99)} />
+        <InsightCompareRow label="Pts / game" h={ppg(homeRow)} a={ppg(awayRow)} hWin={(homeRow?.for ?? 0) > (awayRow?.for ?? 0)} aWin={(awayRow?.for ?? 0) > (homeRow?.for ?? 0)} />
+        <InsightCompareRow label="Conceded / game" h={cpg(homeRow)} a={cpg(awayRow)} hWin={(homeRow?.against ?? 0) < (awayRow?.against ?? 0)} aWin={(awayRow?.against ?? 0) < (homeRow?.against ?? 0)} />
+        <InsightCompareRow label="Win %" h={winPct(homeRow)} a={winPct(awayRow)} hWin={(homeRow?.wins ?? 0) > (awayRow?.wins ?? 0)} aWin={(awayRow?.wins ?? 0) > (homeRow?.wins ?? 0)} />
+        <InsightCompareRow label="Avg margin" h={margin(homeRow)} a={margin(awayRow)} hWin={(homeRow?.diff ?? -99) > (awayRow?.diff ?? -99)} aWin={(awayRow?.diff ?? -99) > (homeRow?.diff ?? -99)} />
+        <InsightCompareRow label="Strength" h={`${model.homeScore}`} a={`${model.awayScore}`} hWin={model.homeScore > model.awayScore} aWin={model.awayScore > model.homeScore} />
       </div>
     </Card>
   );
 }
 
-function CompareRow({ label, h, a, hWin, aWin }: { label: string; h: string; a: string; hWin?: boolean; aWin?: boolean }) {
+function InsightCompareRow({ label, h, a, hWin, aWin }: { label: string; h: string; a: string; hWin?: boolean; aWin?: boolean }) {
   return (
     <>
       <div className={`kbd text-right text-sm font-bold py-1.5 ${hWin ? "text-accent" : "text-foreground"}`}>{h}</div>

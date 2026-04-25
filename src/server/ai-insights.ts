@@ -107,6 +107,12 @@ Then produce a deep "script" with these distinct sections:
 
 Also produce a "bookieScript": from a sharp Australian bookmaker's perspective, which result/outcome they WANT to land (limits liability, public is on the other side), which result they want to AVOID (heavy public liability), and a one-sentence summary of where their book is most exposed.
 
+ALSO produce a "weaknessExploit" for EACH team. For each side identify:
+- opponentWeakness: a specific defensive flaw in the OPPOSITION based on recent form / known matchup data — e.g. "right-edge defence leaking tries", "high missed-tackle rate at left centre", "ruck speed dropping in second half", "kick-return metres conceded", "pivot's defensive read on shape plays". Cite the side conceding it.
+- targetArea: the part of the field / channel / phase the team should attack — e.g. "Right edge 20m channel", "Inside ball off the ruck", "Bomb contests on the left wing", "Short side attack from scrum".
+- tacticalPlan: 2-3 sentences on HOW this team weaponises that weakness — shape, ball-runners, kicking game, set-piece.
+- playersToWatch: exactly 3 NAMED squad players from THIS team most likely to score or directly influence scoring against that weakness — for each give role (e.g. "fullback", "right centre", "halfback") and a one-sentence why (form, matchup advantage, kick targets, line-running role into that channel). Use only players from the named squad above.
+
 FINALLY, generate exactly 3 betSuggestions — one for EACH target payout tier: $100, $1,000, and $10,000. Each suggestion is a small multi (2-4 legs) combining real squad players, head-to-head winner, margin BUCKETS, totals or tryscorer markets.
 
 CRITICAL betting rules:

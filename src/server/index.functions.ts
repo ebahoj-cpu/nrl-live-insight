@@ -9,7 +9,7 @@
 //     in memory so we degrade to cached data instead of empty state.
 
 import { createServerFn } from "@tanstack/react-start";
-import { cached, TTL } from "./cache";
+import { cached, peekCache, TTL } from "./cache";
 import { fetchDraw, fetchLadder, fetchMatchDetails, fetchMatchRecap, type NrlMatchRecap } from "./nrl";
 import { fetchNrlOdds, fetchEventOdds, fetchTryscorerOdds, type OddsEvent, type TryscorerMarkets } from "./odds";
 import { generateInsights } from "./ai-insights";

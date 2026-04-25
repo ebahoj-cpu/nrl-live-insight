@@ -27,11 +27,31 @@ export function peekCache<T>(key: string): T | undefined {
   return undefined;
 }
 
+// Insights-specific TTL: long-lived once generated, short refresh window inside
+// the final hour before kickoff so late team / odds / weather changes can land.
+//   - >24h to kickoff:  cache 24h (rare — most viewers hit closer to game day)
+//   - 1h–24h:           cache until T-60min so the final-hour refresh fires
+//   - 0–60min pre-game: cache 20min so very-late changes (lineup outs) reflect
+//   - kickoff or later: cache 7 days — match is locked, never regenerate
+export function insightsTtlMs(kickoffUtc: string): number {
+  const ko = Date.parse(kickoffUtc);
+  if (!Number.isFinite(ko)) return 60 * 60_000;
+  const now = Date.now();
+  const msToKickoff = ko - now;
+  const ONE_HOUR = 60 * 60_000;
+  const ONE_DAY = 24 * ONE_HOUR;
+  const SEVEN_DAYS = 7 * ONE_DAY;
+  if (msToKickoff <= 0) return SEVEN_DAYS;     // post-kickoff lock
+  if (msToKickoff <= ONE_HOUR) return 20 * 60_000;
+  if (msToKickoff <= ONE_DAY) return msToKickoff - ONE_HOUR; // expire at T-60min
+  return ONE_DAY;
+}
+
 export const TTL = {
   fixtures: 15 * 60_000,
   ladder: 30 * 60_000,
   match: 10 * 60_000,
   odds: 5 * 60_000,
-  insights: 60 * 60_000,
+  insights: 60 * 60_000, // legacy default; prefer insightsTtlMs(kickoffUtc)
   weather: 30 * 60_000,
 };

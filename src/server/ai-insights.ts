@@ -2,8 +2,12 @@
 // Uses tool-calling for structured output. Receives ONLY real data summaries.
 
 const GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
-const MODEL = "google/gemini-3-flash-preview";
-const TIMEOUT_MS = 11_000; // stay comfortably inside the server function timeout budget
+// Use the strongest reasoning model — insights are generated ONCE per match
+// and cached until ~1h before kickoff, so the extra latency/cost is paid once
+// and the user gets the sharpest possible read for their bets.
+const MODEL = "google/gemini-2.5-pro";
+const FALLBACK_MODEL = "google/gemini-3-flash-preview";
+const TIMEOUT_MS = 55_000; // pro model needs more headroom; still inside Worker budget
 
 export type BettingAngle = {
   market: string;
@@ -167,7 +171,11 @@ export async function generateInsights(payload: {
     `Live AU bookie odds summary: ${payload.oddsSummary}`,
     realOddsBlock,
     payload.weatherSummary ? `Forecast at venue at kickoff: ${payload.weatherSummary}` : "",
-    `Provide a sharp, complete NRL betting analysis covering: winner, margin, HT/FT double, total points, first/anytime tryscorers, and multi-tryscorer angles. Also produce 3 specific "keys to victory" for EACH team (concrete tactical/structural points referencing real squad players, recent form, opposition weakness, or weather/ground impact).
+    `Provide a sharp, complete NRL betting analysis covering: winner, margin, HT/FT double, total points, first/anytime tryscorers, and multi-tryscorer angles.
+
+CRITICAL — every insight must serve a BETTOR reading this to land bets. Tie every observation to a specific market: who wins, who covers, who scores, when momentum swings, where the value sits.
+
+Now produce 3 specific "keys to victory" for EACH team. These MUST be DIFFERENT for each team — NOT mirror images. Each team's keys are based on THEIR OWN strengths and HOW THEY can beat THIS specific opponent. Reference real squad players by name, real recent form trends, real opposition weaknesses, and real weather/ground impact. NEVER produce keys that are literally the same point with team names swapped (e.g. "Win the kick-and-chase so X start sets in their own half" used for both sides — that is forbidden). Each key should pick a different lever: e.g. one about set-piece attack from a specific named player, one about defensive structure exploiting a specific opposition weakness, one about game-management (kicking, ruck speed, completion).
 
 Then produce a deep "script" with these distinct sections:
 - headToHead: 3-5 sentences. Recent H2H meetings, score trends, venue history at THIS ground, who has owned the rivalry lately, and any tactical pattern that has decided recent matchups.
@@ -186,10 +194,10 @@ ALSO produce a "matchFix" — a tongue-in-cheek "how the NRL would script this g
 - conspiracyRating: 0-100 "how scripted does this feel?" meter (most matches sit 30-60 — a marquee finals race or grand-final rematch can sit higher).
 
 
-ALSO produce a "weaknessExploit" for EACH team. For each side identify:
-- opponentWeaknesses: an array of EXACTLY 3 distinct, specific defensive flaws in the OPPOSITION based on recent form / known matchup data. Each one a concrete short phrase, e.g. "Right-edge defence leaking tries — missed tackle % at left centre", "Ruck speed drops sharply in second half", "Vulnerable under high bombs on left wing", "Slow line-speed against shape plays from scrum".
-- targetAreas: an array of 1-3 specific channels / phases / parts of the field to attack — e.g. "Right edge 20m channel", "Inside ball off the ruck", "Bomb contests on the left wing", "Short side from scrum".
-- tacticalPlan: 2-3 sentences on HOW this team weaponises those weaknesses — shape, ball-runners, kicking game, set-piece.
+ALSO produce a "weaknessExploit" for EACH team. The two teams' exploit blocks MUST be DIFFERENT — they target different channels, different phases, different named players, because the two opponents have genuinely different defensive profiles. Do NOT produce mirror-image content with names swapped. For each side identify:
+- opponentWeaknesses: an array of EXACTLY 3 distinct, specific defensive flaws in the OPPOSITION based on recent form / known matchup data. Each one a concrete short phrase, e.g. "Right-edge defence leaking tries — missed tackle % at left centre", "Ruck speed drops sharply in second half", "Vulnerable under high bombs on left wing", "Slow line-speed against shape plays from scrum". The home team's "opponentWeaknesses" describe the AWAY team's flaws; the away team's "opponentWeaknesses" describe the HOME team's flaws — and these should NOT overlap unless both sides genuinely share the same flaw.
+- targetAreas: an array of 1-3 specific channels / phases / parts of the field to attack — e.g. "Right edge 20m channel", "Inside ball off the ruck", "Bomb contests on the left wing", "Short side from scrum". Make these concrete and asymmetric across the two teams.
+- tacticalPlan: 2-3 sentences on HOW this team weaponises those weaknesses — shape, ball-runners, kicking game, set-piece. Tie directly to BETTING value (which markets light up if this plan hits — e.g. "boosts our anytime tryscorer for [name] and over 22.5 first-half points").
 - playersToWatch: exactly 3 NAMED squad players from THIS team most likely to score or directly influence scoring against those weaknesses — for each give role and a one-sentence why. Use only players from the named squad above.
 
 ALSO produce a "gameFlow" object — a quarter-by-quarter script of how the match likely unfolds:
@@ -241,15 +249,23 @@ CRITICAL betting & ODDS-MATH rules — READ CAREFULLY:
     { role: "user", content: prompt },
   ];
 
-  // Keep the AI attempt short; if it misses the platform budget we fall back
-  // to a fast deterministic summary so the tabs still render.
+  // Try the Pro model first for the best analysis. If it fails (timeout, rate
+  // limit, parse error), retry once with the fast Flash model. Only after both
+  // miss do we fall back to the deterministic local summary.
   try {
     const parsed = await callGateway(key, MODEL, messages, toolDef, TIMEOUT_MS);
     return normaliseBetMath(applyRealOdds(parsed, payload.realOdds, payload.homeName, payload.awayName));
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    console.warn(`AI insights: ${MODEL} failed (${msg}); using fast local fallback`);
-    return normaliseBetMath(applyRealOdds(buildFallbackInsights(payload), payload.realOdds, payload.homeName, payload.awayName));
+    console.warn(`AI insights: ${MODEL} failed (${msg}); retrying with ${FALLBACK_MODEL}`);
+    try {
+      const parsed = await callGateway(key, FALLBACK_MODEL, messages, toolDef, 15_000);
+      return normaliseBetMath(applyRealOdds(parsed, payload.realOdds, payload.homeName, payload.awayName));
+    } catch (e2) {
+      const msg2 = e2 instanceof Error ? e2.message : String(e2);
+      console.warn(`AI insights: ${FALLBACK_MODEL} also failed (${msg2}); using local fallback`);
+      return normaliseBetMath(applyRealOdds(buildFallbackInsights(payload), payload.realOdds, payload.homeName, payload.awayName));
+    }
   }
 }
 

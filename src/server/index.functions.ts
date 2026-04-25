@@ -9,7 +9,7 @@
 //     in memory so we degrade to cached data instead of empty state.
 
 import { createServerFn } from "@tanstack/react-start";
-import { cached, peekCache, TTL } from "./cache";
+import { cached, peekCache, TTL, insightsTtlMs } from "./cache";
 import { fetchDraw, fetchLadder, fetchMatchDetails, fetchMatchRecap, type NrlMatchRecap } from "./nrl";
 import { fetchNrlOdds, fetchEventOdds, fetchTryscorerOdds, type OddsEvent, type TryscorerMarkets } from "./odds";
 import { generateInsights, type RealOdds } from "./ai-insights";
@@ -202,7 +202,7 @@ export const getMatchInsights = createServerFn({ method: "GET" })
 
       const insights = await cached(
         `insights:${data.matchId}`,
-        TTL.insights,
+        insightsTtlMs(details.kickoffUtc),
         () => generateInsights({
           homeName: details.homeTeam.nickName,
           awayName: details.awayTeam.nickName,

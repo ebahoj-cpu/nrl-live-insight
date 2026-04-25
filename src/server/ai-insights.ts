@@ -339,15 +339,13 @@ function applyRealOdds(ins: Insights, realOdds: RealOdds | undefined, home: stri
       return real ? { ...l, decimalOdds: real } : l;
     });
 
-  if (Array.isArray(ins.betSuggestions)) {
-    ins.betSuggestions = ins.betSuggestions.map((b) => ({ ...b, legs: fixLegs(b.legs) }));
-  }
-  if (ins.getTheaSpecial) {
-    ins.getTheaSpecial = { ...ins.getTheaSpecial, legs: fixLegs(ins.getTheaSpecial.legs) };
-  }
-  if (ins.upset?.suggestedPlay) {
-    const real = lookup(ins.upset.suggestedPlay.pick);
-    if (real) ins.upset.suggestedPlay = { ...ins.upset.suggestedPlay, decimalOdds: real };
+  if (ins.bets && typeof ins.bets === "object") {
+    const fixed: Record<string, BetPlay> = {};
+    for (const [k, b] of Object.entries(ins.bets)) {
+      if (!b) continue;
+      fixed[k] = { ...(b as BetPlay), legs: fixLegs((b as BetPlay).legs) };
+    }
+    ins.bets = fixed as Insights["bets"];
   }
   return ins;
 }

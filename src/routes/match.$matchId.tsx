@@ -995,6 +995,7 @@ function BetsTab({ insights, insightsError, insightsLoading }: { insights: any; 
   return (
     <div className="space-y-4">
       {insights.getTheaSpecial && <GetTheaCard special={insights.getTheaSpecial} />}
+      {insights.upset && <UpsetCard upset={insights.upset} /> }
 
       {sorted.map((b: any, i: number) => {
         const meta = riskMeta[b.risk] ?? riskMeta.medium;

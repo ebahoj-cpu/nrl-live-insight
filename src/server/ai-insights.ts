@@ -64,14 +64,14 @@ export type Insights = {
   keyFactors: string[];
   weaknessExploit: {
     home: {
-      opponentWeakness: string;          // e.g. "Roosters concede right-edge tries — missed tackle % at left centre"
-      targetArea: string;                // e.g. "Right edge attack, 20m channel"
-      tacticalPlan: string;              // 2-3 sentences how home team exploits it
+      opponentWeaknesses: string[];      // exactly 3 specific defensive flaws in the opposition
+      targetAreas: string[];             // 1-3 channels / phases / areas to attack
+      tacticalPlan: string;              // 2-3 sentences how home team exploits them
       playersToWatch: { name: string; role: string; why: string }[]; // 3 players
     };
     away: {
-      opponentWeakness: string;
-      targetArea: string;
+      opponentWeaknesses: string[];
+      targetAreas: string[];
       tacticalPlan: string;
       playersToWatch: { name: string; role: string; why: string }[];
     };

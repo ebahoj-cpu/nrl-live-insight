@@ -125,12 +125,20 @@ function MatchInner() {
           </div>
           {details.weather && (
             <div className="flex items-center justify-center sm:justify-start gap-2 sm:col-span-2 pt-3 border-t border-border flex-wrap">
-              <CloudSun className="h-4 w-4 text-accent shrink-0" />
-              <span className="text-muted-foreground">
-                {details.weather.tempC}° {shortWeather(details.weather.condition)} · {details.weather.windKph} km/h wind · {details.weather.precipMm}mm rain
+              <span className="inline-flex items-center gap-1.5">
+                <CloudSun className="h-4 w-4 text-accent shrink-0" />
+                <span className="text-muted-foreground" suppressHydrationWarning>
+                  {details.weather.tempC}° {shortWeather(details.weather.condition)}
+                </span>
               </span>
-              <span className="text-muted-foreground">·</span>
-              <span className="font-semibold text-foreground">{details.weather.groundCondition} ground</span>
+              <span className="inline-flex items-center gap-1.5">
+                <Zap className="h-4 w-4 text-accent shrink-0" />
+                <span className="text-muted-foreground">{details.weather.windKph} km/h</span>
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <Activity className="h-4 w-4 text-accent shrink-0" />
+                <span className="text-muted-foreground">{details.weather.groundCondition}</span>
+              </span>
             </div>
           )}
         </div>
@@ -198,9 +206,9 @@ function TabButton({ active, onClick, icon: Icon, label }:
 
 function TeamColumn({ name, themeKey }: { name: string; themeKey: string; position?: string }) {
   return (
-    <div className="flex items-center justify-center gap-2 sm:gap-3 min-w-0">
-      <div className="text-sm sm:text-lg font-bold truncate text-right">{name}</div>
-      <TeamLogo themeKey={themeKey} name={name} size={48} />
+    <div className="flex flex-col items-center justify-center gap-2 min-w-0">
+      <TeamLogo themeKey={themeKey} name={name} size={56} />
+      <div className="text-xs sm:text-sm font-bold text-center leading-tight truncate max-w-full">{name}</div>
     </div>
   );
 }
@@ -327,15 +335,21 @@ function OfficialAvatar({ src, firstName, lastName, size }: { src?: string; firs
 
 function SquadPanel({ team }: { team: { nickName: string; themeKey: string; players: { firstName: string; lastName: string; position: string; jerseyNumber?: number; isCaptain?: boolean }[] } }) {
   const sorted = [...team.players].sort((a, b) => {
-    const ai = POSITION_ORDER.indexOf(a.position);
-    const bi = POSITION_ORDER.indexOf(b.position);
-    return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+    const ai = a.jerseyNumber ?? 999;
+    const bi = b.jerseyNumber ?? 999;
+    if (ai !== bi) return ai - bi;
+    const pi = POSITION_ORDER.indexOf(a.position);
+    const pj = POSITION_ORDER.indexOf(b.position);
+    return (pi === -1 ? 99 : pi) - (pj === -1 ? 99 : pj);
   });
   return (
-    <Card title={team.nickName} icon={Users}>
-      <div className="flex items-center gap-3 mb-4">
+    <section className="card-surface p-5">
+      <div className="flex items-center justify-between gap-2 mb-4">
+        <div className="flex items-center gap-2 min-w-0">
+          <Users className="h-4 w-4 text-accent shrink-0" />
+          <h3 className="font-bold text-sm uppercase tracking-wider truncate">{team.nickName}</h3>
+        </div>
         <TeamLogo themeKey={team.themeKey} name={team.nickName} size={36} />
-        <div className="text-xs text-muted-foreground">{sorted.length} players named</div>
       </div>
       {sorted.length === 0 ? (
         <div className="text-xs text-muted-foreground">Squad not yet named.</div>
@@ -355,7 +369,7 @@ function SquadPanel({ team }: { team: { nickName: string; themeKey: string; play
           ))}
         </ul>
       )}
-    </Card>
+    </section>
   );
 }
 
@@ -385,9 +399,7 @@ function StatsTab({ home, away, homeRow, awayRow, statGroups, recentRecaps }:
         <SeasonStats team={away} row={awayRow} />
       </div>
 
-      {recentRecaps && (recentRecaps.home?.length || recentRecaps.away?.length) ? (
-        <RecentRecapsCard home={home} away={away} homeRecaps={recentRecaps.home ?? []} awayRecaps={recentRecaps.away ?? []} />
-      ) : null}
+      {/* Recent recaps section removed per request */}
 
       {statGroups && statGroups.length > 0 && statGroups.map((g, gi) => (
         <Card key={gi} title={g.title} icon={Activity}>
@@ -464,9 +476,7 @@ function SeasonStats({ team, row }: { team: any; row?: any }) {
           <Stat label="PF" value={String(row.for)} />
           <Stat label="Diff" value={fmtSigned(row.diff)} accent={row.diff > 0} danger={row.diff < 0} />
         </div>
-      ) : (
-        <div className="text-xs text-muted-foreground mb-4">No 2026 ladder data yet.</div>
-      )}
+      ) : null}
 
       <div className="flex items-center justify-between mb-1">
         <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Form · Last 5</div>
@@ -942,10 +952,15 @@ function ScriptTab({ insights, insightsError, insightsLoading, home, away }:
   return (
     <div className="space-y-4">
       <Card title="Head to head" icon={ScrollText}>
-        <div className="flex items-center justify-center gap-6 mb-4">
-          <TeamLogo themeKey={home.themeKey} name={home.nickName} size={48} />
-          <span className="text-muted-foreground text-sm font-bold">vs</span>
-          <TeamLogo themeKey={away.themeKey} name={away.nickName} size={48} />
+        <div className="flex items-center justify-center gap-10 mb-4">
+          <div className="flex flex-col items-center gap-2">
+            <TeamLogo themeKey={home.themeKey} name={home.nickName} size={56} />
+            <span className="text-xs font-bold uppercase tracking-wider">{home.nickName}</span>
+          </div>
+          <div className="flex flex-col items-center gap-2">
+            <TeamLogo themeKey={away.themeKey} name={away.nickName} size={56} />
+            <span className="text-xs font-bold uppercase tracking-wider">{away.nickName}</span>
+          </div>
         </div>
         <p className="text-sm leading-relaxed text-muted-foreground">{s.headToHead}</p>
       </Card>

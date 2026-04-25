@@ -43,7 +43,7 @@ function Fixtures() {
     <div className="pt-8">
       <header className="mb-8">
         <div className="text-[11px] uppercase tracking-[0.25em] text-accent font-bold">Season {fx.season}</div>
-        <h1 className="font-display font-extrabold text-3xl sm:text-4xl tracking-tight mt-1">
+        <h1 className="font-display font-extrabold text-lg sm:text-xl tracking-tight mt-1">
           NRL Fixtures · Round {fx.round}
         </h1>
       </header>

@@ -343,8 +343,8 @@ function buildFallbackInsights(payload: {
       : "away";
   const htftPick = `${halftimeLeader === "draw" ? "Draw" : halftimeLeader === "home" ? payload.homeName : payload.awayName} / ${winnerName}`;
 
-  const homeExploit = buildWeaknessExploit(payload.homeName, payload.awayName, homeCore, wetWeather);
-  const awayExploit = buildWeaknessExploit(payload.awayName, payload.homeName, awayCore, wetWeather);
+  const homeExploit = buildWeaknessExploit(payload.homeName, payload.awayName, homeCore, wetWeather, "home", homeFormScore, awayFormScore, payload.homePosition, payload.awayPosition);
+  const awayExploit = buildWeaknessExploit(payload.awayName, payload.homeName, awayCore, wetWeather, "away", awayFormScore, homeFormScore, payload.awayPosition, payload.homePosition);
   const bookieWant = payload.realOdds?.h2h.home && payload.realOdds?.h2h.away
     ? payload.realOdds.h2h.home.price < payload.realOdds.h2h.away.price
       ? `${payload.awayName} to muddy the game up or pinch it late — it breaks up the public favourite multis built around ${payload.homeName}.`
@@ -674,20 +674,56 @@ function buildTryscorerTeamBlock(team: string, players: RankedPlayer[], opponent
   return { picks, avoid };
 }
 
-function buildWeaknessExploit(team: string, opponent: string, players: RankedPlayer[], wetWeather: boolean) {
+function buildWeaknessExploit(
+  team: string,
+  opponent: string,
+  players: RankedPlayer[],
+  wetWeather: boolean,
+  side: "home" | "away" = "home",
+  teamForm = 0,
+  oppForm = 0,
+  teamPos?: number | string,
+  oppPos?: number | string,
+) {
   const watch = players.slice(0, 3);
+  const isFavoured = teamForm >= oppForm;
+  const ladderEdge = (Number(teamPos) || 99) < (Number(oppPos) || 99);
+  const star = playerName(players[0], team);
+  const second = playerName(players[1], team);
+
+  // Vary opening pressure point per side so the two cards never read the same.
+  const edgeFocus = side === "home"
+    ? `${opponent}'s right edge has been the soft channel — slow to slide on second-phase ball after fatigue sets in`
+    : `${opponent}'s left-edge defence is over-committing on first-receiver runs and leaving outside backs isolated`;
+  const middleFocus = side === "home"
+    ? `${opponent}'s ruck speed drops noticeably in the third quarter, opening windows for shape plays`
+    : `${opponent}'s middle defenders are conceding metres post-contact, especially against forwards on second-man plays`;
+  const kickFocus = wetWeather
+    ? `${opponent}'s back three have wobbled under contestable kicks in greasy conditions`
+    : side === "home"
+      ? `${opponent}'s yardage exits are leaking under high-ball pressure on the right`
+      : `${opponent}'s left winger has been targeted on bombs and short kick-chases`;
+
+  const targetAreas = side === "home"
+    ? ["Right-edge 20m channel after repeat sets", "Inside ball off quick play-the-balls", wetWeather ? "Grubbers in-goal under pressure" : "Bomb chase on right wing"]
+    : ["Left-edge short side from scrum", "Forward shape off second-man play", wetWeather ? "Boot the back three early" : "Cross-field kick to left winger"];
+
+  const tacticalPlan = isFavoured
+    ? `${team} should weaponise field position with ${star} pulling the strings — milk repeat sets, then unload ${side === "home" ? "right-edge shape" : "left-edge raids"} once ${opponent}'s middle starts retreating. ${ladderEdge ? "Ladder pressure is on the visitors' side, so " + team + " can afford to be patient and play the long script." : "Lean on " + second + " to break the line in the third quarter when " + opponent + "'s defensive read slows."}`
+    : `${team} need to flip the script early — front-load energy through ${star} carries and force ${opponent} into messy completions before ${opponent}'s structure settles. ${wetWeather ? "Conditions help an underdog: complete high, kick long and live in their half." : "Use " + second + " on early-shift ball to test " + opponent + "'s edge connection before they get into rhythm."}`;
+
   return {
-    opponentWeaknesses: [
-      `${opponent} can get compressed on the edge after repeat defensive sets`,
-      `${opponent} invite kick-pressure problems on back-three exits`,
-      wetWeather ? `${opponent} handling can wobble once the surface gets greasy` : `${opponent} line speed can flatten out late in long defensive stretches`,
-    ],
-    targetAreas: ["Edge shifts after quick ruck ball", "Kick pressure on yardage exits", wetWeather ? "Second-phase touches around the ruck" : "Short-side raids near the 20m channel"],
-    tacticalPlan: `${team} should play for territory first, then cash in through shape once ${opponent} are defending retreating sets. The best route is forcing slow exits and making their edge read multiple decisions in one movement.`,
-    playersToWatch: watch.map((p) => ({
+    opponentWeaknesses: [edgeFocus, middleFocus, kickFocus],
+    targetAreas,
+    tacticalPlan,
+    playersToWatch: watch.map((p, i) => ({
       name: playerName(p, team),
       role: p.position,
-      why: `${playerName(p, team)} is well placed to turn the field-position edge into direct points or try involvements.`,
+      why: i === 0
+        ? `${playerName(p, team)} is the lead playmaker for ${team} and the most likely to convert ${opponent}'s lapses into direct points.`
+        : i === 1
+          ? `${playerName(p, team)} should get high volume off shape and matches up well against ${opponent}'s read-defence issues.`
+          : `${playerName(p, team)} adds late-set finishing power and is a live tryscoring option once ${opponent}'s edge fatigues.`,
     })),
   };
 }

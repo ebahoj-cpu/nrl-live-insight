@@ -647,6 +647,14 @@ function InsightsTab({ insights, insightsError, home, away, tryscorers, tryscore
         </div>
       )}
 
+      {/* 9b. Weakness exploit — opposition flaws + 3 players to watch */}
+      {insights.weaknessExploit && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <WeaknessExploitCard team={home} opponent={away} data={insights.weaknessExploit.home} />
+          <WeaknessExploitCard team={away} opponent={home} data={insights.weaknessExploit.away} />
+        </div>
+      )}
+
       {/* Key factors */}
       <Card title="Key factors" icon={TrendingUp}>
         <ul className="space-y-2 text-sm">

@@ -256,31 +256,44 @@ ALSO produce a "tryscorerScript" — a focused tryscoring read for both teams:
 - For EACH team also list 1-2 "avoid" players — trap names the public will pile into who are poor value this week (out of form, bad matchup, used as decoy, not getting touches). Each with a 1-sentence reason.
 - summary: 2-3 sentences on the overall tryscoring picture — total tries expected, which edge leaks, who carries the kicking game.
 
-FINALLY, generate the "bets" object — TEN bet plays, every one with the SAME shape (title, legs[], combinedOdds, estimatedOdds, stake, potentialReturn, reasoning). Each bet must be ground in the data you produced above (winner, margin, total, HT/FT, tryscorerScript, weaknessExploit, gameFlow, bookieScript). Always quote LIVE BOOKIE ODDS prices exactly when a leg matches.
+FINALLY, generate the "bets" object — ELEVEN bet plays, every one with the SAME shape (category, title, legs[], combinedOdds, estimatedOdds, stake, potentialReturn, reasoning). Each bet must be grounded in the data you produced above. Always quote LIVE BOOKIE ODDS prices exactly when a leg matches.
 
-For EACH of the ten categories use the stake/target shown:
+The bets tab is the most important part of this app. Every bet must offer a meaningful payout — small stakes pulling big returns. NO low-paying favourite-only multis. We want SOLID PICKS that pull money: anytime tryscorer multis, points overs combos, multi-tryscorer stacks. Build them like a sharp punter would.
 
-1. gameScript — the cleanest read of the match. 4-6 legs that match your own predictions: winning team + winning margin BUCKET + total over/under + HT/FT double + ONE tryscorer from EACH team (anytime, drawn from tryscorerScript picks). Stake "$10". This is the "if the script plays out, this lands" multi.
-2. lowRisk — small safe multi (2-3 legs) aiming ~$100 from $5 stake (combinedOdds ~20). Use favourite-leaning legs: h2h winner of the strong side, total over/under at the most stable line, one strong anytime tryscorer. Stake "$5".
-3. mediumRisk — 3-4 legs aiming ~$500 from $5 stake (combinedOdds ~100). Mix in a margin bucket or a 2+ tryscorer. Stake "$5".
-4. highRisk — 4-5 legs aiming ~$1,000 from $5 stake (combinedOdds ~200). Include a HT/FT double and a multi-tryscorer / longer tryscorer. Stake "$5".
-5. getThea — THE bet of the slate. 4-5 long legs aiming ~$10,000 from $5 stake (combinedOdds ~2000). Include a sharp margin bucket, HT/FT cross or favourite double, two tryscorer legs (mix anytime + 2+), one over/under. Stake "$5". Reasoning must cite weakness exploit, X-factor, and named players.
-6. upset — straight underdog play AGAINST the market. Single leg = "<underdog nickname> to win" at the EXACT real h2h price for the underdog (longer h2h price from LIVE BOOKIE ODDS). Stake "$20". Reasoning explains why the underdog can pull it off (form, key matchup, weather, motivation).
-7. bookieWant — the result the bookies WANT to land (low public liability — this matches script.bookieScript.wantToWin). 1-2 legs that line up with that result. Stake "$10".
-8. bookieFear — the result the bookies FEAR (heavy public exposure — script.bookieScript.wantToLose). 2-3 legs that lean into the bookies' nightmare. Stake "$10".
-9. anytime — pure anytime tryscorer multi. 3-4 legs, ALL "<player> anytime tryscorer", drawn from your tryscorerScript picks (mix both teams). Stake "$10". Use real anytime prices.
-10. firstTryscorer — STANDALONE single bet on first tryscorer. Exactly 1 leg "<player> first tryscorer" using the LIVE BOOKIE ODDS first-tryscorer price. Stake "$5". Pick the most credible value name from tryscorerScript.
+For EACH of the eleven categories use the exact stake/target shown — the combined odds MUST be in the target ballpark for the payout to land:
+
+1. gameScript — the cleanest read of the match, aligned with your stats. 5-6 legs: winning team + winning margin BUCKET + total over/under + HT/FT double + 2 anytime tryscorers (one each team, drawn from tryscorerScript). Stake "$10". Target combined odds ~50, payout ~$500. This is the "if the script plays out, this lands" multi.
+
+2. smallStake — Stake "$5", target payout ~$100, combined odds ~20. 3 legs total. Pick legs that combine to ~20: e.g. one h2h favourite (~1.40-1.70), one strong anytime tryscorer (~2.00-2.50), one points over/under or a margin bucket (~3.50-4.50). Avoid stacking 3 short favourites — that won't get to 20. Lean on tryscorer prices to get the multiplier.
+
+3. mediumStake — Stake "$10", target payout ~$500, combined odds ~50. 4 legs. Mix: h2h winner + total over/under + 2 anytime tryscorers. Or: h2h + margin bucket + 2 anytime tryscorers. The two tryscorer legs do the heavy lifting on the multiplier.
+
+4. bigStake — Stake "$20", target payout ~$1,000, combined odds ~50. 4-5 legs. Build similarly to mediumStake but with one extra leg or one slightly longer tryscorer (lean toward 2.50-3.50 anytime prices) to push odds toward ~50. The bigger stake means smaller multiplier needed for the same headline payout.
+
+5. getThea — THE bet of the slate. 4-5 long legs aiming ~$10,000 from $5 stake (combined odds ~2000). Include a margin bucket (~3-4), HT/FT cross or favourite double (~3-12), TWO tryscorer legs (mix one anytime ~2.50 + one 2+ tries ~5-15), one over/under (~1.90). Reasoning must cite weakness exploit, X-factor, and named players.
+
+6. anytimeMulti — Pure anytime tryscorer multi. Stake "$10", target payout ~$300-500, combined odds ~30-50. 4 legs ALL "<player> anytime tryscorer", drawn from your tryscorerScript picks (mix BOTH teams, lean to outside backs and back-row crash options). Use real anytime prices from LIVE BOOKIE ODDS. Pick higher-value names (~2.30+) so the multiplier lands.
+
+7. multiTryStack — Multi-tryscorer stack. Stake "$10", target payout ~$1,000+, combined odds ~100+. 3 legs all "<player> 2+ tries" — sharp 2+ try picks. Use the real 2+ tries prices from LIVE BOOKIE ODDS where available. This is the "double-double" play for serious payouts. Reasoning must explain why each named player is in a high-volume scoring lane.
+
+8. pointsParty — Points + tryscorer combo. Stake "$10", target payout ~$200-400, combined odds ~20-40. 3 legs: one points OVER (use real total line + over price), plus 2 anytime tryscorers from the team(s) most likely to score the points the over needs. Frame the reasoning around the scoring environment.
+
+9. upset — Straight underdog play AGAINST the market. Single leg = "<underdog nickname> to win" at the EXACT real h2h price for the underdog (longer h2h price from LIVE BOOKIE ODDS). Stake "$20". Reasoning explains why the underdog can pull it off (form, key matchup, weather, motivation).
+
+10. bookieFear — The result bookies FEAR (heavy public exposure). Stake "$10", target payout ~$300-600, combined odds ~30-60. 3-4 legs that lean into the bookies' nightmare result — usually the chalk winning + the headline tryscorers landing. Use real prices.
+
+11. firstTryscorer — STANDALONE single bet on first tryscorer. Exactly 1 leg "<player> first tryscorer" using the LIVE BOOKIE ODDS first-tryscorer price. Stake "$5". Pick the most credible value name from tryscorerScript (price ~9-15 for ~$50-75 payout).
 
 CRITICAL betting & ODDS-MATH rules — READ CAREFULLY:
 - USE THE EXACT REAL ODDS PROVIDED ABOVE. The "LIVE BOOKIE ODDS" block contains real prices from AU bookies (TAB-aligned). When a leg matches a market shown there (h2h winner, anytime tryscorer for a listed player, first tryscorer for a listed player, total over/under at a listed line, or 2+ tries for a listed player), you MUST use that exact decimalOdds value. Do NOT estimate or round.
 - For markets not in the block (margin buckets, HT/FT, try-count buckets like "1-2 tries"), use realistic AU prices: margin "1-12" ~$1.80-2.20, "13+" ~$1.70-2.10, "1-6" ~$3-4, "7-12" ~$3.50-4.50, "13-24" ~$3-4, "25+" ~$5-9; HT/FT same team ~$2.20-3.50; HT/FT cross ~$8-15; "1-2 tries" ~$2.50-4 (player-dependent), "3+ tries" ~$15-50.
 - DO NOT use handicap / line / spread markets like "Roosters -12.5". Use winning-margin BUCKETS only.
-- Player try markets must use "anytime tryscorer", "first tryscorer", or try-count buckets "1-2 tries" / "3+ tries". NEVER "over 0.5".
+- Player try markets must use "anytime tryscorer", "first tryscorer", or "2+ tries" / "3+ tries". NEVER "over 0.5".
 - combinedOdds MUST equal the PRODUCT of all leg decimalOdds (within ±5%).
-- Stake × combinedOdds must roughly hit the target payout for that category. The server will recompute everything — get the legs and their prices right.
+- HIT THE TARGET COMBINED ODDS for each category — if your draft is too low, swap a short favourite for a longer tryscorer or margin bucket; if too high, swap a long leg for a shorter one. The headline payout vs stake is the whole point of the bets tab.
 - NEVER invent players — only named squad members above. For tryscorer legs, prefer players that appear in the LIVE BOOKIE ODDS block.
-- DO NOT include first-tryscorer legs in any of gameScript / lowRisk / mediumRisk / highRisk / getThea / anytime — first-tryscorer is RESERVED for the standalone "firstTryscorer" bet only.
-- Each bet's reasoning is 2-3 sentences citing specific stats / lineups / form / weakness exploit / X-factor — explain WHY this bet aligns with the rest of the analysis.`,
+- DO NOT include first-tryscorer legs in any of gameScript / smallStake / mediumStake / bigStake / getThea / anytimeMulti / multiTryStack / pointsParty — first-tryscorer is RESERVED for the standalone "firstTryscorer" bet only.
+- Each bet's reasoning is 2-3 sentences citing specific stats / lineups / form / weakness exploit / X-factor — explain WHY this bet aligns with the rest of the analysis and WHERE the value sits.`,
 
   ].filter(Boolean).join("\n");
 

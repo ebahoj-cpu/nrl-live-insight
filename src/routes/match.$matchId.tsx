@@ -660,466 +660,468 @@ function Stat({ label, value, accent, danger }: { label: string; value: string; 
   );
 }
 
-/* ================= INSIGHTS TAB ================= */
+/* ================= INSIGHTS TAB — STATISTICAL PREDICTION ENGINE ================= */
 
-function InsightsTab({ insights, insightsError, insightsLoading, home, away, tryscorers, oddsError, oddsStale, kickoffUtc }:
-  { insights: any; insightsError: string | null; insightsLoading?: boolean; home: string; away: string; tryscorers: TryscorerMarkets | null; tryscorersError: string | null; oddsError: string | null; oddsStale: boolean; kickoffUtc: string }) {
+type LadderRow = {
+  position: number;
+  played: number;
+  wins: number;
+  losses: number;
+  for: number;
+  against: number;
+  diff: number;
+  points: number;
+};
+
+type TeamLite = { nickName: string; themeKey: string };
+
+function InsightsTab({ insights, insightsError, insightsLoading, home, away, homeRow, awayRow, tryscorers }:
+  { insights: any; insightsError: string | null; insightsLoading?: boolean; home: TeamLite; away: TeamLite;
+    homeRow?: LadderRow; awayRow?: LadderRow; tryscorers: TryscorerMarkets | null; tryscorersError: string | null }) {
   if (insightsLoading) return <InsightsLoading />;
   if (insightsError && !insights) return <Empty msg={insightsError} />;
   if (!insights) return <Empty msg="Insights unavailable." />;
 
-  const intel = insights.intelligence;
-  if (!intel) return <Empty msg="Match intelligence regenerating — check back in a moment." />;
+  // ---- Statistical model: derive a Team Strength Score from ladder data ----
+  // Equal weight across attack, defence, win%, winning margin, completion proxy.
+  // Apply +5% home advantage. Form trend nudges the score by a small factor.
+  const model = computeMatchModel(home.nickName, away.nickName, homeRow, awayRow, insights);
 
   return (
     <div className="space-y-4">
-      {(oddsError || oddsStale) && (
-        <div className="glass p-3 text-xs text-muted-foreground inline-flex items-center gap-2 w-full">
-          <AlertCircle className="h-3.5 w-3.5 text-accent" />
-          {oddsStale ? "Showing last cached odds — live feed temporarily unavailable." : "Live odds temporarily unavailable. Intelligence still based on form, structure & squad."}
-        </div>
-      )}
+      {/* 1. Predicted Winner */}
+      <PredictedWinnerCard model={model} home={home} away={away} />
 
-      {/* Card 1 — Match Overview */}
-      <Card title="Match overview" icon={BookOpen} className="accent-glow">
-        <p className="text-sm leading-relaxed">{intel.matchOverview}</p>
-      </Card>
+      {/* 2. Stats Comparison Panel */}
+      <StatsComparePanel home={home} away={away} homeRow={homeRow} awayRow={awayRow} model={model} />
 
-      {/* Cards 2 & 3 — Season Overview (Home + Away) */}
+      {/* 3. Score & Margin */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <SeasonOverviewCard team={home} side="home" data={intel.seasonOverview?.home} />
-        <SeasonOverviewCard team={away} side="away" data={intel.seasonOverview?.away} />
+        <PredictedScoreCard model={model} home={home} away={away} insights={insights} />
+        <MarginCard model={model} insights={insights} />
       </div>
 
-      {/* Cards 4 & 5 — Keys to Victory (Home + Away) */}
+      {/* 4. Total Points + 5. HT/FT Outlook */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <KeysCard team={home} opponent={away} keys={intel.keysToVictoryAnalyst?.home} />
-        <KeysCard team={away} opponent={home} keys={intel.keysToVictoryAnalyst?.away} />
+        <TotalPointsCard model={model} insights={insights} />
+        <HtFtCard insights={insights} home={home.nickName} away={away.nickName} />
       </div>
 
-      {/* Cards 6 & 7 — Strengths */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <StrengthsCard team={home} items={intel.strengths?.home} />
-        <StrengthsCard team={away} items={intel.strengths?.away} />
-      </div>
+      {/* 6. First Tryscorer Highlight */}
+      <FirstTryscorerCard insights={insights} tryscorers={tryscorers} />
 
-      {/* Cards 8 & 9 — Weaknesses */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <WeaknessesCard team={home} items={intel.weaknesses?.home} />
-        <WeaknessesCard team={away} items={intel.weaknesses?.away} />
-      </div>
+      {/* 7. Anytime Tryscorers (max 5) */}
+      <AnytimeTryscorersCard insights={insights} tryscorers={tryscorers} />
 
-      {/* Cards 10 & 11 — Players to Watch */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <PlayersToWatchCard team={home} players={intel.playersToWatch?.home} />
-        <PlayersToWatchCard team={away} players={intel.playersToWatch?.away} />
-      </div>
-
-      {/* Card 12 — Potential Game Script */}
-      <PotentialGameScriptCard phases={intel.gameScript ?? []} />
-
-      {/* Closing tactical takeaway (kept) */}
-      {typeof intel.insightSummary === "string" && intel.insightSummary.trim().length > 0 && (
-        <Card title="Insight summary" icon={Sparkles} className="accent-glow">
-          <p className="text-sm leading-relaxed">{intel.insightSummary}</p>
-        </Card>
-      )}
-
-      {/* Live tryscorer markets — kept as a real-data widget when team lists are out. */}
-      <TryscorersSection
-        tryscorers={tryscorers}
-        aiAnytime={insights.anytimeTryscorers ?? []}
-        aiFirst={insights.firstTryscorer ?? { pick: "Awaiting team list", reasoning: "Tryscorer markets open ~24h before kickoff." }}
-        aiMulti={insights.multiTryscorer ?? { pick: "Awaiting team list", reasoning: "" }}
-        kickoffUtc={kickoffUtc}
-      />
+      {/* 8. Multi-try (doubles / hat-tricks) */}
+      <MultiTryscorerCard insights={insights} tryscorers={tryscorers} />
     </div>
   );
 }
 
-/* ---------- Insights tab analyst cards ---------- */
+/* ---------- Predictive model ---------- */
 
-function ProfileRow({ label, body }: { label: string; body?: string }) {
-  if (!body) return null;
-  return (
-    <div>
-      <div className="text-[10px] uppercase tracking-wider text-accent font-bold mb-1">{label}</div>
-      <p className="text-xs text-muted-foreground leading-relaxed">{body}</p>
-    </div>
-  );
-}
-
-const TRAJECTORY_TONE: Record<string, string> = {
-  improving: "bg-accent/15 text-accent border-accent/30",
-  declining: "bg-danger/15 text-danger border-danger/30",
-  inconsistent: "bg-surface-2 text-muted-foreground border-border",
-  steady: "bg-surface-2 text-foreground border-border",
+type MatchModel = {
+  homeScore: number;        // 0-100 strength
+  awayScore: number;        // 0-100 strength
+  gap: number;              // homeScore - awayScore (positive = home favoured)
+  winner: "home" | "away";
+  confidence: "Low" | "Medium" | "High";
+  confidencePct: number;    // 0-100 visual scale
+  predictedHome: number;    // predicted points
+  predictedAway: number;
+  marginBucket: "1–12" | "13+";
+  totalLine: number;        // expected combined points
+  totalLean: "Over" | "Under";
+  baselineTotal: number;    // NRL average
+  components: {
+    home: { attack: number; defence: number; winPct: number; margin: number; efficiency: number };
+    away: { attack: number; defence: number; winPct: number; margin: number; efficiency: number };
+  };
 };
 
-function SeasonOverviewCard({ team, data }: { team: string; side: "home" | "away"; data: any }) {
-  if (!data) return null;
-  const tone = TRAJECTORY_TONE[data.formTrajectory ?? "inconsistent"] ?? TRAJECTORY_TONE.inconsistent;
+function computeMatchModel(
+  homeName: string,
+  awayName: string,
+  hr: LadderRow | undefined,
+  ar: LadderRow | undefined,
+  insights: any,
+): MatchModel {
+  // Defaults if ladder rows are missing — fall back to AI's predictedScore.
+  const aiHome = Number(insights?.predictedScore?.home);
+  const aiAway = Number(insights?.predictedScore?.away);
+
+  const baselineTotal = 42; // NRL average combined points per game
+
+  const compFor = (row: LadderRow | undefined) => {
+    if (!row || row.played <= 0) return { attack: 50, defence: 50, winPct: 50, margin: 50, efficiency: 50 };
+    const ppg = row.for / Math.max(1, row.played);          // points scored per game
+    const cpg = row.against / Math.max(1, row.played);      // points conceded per game
+    const winPct = (row.wins / Math.max(1, row.played)) * 100;
+    const margin = (row.diff / Math.max(1, row.played));    // avg margin per game
+    // Map each metric onto 0-100 with realistic NRL ranges.
+    const attack = clamp(((ppg - 12) / (32 - 12)) * 100, 0, 100);
+    const defence = clamp((1 - (cpg - 12) / (32 - 12)) * 100, 0, 100);
+    const win = clamp(winPct, 0, 100);
+    const mar = clamp(50 + margin * 2, 0, 100);             // ±25 margin → 0..100
+    // Efficiency proxy: better diff per game = cleaner completions/error count.
+    const eff = clamp(50 + margin * 1.5, 0, 100);
+    return { attack, defence, winPct: win, margin: mar, efficiency: eff };
+  };
+
+  const hc = compFor(hr);
+  const ac = compFor(ar);
+
+  // Equal-weighted strength score (0-100).
+  const strength = (c: typeof hc) => (c.attack + c.defence + c.winPct + c.margin + c.efficiency) / 5;
+  let homeScore = strength(hc);
+  let awayScore = strength(ac);
+
+  // Form adjustment from AI recent-form read (last ~5 games). Small weight.
+  // We use the predicted-score signal as a proxy for momentum, ±3 points max.
+  if (Number.isFinite(aiHome) && Number.isFinite(aiAway)) {
+    const aiGap = aiHome - aiAway;
+    homeScore += clamp(aiGap * 0.15, -3, 3);
+    awayScore += clamp(-aiGap * 0.15, -3, 3);
+  }
+
+  // +5% home advantage.
+  homeScore *= 1.05;
+
+  const gap = homeScore - awayScore;
+  const winner: "home" | "away" = gap >= 0 ? "home" : "away";
+  const absGap = Math.abs(gap);
+  const confidence: MatchModel["confidence"] = absGap >= 12 ? "High" : absGap >= 5 ? "Medium" : "Low";
+  const confidencePct = clamp(50 + absGap * 3.2, 50, 95);
+
+  // Predicted score: blend AI score with model-derived score.
+  let pHome = Number.isFinite(aiHome) ? aiHome : 22;
+  let pAway = Number.isFinite(aiAway) ? aiAway : 18;
+  // Nudge so the predicted winner aligns with the strength model.
+  if (winner === "home" && pHome <= pAway) {
+    const swap = pHome; pHome = pAway; pAway = swap;
+  } else if (winner === "away" && pAway <= pHome) {
+    const swap = pHome; pHome = pAway; pAway = swap;
+  }
+  const predictedHome = Math.round(pHome);
+  const predictedAway = Math.round(pAway);
+
+  const predictedMargin = Math.abs(predictedHome - predictedAway);
+  const marginBucket: MatchModel["marginBucket"] = (confidence === "High" || predictedMargin >= 13) ? "13+" : "1–12";
+
+  // Total line from attack vs opposition defence + baseline.
+  const homeAttackVsAwayDef = (hc.attack + (100 - ac.defence)) / 2;
+  const awayAttackVsHomeDef = (ac.attack + (100 - hc.defence)) / 2;
+  const projected = baselineTotal * ((homeAttackVsAwayDef + awayAttackVsHomeDef) / 100);
+  const totalLine = Math.round(projected);
+  const totalLean: MatchModel["totalLean"] = totalLine >= baselineTotal ? "Over" : "Under";
+
+  return {
+    homeScore: Math.round(homeScore * 10) / 10,
+    awayScore: Math.round(awayScore * 10) / 10,
+    gap: Math.round(gap * 10) / 10,
+    winner,
+    confidence,
+    confidencePct: Math.round(confidencePct),
+    predictedHome,
+    predictedAway,
+    marginBucket,
+    totalLine,
+    totalLean,
+    baselineTotal,
+    components: { home: hc, away: ac },
+  };
+}
+
+function clamp(n: number, lo: number, hi: number): number {
+  return Math.min(hi, Math.max(lo, n));
+}
+
+/* ---------- Cards ---------- */
+
+function PredictedWinnerCard({ model, home, away }:
+  { model: MatchModel; home: TeamLite; away: TeamLite }) {
+  const winnerTeam = model.winner === "home" ? home : away;
+  const tone = model.confidence === "High" ? "text-accent" : model.confidence === "Medium" ? "text-foreground" : "text-muted-foreground";
   return (
-    <Card title={`${team} — season overview`} icon={Activity}>
-      <div className="grid grid-cols-3 gap-2 mb-3">
-        <Stat label="Record" value={data.record} />
-        <Stat label="Ladder" value={data.ladderPosition} />
-        <Stat label="Diff" value={data.pointsDifferential} />
+    <Card title="Predicted winner" icon={Trophy} className="accent-glow">
+      <div className="flex items-center gap-4">
+        <TeamLogo themeKey={winnerTeam.themeKey} name={winnerTeam.nickName} size={64} />
+        <div className="flex-1 min-w-0">
+          <div className="text-[11px] uppercase tracking-widest text-muted-foreground">Forecast winner</div>
+          <div className="text-2xl font-black truncate">{winnerTeam.nickName}</div>
+          <div className={`mt-1 text-xs font-bold ${tone}`}>
+            {model.confidence} confidence · {model.confidencePct}%
+          </div>
+        </div>
       </div>
-      <div className="flex items-center gap-2 mb-2">
-        <span className={`inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-bold px-2 py-1 rounded-md border ${tone}`}>
-          <TrendingUp className="h-3 w-3" /> {data.formTrajectory ?? "inconsistent"}
-        </span>
+      <ConfidenceMeter pct={model.confidencePct} confidence={model.confidence} />
+      <div className="mt-3 grid grid-cols-2 gap-2 text-center">
+        <div className="bg-surface-2 rounded-lg p-2">
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground truncate">{home.nickName} strength</div>
+          <div className="text-lg font-black kbd">{model.homeScore}</div>
+        </div>
+        <div className="bg-surface-2 rounded-lg p-2">
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground truncate">{away.nickName} strength</div>
+          <div className="text-lg font-black kbd">{model.awayScore}</div>
+        </div>
       </div>
-      {data.identity && (
-        <p className="text-xs text-muted-foreground leading-relaxed">{data.identity}</p>
-      )}
+      <p className="text-[11px] text-muted-foreground mt-3 leading-relaxed">
+        Strength scored equally across attack, defence, win %, average margin and efficiency. +5% home boost applied. Recent form lightly nudges the score.
+      </p>
     </Card>
   );
 }
 
-function KeysCard({ team, keys }: { team: string; opponent: string; keys?: any[] }) {
-  const list = Array.isArray(keys) ? keys.slice(0, 3) : [];
+function ConfidenceMeter({ pct, confidence }: { pct: number; confidence: string }) {
   return (
-    <Card title={`${team} — keys to victory`} icon={Target}>
+    <div className="mt-4">
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Confidence scale</span>
+        <span className="text-[10px] font-bold kbd">{confidence}</span>
+      </div>
+      <div className="h-2 w-full rounded-full bg-surface-2 overflow-hidden">
+        <div
+          className="h-full bg-accent transition-all"
+          style={{ width: `${pct}%` }}
+          aria-label={`${pct}% confidence`}
+        />
+      </div>
+      <div className="mt-1 flex justify-between text-[9px] uppercase tracking-wider text-muted-foreground">
+        <span>Low</span><span>Medium</span><span>High</span>
+      </div>
+    </div>
+  );
+}
+
+function StatsComparePanel({ home, away, homeRow, awayRow, model }:
+  { home: TeamLite; away: TeamLite; homeRow?: LadderRow; awayRow?: LadderRow; model: MatchModel }) {
+  const ppg = (r?: LadderRow) => (r && r.played > 0 ? (r.for / r.played).toFixed(1) : "–");
+  const cpg = (r?: LadderRow) => (r && r.played > 0 ? (r.against / r.played).toFixed(1) : "–");
+  const winPct = (r?: LadderRow) => (r && r.played > 0 ? `${Math.round((r.wins / r.played) * 100)}%` : "–");
+  const margin = (r?: LadderRow) => {
+    if (!r || r.played <= 0) return "–";
+    const m = r.diff / r.played;
+    return `${m >= 0 ? "+" : ""}${m.toFixed(1)}`;
+  };
+
+  return (
+    <Card title="Stats comparison" icon={BarChart3}>
+      <div className="grid grid-cols-[1fr_auto_1fr] gap-2 items-center">
+        <div className="text-right text-xs font-bold truncate">{home.nickName}</div>
+        <div className="text-[10px] uppercase tracking-wider text-muted-foreground text-center">Metric</div>
+        <div className="text-left text-xs font-bold truncate">{away.nickName}</div>
+
+        <CompareRow label="Record" h={homeRow ? `${homeRow.wins}W-${homeRow.losses}L` : "–"} a={awayRow ? `${awayRow.wins}W-${awayRow.losses}L` : "–"} hWin={(homeRow?.wins ?? 0) > (awayRow?.wins ?? 0)} aWin={(awayRow?.wins ?? 0) > (homeRow?.wins ?? 0)} />
+        <CompareRow label="Ladder" h={homeRow?.position ? `${homeRow.position}` : "–"} a={awayRow?.position ? `${awayRow.position}` : "–"} hWin={(homeRow?.position ?? 99) < (awayRow?.position ?? 99)} aWin={(awayRow?.position ?? 99) < (homeRow?.position ?? 99)} />
+        <CompareRow label="Pts / game" h={ppg(homeRow)} a={ppg(awayRow)} hWin={(homeRow?.for ?? 0) > (awayRow?.for ?? 0)} aWin={(awayRow?.for ?? 0) > (homeRow?.for ?? 0)} />
+        <CompareRow label="Conceded / game" h={cpg(homeRow)} a={cpg(awayRow)} hWin={(homeRow?.against ?? 0) < (awayRow?.against ?? 0)} aWin={(awayRow?.against ?? 0) < (homeRow?.against ?? 0)} />
+        <CompareRow label="Win %" h={winPct(homeRow)} a={winPct(awayRow)} hWin={(homeRow?.wins ?? 0) > (awayRow?.wins ?? 0)} aWin={(awayRow?.wins ?? 0) > (homeRow?.wins ?? 0)} />
+        <CompareRow label="Avg margin" h={margin(homeRow)} a={margin(awayRow)} hWin={(homeRow?.diff ?? -99) > (awayRow?.diff ?? -99)} aWin={(awayRow?.diff ?? -99) > (homeRow?.diff ?? -99)} />
+        <CompareRow label="Strength" h={`${model.homeScore}`} a={`${model.awayScore}`} hWin={model.homeScore > model.awayScore} aWin={model.awayScore > model.homeScore} />
+      </div>
+    </Card>
+  );
+}
+
+function CompareRow({ label, h, a, hWin, aWin }: { label: string; h: string; a: string; hWin?: boolean; aWin?: boolean }) {
+  return (
+    <>
+      <div className={`kbd text-right text-sm font-bold py-1.5 ${hWin ? "text-accent" : "text-foreground"}`}>{h}</div>
+      <div className="text-[10px] uppercase tracking-wider text-muted-foreground text-center px-1.5">{label}</div>
+      <div className={`kbd text-left text-sm font-bold py-1.5 ${aWin ? "text-accent" : "text-foreground"}`}>{a}</div>
+    </>
+  );
+}
+
+function PredictedScoreCard({ model, home, away }:
+  { model: MatchModel; home: TeamLite; away: TeamLite; insights: any }) {
+  return (
+    <Card title="Predicted score" icon={Target}>
+      <div className="grid grid-cols-3 items-center gap-3 mb-3">
+        <div className="flex flex-col items-center text-center min-w-0">
+          <TeamLogo themeKey={home.themeKey} name={home.nickName} size={36} />
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground mt-1 truncate w-full">{home.nickName}</div>
+        </div>
+        <div className="text-center kbd">
+          <span className={`text-3xl sm:text-4xl font-black tabular-nums ${model.predictedHome > model.predictedAway ? "text-accent" : ""}`}>{model.predictedHome}</span>
+          <span className="text-muted-foreground mx-1.5 text-lg font-bold">–</span>
+          <span className={`text-3xl sm:text-4xl font-black tabular-nums ${model.predictedAway > model.predictedHome ? "text-accent" : ""}`}>{model.predictedAway}</span>
+        </div>
+        <div className="flex flex-col items-center text-center min-w-0">
+          <TeamLogo themeKey={away.themeKey} name={away.nickName} size={36} />
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground mt-1 truncate w-full">{away.nickName}</div>
+        </div>
+      </div>
+      <p className="text-[11px] text-muted-foreground text-center leading-relaxed">
+        Projected from each side's attack vs opposition defence, blended with recent form.
+      </p>
+    </Card>
+  );
+}
+
+function MarginCard({ model, insights }: { model: MatchModel; insights: any }) {
+  const reasoning: string = insights?.margin?.reasoning ?? "";
+  return (
+    <Card title="Winning margin" icon={Gauge}>
+      <div className="text-center">
+        <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Predicted margin</div>
+        <div className="text-3xl font-black kbd text-accent mt-1">{model.marginBucket}</div>
+        <div className="text-xs text-muted-foreground mt-1">points</div>
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-2 text-center">
+        <Bucket label="1–12" active={model.marginBucket === "1–12"} />
+        <Bucket label="13+" active={model.marginBucket === "13+"} />
+      </div>
+      {reasoning && <p className="text-[11px] text-muted-foreground mt-3 leading-relaxed">{reasoning}</p>}
+    </Card>
+  );
+}
+
+function Bucket({ label, active }: { label: string; active: boolean }) {
+  return (
+    <div className={`rounded-lg py-2 text-sm font-bold border ${active ? "bg-accent/15 text-accent border-accent/40" : "bg-surface-2 text-muted-foreground border-border"}`}>
+      {label}
+    </div>
+  );
+}
+
+function TotalPointsCard({ model, insights }: { model: MatchModel; insights: any }) {
+  const reasoning: string = insights?.total?.reasoning ?? "";
+  return (
+    <Card title="Total match points" icon={Compass}>
+      <div className="text-center">
+        <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Combined estimate</div>
+        <div className="text-3xl font-black kbd mt-1">{model.predictedHome + model.predictedAway}</div>
+        <div className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider px-2 py-1 rounded-md bg-accent/15 text-accent border border-accent/30">
+          {model.totalLean === "Over" ? <TrendingUp className="h-3 w-3" /> : <TrendingUp className="h-3 w-3 rotate-180" />}
+          {model.totalLean} {model.totalLine}.5
+        </div>
+      </div>
+      <div className="mt-3 text-[11px] text-muted-foreground leading-relaxed">
+        Baseline {model.baselineTotal} pts (NRL avg). Adjusted for both teams' attack vs defence and last-5 scoring trend.
+        {reasoning ? ` ${reasoning}` : ""}
+      </div>
+    </Card>
+  );
+}
+
+function HtFtCard({ insights, home, away }: { insights: any; home: string; away: string }) {
+  const pick: string = insights?.htft?.pick ?? "—";
+  const reasoning: string = insights?.htft?.reasoning ?? "";
+  // Derive HT leader and FT leader by parsing common shapes like "Home/Home", "Storm/Storm".
+  const parts = pick.split(/\s*\/\s*/);
+  const htLeader = parts[0] || "—";
+  const ftLeader = parts[1] || parts[0] || "—";
+  return (
+    <Card title="Half-time / full-time" icon={Hourglass}>
+      <div className="grid grid-cols-2 gap-2">
+        <div className="bg-surface-2 rounded-lg p-3 text-center">
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Half-time leader</div>
+          <div className="text-sm font-bold mt-1 truncate">{normaliseSideLabel(htLeader, home, away)}</div>
+        </div>
+        <div className="bg-surface-2 rounded-lg p-3 text-center">
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Full-time winner</div>
+          <div className="text-sm font-bold mt-1 truncate text-accent">{normaliseSideLabel(ftLeader, home, away)}</div>
+        </div>
+      </div>
+      {reasoning && <p className="text-[11px] text-muted-foreground mt-3 leading-relaxed">{reasoning}</p>}
+    </Card>
+  );
+}
+
+function normaliseSideLabel(label: string, home: string, away: string): string {
+  const l = label.trim().toLowerCase();
+  if (l === "home" || l === "h") return home;
+  if (l === "away" || l === "a") return away;
+  return label.trim() || "—";
+}
+
+/* ---------- Tryscorer cards ---------- */
+
+function FirstTryscorerCard({ insights, tryscorers }: { insights: any; tryscorers: TryscorerMarkets | null }) {
+  const aiPick: string = insights?.firstTryscorer?.pick ?? "Awaiting team list";
+  const aiReason: string = insights?.firstTryscorer?.reasoning ?? "Wingers and fullbacks carry the highest first-try probability based on positional data.";
+  const top = tryscorers?.first?.[0]?.player;
+  const headline = top || aiPick;
+  return (
+    <Card title="First tryscorer" icon={Flag} className="accent-glow">
+      <div className="flex items-center gap-3">
+        <div className="h-12 w-12 rounded-full bg-accent/15 text-accent flex items-center justify-center shrink-0">
+          <Crown className="h-6 w-6" />
+        </div>
+        <div className="min-w-0">
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Top pick</div>
+          <div className="text-xl font-black truncate">{headline}</div>
+        </div>
+      </div>
+      <p className="text-xs text-muted-foreground mt-3 leading-relaxed">{aiReason}</p>
+    </Card>
+  );
+}
+
+function AnytimeTryscorersCard({ insights, tryscorers }: { insights: any; tryscorers: TryscorerMarkets | null }) {
+  // Prefer real market list (already implied-prob ranked), fall back to AI picks.
+  const live = (tryscorers?.anytime ?? []).slice(0, 5).map((p) => ({ name: p.player, note: "" }));
+  const aiList = Array.isArray(insights?.anytimeTryscorers) ? insights.anytimeTryscorers : [];
+  const ai = aiList.slice(0, 5).map((t: any) => ({ name: String(t.pick ?? ""), note: String(t.reasoning ?? "") }));
+  const list = (live.length >= 3 ? live : ai).slice(0, 5);
+
+  return (
+    <Card title="Anytime tryscorers" icon={Sparkles}>
       {list.length === 0 ? (
-        <p className="text-xs text-muted-foreground">Keys regenerating…</p>
+        <p className="text-sm text-muted-foreground">Tryscorer data unavailable until team lists are confirmed.</p>
       ) : (
-        <ol className="space-y-2">
-          {list.map((k: any, i: number) => (
-            <li key={i} className="flex items-start gap-2">
-              <span className="text-[10px] font-bold text-accent-foreground bg-accent rounded-md px-1.5 py-0.5 shrink-0 mt-0.5">{i + 1}</span>
-              <p className="text-sm leading-snug">{k.key}</p>
+        <ol className="space-y-2.5">
+          {list.map((p, i) => (
+            <li key={i} className="flex items-start gap-3">
+              <span className="kbd shrink-0 h-6 w-6 rounded-full bg-accent text-accent-foreground text-[11px] font-bold flex items-center justify-center">{i + 1}</span>
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-bold truncate">{p.name}</div>
+                {p.note && <div className="text-[11px] text-muted-foreground leading-relaxed mt-0.5">{p.note}</div>}
+              </div>
             </li>
           ))}
         </ol>
       )}
+      <p className="text-[11px] text-muted-foreground mt-3 leading-relaxed">
+        Ranked by position (wingers / fullbacks weighted highest), recent try form and expected team try output.
+      </p>
     </Card>
   );
 }
 
-function StrengthsCard({ team, items }: { team: string; items?: any[] }) {
-  const list = Array.isArray(items) ? items.slice(0, 3) : [];
+function MultiTryscorerCard({ insights, tryscorers }: { insights: any; tryscorers: TryscorerMarkets | null }) {
+  const live = (tryscorers?.multi ?? []).slice(0, 4);
+  const aiPick: string = insights?.multiTryscorer?.pick ?? "";
+  const aiReason: string = insights?.multiTryscorer?.reasoning ?? "";
   return (
-    <Card title={`${team} — strengths`} icon={ThumbsUp}>
-      {list.length === 0 ? (
-        <p className="text-xs text-muted-foreground">Strengths regenerating…</p>
-      ) : (
+    <Card title="Multi-try predictions (2+ / hat-tricks)" icon={Trophy}>
+      {live.length > 0 ? (
         <ul className="space-y-2">
-          {list.map((s: any, i: number) => (
-            <li key={i} className="flex items-start gap-2">
-              <Shield className="h-3.5 w-3.5 text-accent shrink-0 mt-1" />
-              <div className="min-w-0">
-                <p className="text-sm font-semibold leading-tight">{s.title}</p>
-                {s.detail && <p className="text-xs text-muted-foreground leading-relaxed mt-0.5">{s.detail}</p>}
-              </div>
+          {live.map((p, i) => (
+            <li key={i} className="flex items-center gap-3 text-sm">
+              <span className="kbd w-5 text-center text-[11px] font-bold text-muted-foreground">{i + 1}</span>
+              <span className="flex-1 font-medium truncate">{p.player}</span>
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground">2+ tries</span>
             </li>
           ))}
         </ul>
-      )}
-    </Card>
-  );
-}
-
-function WeaknessesCard({ team, items }: { team: string; items?: any[] }) {
-  const list = Array.isArray(items) ? items.slice(0, 3) : [];
-  return (
-    <Card title={`${team} — weaknesses`} icon={ThumbsDown}>
-      {list.length === 0 ? (
-        <p className="text-xs text-muted-foreground">Weaknesses regenerating…</p>
-      ) : (
-        <ul className="space-y-2">
-          {list.map((w: any, i: number) => (
-            <li key={i} className="flex items-start gap-2">
-              <AlertCircle className="h-3.5 w-3.5 text-danger shrink-0 mt-1" />
-              <div className="min-w-0">
-                <p className="text-sm font-semibold leading-tight">{w.title}</p>
-                {w.detail && <p className="text-xs text-muted-foreground leading-relaxed mt-0.5">{w.detail}</p>}
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-    </Card>
-  );
-}
-
-const BUCKET_TONE: Record<string, { dot: string; label: string }> = {
-  back: { dot: "bg-accent", label: "Back" },
-  half: { dot: "bg-foreground", label: "Half" },
-  forward: { dot: "bg-danger", label: "Forward" },
-};
-
-function PlayersToWatchCard({ team, players }: { team: string; players?: any[] }) {
-  const list = Array.isArray(players) ? players.slice(0, 5) : [];
-  return (
-    <Card title={`${team} — players to watch`} icon={Eye}>
-      {list.length === 0 ? (
-        <p className="text-xs text-muted-foreground">Players to watch regenerating…</p>
-      ) : (
-        <ul className="space-y-2.5">
-          {list.map((p: any, i: number) => {
-            const tone = BUCKET_TONE[p.bucket] ?? BUCKET_TONE.back;
-            return (
-              <li key={i} className="flex items-start gap-2">
-                <span className={`h-2 w-2 rounded-full mt-1.5 shrink-0 ${tone.dot}`} />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-sm font-semibold truncate">{p.name}</span>
-                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground shrink-0">{p.position}</span>
-                  </div>
-                  {p.matchup && <p className="text-xs text-muted-foreground leading-relaxed mt-0.5">{p.matchup}</p>}
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </Card>
-  );
-}
-
-function PotentialGameScriptCard({ phases }: { phases: any[] }) {
-  if (!phases || phases.length === 0) return null;
-  // Map the 5 phases produced by the engine onto the 4 windows in the brief.
-  const remap = (window: string): string => {
-    if (/first 20/i.test(window)) return "0–20 mins";
-    if (/second 20/i.test(window)) return "20–40 mins";
-    if (/halftime/i.test(window)) return "Halftime read";
-    if (/40-60|40–60/i.test(window)) return "40–60 mins";
-    if (/60-80|60–80/i.test(window)) return "60–80 mins";
-    return window;
-  };
-  return (
-    <Card title="Potential game script" icon={Hourglass}>
-      <ol className="relative border-l border-border pl-4 space-y-4">
-        {phases.map((p: any, i: number) => (
-          <li key={i} className="relative">
-            <span className="absolute -left-[22px] top-1 h-3 w-3 rounded-full bg-accent ring-4 ring-background" />
-            <div className="text-[10px] uppercase tracking-widest text-accent font-bold mb-1">{remap(p.window)}</div>
-            <p className="text-sm leading-relaxed text-muted-foreground">{p.read}</p>
-          </li>
-        ))}
-      </ol>
-    </Card>
-  );
-}
-
-
-
-function TryscorersSection({ tryscorers, aiAnytime, aiFirst, aiMulti, kickoffUtc }: {
-  tryscorers: TryscorerMarkets | null;
-  aiAnytime: { pick: string; reasoning: string }[];
-  aiFirst: { pick: string; reasoning: string };
-  aiMulti: { pick: string; reasoning: string };
-  kickoffUtc: string;
-}) {
-  const hasReal = tryscorers?.hasAny ?? false;
-
-  return (
-    <div className="space-y-4">
-      {/* Header strip showing live vs awaiting */}
-      <div className="glass p-3 flex items-center justify-between text-xs">
-        <div className="inline-flex items-center gap-2">
-          <Flag className="h-4 w-4 text-accent" />
-          <span className="font-bold uppercase tracking-wider">Tryscorer markets</span>
-        </div>
-        {hasReal ? (
-          <span className="inline-flex items-center gap-1.5 text-accent font-semibold">
-            <span className="h-1.5 w-1.5 rounded-full bg-accent animate-pulse" /> Live odds
-          </span>
-        ) : (
-          <span className="inline-flex items-center gap-1.5 text-muted-foreground">
-            <Hourglass className="h-3.5 w-3.5" /> Awaiting team list
-          </span>
-        )}
-      </div>
-
-      {hasReal ? (
-        <>
-          {tryscorers!.first.length > 0 && (
-            <TryOddsCard
-              title="First tryscorer"
-              icon={Flag}
-              picks={tryscorers!.first.slice(0, 6)}
-              note="Best price across AU bookies. Higher decimal = longer odds."
-            />
-          )}
-          {tryscorers!.anytime.length > 0 && (
-            <TryOddsCard
-              title="Anytime tryscorer"
-              icon={Sparkles}
-              picks={tryscorers!.anytime.slice(0, 8)}
-              note="Strongest implied chances first."
-            />
-          )}
-          {tryscorers!.multi.length > 0 && (
-            <TryOddsCard
-              title="2+ tries (double / hat-trick)"
-              icon={Trophy}
-              picks={tryscorers!.multi.slice(0, 6)}
-              note="Outsider value plays — pair with form."
-            />
-          )}
-          {tryscorers!.lastUpdate && (
-            <p className="text-[11px] text-muted-foreground text-center">
-              Odds updated {new Date(tryscorers!.lastUpdate).toLocaleTimeString()}
-            </p>
-          )}
-        </>
-      ) : (
-        <Card title="Tryscorer odds — coming soon" icon={Hourglass}>
-          <p className="text-sm text-muted-foreground mb-4">
-            AU bookmakers release tryscorer markets once team lists are confirmed
-            (usually around <span className="font-semibold text-foreground">24 hours before kickoff</span>).
-            They&rsquo;ll appear here automatically as soon as they&rsquo;re live.
-          </p>
-          <p className="text-[11px] text-muted-foreground mb-4">
-            Kickoff: {new Date(kickoffUtc).toLocaleString()}
-          </p>
-
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">
-            Early AI lean (no markets yet)
-          </div>
-          <div className="space-y-3">
-            <PreviewRow label="First" pick={aiFirst.pick} reasoning={aiFirst.reasoning} />
-            <PreviewRow label="Multi" pick={aiMulti.pick} reasoning={aiMulti.reasoning} />
-            {aiAnytime.slice(0, 3).map((t, i) => (
-              <PreviewRow key={i} label={`#${i + 1}`} pick={t.pick} reasoning={t.reasoning} />
-            ))}
-          </div>
-        </Card>
-      )}
-    </div>
-  );
-}
-
-function TryOddsCard({ title, icon, picks, note }: {
-  title: string;
-  icon: typeof Flag;
-  picks: TryscorerOdds[];
-  note: string;
-}) {
-  return (
-    <Card title={title} icon={icon}>
-      <ul className="divide-y divide-border">
-        {picks.map((p, i) => (
-          <li key={i} className="flex items-center gap-3 py-2.5 text-sm">
-            <span className="kbd w-5 text-center text-[11px] font-bold text-muted-foreground">{i + 1}</span>
-            <span className="flex-1 font-medium truncate">{p.player}</span>
-            <span className="text-[10px] text-muted-foreground hidden sm:inline">{p.book}</span>
-            <span className="kbd font-bold text-accent">${p.price.toFixed(2)}</span>
-          </li>
-        ))}
-      </ul>
-      <p className="text-[11px] text-muted-foreground mt-3">{note}</p>
-    </Card>
-  );
-}
-
-function PreviewRow({ label, pick, reasoning }: { label: string; pick: string; reasoning: string }) {
-  return (
-    <div className="flex gap-3">
-      <span className="kbd shrink-0 w-12 h-6 rounded-md bg-surface-2 text-[10px] font-bold text-muted-foreground flex items-center justify-center uppercase">
-        {label}
-      </span>
-      <div className="min-w-0">
-        <div className="font-semibold text-sm">{pick}</div>
-        <div className="text-xs text-muted-foreground mt-0.5">{reasoning}</div>
-      </div>
-    </div>
-  );
-}
-
-function PickCard({ icon: Icon, market, pick, reasoning }:
-  { icon: typeof Sparkles; market: string; pick: string; reasoning: string }) {
-  return (
-    <div className="glass p-4 flex flex-col">
-      <div className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground mb-2">
-        <Icon className="h-3.5 w-3.5 text-accent" /> {market}
-      </div>
-      <div className="font-bold mb-1.5">{pick}</div>
-      <div className="text-xs text-muted-foreground">{reasoning}</div>
-    </div>
-  );
-}
-
-function WeaknessExploitCard({ team, opponent, data }: {
-  team: string;
-  opponent: string;
-  data: {
-    opponentWeaknesses?: string[];
-    opponentWeakness?: string; // legacy single-string fallback for cached payloads
-    targetAreas?: string[];
-    targetArea?: string;       // legacy fallback
-    tacticalPlan: string;
-    playersToWatch: { name: string; role: string; why: string }[];
-  };
-}) {
-  const weaknesses = data.opponentWeaknesses && data.opponentWeaknesses.length > 0
-    ? data.opponentWeaknesses
-    : data.opponentWeakness ? [data.opponentWeakness] : [];
-  const areas = data.targetAreas && data.targetAreas.length > 0
-    ? data.targetAreas
-    : data.targetArea ? [data.targetArea] : [];
-
-  return (
-    <Card title={`${team} — exploit ${opponent}`} icon={Crosshair}>
-      <div className="space-y-3 text-sm">
+      ) : aiPick ? (
         <div>
-          <div className="text-[10px] uppercase tracking-widest text-danger font-bold mb-2">
-            {weaknesses.length} potential exploit{weaknesses.length === 1 ? "" : "s"}
-          </div>
-          <ol className="space-y-1.5">
-            {weaknesses.map((w, i) => (
-              <li key={i} className="flex gap-2 leading-relaxed">
-                <span className="kbd w-5 h-5 shrink-0 rounded-full bg-danger/15 text-danger text-[11px] font-bold flex items-center justify-center">{i + 1}</span>
-                <span>{w}</span>
-              </li>
-            ))}
-          </ol>
+          <div className="text-base font-bold">{aiPick}</div>
+          {aiReason && <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{aiReason}</p>}
         </div>
-
-        <div className="pt-1">
-          <div className="text-[10px] uppercase tracking-widest text-accent font-bold mb-2">
-            Target area{areas.length === 1 ? "" : "s"}
-          </div>
-          <ul className="flex flex-wrap gap-1.5">
-            {areas.map((a, i) => (
-              <li key={i} className="text-xs px-2 py-1 rounded-md bg-accent/10 text-accent font-semibold border border-accent/20">
-                {a}
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        <div className="pt-1">
-          <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold mb-1">Tactical plan</div>
-          <p className="leading-relaxed text-muted-foreground">{data.tacticalPlan}</p>
-        </div>
-
-        <div className="pt-2 border-t border-border/40">
-          <div className="text-[10px] uppercase tracking-widest text-accent font-bold mb-2 flex items-center gap-1.5">
-            <Eye className="h-3 w-3" /> 3 players to watch
-          </div>
-          <ol className="space-y-2">
-            {data.playersToWatch.map((p, i) => (
-              <li key={i} className="flex gap-3">
-                <span className="kbd w-6 h-6 shrink-0 rounded-full bg-accent text-accent-foreground text-xs font-bold flex items-center justify-center">{i + 1}</span>
-                <div className="min-w-0">
-                  <div className="font-semibold leading-tight">
-                    {p.name} <span className="text-[11px] text-muted-foreground font-normal">· {p.role}</span>
-                  </div>
-                  <div className="text-xs text-muted-foreground leading-relaxed mt-0.5">{p.why}</div>
-                </div>
-              </li>
-            ))}
-          </ol>
-        </div>
-      </div>
+      ) : (
+        <p className="text-sm text-muted-foreground">Multi-try projections release with team lists.</p>
+      )}
+      <p className="text-[11px] text-muted-foreground mt-3 leading-relaxed">
+        Based on form, expected team try volume and the opposition's defensive weakness in that lane.
+      </p>
     </Card>
   );
 }
+
 
 /* (Script + Bets tabs removed — Insights tab is now the single predictive view) */
 

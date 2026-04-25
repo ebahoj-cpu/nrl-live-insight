@@ -245,15 +245,23 @@ CRITICAL betting & ODDS-MATH rules — READ CAREFULLY:
     { role: "user", content: prompt },
   ];
 
-  // Keep the AI attempt short; if it misses the platform budget we fall back
-  // to a fast deterministic summary so the tabs still render.
+  // Try the Pro model first for the best analysis. If it fails (timeout, rate
+  // limit, parse error), retry once with the fast Flash model. Only after both
+  // miss do we fall back to the deterministic local summary.
   try {
     const parsed = await callGateway(key, MODEL, messages, toolDef, TIMEOUT_MS);
     return normaliseBetMath(applyRealOdds(parsed, payload.realOdds, payload.homeName, payload.awayName));
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    console.warn(`AI insights: ${MODEL} failed (${msg}); using fast local fallback`);
-    return normaliseBetMath(applyRealOdds(buildFallbackInsights(payload), payload.realOdds, payload.homeName, payload.awayName));
+    console.warn(`AI insights: ${MODEL} failed (${msg}); retrying with ${FALLBACK_MODEL}`);
+    try {
+      const parsed = await callGateway(key, FALLBACK_MODEL, messages, toolDef, 15_000);
+      return normaliseBetMath(applyRealOdds(parsed, payload.realOdds, payload.homeName, payload.awayName));
+    } catch (e2) {
+      const msg2 = e2 instanceof Error ? e2.message : String(e2);
+      console.warn(`AI insights: ${FALLBACK_MODEL} also failed (${msg2}); using local fallback`);
+      return normaliseBetMath(applyRealOdds(buildFallbackInsights(payload), payload.realOdds, payload.homeName, payload.awayName));
+    }
   }
 }
 

@@ -2,9 +2,12 @@ import {
   Outlet, Link, HeadContent, Scripts,
   createRootRouteWithContext, useRouter,
 } from "@tanstack/react-router";
-import { QueryClient, QueryClientProvider, useIsFetching } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, useIsFetching, useQuery } from "@tanstack/react-query";
 import appCss from "../styles.css?url";
-import { RotateCw } from "lucide-react";
+import { RotateCw, Menu, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { getCurrentRoundFixtures } from "@/server/index.functions";
+import { TeamLogo } from "@/components/TeamLogo";
 
 interface RouterContext { queryClient: QueryClient }
 

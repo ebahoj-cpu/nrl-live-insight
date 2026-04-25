@@ -326,7 +326,7 @@ CRITICAL betting rules:
             required: [
               "predictedScore","winner","margin","total","htft",
               "firstTryscorer","anytimeTryscorers","multiTryscorer",
-              "keysToVictory","keyFactors","betSuggestions","script",
+              "keysToVictory","keyFactors","weaknessExploit","betSuggestions","script",
             ],
             additionalProperties: false,
           },

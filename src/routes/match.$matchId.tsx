@@ -1062,10 +1062,11 @@ function FirstTryscorerCard({ insights, tryscorers }: { insights: any; tryscorer
 
 function AnytimeTryscorersCard({ insights, tryscorers }: { insights: any; tryscorers: TryscorerMarkets | null }) {
   // Prefer real market list (already implied-prob ranked), fall back to AI picks.
-  const live = (tryscorers?.anytime ?? []).slice(0, 5).map((p) => ({ name: p.player, note: "" }));
+  type Pick = { name: string; note: string };
+  const live: Pick[] = (tryscorers?.anytime ?? []).slice(0, 5).map((p) => ({ name: p.player, note: "" }));
   const aiList = Array.isArray(insights?.anytimeTryscorers) ? insights.anytimeTryscorers : [];
-  const ai = aiList.slice(0, 5).map((t: any) => ({ name: String(t.pick ?? ""), note: String(t.reasoning ?? "") }));
-  const list = (live.length >= 3 ? live : ai).slice(0, 5);
+  const ai: Pick[] = aiList.slice(0, 5).map((t: any) => ({ name: String(t.pick ?? ""), note: String(t.reasoning ?? "") }));
+  const list: Pick[] = (live.length >= 3 ? live : ai).slice(0, 5);
 
   return (
     <Card title="Anytime tryscorers" icon={Sparkles}>

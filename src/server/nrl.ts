@@ -105,12 +105,15 @@ export async function fetchLadder(season: number): Promise<NrlLadderRow[]> {
     const stats = p.stats || {};
     return {
       position: p.position ?? i + 1,
-      teamId: p.teamId ?? p.team?.teamId,
-      nickname: p.team?.nickname ?? p.nickname ?? "",
-      themeKey: p.team?.theme?.key ?? p.theme?.key ?? "",
+      teamId: p.teamId ?? p.team?.teamId ?? p.next?.teamId ?? 0,
+      // NRL ladder JSON exposes the row's own team via `teamNickname` / `theme`.
+      // (`p.next` is the team's NEXT opponent — do NOT use it for identity.)
+      nickname: p.teamNickname ?? p.team?.nickname ?? p.nickname ?? "",
+      themeKey: p.theme?.key ?? p.team?.theme?.key ?? "",
       played: Number(stats.played ?? 0),
       wins: Number(stats.wins ?? 0),
-      losses: Number(stats.losses ?? 0),
+      // NRL uses `lost` (singular) — keep `losses` as a fallback.
+      losses: Number(stats.lost ?? stats.losses ?? 0),
       drawn: Number(stats.drawn ?? 0),
       byes: Number(stats.byes ?? 0),
       points: Number(stats.points ?? p.points ?? 0),

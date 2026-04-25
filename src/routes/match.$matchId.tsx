@@ -90,9 +90,7 @@ function MatchInner() {
           {(() => {
             const hs = details.homeTeam.score;
             const as = details.awayTeam.score;
-            const finished = typeof hs === "number" && typeof as === "number" && /^(FullTime|Final|Completed)$/i.test(details.matchState);
             const live = typeof hs === "number" && typeof as === "number" && /^(InProgress|Live|HalfTime)$/i.test(details.matchState);
-            if (finished) return <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-md bg-surface-2 text-muted-foreground">Full Time</span>;
             if (live) return <span className="inline-flex items-center gap-1 text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-md bg-danger/15 text-danger"><span className="h-1.5 w-1.5 rounded-full bg-danger animate-pulse" />Live</span>;
             return null;
           })()}

@@ -335,15 +335,21 @@ function OfficialAvatar({ src, firstName, lastName, size }: { src?: string; firs
 
 function SquadPanel({ team }: { team: { nickName: string; themeKey: string; players: { firstName: string; lastName: string; position: string; jerseyNumber?: number; isCaptain?: boolean }[] } }) {
   const sorted = [...team.players].sort((a, b) => {
-    const ai = POSITION_ORDER.indexOf(a.position);
-    const bi = POSITION_ORDER.indexOf(b.position);
-    return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+    const ai = a.jerseyNumber ?? 999;
+    const bi = b.jerseyNumber ?? 999;
+    if (ai !== bi) return ai - bi;
+    const pi = POSITION_ORDER.indexOf(a.position);
+    const pj = POSITION_ORDER.indexOf(b.position);
+    return (pi === -1 ? 99 : pi) - (pj === -1 ? 99 : pj);
   });
   return (
-    <Card title={team.nickName} icon={Users}>
-      <div className="flex items-center gap-3 mb-4">
+    <section className="card-surface p-5">
+      <div className="flex items-center justify-between gap-2 mb-4">
+        <div className="flex items-center gap-2 min-w-0">
+          <Users className="h-4 w-4 text-accent shrink-0" />
+          <h3 className="font-bold text-sm uppercase tracking-wider truncate">{team.nickName}</h3>
+        </div>
         <TeamLogo themeKey={team.themeKey} name={team.nickName} size={36} />
-        <div className="text-xs text-muted-foreground">{sorted.length} players named</div>
       </div>
       {sorted.length === 0 ? (
         <div className="text-xs text-muted-foreground">Squad not yet named.</div>
@@ -363,7 +369,7 @@ function SquadPanel({ team }: { team: { nickName: string; themeKey: string; play
           ))}
         </ul>
       )}
-    </Card>
+    </section>
   );
 }
 

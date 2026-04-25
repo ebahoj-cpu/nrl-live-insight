@@ -160,6 +160,7 @@ export type NrlMatchDetails = {
   history: any;
   statGroups: NrlStatGroup[];
   officials: NrlOfficial[];
+  teamNews: { home: TeamNews | null; away: TeamNews | null };
 };
 
 export type NrlPlayer = {

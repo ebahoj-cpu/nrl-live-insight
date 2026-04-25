@@ -193,6 +193,21 @@ ALSO produce ONE "upset" object — the most credible underdog scenario:
 - keyFactors: 2-4 short bullets — concrete reasons the upset can land.
 - suggestedPlay: a single straight bet — pick = "<underdog> to win", decimalOdds = the real h2h underdog price, stake "$20", potentialReturn = stake × odds rounded to whole dollars (e.g. "$60").
 
+ALSO produce a "gameFlow" object — a quarter-by-quarter script of how the match likely unfolds:
+- openingTen: 1-2 sentences. Who starts hot, who is slow out the blocks, early field-position battle, opening kick chase.
+- firstHalf: 2-3 sentences on how the first 40 mins plays out — completion battle, who scores first, set-piece tries, defensive lapses.
+- halftimeScore: realistic { home, away } prediction. Should roughly match the predictedScore final but split sensibly across halves.
+- halftimeLeader: "home", "away", or "draw" based on halftimeScore.
+- secondHalf: 2-3 sentences on the second 40 — bench impact, kicking game in the wet/dry, who tires, late surge.
+- momentumSwings: 2-4 short bullets pinned to time windows e.g. "10-20min: Storm grab early lead through Munster shape", "55min: Eels mount comeback off back-to-back sets", "70min: Roosters ice it through field goal".
+- halftimeDouble: a HT/FT pick like "Storm / Storm" or "Draw / Storm" with reasoning and confidence 0-100. Mix in cross-overs (Draw/X or AwayHT/HomeFT) when the script supports it — don't always default to favourite/favourite.
+- closing: 1-2 sentences on the final 10 — close finish, blowout, late try cover, golden point territory?
+
+ALSO produce a "tryscorerScript" — a focused tryscoring read for both teams:
+- For EACH team, pick 3-4 tryscorer plays from the named squad. Pull the price directly from the LIVE BOOKIE ODDS block (anytime / first / 2+) — set price to that exact number, otherwise null. Each pick has: name (named squad only), market ("first" | "anytime" | "2+"), price (number from real odds, or null if not yet listed), reasoning (1-2 sentences citing form, opposition weakness, attacking shape, set-piece role, kick-chase). Spread the picks across edge (wing/centre), middle (back-row/lock crash), and spine (fullback/half) where the matchup supports it. Don't pick all from the favourite — go where the tries actually land.
+- For EACH team also list 1-2 "avoid" players — trap names the public will pile into who are poor value this week (out of form, bad matchup, used as decoy, not getting touches). Each with a 1-sentence reason.
+- summary: 2-3 sentences on the overall tryscoring picture — total tries expected, which edge leaks, who carries the kicking game.
+
 FINALLY, generate exactly 3 betSuggestions — one for EACH target payout tier: $100, $1,000, and $10,000. Each suggestion is a small multi (2-4 legs) combining real squad players, head-to-head winner, margin BUCKETS, totals, HT/FT doubles, or tryscorer markets.
 
 CRITICAL betting & ODDS-MATH rules — READ CAREFULLY:
@@ -200,6 +215,7 @@ CRITICAL betting & ODDS-MATH rules — READ CAREFULLY:
 - For markets not in the block (margin buckets, HT/FT, try-count buckets like "1-2 tries"), use realistic AU prices: margin "1-12" ~$1.80-2.20, "13+" ~$1.70-2.10, "1-6" ~$3-4, "7-12" ~$3.50-4.50, "13-24" ~$3-4, "25+" ~$5-9; HT/FT same team ~$2.20-3.50; HT/FT cross ~$8-15; "1-2 tries" ~$2.50-4 (player-dependent), "3+ tries" ~$15-50.
 - DO NOT use handicap / line / spread markets like "Roosters -12.5". Use winning-margin BUCKETS only.
 - Player try markets must use "anytime tryscorer", "first tryscorer", or try-count buckets "1-2 tries" / "3+ tries". NEVER "over 0.5".
+- DO NOT default to first tryscorer in every multi — at most ONE of the three suggestions should include a first-tryscorer leg. Prefer anytime, 2+, or no tryscorer leg at all when value lies elsewhere (margin, HT/FT, totals).
 - combinedOdds MUST equal the PRODUCT of all leg decimalOdds (within ±5%).
 - For the $100 tier aim ~5x; $1,000 tier ~50x; $10,000 tier ~500x.
 - Stake × combinedOdds MUST equal targetPayout (within ±10%). Stake usually $10–$50. Add another booster leg if math doesn't reach the target.

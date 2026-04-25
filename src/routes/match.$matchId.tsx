@@ -5,10 +5,9 @@ import { TeamLogo } from "@/components/TeamLogo";
 import type { TryscorerMarkets, TryscorerOdds } from "@/server/odds";
 import { Suspense, useState } from "react";
 import {
-  ArrowLeft, Clock, MapPin, Users, BarChart3, Sparkles, ScrollText,
+  ArrowLeft, Clock, MapPin, Users, BarChart3, Sparkles,
   Trophy, Target, Flag, Crown, TrendingUp, AlertCircle, CloudSun, Calendar, Zap, Hourglass,
-  Coins, ThumbsUp, ThumbsDown, Wallet, Activity, Shield, Brain, Crosshair, Eye,
-  Timer, Ban, Swords, Compass, Layers, Gauge, Radar, BookOpen,
+  ThumbsUp, ThumbsDown, Activity, Shield, Eye, Compass, Gauge,
 } from "lucide-react";
 
 const matchQO = (matchId: string) => queryOptions({

@@ -752,7 +752,70 @@ HARD RULES for the simulation block:
 - modelProbability is YOUR number, NOT the implied price.
 - USE EXACT bookie prices from LIVE BOOKIE ODDS where listed.
 - Tryscorer scores must be honest — explicit weak components are fine.
-- Stack only when the simulation supports it (same edge / same scoring window).`,
+- Stack only when the simulation supports it (same edge / same scoring window).
+
+==============================================================================
+SCRIPT TAB — 7-CARD ANALYST LAYOUT (HIGH PRIORITY)
+==============================================================================
+Produce a "scriptAnalyst" object that powers the redesigned Script tab. The 7 cards
+must read like a sharp NRL analyst article — grounded in the SAME unified simulation
+above (winner, margin, total, dominance, scoring pattern). Use REAL named squad
+players. NEVER repeat full sentences across cards; each card has its own job.
+
+scriptAnalyst.overview (Card 1 — Match Overview):
+- ladderContext: 1-2 sentences citing both ladder positions and points differential.
+- formContext: 1-2 sentences on last 3-5 trajectories (improving / patchy / sliding) for both sides.
+- headToHead: 1-2 sentences on H2H + venue impact at THIS specific ground.
+- stylisticContrast: 1-2 sentences naming the stylistic clash (defensive grind vs attacking flair, etc.).
+- contestSummary: EXACTLY ONE sentence summarising the expected contest dynamic.
+
+scriptAnalyst.stakes (Card 2 — What's On The Line) — for EACH team (home, away):
+- implications: 1-2 sentences on finals / ladder movement scenarios specific to THIS side.
+- pressure: 1 sentence — must-win, bounce-back, upset opportunity.
+- narrative: 1 sentence — rivalries, redemption, milestone games, coach storylines.
+- psychology: 1 sentence — confidence vs desperation framing.
+
+scriptAnalyst.homeWinningScript (Card 3 — Home Team Winning Script) — read as a step-by-step game flow, NOT bullet points:
+- opening: 1-2 sentences on how home starts (tempo, field position, defensive intent).
+- tacticalFocus: 1-2 sentences naming the key tactical lever (dominate middle / target edge / kicking control).
+- keyDrivers: 2-4 NAMED home squad players that drive this script.
+- closingOut: 1-2 sentences on how they maintain control and close the match.
+
+scriptAnalyst.awayWinningScript (Card 4 — Away Team Winning Script) — same step-by-step style, but a believable AWAY narrative:
+- opening: 1-2 sentences on early strategy (weather pressure vs fast start).
+- tacticalFocus: 1-2 sentences on tactical adjustments during the game.
+- keyMatchups: 2-4 short bullets naming specific matchups they MUST win (player vs player or unit vs unit).
+- endgame: 1-2 sentences on the closing scenario (chasing vs protecting a lead).
+
+scriptAnalyst.idealNarrative (Card 5 — Ideal Game Narrative, neutral / league perspective):
+- storyline: 1-2 sentences on the most compelling version of this match for fans / broadcast.
+- starMoments: 2-4 named star-player moments / key beats during the game.
+- finishType: 1 sentence on a dramatic or high-quality finish (close finish, late try, chase-down).
+- fanAngle: 1 sentence on why this outcome benefits fan engagement and spectacle.
+- KEEP IT REALISTIC — NOT rigged-feeling, NOT a fairytale.
+
+scriptAnalyst.marketLean (Card 6 — Market / Betting Lean Narrative — analytical, NOT conspiracy):
+- favouriteVsUnderdog: 1-2 sentences on the dynamic.
+- coverLikelihood: 1-2 sentences on whether the favourite covers the line.
+- totalsAngle: 1-2 sentences on scoring trends vs the total points line (over / under).
+- valueOrRisk: 1-2 sentences on where market value or risk sits based on form and stats.
+- DO NOT use conspiracy language. Frame as analytical, smart and grounded.
+
+scriptAnalyst.predictions (Card 7 — Match Predictions) — every prediction MUST be supported by stats / tendencies / matchup. NO random guessing:
+- winner: { team: "home" | "away", reasoning: 1-2 sentences citing form / matchup / structure }.
+- margin: { range: e.g. "1-12" or "13-24" or "25+", reasoning: 1-2 sentences }.
+- predictedScore: { home, away, reasoning: 1 sentence reflecting BOTH teams' scoring trends — must be consistent with margin and totalPoints }.
+- totalPoints: { lean: "over" | "under", line, reasoning }.
+- htft: { pick: e.g. "Storm / Storm" or "Draw / Storm" or "Eels / Storm", reasoning }.
+- firstTryscorer: { name (named squad only), reasoning: 1 sentence on matchup + team tendencies }.
+- scoringPool: 3-6 NAMED squad players in the first/second/third tryscorer pool, each with a 1-sentence reasoning citing role and red-zone / set-piece usage.
+- anytimeTryscorers: 3-6 NAMED squad players, each with 1 sentence on role, usage, and opposition weakness.
+
+HARD RULES for scriptAnalyst:
+- The cards must INTERLOCK with the simulation block — same winner, same margin bucket, same dominant side, same scoring pattern.
+- Use ONLY named squad players. Pull odds from LIVE BOOKIE ODDS where relevant.
+- No card repeats a sentence from another card or from the script / simulation blocks above.
+- Avoid generic filler — every sentence must say something a sharp NRL analyst would say.`,
 
   ].filter(Boolean).join("\n");
 

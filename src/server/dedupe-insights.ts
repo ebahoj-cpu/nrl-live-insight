@@ -85,19 +85,28 @@ export function dedupeInsights(ins: Insights): Insights {
   if (ins.script?.headToHead) seen.push(tokens(ins.script.headToHead));
   if (ins.script?.formAnalysis) seen.push(tokens(ins.script.formAnalysis));
 
+  // Weakness exploit: dedupe ONLY within each team's own block — never against
+  // the global pool. These fields drive the UI and must always be fully
+  // populated (3 weaknesses, 3 players to watch). Cross-section dedup over-prunes
+  // and leaves the cards looking broken (was: only 2 exploits showing for
+  // Roosters because the 3rd was paraphrased in xFactor).
   if (ins.weaknessExploit?.home) {
     const h = ins.weaknessExploit.home;
-    h.opponentWeaknesses = filterUnique(h.opponentWeaknesses, (s) => s, seen);
-    h.targetAreas = filterUnique(h.targetAreas, (s) => s, seen);
-    if (h.tacticalPlan) seen.push(tokens(h.tacticalPlan));
-    h.playersToWatch = filterUnique(h.playersToWatch, (p) => `${p.name} ${p.role} ${p.why}`, seen);
+    const localA: Set<string>[] = [];
+    h.opponentWeaknesses = filterUnique(h.opponentWeaknesses, (s) => s, localA, 0.7);
+    const localB: Set<string>[] = [];
+    h.targetAreas = filterUnique(h.targetAreas, (s) => s, localB, 0.7);
+    const localC: Set<string>[] = [];
+    h.playersToWatch = filterUnique(h.playersToWatch, (p) => `${p.name} ${p.role} ${p.why}`, localC, 0.7);
   }
   if (ins.weaknessExploit?.away) {
     const a = ins.weaknessExploit.away;
-    a.opponentWeaknesses = filterUnique(a.opponentWeaknesses, (s) => s, seen);
-    a.targetAreas = filterUnique(a.targetAreas, (s) => s, seen);
-    if (a.tacticalPlan) seen.push(tokens(a.tacticalPlan));
-    a.playersToWatch = filterUnique(a.playersToWatch, (p) => `${p.name} ${p.role} ${p.why}`, seen);
+    const localA: Set<string>[] = [];
+    a.opponentWeaknesses = filterUnique(a.opponentWeaknesses, (s) => s, localA, 0.7);
+    const localB: Set<string>[] = [];
+    a.targetAreas = filterUnique(a.targetAreas, (s) => s, localB, 0.7);
+    const localC: Set<string>[] = [];
+    a.playersToWatch = filterUnique(a.playersToWatch, (p) => `${p.name} ${p.role} ${p.why}`, localC, 0.7);
   }
 
   // Mirror-image guard for tactical plans: if the two team plans are too
@@ -115,16 +124,34 @@ export function dedupeInsights(ins: Insights): Insights {
 
   // Keys to victory: dedupe within each team AND vs opposite team's keys
   // (mirror guard) AND vs the global seen pool.
+  // Keys to victory: dedupe within each team only — cross-section pruning was
+  // wiping the home team's keys entirely when xFactor / formAnalysis covered
+  // similar ground. The keys card MUST always render with 3 entries.
   if (ins.keysToVictory?.home) {
-    ins.keysToVictory.home = filterUnique(ins.keysToVictory.home, (s) => s, seen, 0.5);
+    const localSeen: Set<string>[] = [];
+    ins.keysToVictory.home = filterUnique(ins.keysToVictory.home, (s) => s, localSeen, 0.6);
   }
   if (ins.keysToVictory?.away) {
-    ins.keysToVictory.away = filterUnique(ins.keysToVictory.away, (s) => s, seen, 0.5);
+    const localSeen: Set<string>[] = [];
+    ins.keysToVictory.away = filterUnique(ins.keysToVictory.away, (s) => s, localSeen, 0.6);
   }
 
-  // Key factors: most aggressive prune — only the truly novel ones survive
+  // Mirror-image guard between the two teams' keys — if home key #1 reads the
+  // same as away key #1 with names swapped, blank the away one (it'll be
+  // backfilled by the normaliser).
+  if (ins.keysToVictory?.home && ins.keysToVictory?.away) {
+    const homeKeys = ins.keysToVictory.home;
+    const awayKeys = ins.keysToVictory.away.filter((aw) => {
+      const at = tokens(aw);
+      return !homeKeys.some((hk) => jaccard(at, tokens(hk)) >= 0.7);
+    });
+    ins.keysToVictory.away = awayKeys;
+  }
+
+  // Key factors: prune against the global narrative pool — these are meta-level
+  // and SHOULD be novel vs xFactor / form / weakness commentary.
   if (ins.keyFactors) {
-    ins.keyFactors = filterUnique(ins.keyFactors, (s) => s, seen, 0.45);
+    ins.keyFactors = filterUnique(ins.keyFactors, (s) => s, seen, 0.5);
   }
 
   // Game flow momentum swings — dedupe against each other only (they're

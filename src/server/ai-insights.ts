@@ -402,5 +402,54 @@ ON TOP OF THAT, generate ONE standalone "getTheaSpecial" — the GET THEA bet:
   const data = await res.json() as any;
   const call = data.choices?.[0]?.message?.tool_calls?.[0];
   if (!call?.function?.arguments) throw new Error("AI returned no structured output");
-  return JSON.parse(call.function.arguments) as Insights;
+  const parsed = JSON.parse(call.function.arguments) as Insights;
+  return normaliseBetMath(parsed);
+}
+
+// Recompute combinedOdds = product(legs) and potentialReturn = stake × combinedOdds.
+// Guards against AI arithmetic mistakes — what we render always adds up.
+function normaliseBetMath(ins: Insights): Insights {
+  const parseStake = (s: string) => Number((s || "").replace(/[^0-9.]/g, "")) || 0;
+  const fmtOdds = (n: number) => `$${n.toFixed(2)}`;
+  const fmtMoney = (n: number) => {
+    if (n >= 1000) return `$${Math.round(n).toLocaleString("en-AU")}`;
+    return `$${n.toFixed(2)}`;
+  };
+
+  const fixMulti = <T extends { legs: BetLeg[]; stake: string; combinedOdds?: number }>(b: T) => {
+    const legs = (b.legs || []).map((l) => ({
+      pick: String(l.pick || ""),
+      decimalOdds: Math.max(1.01, Number(l.decimalOdds) || 1.01),
+    }));
+    const combined = legs.reduce((acc, l) => acc * l.decimalOdds, 1);
+    const stakeNum = parseStake(b.stake);
+    const ret = stakeNum * combined;
+    return { ...b, legs, combinedOdds: combined, _return: ret };
+  };
+
+  if (Array.isArray(ins.betSuggestions)) {
+    ins.betSuggestions = ins.betSuggestions.map((b) => {
+      const fixed = fixMulti(b);
+      return {
+        ...b,
+        legs: fixed.legs,
+        combinedOdds: fixed.combinedOdds,
+        estimatedOdds: fmtOdds(fixed.combinedOdds),
+        potentialReturn: fmtMoney(fixed._return),
+      };
+    });
+  }
+
+  if (ins.getTheaSpecial) {
+    const fixed = fixMulti(ins.getTheaSpecial);
+    ins.getTheaSpecial = {
+      ...ins.getTheaSpecial,
+      legs: fixed.legs,
+      combinedOdds: fixed.combinedOdds,
+      stake: ins.getTheaSpecial.stake || "$5",
+      potentialReturn: fmtMoney(fixed._return),
+    };
+  }
+
+  return ins;
 }

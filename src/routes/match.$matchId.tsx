@@ -8,6 +8,7 @@ import {
   ArrowLeft, Clock, MapPin, Users, BarChart3, Sparkles, ScrollText,
   Trophy, Target, Flag, Crown, TrendingUp, AlertCircle, CloudSun, Calendar, Zap, Hourglass,
   Coins, ThumbsUp, ThumbsDown, Wallet, Activity, Shield, Brain, Crosshair, Eye,
+  Timer, Ban,
 } from "lucide-react";
 
 const matchQO = (matchId: string) => queryOptions({
@@ -940,6 +941,8 @@ function ScriptTab({ insights, insightsError, insightsLoading, home, away }:
   if (!insights?.script) return <Empty msg="Script unavailable." />;
 
   const s = insights.script;
+  const homeName = home.nickName;
+  const awayName = away.nickName;
 
   return (
     <div className="space-y-4">
@@ -959,6 +962,18 @@ function ScriptTab({ insights, insightsError, insightsLoading, home, away }:
       <Card title="X-factor" icon={Sparkles} className="accent-glow">
         <p className="text-sm leading-relaxed">{s.xFactor}</p>
       </Card>
+
+      {insights.gameFlow && (
+        <GameFlowCard flow={insights.gameFlow} home={homeName} away={awayName} />
+      )}
+
+      {insights.tryscorerScript && (
+        <TryscorerScriptCard
+          script={insights.tryscorerScript}
+          home={home}
+          away={away}
+        />
+      )}
 
       {s.psychological && (
         <Card title="Psychological" icon={Brain}>
@@ -1006,6 +1021,168 @@ function ScriptTab({ insights, insightsError, insightsLoading, home, away }:
 }
 
 /* ================= BETS TAB ================= */
+
+function GameFlowCard({ flow, home, away }: { flow: any; home: string; away: string }) {
+  const ht = flow.halftimeScore || { home: 0, away: 0 };
+  const leader = flow.halftimeLeader === "home" ? home : flow.halftimeLeader === "away" ? away : "Level";
+  return (
+    <Card title="Game flow" icon={Timer}>
+      <p className="text-[11px] text-muted-foreground mb-4 italic">
+        Quarter-by-quarter script — how the match unfolds, HT score and HT/FT double.
+      </p>
+
+      {/* HT score band */}
+      <div className="rounded-xl bg-surface-2 p-4 mb-4">
+        <div className="text-[10px] uppercase tracking-widest text-muted-foreground text-center mb-2">Half-time score</div>
+        <div className="grid grid-cols-3 items-center gap-2">
+          <div className="text-center">
+            <div className="text-[10px] text-muted-foreground uppercase tracking-wider">{home}</div>
+            <div className={`text-3xl font-black kbd ${ht.home > ht.away ? "text-accent" : ""}`}>{ht.home}</div>
+          </div>
+          <div className="text-center">
+            <div className="text-[9px] text-muted-foreground uppercase tracking-widest">Leading</div>
+            <div className="text-sm font-bold text-accent leading-tight mt-0.5">{leader}</div>
+          </div>
+          <div className="text-center">
+            <div className="text-[10px] text-muted-foreground uppercase tracking-wider">{away}</div>
+            <div className={`text-3xl font-black kbd ${ht.away > ht.home ? "text-accent" : ""}`}>{ht.away}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Phase blocks */}
+      <div className="space-y-3 text-sm">
+        {flow.openingTen && (
+          <PhaseBlock label="Opening 10" text={flow.openingTen} />
+        )}
+        {flow.firstHalf && (
+          <PhaseBlock label="First half" text={flow.firstHalf} />
+        )}
+        {flow.secondHalf && (
+          <PhaseBlock label="Second half" text={flow.secondHalf} />
+        )}
+        {flow.closing && (
+          <PhaseBlock label="Final 10" text={flow.closing} />
+        )}
+      </div>
+
+      {/* Momentum swings */}
+      {flow.momentumSwings?.length > 0 && (
+        <div className="mt-4 pt-4 border-t border-border">
+          <div className="text-[10px] uppercase tracking-widest text-accent font-bold mb-2">Momentum swings</div>
+          <ul className="space-y-1.5">
+            {flow.momentumSwings.map((m: string, i: number) => (
+              <li key={i} className="flex gap-2 text-xs leading-relaxed">
+                <span className="text-accent shrink-0">⟶</span>
+                <span>{m}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* HT/FT double */}
+      {flow.halftimeDouble && (
+        <div className="mt-4 pt-4 border-t border-border">
+          <div className="flex items-center justify-between mb-1">
+            <div className="text-[10px] uppercase tracking-widest text-accent font-bold">HT/FT double</div>
+            {typeof flow.halftimeDouble.confidence === "number" && (
+              <div className="kbd text-[10px] font-bold text-muted-foreground">{Math.round(flow.halftimeDouble.confidence)}% confidence</div>
+            )}
+          </div>
+          <div className="text-base font-black mb-1">{flow.halftimeDouble.pick}</div>
+          <p className="text-xs text-muted-foreground leading-relaxed">{flow.halftimeDouble.reasoning}</p>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+function PhaseBlock({ label, text }: { label: string; text: string }) {
+  return (
+    <div className="flex gap-3">
+      <span className="kbd shrink-0 w-20 h-6 rounded-md bg-surface-2 text-[10px] font-bold text-muted-foreground flex items-center justify-center uppercase">
+        {label}
+      </span>
+      <p className="text-sm leading-relaxed text-muted-foreground flex-1">{text}</p>
+    </div>
+  );
+}
+
+function TryscorerScriptCard({ script, home, away }: {
+  script: { home: any; away: any; summary: string };
+  home: { nickName: string; themeKey: string };
+  away: { nickName: string; themeKey: string };
+}) {
+  return (
+    <Card title="Tryscorer script" icon={Flag}>
+      <p className="text-[11px] text-muted-foreground mb-4 italic">
+        Picks anchored to live AU bookie prices when available. Plus trap names to fade this week.
+      </p>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <TryscorerTeamBlock team={home} data={script.home} />
+        <TryscorerTeamBlock team={away} data={script.away} />
+      </div>
+      {script.summary && (
+        <div className="mt-4 pt-4 border-t border-border">
+          <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold mb-1">Match read</div>
+          <p className="text-xs text-muted-foreground leading-relaxed">{script.summary}</p>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+function TryscorerTeamBlock({ team, data }: {
+  team: { nickName: string; themeKey: string };
+  data: { picks: { name: string; market: string; price: number | null; reasoning: string }[]; avoid: { name: string; reasoning: string }[] };
+}) {
+  const marketLabel = (m: string) => m === "first" ? "FTS" : m === "2+" ? "2+ tries" : "Anytime";
+  return (
+    <div className="bg-surface-2 rounded-xl p-3">
+      <div className="flex items-center gap-2 mb-3">
+        <TeamLogo themeKey={team.themeKey} name={team.nickName} size={24} />
+        <div className="text-xs font-bold uppercase tracking-wider">{team.nickName}</div>
+      </div>
+
+      <ol className="space-y-2 mb-3">
+        {(data?.picks ?? []).map((p, i) => (
+          <li key={i} className="bg-surface rounded-lg p-2.5">
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="kbd w-5 h-5 shrink-0 rounded-full bg-accent text-accent-foreground text-[10px] font-bold flex items-center justify-center">{i + 1}</span>
+                <span className="font-semibold text-sm truncate">{p.name}</span>
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-accent/10 text-accent font-bold">{marketLabel(p.market)}</span>
+                {p.price != null && (
+                  <span className="kbd text-[11px] font-black text-accent">${Number(p.price).toFixed(2)}</span>
+                )}
+              </div>
+            </div>
+            <p className="text-[11px] text-muted-foreground leading-relaxed">{p.reasoning}</p>
+          </li>
+        ))}
+      </ol>
+
+      {data?.avoid?.length > 0 && (
+        <div className="pt-3 border-t border-border/40">
+          <div className="text-[10px] uppercase tracking-widest text-danger font-bold mb-1.5 inline-flex items-center gap-1.5">
+            <Ban className="h-3 w-3" /> Avoid
+          </div>
+          <ul className="space-y-1.5">
+            {data.avoid.map((a, i) => (
+              <li key={i} className="text-[11px] leading-relaxed">
+                <span className="font-semibold text-foreground">{a.name}</span>
+                <span className="text-muted-foreground"> — {a.reasoning}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function BetsTab({ insights, insightsError, insightsLoading }: { insights: any; insightsError: string | null; insightsLoading?: boolean }) {
   if (insightsLoading) return <InsightsLoading />;

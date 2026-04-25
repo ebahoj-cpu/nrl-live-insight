@@ -92,9 +92,8 @@ export type Insights = {
       playersToWatch: { name: string; role: string; why: string }[];
     };
   };
-  betSuggestions: BetSuggestion[];
-  getTheaSpecial: GetTheaSpecial;
-  upset: UpsetPlay;
+  // All bets live here in one consistent shape — rendered as identical cards on the Bets tab.
+  bets: Record<BetCategoryKey, BetPlay>;
   gameFlow: GameFlow;
   tryscorerScript: TryscorerScript;
   script: {

@@ -131,17 +131,27 @@ ALSO produce a "weaknessExploit" for EACH team. For each side identify:
 - tacticalPlan: 2-3 sentences on HOW this team weaponises that weakness — shape, ball-runners, kicking game, set-piece.
 - playersToWatch: exactly 3 NAMED squad players from THIS team most likely to score or directly influence scoring against that weakness — for each give role (e.g. "fullback", "right centre", "halfback") and a one-sentence why (form, matchup advantage, kick targets, line-running role into that channel). Use only players from the named squad above.
 
-FINALLY, generate exactly 3 betSuggestions — one for EACH target payout tier: $100, $1,000, and $10,000. Each suggestion is a small multi (2-4 legs) combining real squad players, head-to-head winner, margin BUCKETS, totals or tryscorer markets.
+FINALLY, generate exactly 3 betSuggestions — one for EACH target payout tier: $100, $1,000, and $10,000. Each suggestion is a small multi (2-4 legs) combining real squad players, head-to-head winner, margin BUCKETS, totals, HT/FT doubles, or tryscorer markets.
 
-CRITICAL betting rules:
+CRITICAL betting & ODDS-MATH rules:
 - DO NOT use handicap / line / spread markets like "Roosters -12.5". Lovable users do not bet handicap. Use winning-margin BUCKETS only: "1-12", "13+", "1-6", "7-12", "13-24", "25+".
 - Player try markets must use either "anytime tryscorer", "first tryscorer", or try-count buckets "1-2 tries" or "3+ tries". NEVER use a try line like "0.5".
+- Each leg MUST have its own realistic decimalOdds field. Estimate from the live odds summary above; for tryscorers use $4–$15 anytime, $11–$26 first; margin buckets ~$3–$8; HT/FT doubles ~$3.50–$9; over/under totals ~$1.85–$2.10.
+- combinedOdds MUST equal the PRODUCT of all leg decimalOdds (within ±5%). Do the math leg by leg. Example: 1.45 × 3.00 × 4.50 = 19.575 ≈ $19.50.
+- For the $100 tier aim for combined odds ≈ 5x; for $1,000 tier ≈ 50x (often need 4 legs incl. a margin + HT/FT or over/under booster); for $10,000 tier ≈ 500x (4 legs incl. multi-tryscorer or 3+ tries player).
+- Stake × combinedOdds MUST equal targetPayout (within ±10%). Stake usually $10–$50. If math doesn't reach the target, ADD another booster leg (HT/FT, over/under total, margin bucket, second anytime tryscorer) until it does.
 - Set "risk" to low for the $100 tier, medium for the $1,000 tier, high for the $10,000 tier.
-- Set "targetPayout" to exactly 100, 1000, or 10000 to match.
-- Pick a stake that, multiplied by combined estimated decimal odds, returns approximately the target payout (e.g. $20 stake @ $5.00 odds = $100; $20 stake @ $50 odds = $1,000; $20 stake @ $500 odds = $10,000). Stake should usually be $10–$50.
-- Estimate combined decimal odds by roughly multiplying the implied odds of each leg from the live odds shown.
-- Make legs sharp and specific (e.g. "Roosters to win", "Margin 13+", "Tedesco anytime tryscorer", "Tupou 1-2 tries"). NEVER invent players — only use named squad members above.
-- Explain in 1-2 sentences why each combo wins.`,
+- Set "targetPayout" to exactly "100", "1000", or "10000" to match.
+- NEVER invent players — only named squad members above.
+- Explain in 1-2 sentences why each combo wins.
+
+ON TOP OF THAT, generate ONE standalone "getTheaSpecial" — the GET THEA bet:
+- This is THE single best $5 → $1,000 (≈200x odds) opportunity you can construct from EVERYTHING on this fixture: stats, form, weakness exploit, weather, ladder pressure, psychological factors, X-factor, named squad.
+- 3-5 legs that are individually defensible but combine to ~200x. Use a mix: head-to-head winner + margin bucket + HT/FT + multi-tryscorer or first tryscorer + over/under booster.
+- Stake is exactly "$5", potentialReturn exactly "$1,000".
+- combinedOdds ≈ 200 (range 180–220), product of leg decimalOdds within ±5%.
+- reasoning: 3-4 sentences explaining WHY this is the play of the slate, citing weakness exploit, X-factor, weather/ground, psychological edge, and at least one named squad player.
+- confidence: 0-100 honest read. Be willing to go 25-45 — this is a long shot by design.`,
 
   ].filter(Boolean).join("\n");
 

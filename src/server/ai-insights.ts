@@ -401,9 +401,22 @@ ON TOP OF THAT, generate ONE standalone "getTheaSpecial" — the GET THEA bet:
   if (!res.ok) throw new Error(`AI gateway HTTP ${res.status}: ${await res.text()}`);
 
   const data = await res.json() as any;
-  const call = data.choices?.[0]?.message?.tool_calls?.[0];
-  if (!call?.function?.arguments) throw new Error("AI returned no structured output");
-  const parsed = JSON.parse(call.function.arguments) as Insights;
+  const choice = data.choices?.[0];
+  const call = choice?.message?.tool_calls?.[0];
+  const argStr = call?.function?.arguments;
+  if (!argStr) {
+    const finish = choice?.finish_reason || choice?.native_finish_reason || "unknown";
+    const textFallback = choice?.message?.content;
+    console.error("AI insights: no tool_call returned", { finish, textFallback: textFallback?.slice(0, 500) });
+    throw new Error(`AI returned no structured output (finish: ${finish}). Try Refresh.`);
+  }
+  let parsed: Insights;
+  try {
+    parsed = JSON.parse(argStr) as Insights;
+  } catch (e) {
+    console.error("AI insights: JSON.parse failed", { len: argStr.length, head: argStr.slice(0, 300), tail: argStr.slice(-300) });
+    throw new Error("AI returned malformed JSON. Try Refresh.");
+  }
   return normaliseBetMath(parsed);
 }
 

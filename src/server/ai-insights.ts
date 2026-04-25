@@ -78,6 +78,7 @@ export type Insights = {
   };
   betSuggestions: BetSuggestion[];
   getTheaSpecial: GetTheaSpecial;
+  upset: UpsetPlay;
   script: {
     headToHead: string;
     formAnalysis: string;
@@ -89,6 +90,17 @@ export type Insights = {
       wantToLose: string;
       liability: string;
     };
+  };
+};
+
+export type RealOdds = {
+  h2h: { home: { price: number; book: string } | null; away: { price: number; book: string } | null };
+  totals: { line: number; over: number; under: number; book: string }[]; // best lines
+  spreads: { line: number; homePrice: number; awayPrice: number; book: string }[];
+  tryscorers: {
+    first: { player: string; price: number }[];
+    anytime: { player: string; price: number }[];
+    multi: { player: string; price: number }[]; // 2+ tries
   };
 };
 

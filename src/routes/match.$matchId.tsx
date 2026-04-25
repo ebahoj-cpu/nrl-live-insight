@@ -113,23 +113,23 @@ function MatchInner() {
           <TeamColumn name={details.awayTeam.nickName} themeKey={details.awayTeam.themeKey} position={details.awayTeam.position} />
         </div>
 
-        <div className="mt-6 pt-5 border-t border-border grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-          <div className="inline-flex items-center gap-2">
+        <div className="mt-6 pt-5 border-t border-border space-y-2 text-sm text-center sm:text-left sm:grid sm:grid-cols-2 sm:gap-3 sm:space-y-0">
+          <div className="inline-flex items-center justify-center sm:justify-start gap-2 flex-wrap">
             <Calendar className="h-4 w-4 text-accent shrink-0" />
             <span className="text-muted-foreground">{formatDate(details.kickoffUtc)}</span>
             <span className="text-muted-foreground">·</span>
             <Clock className="h-4 w-4 text-accent shrink-0" />
             <span className="text-muted-foreground kbd">{formatTime(details.kickoffUtc)}</span>
           </div>
-          <div className="inline-flex items-center gap-2 sm:justify-end sm:text-right">
+          <div className="flex items-center justify-center sm:justify-end gap-2">
             <MapPin className="h-4 w-4 text-accent shrink-0" />
             <span className="text-muted-foreground truncate">{details.venue}{details.venueCity ? `, ${details.venueCity}` : ""}</span>
           </div>
           {details.weather && (
-            <div className="inline-flex items-center gap-2 sm:col-span-2 pt-3 border-t border-border">
+            <div className="flex items-center justify-center sm:justify-start gap-2 sm:col-span-2 pt-3 border-t border-border flex-wrap">
               <CloudSun className="h-4 w-4 text-accent shrink-0" />
               <span className="text-muted-foreground">
-                {details.weather.tempC}° {details.weather.condition} · {details.weather.windKph} km/h wind · {details.weather.precipMm}mm rain
+                {details.weather.tempC}° {shortWeather(details.weather.condition)} · {details.weather.windKph} km/h wind · {details.weather.precipMm}mm rain
               </span>
               <span className="text-muted-foreground">·</span>
               <span className="font-semibold text-foreground">{details.weather.groundCondition} ground</span>
@@ -138,7 +138,7 @@ function MatchInner() {
         </div>
       </section>
 
-      {/* Tabs */}
+      {/* Tabs — icon-only on mobile, icon+label on sm+ */}
       <nav className="mt-6 grid grid-cols-5 gap-1 p-1 glass" role="tablist">
         <TabButton active={tab === "lineup"} onClick={() => setTab("lineup")} icon={Users} label="Lineup" />
         <TabButton active={tab === "stats"} onClick={() => setTab("stats")} icon={BarChart3} label="Stats" />

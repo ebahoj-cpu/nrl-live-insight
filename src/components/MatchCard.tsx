@@ -145,16 +145,24 @@ export function MatchCard({ fixture, odds }: { fixture: NrlFixture & { weather?:
           <CloudSun className="h-3.5 w-3.5 shrink-0 text-accent" />
           {w ? (
             <span className="truncate">
-              {w.tempC}° {w.condition} · <span className="text-foreground/80">{w.groundCondition}</span>
+              {w.tempC}° {shortCondition(w.condition)}
             </span>
           ) : (
             <span className="truncate">Forecast pending</span>
           )}
         </div>
-        <span className="inline-flex items-center gap-1 text-accent font-semibold group-hover:gap-2 transition-all shrink-0">
+        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-accent text-accent-foreground font-bold text-[11px] uppercase tracking-wider group-hover:gap-2.5 transition-all shrink-0 shadow-[0_4px_14px_-4px_color-mix(in_oklab,var(--accent)_60%,transparent)]">
           View analysis <ArrowRight className="h-3.5 w-3.5" />
         </span>
       </div>
     </Link>
   );
+}
+
+function shortCondition(c: string): string {
+  if (!c) return "";
+  // Keep at most 2 words; trim long descriptors like "Partly cloudy with showers"
+  const words = c.trim().split(/\s+/);
+  if (words.length <= 2) return c;
+  return words.slice(0, 2).join(" ");
 }

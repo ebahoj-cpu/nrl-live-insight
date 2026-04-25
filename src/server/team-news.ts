@@ -4,9 +4,8 @@
 // public surface for ins/outs short of the per-club press releases.
 //
 // URL pattern: https://www.nrl.com/news/{yyyy}/{mm}/{dd}/nrl-team-lists-round-{N}/
-// We don't know the publish date in advance, so we discover the article via
-// the news listing for the round and cache the resolved URL alongside the
-// parsed payload.
+// Discovery: we read https://www.nrl.com/news/topic/team-lists/ and grab the
+// first href that matches the canonical slug for the given round + season.
 
 const UA = "Mozilla/5.0 (compatible; NRLLiveInsight/1.0)";
 
@@ -22,23 +21,18 @@ export type MatchTeamNews = {
   away: TeamNews | null;
 };
 
-// Cache the article body per (season, round) — the article is updated multiple
-// times during the week so the in-memory TTL is short. The match-page caller
-// already memoises the whole match details object on top.
 const articleCache = new Map<string, { ts: number; body: string; url: string }>();
 const ARTICLE_TTL_MS = 30 * 60_000; // 30 minutes
 
 async function resolveArticleUrl(season: number, round: number): Promise<string | null> {
-  // The slug is stable: nrl-team-lists-round-{N}
-  // The URL has the publish date which we don't know, so use Google-style search
-  // via the NRL site search redirect (or try the most recent few weeks of dates).
-  // Easiest robust path: fetch the news listing, which lists recent articles.
+  // The team-lists topic listing has a stable slot for the most recent rounds
+  // and is updated immediately when a new article is published.
   try {
-    const listUrl = `https://www.nrl.com/news/?tagNames=Round%20${round}&competitionId=111&seasonId=${season}`;
-    const res = await fetch(listUrl, { headers: { "User-Agent": UA } });
+    const res = await fetch("https://www.nrl.com/news/topic/team-lists/", {
+      headers: { "User-Agent": UA },
+    });
     if (!res.ok) return null;
     const html = await res.text();
-    // Look for the canonical team-lists slug inside any link href.
     const re = new RegExp(`/news/${season}/\\d{2}/\\d{2}/nrl-team-lists-round-${round}/`, "i");
     const m = html.match(re);
     return m ? `https://www.nrl.com${m[0]}` : null;
@@ -84,88 +78,102 @@ function htmlToText(html: string): string {
     .trim();
 }
 
-// Find the slice of text for a given match (e.g. "Knights v Panthers"). The
-// article uses headings like "### Knights v Panthers, Sunday 2.00pm at ...".
-function sliceMatchSection(text: string, homeNick: string, awayNick: string): string | null {
-  const lines = text.split("\n");
-  const startRe = new RegExp(`^#?#? ?${escape(homeNick)}\\s+v\\s+${escape(awayNick)}\\b`, "i");
-  const altRe = new RegExp(`^#?#? ?${escape(awayNick)}\\s+v\\s+${escape(homeNick)}\\b`, "i");
-  let startIdx = -1;
-  for (let i = 0; i < lines.length; i++) {
-    if (startRe.test(lines[i].trim()) || altRe.test(lines[i].trim())) {
-      startIdx = i;
-      break;
-    }
-  }
-  if (startIdx === -1) return null;
-  // End at the next "Xxx v Yyy," heading — that's the next match in the article.
-  const nextRe = /^#?#? ?[A-Z][A-Za-z' ]+\s+v\s+[A-Z][A-Za-z' ]+,/;
-  let endIdx = lines.length;
-  for (let i = startIdx + 1; i < lines.length; i++) {
-    if (nextRe.test(lines[i].trim())) { endIdx = i; break; }
-  }
-  return lines.slice(startIdx, endIdx).join("\n");
-}
-
 function escape(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-// Parse "### {Team} Ins" / "### {Team} Outs" sections. Each section is a list
-// of bullet items where the player name is split across two lines (first / last).
-function parseInsOuts(section: string, teamNick: string): { ins: string[]; outs: string[] } {
-  const ins = parseSection(section, `### ${teamNick} Ins`, "ins");
-  const outs = parseSection(section, `### ${teamNick} Outs`, "outs");
-  return { ins, outs };
-}
-
-function parseSection(section: string, heading: string, kind: "ins" | "outs"): string[] {
-  const lines = section.split("\n");
-  const idx = lines.findIndex((l) => l.trim().toLowerCase() === heading.toLowerCase());
-  if (idx === -1) return [];
-  // Read forward until the next "###" heading or "#### Match Officials".
-  const out: string[] = [];
-  let buffer: string[] = [];
-  const flushBuffer = () => {
-    const name = buffer.map((b) => b.trim()).filter(Boolean).join(" ").trim();
-    if (name && /^[A-Z][A-Za-z'’\-\.]+(?:\s+[A-Z][A-Za-z'’\-\.]+)+/.test(name)) {
-      out.push(name);
-    }
-    buffer = [];
-  };
-  for (let i = idx + 1; i < lines.length; i++) {
-    const raw = lines[i];
-    const t = raw.trim();
-    if (/^#{2,4}\s/.test(t)) break;
-    if (/^Match Officials/i.test(t)) break;
-    if (t.startsWith("- ")) {
-      flushBuffer();
-      buffer.push(t.slice(2));
-    } else if (t === "" ) {
-      // blank line — possible item boundary inside a multiline bullet
-      if (buffer.length) {
-        // Heuristic: if buffer already looks like a full name, flush; otherwise keep collecting.
-        const joined = buffer.join(" ").trim();
-        if (/\s/.test(joined)) flushBuffer();
-      }
-    } else if (/^Ins$|^Outs$/i.test(t)) {
-      // Stray label – ignore.
-      continue;
-    } else {
-      // Continuation of current bullet (last name on its own line).
-      if (buffer.length) buffer.push(t);
-    }
-    // Safety: don't accumulate forever
-    if (out.length > 25) break;
+// Find the slice of text for a given match (e.g. "Knights v Panthers, Sunday 2.00pm at ...").
+function sliceMatchSection(text: string, homeNick: string, awayNick: string): string | null {
+  const lines = text.split("\n").map((l) => l.trim());
+  const startRe = new RegExp(`^${escape(homeNick)}\\s+v\\s+${escape(awayNick)}\\b`, "i");
+  const altRe = new RegExp(`^${escape(awayNick)}\\s+v\\s+${escape(homeNick)}\\b`, "i");
+  let startIdx = -1;
+  for (let i = 0; i < lines.length; i++) {
+    if (startRe.test(lines[i]) || altRe.test(lines[i])) { startIdx = i; break; }
   }
-  flushBuffer();
-  // Dedupe while preserving order.
-  return Array.from(new Set(out));
+  if (startIdx === -1) return null;
+  // End at the next "Xxx v Yyy" heading line.
+  const nextRe = /^[A-Z][A-Za-z' ]+\s+v\s+[A-Z][A-Za-z' ]+,/;
+  let endIdx = lines.length;
+  for (let i = startIdx + 1; i < lines.length; i++) {
+    if (nextRe.test(lines[i])) { endIdx = i; break; }
+  }
+  return lines.slice(startIdx, endIdx).join("\n");
 }
 
-// Late-mail blurb at the end of each match block: "**{Team}:** ..."
+// The article structure (post-mid-2025 markup) is:
+//   {Team} Ins
+//   FirstName
+//   LastName
+//   FirstName
+//   LastName
+//   Ins  <-- spurious "Ins" label sometimes appears
+//   {Team} Outs
+//   FirstName
+//   LastName
+//   ...
+//   Match Officials  <-- end marker
+//
+// Recurring markup glitch: the second team's Outs heading is sometimes
+// mislabelled as "{otherTeam} Ins" again. We defend by splitting on every
+// known section heading and assigning by order of appearance.
+
+type Section = { heading: string; lines: string[] };
+
+function splitSections(section: string, homeNick: string, awayNick: string): Section[] {
+  const lines = section.split("\n").map((l) => l.trim()).filter(Boolean);
+  const headingRe = new RegExp(
+    `^(?:${escape(homeNick)}|${escape(awayNick)})\\s+(Ins|Outs)$`,
+    "i",
+  );
+  const out: Section[] = [];
+  let current: Section | null = null;
+  for (const line of lines) {
+    if (headingRe.test(line)) {
+      if (current) out.push(current);
+      current = { heading: line, lines: [] };
+    } else if (/^Match Officials$/i.test(line)) {
+      break;
+    } else if (current) {
+      current.lines.push(line);
+    }
+  }
+  if (current) out.push(current);
+  return out;
+}
+
+// Parse the alternating first-name/last-name lines into full player names.
+// Stops when a stray heading-like token is encountered ("Ins", "Outs", etc.).
+function parsePlayerList(lines: string[]): string[] {
+  const cleaned = lines.filter((l) => !/^(Ins|Outs)$/i.test(l));
+  const names: string[] = [];
+  for (let i = 0; i + 1 < cleaned.length; i += 2) {
+    const first = cleaned[i];
+    const last = cleaned[i + 1];
+    if (!isLikelyNamePart(first) || !isLikelyNamePart(last)) {
+      // Skip past one token and try again on the next pair.
+      i -= 1;
+      continue;
+    }
+    names.push(`${first} ${last}`.replace(/\s+/g, " ").trim());
+  }
+  // Dedupe preserving order.
+  return Array.from(new Set(names));
+}
+
+function isLikelyNamePart(s: string): boolean {
+  if (!s) return false;
+  if (s.length < 2 || s.length > 30) return false;
+  // Allow letters, hyphen, apostrophe (e.g. To'o, Papali'i), accents.
+  return /^[A-Za-zÀ-ÖØ-öø-ÿ'’\-\.]+$/.test(s);
+}
+
 function parseBlurb(section: string, teamNick: string): string {
-  const re = new RegExp(`\\*\\*${escape(teamNick)}:\\*\\*\\s*([^\\n]+(?:\\n(?!\\*\\*|###|####)[^\\n]+){0,3})`, "i");
+  // Pattern: "{Team}: ..." paragraph after the Match Officials block.
+  const re = new RegExp(
+    `(?:^|\\n)${escape(teamNick)}\\s*:\\s*([^\\n]+(?:\\n(?!(?:${escape(teamNick)}|Match Officials|[A-Z][A-Za-z' ]+\\s+v\\s+))[^\\n]+){0,5})`,
+    "i",
+  );
   const m = section.match(re);
   if (!m) return "";
   return m[1].replace(/\s+/g, " ").trim();
@@ -183,39 +191,47 @@ export async function fetchMatchTeamNews(
   const section = sliceMatchSection(text, homeNick, awayNick);
   if (!section) return { home: null, away: null };
 
-  // The article uses the "{Team} Ins/Outs" heading style most of the time, but
-  // a recurring markup glitch causes the second team's "Outs" heading to be
-  // mislabelled "{Team} Ins" again. We defend against that by parsing both
-  // headings and, when a duplicate "Ins" is found, treating the second one as
-  // the missing "Outs".
-  const homeIO = parseInsOuts(section, homeNick);
-  const awayIO = parseInsOuts(section, awayNick);
+  // Pull all "{Team} (Ins|Outs)" sections in order of appearance. The expected
+  // sequence is [home Ins, away Ins, home Outs, away Outs] but the markup
+  // glitch can produce [home Ins, away Ins, home Outs, away Ins(=Outs)] —
+  // we treat the 4th positional slot as the away-team Outs regardless of
+  // its declared heading text.
+  const sections = splitSections(section, homeNick, awayNick);
 
-  // Patch the markup glitch: if away.outs is empty AND there are TWO "{away} Ins"
-  // headings in the section, treat the second occurrence as the away outs.
-  if (awayIO.outs.length === 0) {
-    const dupHeading = `### ${awayNick} Ins`;
-    const occurrences = section.split(dupHeading).length - 1;
-    if (occurrences >= 2) {
-      const secondStart = section.indexOf(dupHeading, section.indexOf(dupHeading) + dupHeading.length);
-      const tail = section.slice(secondStart).replace(dupHeading, `### ${awayNick} Outs`);
-      const fixed = parseSection(tail, `### ${awayNick} Outs`, "outs");
-      if (fixed.length) awayIO.outs = fixed;
+  const homeNews: TeamNews = { ins: [], outs: [], blurb: parseBlurb(section, homeNick), sourceUrl: article.url };
+  const awayNews: TeamNews = { ins: [], outs: [], blurb: parseBlurb(section, awayNick), sourceUrl: article.url };
+
+  // Try heading-driven assignment first.
+  for (const s of sections) {
+    const isHome = new RegExp(`^${escape(homeNick)}\\s`, "i").test(s.heading);
+    const isOuts = /Outs$/i.test(s.heading);
+    const players = parsePlayerList(s.lines);
+    const target = isHome ? homeNews : awayNews;
+    if (isOuts) target.outs.push(...players);
+    else target.ins.push(...players);
+  }
+
+  // Glitch repair: if away.outs is empty AND we see two "{away} Ins" headings,
+  // treat the second as away.outs.
+  if (awayNews.outs.length === 0) {
+    const awayInsHeadings = sections.filter((s) =>
+      new RegExp(`^${escape(awayNick)}\\s+Ins$`, "i").test(s.heading),
+    );
+    if (awayInsHeadings.length >= 2) {
+      const second = awayInsHeadings[awayInsHeadings.length - 1];
+      const players = parsePlayerList(second.lines);
+      // The "ins" we already pushed was the duplicate — keep only the first occurrence.
+      // We can't easily reverse, so dedupe ins against outs to keep things sensible.
+      awayNews.outs = players;
+      awayNews.ins = awayNews.ins.filter((p) => !players.includes(p));
     }
   }
 
-  return {
-    home: {
-      ins: homeIO.ins,
-      outs: homeIO.outs,
-      blurb: parseBlurb(section, homeNick),
-      sourceUrl: article.url,
-    },
-    away: {
-      ins: awayIO.ins,
-      outs: awayIO.outs,
-      blurb: parseBlurb(section, awayNick),
-      sourceUrl: article.url,
-    },
-  };
+  // Dedupe each list once more.
+  homeNews.ins = Array.from(new Set(homeNews.ins));
+  homeNews.outs = Array.from(new Set(homeNews.outs));
+  awayNews.ins = Array.from(new Set(awayNews.ins));
+  awayNews.outs = Array.from(new Set(awayNews.outs));
+
+  return { home: homeNews, away: awayNews };
 }

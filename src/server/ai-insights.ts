@@ -658,7 +658,7 @@ FINALLY, generate the "bets" object — EXACTLY FOUR betting slips, one per risk
 CORE RULES — every tier:
 - Each leg must be supported by AT LEAST one of: the simulation profile, a ranked tryscorer (PAIS/TTCP/matchupExploit/scriptFit), a recommendedPlay with positive edge, or the weaknessExploit / gameFlow analysis.
 - Same-game multi correlation must be moderate (not strict, not loose). Stronger script = tighter correlation; weaker script = slightly more diversified legs.
-- NEVER include contradictory legs (e.g. "home to win" + "away leads at half" without supporting HT/FT). NEVER duplicate logical markets (e.g. winner + winning-margin where the margin already implies the winner — pick ONE).
+- NEVER include contradictory legs (e.g. "home to win" + "away leads at half" without supporting HT/FT). NEVER duplicate logical markets (e.g. winner + winning-margin where the margin already implies the winner — pick ONE). NEVER include the same player in the same market twice in one slip (e.g. "Brian To'o 2+ tries" cannot appear twice). NEVER include the same player with overlapping try markets (e.g. "Brian To'o anytime tryscorer" + "Brian To'o 2+ tries" — pick ONE). Each leg in a slip MUST be a UNIQUE market+pick combination.
 - Quote LIVE BOOKIE ODDS prices EXACTLY for any leg that matches a listed market.
 - combinedOdds MUST equal product(legs) within ±5%.
 - Default stake is "$10" per slip — the user can override in the UI.
@@ -1861,19 +1861,21 @@ function buildFallbackBets(input: {
       category: "ultra",
       title: `Ultra — extreme script outcome`,
       legs: [
-        { pick: `${input.winnerName} winning margin 13+`, decimalOdds: 1.95 },
         { pick: `${input.winnerName} winning margin ${input.marginBucket === "13+" ? "13-24" : input.marginBucket}`, decimalOdds: marginOdds },
         { pick: input.htftPick, decimalOdds: 2.6 },
         { pick: totalPickLabel, decimalOdds: totalOddsApprox },
         { pick: `${aA.name} 2+ tries`, decimalOdds: multiB },
         { pick: `${aB.name} 2+ tries`, decimalOdds: multiC },
-        { pick: `${input.multiTryName} 2+ tries`, decimalOdds: input.multiTryPrice },
+        // Only add the multi-try star if it isn't already represented above.
+        ...(input.multiTryName && input.multiTryName !== aA.name && input.multiTryName !== aB.name
+          ? [{ pick: `${input.multiTryName} 2+ tries`, decimalOdds: input.multiTryPrice }]
+          : [{ pick: `${aD.name} anytime tryscorer`, decimalOdds: aD.price }]),
       ],
       combinedOdds: 1,
       estimatedOdds: "$0.00",
       stake: "$10",
       potentialReturn: "$0.00",
-      reasoning: `Extreme variance scenario — needs ${input.winnerName} to fully impose the script, with multiple finishers cashing doubles. Big margins + HT/FT + stacked 2+ tries — the rare game where everything aligns.`,
+      reasoning: `Extreme variance scenario — needs ${input.winnerName} to fully impose the script, with multiple finishers cashing doubles.`,
       hitRateScore: scriptStrength === "strong" ? 14 : 8,
       scriptAlignment: `extreme dominance + scoring flood`,
     },
@@ -2284,11 +2286,29 @@ function normaliseBetMath(ins: Insights): Insights {
     return `$${n.toFixed(2)}`;
   };
 
+  // Build a normalised signature so duplicate legs (same pick, casing/quote
+  // variants) are dropped before we compute combined odds. This is what made
+  // ultra slips show e.g. "Brian To'o 2+ tries" twice and overstate payouts.
+  const legSig = (pick: string) => pick
+    .toLowerCase()
+    .replace(/[’]/g, "'")
+    .replace(/\s+/g, " ")
+    .trim();
+
   const fixMulti = <T extends { legs: BetLeg[]; stake: string; combinedOdds?: number }>(b: T) => {
-    const legs = (b.legs || []).map((l) => ({
-      pick: String(l.pick || ""),
-      decimalOdds: Math.max(1.01, Number(l.decimalOdds) || 1.01),
-    }));
+    const seen = new Set<string>();
+    const legs: BetLeg[] = [];
+    for (const l of b.legs || []) {
+      const pick = String(l?.pick ?? "").trim();
+      if (!pick) continue;
+      const sig = legSig(pick);
+      if (seen.has(sig)) continue;
+      seen.add(sig);
+      legs.push({
+        pick,
+        decimalOdds: Math.max(1.01, Number(l?.decimalOdds) || 1.01),
+      });
+    }
     const combined = legs.reduce((acc, l) => acc * l.decimalOdds, 1);
     const stakeNum = parseStake(b.stake);
     const ret = stakeNum * combined;

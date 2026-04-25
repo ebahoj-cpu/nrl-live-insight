@@ -775,18 +775,14 @@ function SeasonOverviewCard({ team, data }: { team: string; side: "home" | "away
         <Stat label="Ladder" value={data.ladderPosition} />
         <Stat label="Diff" value={data.pointsDifferential} />
       </div>
-      <div className="mb-3">
+      <div className="flex items-center gap-2 mb-2">
         <span className={`inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-bold px-2 py-1 rounded-md border ${tone}`}>
           <TrendingUp className="h-3 w-3" /> {data.formTrajectory ?? "inconsistent"}
         </span>
-        {data.trajectoryNote && <p className="text-xs text-muted-foreground leading-relaxed mt-2">{data.trajectoryNote}</p>}
       </div>
-      <div className="space-y-2">
-        <ProfileRow label="Stat trends" body={data.statTrends} />
-        <ProfileRow label="Vs top vs bottom" body={data.vsTopVsBottom} />
-        <ProfileRow label="Home / away split" body={data.homeAwaySplit} />
-        <ProfileRow label="Identity" body={data.identity} />
-      </div>
+      {data.identity && (
+        <p className="text-xs text-muted-foreground leading-relaxed">{data.identity}</p>
+      )}
     </Card>
   );
 }
@@ -798,25 +794,11 @@ function KeysCard({ team, keys }: { team: string; opponent: string; keys?: any[]
       {list.length === 0 ? (
         <p className="text-xs text-muted-foreground">Keys regenerating…</p>
       ) : (
-        <ol className="space-y-3">
+        <ol className="space-y-2">
           {list.map((k: any, i: number) => (
-            <li key={i} className="bg-surface-2 rounded-xl p-3">
-              <div className="flex items-start gap-2 mb-2">
-                <span className="text-[10px] font-bold text-accent-foreground bg-accent rounded-md px-1.5 py-0.5 shrink-0 mt-0.5">{i + 1}</span>
-                <p className="text-sm font-bold leading-tight">{k.key}</p>
-              </div>
-              {k.targetsWeakness && (
-                <div className="mb-1.5">
-                  <div className="text-[10px] uppercase tracking-wider text-danger font-bold mb-0.5">Targets</div>
-                  <p className="text-xs text-muted-foreground leading-relaxed">{k.targetsWeakness}</p>
-                </div>
-              )}
-              {k.reasoning && (
-                <div>
-                  <div className="text-[10px] uppercase tracking-wider text-accent font-bold mb-0.5">Why</div>
-                  <p className="text-xs text-muted-foreground leading-relaxed">{k.reasoning}</p>
-                </div>
-              )}
+            <li key={i} className="flex items-start gap-2">
+              <span className="text-[10px] font-bold text-accent-foreground bg-accent rounded-md px-1.5 py-0.5 shrink-0 mt-0.5">{i + 1}</span>
+              <p className="text-sm leading-snug">{k.key}</p>
             </li>
           ))}
         </ol>
@@ -832,20 +814,14 @@ function StrengthsCard({ team, items }: { team: string; items?: any[] }) {
       {list.length === 0 ? (
         <p className="text-xs text-muted-foreground">Strengths regenerating…</p>
       ) : (
-        <ul className="space-y-3">
+        <ul className="space-y-2">
           {list.map((s: any, i: number) => (
-            <li key={i} className="bg-surface-2 rounded-xl p-3">
-              <div className="flex items-start gap-2 mb-2">
-                <Shield className="h-3.5 w-3.5 text-accent shrink-0 mt-0.5" />
-                <p className="text-sm font-bold leading-tight">{s.title}</p>
+            <li key={i} className="flex items-start gap-2">
+              <Shield className="h-3.5 w-3.5 text-accent shrink-0 mt-1" />
+              <div className="min-w-0">
+                <p className="text-sm font-semibold leading-tight">{s.title}</p>
+                {s.detail && <p className="text-xs text-muted-foreground leading-relaxed mt-0.5">{s.detail}</p>}
               </div>
-              {s.detail && <p className="text-xs text-muted-foreground leading-relaxed mb-1.5">{s.detail}</p>}
-              {s.impact && (
-                <div>
-                  <div className="text-[10px] uppercase tracking-wider text-accent font-bold mb-0.5">Impact</div>
-                  <p className="text-xs text-muted-foreground leading-relaxed">{s.impact}</p>
-                </div>
-              )}
             </li>
           ))}
         </ul>
@@ -861,20 +837,14 @@ function WeaknessesCard({ team, items }: { team: string; items?: any[] }) {
       {list.length === 0 ? (
         <p className="text-xs text-muted-foreground">Weaknesses regenerating…</p>
       ) : (
-        <ul className="space-y-3">
+        <ul className="space-y-2">
           {list.map((w: any, i: number) => (
-            <li key={i} className="bg-surface-2 rounded-xl p-3 border border-danger/20">
-              <div className="flex items-start gap-2 mb-2">
-                <AlertCircle className="h-3.5 w-3.5 text-danger shrink-0 mt-0.5" />
-                <p className="text-sm font-bold leading-tight">{w.title}</p>
+            <li key={i} className="flex items-start gap-2">
+              <AlertCircle className="h-3.5 w-3.5 text-danger shrink-0 mt-1" />
+              <div className="min-w-0">
+                <p className="text-sm font-semibold leading-tight">{w.title}</p>
+                {w.detail && <p className="text-xs text-muted-foreground leading-relaxed mt-0.5">{w.detail}</p>}
               </div>
-              {w.detail && <p className="text-xs text-muted-foreground leading-relaxed mb-1.5">{w.detail}</p>}
-              {w.howToTarget && (
-                <div>
-                  <div className="text-[10px] uppercase tracking-wider text-danger font-bold mb-0.5">How to target</div>
-                  <p className="text-xs text-muted-foreground leading-relaxed">{w.howToTarget}</p>
-                </div>
-              )}
             </li>
           ))}
         </ul>
@@ -896,21 +866,18 @@ function PlayersToWatchCard({ team, players }: { team: string; players?: any[] }
       {list.length === 0 ? (
         <p className="text-xs text-muted-foreground">Players to watch regenerating…</p>
       ) : (
-        <ul className="space-y-3">
+        <ul className="space-y-2.5">
           {list.map((p: any, i: number) => {
             const tone = BUCKET_TONE[p.bucket] ?? BUCKET_TONE.back;
             return (
-              <li key={i} className="bg-surface-2 rounded-xl p-3">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className={`h-2 w-2 rounded-full ${tone.dot}`} />
-                  <span className="text-sm font-bold">{p.name}</span>
-                  <span className="text-[10px] uppercase tracking-wider text-muted-foreground">· {p.position}</span>
-                  <span className="ml-auto text-[10px] uppercase tracking-wider font-bold text-muted-foreground">{tone.label}</span>
-                </div>
-                <div className="space-y-1.5">
-                  <ProfileRow label="Form" body={p.form} />
-                  <ProfileRow label="Role this week" body={p.role} />
-                  <ProfileRow label="Matchup" body={p.matchup} />
+              <li key={i} className="flex items-start gap-2">
+                <span className={`h-2 w-2 rounded-full mt-1.5 shrink-0 ${tone.dot}`} />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-sm font-semibold truncate">{p.name}</span>
+                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground shrink-0">{p.position}</span>
+                  </div>
+                  {p.matchup && <p className="text-xs text-muted-foreground leading-relaxed mt-0.5">{p.matchup}</p>}
                 </div>
               </li>
             );
@@ -1999,12 +1966,12 @@ function BetsTab({ insights, insightsError, insightsLoading }: { insights: any; 
   return (
     <div className="space-y-4">
       <div className="glass p-4 sm:p-5">
-        <div className="flex items-center gap-2 mb-2">
+        <div className="flex items-center gap-2 mb-1">
           <Wallet className="h-4 w-4 text-accent" />
           <h2 className="text-sm font-black uppercase tracking-widest">Slip engine</h2>
         </div>
         <p className="text-[12px] text-muted-foreground leading-relaxed">
-          Four slips, one per risk tier — all derived from the same match simulation. Adjust your stake to see live payout. Higher tiers add legs and variance; lower tiers prioritise hit rate over headline payout.
+          Four slips, one per risk tier. Same match script, different appetite. Edit stake to update payout.
         </p>
       </div>
 
@@ -2029,25 +1996,58 @@ function fmtMoney(n: number): string {
   return `$${n.toFixed(2)}`;
 }
 
+// Build a stable signature for a leg so we can dedupe duplicates
+// (e.g. AI sometimes generates "Brian To'o 2+ tries" twice in the same slip).
+function legSignature(leg: any): string {
+  const pick = String(typeof leg === "string" ? leg : leg?.pick ?? "")
+    .toLowerCase()
+    .replace(/[’']/g, "'")
+    .replace(/\s+/g, " ")
+    .trim();
+  return pick;
+}
+
+function dedupeLegs(legs: any[]): any[] {
+  const seen = new Set<string>();
+  const out: any[] = [];
+  for (const leg of legs || []) {
+    const sig = legSignature(leg);
+    if (!sig || seen.has(sig)) continue;
+    seen.add(sig);
+    out.push(leg);
+  }
+  return out;
+}
+
 function BetCard({ categoryKey, bet }: { categoryKey: BetCategoryKey; bet: any }) {
   const meta = BET_META[categoryKey];
   const Icon = meta.Icon;
-  const odds = Number(bet.combinedOdds) || 0;
   const accent = meta.accent;
   const borderCls = accentBorder(accent);
   const tintCls = accentTint(accent);
   const textCls = accentText(accent);
+
+  // Dedupe at render time so duplicate legs from the AI never inflate the price.
+  const legs = dedupeLegs(Array.isArray(bet.legs) ? bet.legs : []);
+
+  // Always recompute combined odds from the legs we actually show, so the
+  // displayed payout matches the displayed legs (the AI's own combinedOdds
+  // can drift, especially after we strip duplicates).
+  const computedOdds = legs.reduce((acc, leg) => {
+    const price = typeof leg === "object" ? Number(leg?.decimalOdds) : NaN;
+    return Number.isFinite(price) && price > 1 ? acc * price : acc;
+  }, 1);
+  const fallbackOdds = Number(bet.combinedOdds);
+  const odds = computedOdds > 1
+    ? computedOdds
+    : (Number.isFinite(fallbackOdds) && fallbackOdds > 1 ? fallbackOdds : 0);
 
   const defaultStake = parseStakeNum(bet.stake);
   const [stake, setStake] = useState<string>(String(defaultStake));
   const stakeNum = parseStakeNum(stake);
   const payout = stakeNum * odds;
 
-  const hitRate = typeof bet.hitRateScore === "number" ? Math.max(0, Math.min(100, Math.round(bet.hitRateScore))) : null;
-  const hitRateLabel = hitRate == null
-    ? null
-    : hitRate >= 65 ? "High" : hitRate >= 40 ? "Medium" : "Low";
-  const legCount = Array.isArray(bet.legs) ? bet.legs.length : 0;
+  const legCount = legs.length;
 
   return (
     <div className={`relative overflow-hidden rounded-2xl border-2 ${borderCls} ${tintCls} p-5`}>
@@ -2055,33 +2055,21 @@ function BetCard({ categoryKey, bet }: { categoryKey: BetCategoryKey; bet: any }
         {meta.riskLabel}
       </div>
 
-      <div className="flex items-center gap-2 mb-1">
+      <div className="flex items-center gap-2 mb-2">
         <Icon className={`h-5 w-5 ${textCls}`} />
         <div className={`text-[10px] uppercase tracking-[0.25em] font-black ${textCls}`}>{meta.label}</div>
       </div>
-      <p className="text-[11px] text-muted-foreground mb-3 italic">{meta.tagline}</p>
 
       <h3 className="font-black text-base mb-2 leading-tight">{bet.title}</h3>
 
-      {/* Meta row: leg count + hit-rate + script alignment */}
       <div className="flex flex-wrap items-center gap-2 mb-3">
         <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-background/40 border border-border">
           <Layers className="h-3 w-3" /> {legCount} leg{legCount === 1 ? "" : "s"}
         </span>
-        {hitRate != null && (
-          <span className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-background/40 border border-border ${textCls}`}>
-            <Gauge className="h-3 w-3" /> Hit rate: {hitRateLabel} ({hitRate})
-          </span>
-        )}
-        {bet.scriptAlignment && (
-          <span className="inline-flex items-center gap-1 text-[10px] font-medium uppercase tracking-wider px-2 py-0.5 rounded-md bg-background/40 border border-border text-muted-foreground">
-            <Compass className="h-3 w-3" /> {bet.scriptAlignment}
-          </span>
-        )}
       </div>
 
       <ul className="space-y-1.5 mb-4">
-        {(bet.legs || []).map((leg: any, li: number) => (
+        {legs.map((leg: any, li: number) => (
           <li key={li} className="flex items-center justify-between gap-2 text-sm rounded-md bg-background/40 px-2.5 py-2 border border-border">
             <div className="flex gap-2 min-w-0">
               <span className={`shrink-0 ${textCls}`}>✓</span>
@@ -2094,10 +2082,9 @@ function BetCard({ categoryKey, bet }: { categoryKey: BetCategoryKey; bet: any }
         ))}
       </ul>
 
-      {/* Editable stake + live payout */}
       <div className="grid grid-cols-3 gap-2 mb-3 pt-3 border-t border-border items-end">
         <div className="text-center">
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Combined odds</div>
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Odds</div>
           <div className={`text-lg font-black kbd ${textCls}`}>${odds.toFixed(2)}</div>
         </div>
         <div className="text-center">
@@ -2122,7 +2109,6 @@ function BetCard({ categoryKey, bet }: { categoryKey: BetCategoryKey; bet: any }
         </div>
       </div>
 
-      {/* Quick-stake chips */}
       <div className="flex flex-wrap gap-1.5 mb-3">
         {[5, 10, 20, 50, 100].map((amt) => (
           <button
@@ -2136,7 +2122,9 @@ function BetCard({ categoryKey, bet }: { categoryKey: BetCategoryKey; bet: any }
         ))}
       </div>
 
-      <p className="text-xs text-muted-foreground leading-relaxed">{bet.reasoning}</p>
+      {bet.reasoning && (
+        <p className="text-xs text-muted-foreground leading-relaxed">{bet.reasoning}</p>
+      )}
     </div>
   );
 }

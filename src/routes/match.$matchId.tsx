@@ -198,9 +198,9 @@ function TabButton({ active, onClick, icon: Icon, label }:
 
 function TeamColumn({ name, themeKey }: { name: string; themeKey: string; position?: string }) {
   return (
-    <div className="flex items-center justify-center gap-2 sm:gap-3 min-w-0">
-      <div className="text-sm sm:text-lg font-bold truncate text-right">{name}</div>
-      <TeamLogo themeKey={themeKey} name={name} size={48} />
+    <div className="flex flex-col items-center justify-center gap-2 min-w-0">
+      <TeamLogo themeKey={themeKey} name={name} size={56} />
+      <div className="text-xs sm:text-sm font-bold text-center leading-tight truncate max-w-full">{name}</div>
     </div>
   );
 }

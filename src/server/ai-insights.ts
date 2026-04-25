@@ -223,6 +223,54 @@ CRITICAL betting rules:
                 required: ["home", "away"], additionalProperties: false,
               },
               keyFactors: { type: "array", items: { type: "string" }, minItems: 3, maxItems: 6 },
+              weaknessExploit: {
+                type: "object",
+                properties: {
+                  home: {
+                    type: "object",
+                    properties: {
+                      opponentWeakness: { type: "string", description: "Specific defensive flaw in the AWAY team" },
+                      targetArea: { type: "string", description: "Channel / phase / part of the field to attack" },
+                      tacticalPlan: { type: "string", description: "2-3 sentences on how to weaponise it" },
+                      playersToWatch: {
+                        type: "array", minItems: 3, maxItems: 3,
+                        items: {
+                          type: "object",
+                          properties: {
+                            name: { type: "string", description: "Named squad player from HOME team" },
+                            role: { type: "string", description: "Position / role" },
+                            why: { type: "string", description: "Why they score or influence — 1 sentence" },
+                          },
+                          required: ["name", "role", "why"], additionalProperties: false,
+                        },
+                      },
+                    },
+                    required: ["opponentWeakness", "targetArea", "tacticalPlan", "playersToWatch"], additionalProperties: false,
+                  },
+                  away: {
+                    type: "object",
+                    properties: {
+                      opponentWeakness: { type: "string", description: "Specific defensive flaw in the HOME team" },
+                      targetArea: { type: "string" },
+                      tacticalPlan: { type: "string" },
+                      playersToWatch: {
+                        type: "array", minItems: 3, maxItems: 3,
+                        items: {
+                          type: "object",
+                          properties: {
+                            name: { type: "string", description: "Named squad player from AWAY team" },
+                            role: { type: "string" },
+                            why: { type: "string" },
+                          },
+                          required: ["name", "role", "why"], additionalProperties: false,
+                        },
+                      },
+                    },
+                    required: ["opponentWeakness", "targetArea", "tacticalPlan", "playersToWatch"], additionalProperties: false,
+                  },
+                },
+                required: ["home", "away"], additionalProperties: false,
+              },
               betSuggestions: {
                 type: "array",
                 minItems: 3, maxItems: 3,

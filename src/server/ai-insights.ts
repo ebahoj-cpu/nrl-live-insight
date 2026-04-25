@@ -791,40 +791,36 @@ function normaliseBetMath(ins: Insights): Insights {
     return { ...b, legs, combinedOdds: combined, _return: ret };
   };
 
-  if (Array.isArray(ins.betSuggestions)) {
-    ins.betSuggestions = ins.betSuggestions.map((b) => {
-      const fixed = fixMulti(b);
-      return {
-        ...b,
+  const defaultStakes: Partial<Record<BetCategoryKey, string>> = {
+    gameScript: "$10",
+    lowRisk: "$5",
+    mediumRisk: "$5",
+    highRisk: "$5",
+    getThea: "$5",
+    upset: "$20",
+    bookieWant: "$10",
+    bookieFear: "$10",
+    anytime: "$10",
+    firstTryscorer: "$5",
+  };
+
+  if (ins.bets && typeof ins.bets === "object") {
+    const out: Record<string, BetPlay> = {};
+    for (const [k, b] of Object.entries(ins.bets)) {
+      if (!b) continue;
+      const stake = (b as BetPlay).stake || defaultStakes[k as BetCategoryKey] || "$5";
+      const fixed = fixMulti({ ...(b as BetPlay), stake });
+      out[k] = {
+        title: (b as BetPlay).title || "",
+        reasoning: (b as BetPlay).reasoning || "",
         legs: fixed.legs,
         combinedOdds: fixed.combinedOdds,
         estimatedOdds: fmtOdds(fixed.combinedOdds),
+        stake,
         potentialReturn: fmtMoney(fixed._return),
       };
-    });
-  }
-
-  if (ins.getTheaSpecial) {
-    const fixed = fixMulti(ins.getTheaSpecial);
-    ins.getTheaSpecial = {
-      ...ins.getTheaSpecial,
-      legs: fixed.legs,
-      combinedOdds: fixed.combinedOdds,
-      stake: ins.getTheaSpecial.stake || "$5",
-      potentialReturn: fmtMoney(fixed._return),
-    };
-  }
-
-  if (ins.upset?.suggestedPlay) {
-    const odds = Math.max(1.01, Number(ins.upset.suggestedPlay.decimalOdds) || 1.01);
-    const stakeNum = parseStake(ins.upset.suggestedPlay.stake) || 20;
-    ins.upset.suggestedPlay = {
-      ...ins.upset.suggestedPlay,
-      decimalOdds: odds,
-      stake: ins.upset.suggestedPlay.stake || "$20",
-      potentialReturn: fmtMoney(stakeNum * odds),
-    };
-    ins.upset.upsetOdds = odds;
+    }
+    ins.bets = out as Insights["bets"];
   }
 
   return ins;

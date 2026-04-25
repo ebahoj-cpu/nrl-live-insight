@@ -124,16 +124,34 @@ export function dedupeInsights(ins: Insights): Insights {
 
   // Keys to victory: dedupe within each team AND vs opposite team's keys
   // (mirror guard) AND vs the global seen pool.
+  // Keys to victory: dedupe within each team only — cross-section pruning was
+  // wiping the home team's keys entirely when xFactor / formAnalysis covered
+  // similar ground. The keys card MUST always render with 3 entries.
   if (ins.keysToVictory?.home) {
-    ins.keysToVictory.home = filterUnique(ins.keysToVictory.home, (s) => s, seen, 0.5);
+    const localSeen: Set<string>[] = [];
+    ins.keysToVictory.home = filterUnique(ins.keysToVictory.home, (s) => s, localSeen, 0.6);
   }
   if (ins.keysToVictory?.away) {
-    ins.keysToVictory.away = filterUnique(ins.keysToVictory.away, (s) => s, seen, 0.5);
+    const localSeen: Set<string>[] = [];
+    ins.keysToVictory.away = filterUnique(ins.keysToVictory.away, (s) => s, localSeen, 0.6);
   }
 
-  // Key factors: most aggressive prune — only the truly novel ones survive
+  // Mirror-image guard between the two teams' keys — if home key #1 reads the
+  // same as away key #1 with names swapped, blank the away one (it'll be
+  // backfilled by the normaliser).
+  if (ins.keysToVictory?.home && ins.keysToVictory?.away) {
+    const homeKeys = ins.keysToVictory.home;
+    const awayKeys = ins.keysToVictory.away.filter((aw) => {
+      const at = tokens(aw);
+      return !homeKeys.some((hk) => jaccard(at, tokens(hk)) >= 0.7);
+    });
+    ins.keysToVictory.away = awayKeys;
+  }
+
+  // Key factors: prune against the global narrative pool — these are meta-level
+  // and SHOULD be novel vs xFactor / form / weakness commentary.
   if (ins.keyFactors) {
-    ins.keyFactors = filterUnique(ins.keyFactors, (s) => s, seen, 0.45);
+    ins.keyFactors = filterUnique(ins.keyFactors, (s) => s, seen, 0.5);
   }
 
   // Game flow momentum swings — dedupe against each other only (they're

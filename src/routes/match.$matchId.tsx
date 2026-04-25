@@ -1103,142 +1103,338 @@ function ScriptTab({ insights, insightsError, insightsLoading, home, away }:
   { insights: any; insightsError: string | null; insightsLoading?: boolean; home: any; away: any }) {
   if (insightsLoading) return <InsightsLoading />;
   if (insightsError) return <Empty msg={insightsError} />;
-  if (!insights?.script) return <Empty msg="Script unavailable." />;
+  const sa = insights?.scriptAnalyst;
+  if (!sa) return <Empty msg="Script unavailable." />;
 
-  const s = insights.script;
-  const sim = insights.simulation;
   const homeName = home.nickName;
   const awayName = away.nickName;
 
   return (
     <div className="space-y-4">
-      {/* Top of tab: the simulation drives everything below */}
-      {sim && (
-        <>
-          <SimulationProfileCard sim={sim} home={home} away={away} />
-          <RecommendedPlaysCard plays={sim.recommendedPlays || []} correlatedAngle={sim.correlatedAngle} scriptCaveat={sim.scriptCaveat} />
-          <RankedTryscorersCard players={sim.rankedTryscorers || []} home={home} away={away} />
-        </>
-      )}
-
-      {insights.gameFlow && (
-        <GameFlowCard flow={insights.gameFlow} home={homeName} away={awayName} />
-      )}
-
-      {insights.tryscorerScript && (
-        <TryscorerScriptCard
-          script={insights.tryscorerScript}
-          home={home}
-          away={away}
-        />
-      )}
-
-      <Card title="Head to head" icon={ScrollText}>
-        <p className="text-sm leading-relaxed text-muted-foreground">{s.headToHead}</p>
-      </Card>
-
-      <Card title="Form analysis" icon={TrendingUp}>
-        <p className="text-sm leading-relaxed text-muted-foreground whitespace-pre-line">{s.formAnalysis}</p>
-      </Card>
-
-      <Card title="X-factor" icon={Sparkles} className="accent-glow">
-        <p className="text-sm leading-relaxed">{s.xFactor}</p>
-      </Card>
-
-      {s.psychological && (
-        <Card title="Psychological" icon={Brain}>
-          <p className="text-sm leading-relaxed text-muted-foreground whitespace-pre-line">{s.psychological}</p>
-        </Card>
-      )}
-
-      <Card title="Upcoming milestones" icon={Crown}>
-        <ul className="space-y-3">
-          {s.milestones.map((m: string, i: number) => (
-            <li key={i} className="flex gap-2 text-sm">
-              <span className="text-accent shrink-0">›</span>
-              <span>{m}</span>
-            </li>
-          ))}
-        </ul>
-      </Card>
-
-      {s.bookieScript && (
-        <Card title="Bookie script" icon={Coins}>
-          <p className="text-[11px] text-muted-foreground mb-4 italic">
-            How an Australian bookmaker is praying this game plays out — and the result that hurts their book.
-          </p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div className="rounded-xl border border-accent/30 bg-accent/5 p-4">
-              <div className="inline-flex items-center gap-2 text-[10px] uppercase tracking-wider text-accent font-bold mb-2">
-                <ThumbsUp className="h-3.5 w-3.5" /> Bookies want
-              </div>
-              <p className="text-sm leading-relaxed">{s.bookieScript.wantToWin}</p>
-            </div>
-            <div className="rounded-xl border border-danger/30 bg-danger/5 p-4">
-              <div className="inline-flex items-center gap-2 text-[10px] uppercase tracking-wider text-danger font-bold mb-2">
-                <ThumbsDown className="h-3.5 w-3.5" /> Bookies fear
-              </div>
-              <p className="text-sm leading-relaxed">{s.bookieScript.wantToLose}</p>
-            </div>
-          </div>
-          <div className="mt-3 text-xs text-muted-foreground border-t border-border pt-3">
-            <span className="font-bold text-foreground">Liability: </span>{s.bookieScript.liability}
-          </div>
-        </Card>
-      )}
-
-      {s.matchFix && (
-        <Card title="Match Fix script" icon={Eye}>
-          <p className="text-[11px] text-muted-foreground mb-4 italic">
-            Tongue-in-cheek: how head office would script this game for ratings, sponsors and the finals race. Strictly for laughs 🙃
-          </p>
-
-          <div className="rounded-xl border border-fuchsia-500/40 bg-fuchsia-500/5 p-4 mb-3">
-            <div className="text-[10px] uppercase tracking-wider text-fuchsia-400 font-bold mb-1">Preferred winner</div>
-            <p className="text-sm font-semibold leading-relaxed">{s.matchFix.preferredWinner}</p>
-          </div>
-
-          <div className="rounded-xl border border-border bg-surface-2/40 p-4 mb-3">
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold mb-2">Broadcast / ratings angle</div>
-            <p className="text-sm leading-relaxed">{s.matchFix.ratingsAngle}</p>
-          </div>
-
-          {Array.isArray(s.matchFix.refereeNudges) && s.matchFix.refereeNudges.length > 0 && (
-            <div className="rounded-xl border border-yellow-500/30 bg-yellow-500/5 p-4 mb-3">
-              <div className="text-[10px] uppercase tracking-wider text-yellow-500 font-bold mb-2">Referee nudges 👀</div>
-              <ul className="space-y-1.5">
-                {s.matchFix.refereeNudges.map((n: string, i: number) => (
-                  <li key={i} className="flex gap-2 text-sm">
-                    <span className="text-yellow-500 shrink-0">▸</span>
-                    <span className="leading-relaxed">{n}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          <div className="rounded-xl border border-accent/30 bg-accent/5 p-4 mb-3">
-            <div className="text-[10px] uppercase tracking-wider text-accent font-bold mb-1">Narrative moment</div>
-            <p className="text-sm leading-relaxed">{s.matchFix.narrativeMoment}</p>
-          </div>
-
-          <div className="flex items-center gap-3 pt-2 border-t border-border">
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold shrink-0">Conspiracy meter</div>
-            <div className="flex-1 h-2 rounded-full bg-surface-2 overflow-hidden">
-              <div
-                className="h-full bg-gradient-to-r from-accent via-yellow-500 to-fuchsia-500"
-                style={{ width: `${Math.max(0, Math.min(100, Number(s.matchFix.conspiracyRating) || 0))}%` }}
-              />
-            </div>
-            <div className="kbd text-sm font-black text-fuchsia-400 shrink-0">
-              {Math.round(Number(s.matchFix.conspiracyRating) || 0)}%
-            </div>
-          </div>
-        </Card>
-      )}
+      <ScriptOverviewCard data={sa.overview} home={homeName} away={awayName} />
+      <ScriptStakesCard data={sa.stakes} home={homeName} away={awayName} homeKey={home.themeKey} awayKey={away.themeKey} />
+      <ScriptWinningCard
+        title={`${homeName} Winning Script`}
+        side="home"
+        themeKey={home.themeKey}
+        opening={sa.homeWinningScript?.opening}
+        tacticalFocus={sa.homeWinningScript?.tacticalFocus}
+        listLabel="Key drivers"
+        listItems={sa.homeWinningScript?.keyDrivers || []}
+        closing={sa.homeWinningScript?.closingOut}
+        closingLabel="Closing out"
+      />
+      <ScriptWinningCard
+        title={`${awayName} Winning Script`}
+        side="away"
+        themeKey={away.themeKey}
+        opening={sa.awayWinningScript?.opening}
+        tacticalFocus={sa.awayWinningScript?.tacticalFocus}
+        listLabel="Key matchups"
+        listItems={sa.awayWinningScript?.keyMatchups || []}
+        closing={sa.awayWinningScript?.endgame}
+        closingLabel="Endgame"
+      />
+      <ScriptIdealNarrativeCard data={sa.idealNarrative} />
+      <ScriptMarketLeanCard data={sa.marketLean} />
+      <ScriptPredictionsCard data={sa.predictions} home={home} away={away} />
     </div>
   );
 }
+
+/* ============ Script tab — 7-card analyst layout ============ */
+
+function ScriptOverviewCard({ data, home, away }: { data: any; home: string; away: string }) {
+  if (!data) return null;
+  return (
+    <Card title="Match Overview" icon={ScrollText}>
+      <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-bold mb-3">
+        {home} vs {away}
+      </p>
+      <div className="space-y-3 text-sm leading-relaxed">
+        <ScriptRow label="Ladder & differential" body={data.ladderContext} />
+        <ScriptRow label="Recent form" body={data.formContext} />
+        <ScriptRow label="Head-to-head & venue" body={data.headToHead} />
+        <ScriptRow label="Stylistic clash" body={data.stylisticContrast} />
+      </div>
+      {data.contestSummary && (
+        <div className="mt-4 rounded-xl border border-accent/30 bg-accent/5 p-3">
+          <div className="text-[10px] uppercase tracking-wider text-accent font-bold mb-1">Expected dynamic</div>
+          <p className="text-sm font-semibold leading-relaxed">{data.contestSummary}</p>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+function ScriptRow({ label, body }: { label: string; body?: string }) {
+  if (!body) return null;
+  return (
+    <div>
+      <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold mb-1">{label}</div>
+      <p className="text-sm leading-relaxed text-foreground/90">{body}</p>
+    </div>
+  );
+}
+
+function ScriptStakesCard({ data, home, away, homeKey, awayKey }:
+  { data: any; home: string; away: string; homeKey: string; awayKey: string }) {
+  if (!data) return null;
+  return (
+    <Card title="What's On The Line" icon={Flag}>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <StakesBlock team={home} themeKey={homeKey} block={data.home} />
+        <StakesBlock team={away} themeKey={awayKey} block={data.away} />
+      </div>
+    </Card>
+  );
+}
+
+function StakesBlock({ team, themeKey, block }: { team: string; themeKey: string; block: any }) {
+  if (!block) return null;
+  return (
+    <div className={`rounded-xl border ${accentBorder(themeKey)} ${accentTint(themeKey)} p-4`}>
+      <div className={`text-[11px] uppercase tracking-wider font-bold mb-3 ${accentText(themeKey)}`}>{team}</div>
+      <div className="space-y-2.5 text-sm leading-relaxed">
+        <ScriptRow label="Implications" body={block.implications} />
+        <ScriptRow label="Pressure" body={block.pressure} />
+        <ScriptRow label="Narrative" body={block.narrative} />
+        <ScriptRow label="Psychology" body={block.psychology} />
+      </div>
+    </div>
+  );
+}
+
+function ScriptWinningCard({ title, themeKey, opening, tacticalFocus, listLabel, listItems, closing, closingLabel }:
+  { title: string; side: "home" | "away"; themeKey: string; opening?: string; tacticalFocus?: string; listLabel: string; listItems: string[]; closing?: string; closingLabel: string }) {
+  return (
+    <Card title={title} icon={Swords}>
+      <div className="space-y-4">
+        {opening && (
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <div className={`h-7 w-7 rounded-full ${accentTint(themeKey)} ${accentText(themeKey)} flex items-center justify-center text-[11px] font-black`}>1</div>
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Opening — set the tone</div>
+            </div>
+            <p className="text-sm leading-relaxed text-foreground/90 pl-9">{opening}</p>
+          </div>
+        )}
+        {tacticalFocus && (
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <div className={`h-7 w-7 rounded-full ${accentTint(themeKey)} ${accentText(themeKey)} flex items-center justify-center text-[11px] font-black`}>2</div>
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Tactical focus</div>
+            </div>
+            <p className="text-sm leading-relaxed text-foreground/90 pl-9">{tacticalFocus}</p>
+          </div>
+        )}
+        {listItems.length > 0 && (
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <div className={`h-7 w-7 rounded-full ${accentTint(themeKey)} ${accentText(themeKey)} flex items-center justify-center text-[11px] font-black`}>3</div>
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">{listLabel}</div>
+            </div>
+            <ul className="space-y-1.5 pl-9">
+              {listItems.map((item, i) => (
+                <li key={i} className="flex gap-2 text-sm leading-relaxed">
+                  <span className={`shrink-0 ${accentText(themeKey)}`}>›</span>
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {closing && (
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <div className={`h-7 w-7 rounded-full ${accentTint(themeKey)} ${accentText(themeKey)} flex items-center justify-center text-[11px] font-black`}>4</div>
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">{closingLabel}</div>
+            </div>
+            <p className="text-sm leading-relaxed text-foreground/90 pl-9">{closing}</p>
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+function ScriptIdealNarrativeCard({ data }: { data: any }) {
+  if (!data) return null;
+  return (
+    <Card title="Ideal Game Narrative" icon={Sparkles} className="accent-glow">
+      <p className="text-[11px] text-muted-foreground italic mb-3">
+        The most compelling version of this match from a league / storytelling perspective.
+      </p>
+      {data.storyline && (
+        <p className="text-sm leading-relaxed mb-4">{data.storyline}</p>
+      )}
+      {Array.isArray(data.starMoments) && data.starMoments.length > 0 && (
+        <div className="rounded-xl border border-border bg-surface-2/40 p-3 mb-3">
+          <div className="text-[10px] uppercase tracking-wider text-accent font-bold mb-2">Star moments</div>
+          <ul className="space-y-1.5">
+            {data.starMoments.map((m: string, i: number) => (
+              <li key={i} className="flex gap-2 text-sm leading-relaxed">
+                <span className="text-accent shrink-0">★</span>
+                <span>{m}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {data.finishType && (
+          <div className="rounded-xl border border-border bg-surface-2/40 p-3">
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold mb-1">Finish</div>
+            <p className="text-sm leading-relaxed">{data.finishType}</p>
+          </div>
+        )}
+        {data.fanAngle && (
+          <div className="rounded-xl border border-border bg-surface-2/40 p-3">
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold mb-1">Why it matters</div>
+            <p className="text-sm leading-relaxed">{data.fanAngle}</p>
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+function ScriptMarketLeanCard({ data }: { data: any }) {
+  if (!data) return null;
+  return (
+    <Card title="Market Lean" icon={Coins}>
+      <p className="text-[11px] text-muted-foreground italic mb-3">
+        How the game could play out relative to market expectations — analytical, not conspiracy.
+      </p>
+      <div className="space-y-3">
+        <ScriptRow label="Favourite vs underdog" body={data.favouriteVsUnderdog} />
+        <ScriptRow label="Cover likelihood" body={data.coverLikelihood} />
+        <ScriptRow label="Totals angle" body={data.totalsAngle} />
+        <ScriptRow label="Where value or risk sits" body={data.valueOrRisk} />
+      </div>
+    </Card>
+  );
+}
+
+function ScriptPredictionsCard({ data, home, away }: { data: any; home: any; away: any }) {
+  if (!data) return null;
+  const winnerName = data.winner?.team === "home" ? home.nickName : away.nickName;
+  const winnerTheme = data.winner?.team === "home" ? home.themeKey : away.themeKey;
+
+  return (
+    <Card title="Match Predictions" icon={Target}>
+      <div className="space-y-4">
+        {/* Headline winner + score */}
+        <div className={`rounded-xl border ${accentBorder(winnerTheme)} ${accentTint(winnerTheme)} p-4`}>
+          <div className={`text-[10px] uppercase tracking-wider font-bold mb-2 ${accentText(winnerTheme)}`}>Predicted winner</div>
+          <div className="flex items-end justify-between flex-wrap gap-3">
+            <div>
+              <div className={`text-2xl font-black ${accentText(winnerTheme)}`}>{winnerName}</div>
+              {data.winner?.reasoning && (
+                <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">{data.winner.reasoning}</p>
+              )}
+            </div>
+            {data.predictedScore && (
+              <div className="text-right">
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Predicted score</div>
+                <div className="kbd text-2xl font-black tabular-nums">
+                  {data.predictedScore.home} — {data.predictedScore.away}
+                </div>
+              </div>
+            )}
+          </div>
+          {data.predictedScore?.reasoning && (
+            <p className="text-xs text-muted-foreground mt-2 leading-relaxed">{data.predictedScore.reasoning}</p>
+          )}
+        </div>
+
+        {/* Margin / total / HT-FT grid */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <PredictionTile
+            label="Winning margin"
+            value={data.margin?.range || "—"}
+            reasoning={data.margin?.reasoning}
+            icon={Gauge}
+          />
+          <PredictionTile
+            label={`Total points (line ${data.totalPoints?.line ?? "—"})`}
+            value={data.totalPoints?.lean ? `${data.totalPoints.lean.toUpperCase()}` : "—"}
+            reasoning={data.totalPoints?.reasoning}
+            icon={Activity}
+            valueClass={data.totalPoints?.lean === "over" ? "text-emerald-400" : "text-sky-400"}
+          />
+          <PredictionTile
+            label="Half / full time"
+            value={data.htft?.pick || "—"}
+            reasoning={data.htft?.reasoning}
+            icon={Hourglass}
+          />
+        </div>
+
+        {/* First tryscorer */}
+        {data.firstTryscorer && (
+          <div className="rounded-xl border border-border bg-surface-2/40 p-4">
+            <div className="text-[10px] uppercase tracking-wider text-accent font-bold mb-2">First tryscorer</div>
+            <div className="font-bold text-base">{data.firstTryscorer.name}</div>
+            {data.firstTryscorer.reasoning && (
+              <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">{data.firstTryscorer.reasoning}</p>
+            )}
+          </div>
+        )}
+
+        {/* Scoring pool */}
+        {Array.isArray(data.scoringPool) && data.scoringPool.length > 0 && (
+          <div className="rounded-xl border border-border bg-surface-2/40 p-4">
+            <div className="text-[10px] uppercase tracking-wider text-accent font-bold mb-2">First, second or third tryscorer pool</div>
+            <ul className="space-y-2">
+              {data.scoringPool.map((p: any, i: number) => (
+                <li key={i} className="flex gap-3 text-sm">
+                  <span className="kbd text-[10px] tabular-nums text-accent shrink-0 mt-0.5">#{i + 1}</span>
+                  <div>
+                    <div className="font-semibold">{p.name}</div>
+                    {p.reasoning && <div className="text-xs text-muted-foreground leading-relaxed">{p.reasoning}</div>}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Anytime tryscorers */}
+        {Array.isArray(data.anytimeTryscorers) && data.anytimeTryscorers.length > 0 && (
+          <div className="rounded-xl border border-border bg-surface-2/40 p-4">
+            <div className="text-[10px] uppercase tracking-wider text-accent font-bold mb-2">Anytime tryscorers</div>
+            <ul className="space-y-2">
+              {data.anytimeTryscorers.map((p: any, i: number) => (
+                <li key={i} className="flex gap-3 text-sm">
+                  <Trophy className="h-3.5 w-3.5 text-accent shrink-0 mt-1" />
+                  <div>
+                    <div className="font-semibold">{p.name}</div>
+                    {p.reasoning && <div className="text-xs text-muted-foreground leading-relaxed">{p.reasoning}</div>}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+function PredictionTile({ label, value, reasoning, icon: Icon, valueClass = "text-foreground" }:
+  { label: string; value: string; reasoning?: string; icon: any; valueClass?: string }) {
+  return (
+    <div className="rounded-xl border border-border bg-surface-2/40 p-3">
+      <div className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground font-bold mb-1.5">
+        <Icon className="h-3 w-3 text-accent" /> {label}
+      </div>
+      <div className={`text-lg font-black mb-1.5 ${valueClass}`}>{value}</div>
+      {reasoning && <p className="text-xs text-muted-foreground leading-relaxed">{reasoning}</p>}
+    </div>
+  );
+}
+
 
 /* ============ Match Simulation Engine UI cards ============ */
 

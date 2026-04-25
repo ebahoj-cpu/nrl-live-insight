@@ -202,7 +202,7 @@ export const getMatchInsights = createServerFn({ method: "GET" })
 
       const insights = await cached(
         `insights:${data.matchId}`,
-        TTL.insights,
+        insightsTtlMs(details.kickoffUtc),
         () => generateInsights({
           homeName: details.homeTeam.nickName,
           awayName: details.awayTeam.nickName,

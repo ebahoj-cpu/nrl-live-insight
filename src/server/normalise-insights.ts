@@ -258,5 +258,117 @@ export function normaliseInsights(ins: Insights, homeName: string, awayName: str
     }).sort((a, b) => b.totalScore - a.totalScore);
   }
 
+  // Script analyst — guarantee the 7-card analyst block exists so the Script
+  // tab always renders, even from older cached payloads. AI output is preferred.
+  const placeholderAnalyst = (): NonNullable<Insights["scriptAnalyst"]> => ({
+    overview: {
+      ladderContext: `${homeName} host ${awayName} with both sides chasing ladder differential.`,
+      formContext: `Both teams enter on inconsistent recent form, with results shaped by small margins.`,
+      headToHead: `${homeName} hold the venue edge; recent meetings have leaned tight rather than blow-out.`,
+      stylisticContrast: `${homeName} project as the more structured side; ${awayName} need to manufacture chances off broken-play moments.`,
+      contestSummary: `Expect a territory-led contest decided in the third quarter rather than a free-flowing shootout.`,
+    },
+    stakes: {
+      home: {
+        implications: `A win lifts ${homeName} up the ladder differential and tightens their finals positioning.`,
+        pressure: `Favourites at home — anything less than two points reads as a missed opportunity.`,
+        narrative: `${homeName} need to back up the early-week noise with a composed home performance.`,
+        psychology: `Confidence side — they expect to win, so the test is handling the chase late.`,
+      },
+      away: {
+        implications: `A road win for ${awayName} swings ladder momentum and applies pressure on the sides above.`,
+        pressure: `Underdog opportunity on the road — nothing to lose, everything to gain.`,
+        narrative: `${awayName} can flip the storyline of the round with a controlled away result.`,
+        psychology: `Free swing — they can play with confidence because the market has priced them as the longshot.`,
+      },
+    },
+    homeWinningScript: {
+      opening: `${homeName} start with sharp kick-pressure to pin ${awayName} deep and set the defensive tone in the first two sets.`,
+      tacticalFocus: `Dominate the middle third with quick play-the-balls, then attack the dominant edge once ${awayName}'s forwards tire after 25 minutes.`,
+      keyDrivers: [`${homeName} spine`, `${homeName} edge runner`],
+      closingOut: `Once in front, ${homeName} kill the game with possession through the middle and exit kicks that flip ${awayName} back into their own half.`,
+    },
+    awayWinningScript: {
+      opening: `${awayName} weather the early storm, prioritise completion in their own half, and force ${homeName} into low-percentage long-range attempts.`,
+      tacticalFocus: `Pick the right moments to inject pace — quick taps, second-phase ball off the edge — and win one bomb-and-chase contest to flip territory.`,
+      keyMatchups: [
+        `${awayName} half vs ${homeName}'s spine — winning the ruck speed battle.`,
+        `${awayName} edge runners vs ${homeName}'s defensive slide on second-phase ball.`,
+      ],
+      endgame: `If ${awayName} are within a score with 15 to play, they back themselves to manufacture one late piece of brilliance.`,
+    },
+    idealNarrative: {
+      storyline: `The most compelling version is a tight, momentum-swinging contest with the lead changing hands and the result undecided inside the last 10.`,
+      starMoments: [
+        `${homeName} spine producing a piece of brilliance to put the home side in front mid-second half.`,
+        `${awayName} answering with a try-saver or game-breaker to reset the contest.`,
+        `A late-game kick or scramble defence sequence that decides the result.`,
+      ],
+      finishType: `A one-score finish inside the final five — clutch field goal, chase-down try, or goal-line stand.`,
+      fanAngle: `A close result with star moments protects the round narrative and keeps both fanbases invested for next week.`,
+    },
+    marketLean: {
+      favouriteVsUnderdog: `The market reads the favourite as the structurally more reliable side; the underdog is priced for the upset shot.`,
+      coverLikelihood: `The line is tight enough that covering is no certainty — recent form points to a one-score finish.`,
+      totalsAngle: `Total sits in the mid-40s — recent scoring trends sit close to the line, so script flips decide over/under.`,
+      valueOrRisk: `Value sits in correlated favourite plays when the script lands; the risk is a script flip from an early sin bin or weather change.`,
+    },
+    predictions: {
+      winner: { team: "home", reasoning: `Home side rates higher on form and structure with venue advantage tipping the scales.` },
+      margin: { range: "1-12", reasoning: `Profile favours a one-score finish, not a blowout.` },
+      predictedScore: { home: 22, away: 16, reasoning: `Both sides land structured tries; favourite controls territory in the back end.` },
+      totalPoints: { lean: "under", line: 44.5, reasoning: `Both sides have enough strike, but the kicking exchange should keep total close to the line.` },
+      htft: { pick: `${homeName} / ${homeName}`, reasoning: `Steadier side across both halves; halftime state should track the eventual winner.` },
+      firstTryscorer: { name: `${homeName} fullback`, reasoning: `Sits in the cleanest first-strike lane through early shift ball and red-zone usage.` },
+      scoringPool: [
+        { name: `${homeName} winger`, reasoning: `Live edge finisher whenever the structured shape gets to the corner.` },
+        { name: `${homeName} centre`, reasoning: `Decision-maker on the second-receiver shape in red-zone sets.` },
+        { name: `${awayName} winger`, reasoning: `Carries the kick-return work and finishes left-edge shape plays.` },
+      ],
+      anytimeTryscorers: [
+        { name: `${homeName} fullback`, reasoning: `High-touch lead-support runner with multiple set-piece scoring chances.` },
+        { name: `${homeName} winger`, reasoning: `Finisher on the dominant edge once shape lands in good ball.` },
+        { name: `${awayName} half`, reasoning: `Scoring threat off scoot tries and short-side runs against tired markers.` },
+      ],
+    },
+  });
+
+  if (!ins.scriptAnalyst) {
+    ins.scriptAnalyst = placeholderAnalyst();
+  } else {
+    const ph = placeholderAnalyst();
+    const sa: any = ins.scriptAnalyst as any;
+    sa.overview = { ...ph.overview, ...(sa.overview || {}) };
+    sa.stakes = sa.stakes || ph.stakes;
+    sa.stakes.home = { ...ph.stakes.home, ...(sa.stakes.home || {}) };
+    sa.stakes.away = { ...ph.stakes.away, ...(sa.stakes.away || {}) };
+    sa.homeWinningScript = { ...ph.homeWinningScript, ...(sa.homeWinningScript || {}) };
+    if (!Array.isArray(sa.homeWinningScript.keyDrivers) || sa.homeWinningScript.keyDrivers.length === 0) {
+      sa.homeWinningScript.keyDrivers = ph.homeWinningScript.keyDrivers;
+    }
+    sa.awayWinningScript = { ...ph.awayWinningScript, ...(sa.awayWinningScript || {}) };
+    if (!Array.isArray(sa.awayWinningScript.keyMatchups) || sa.awayWinningScript.keyMatchups.length === 0) {
+      sa.awayWinningScript.keyMatchups = ph.awayWinningScript.keyMatchups;
+    }
+    sa.idealNarrative = { ...ph.idealNarrative, ...(sa.idealNarrative || {}) };
+    if (!Array.isArray(sa.idealNarrative.starMoments) || sa.idealNarrative.starMoments.length === 0) {
+      sa.idealNarrative.starMoments = ph.idealNarrative.starMoments;
+    }
+    sa.marketLean = { ...ph.marketLean, ...(sa.marketLean || {}) };
+    sa.predictions = sa.predictions || ph.predictions;
+    sa.predictions.winner = { ...ph.predictions.winner, ...(sa.predictions.winner || {}) };
+    sa.predictions.margin = { ...ph.predictions.margin, ...(sa.predictions.margin || {}) };
+    sa.predictions.predictedScore = { ...ph.predictions.predictedScore, ...(sa.predictions.predictedScore || {}) };
+    sa.predictions.totalPoints = { ...ph.predictions.totalPoints, ...(sa.predictions.totalPoints || {}) };
+    sa.predictions.htft = { ...ph.predictions.htft, ...(sa.predictions.htft || {}) };
+    sa.predictions.firstTryscorer = { ...ph.predictions.firstTryscorer, ...(sa.predictions.firstTryscorer || {}) };
+    if (!Array.isArray(sa.predictions.scoringPool) || sa.predictions.scoringPool.length === 0) {
+      sa.predictions.scoringPool = ph.predictions.scoringPool;
+    }
+    if (!Array.isArray(sa.predictions.anytimeTryscorers) || sa.predictions.anytimeTryscorers.length === 0) {
+      sa.predictions.anytimeTryscorers = ph.predictions.anytimeTryscorers;
+    }
+  }
+
   return ins;
 }

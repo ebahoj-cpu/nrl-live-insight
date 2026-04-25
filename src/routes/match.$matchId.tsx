@@ -2,8 +2,8 @@ import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useSuspenseQuery, useQuery, queryOptions } from "@tanstack/react-query";
 import { getMatchPage, getMatchInsights } from "@/server/index.functions";
 import { TeamLogo } from "@/components/TeamLogo";
-import type { TryscorerMarkets, TryscorerOdds } from "@/server/odds";
-import { Suspense, useState } from "react";
+import type { TryscorerMarkets, TryscorerOdds, OddsEvent } from "@/server/odds";
+import { Fragment, Suspense, useState } from "react";
 import {
   ArrowLeft, Clock, MapPin, Users, BarChart3, Sparkles,
   Trophy, Target, Flag, Crown, TrendingUp, AlertCircle, CloudSun, Calendar, Zap, Hourglass,
@@ -59,7 +59,7 @@ function MatchPage() {
 function MatchInner() {
   const { matchId } = Route.useParams();
   const { data } = useSuspenseQuery(matchQO(matchId));
-  const { details, ladder, tryscorers, oddsError, oddsStale, tryscorersError, recentRecaps } = data as any;
+  const { details, ladder, odds, tryscorers, oddsError, oddsStale, tryscorersError, recentRecaps } = data as any;
 
   // Lazy AI insights — fetched in background after the page renders.
   // Initial value comes from the page payload (cache hit on the server).
@@ -164,6 +164,7 @@ function MatchInner() {
             awayRow={awayRow}
             tryscorers={tryscorers}
             tryscorersError={tryscorersError}
+            odds={odds}
           />
         )}
       </div>
@@ -674,45 +675,36 @@ type LadderRow = {
 
 type TeamLite = { nickName: string; themeKey: string };
 
-function InsightsTab({ insights, insightsError, insightsLoading, home, away, homeRow, awayRow, tryscorers }:
-  { insights: any; insightsError: string | null; insightsLoading?: boolean; home: TeamLite; away: TeamLite;
-    homeRow?: LadderRow; awayRow?: LadderRow; tryscorers: TryscorerMarkets | null; tryscorersError: string | null }) {
+type TeamWithPlayers = TeamLite & { players?: { firstName: string; lastName: string; position: string }[] };
+
+function InsightsTab({ insights, insightsError, insightsLoading, home, away, homeRow, awayRow, tryscorers, odds }:
+  { insights: any; insightsError: string | null; insightsLoading?: boolean; home: TeamWithPlayers; away: TeamWithPlayers;
+    homeRow?: LadderRow; awayRow?: LadderRow; tryscorers: TryscorerMarkets | null; tryscorersError: string | null;
+    odds?: OddsEvent | null }) {
   if (insightsLoading) return <InsightsLoading />;
   if (insightsError && !insights) return <Empty msg={insightsError} />;
   if (!insights) return <Empty msg="Insights unavailable." />;
 
-  // ---- Statistical model: derive a Team Strength Score from ladder data ----
-  // Equal weight across attack, defence, win%, winning margin, completion proxy.
-  // Apply +5% home advantage. Form trend nudges the score by a small factor.
   const model = computeMatchModel(home.nickName, away.nickName, homeRow, awayRow, insights);
+  const bookieTotal = pickBookmakerTotal(odds ?? null);
 
   return (
     <div className="space-y-4">
-      {/* 1. Predicted Winner */}
       <PredictedWinnerCard model={model} home={home} away={away} />
-
-      {/* 2. Stats Comparison Panel */}
       <StatsComparePanel home={home} away={away} homeRow={homeRow} awayRow={awayRow} model={model} />
 
-      {/* 3. Score & Margin */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <PredictedScoreCard model={model} home={home} away={away} insights={insights} />
+        <PredictedScoreCard model={model} home={home} away={away} />
         <MarginCard model={model} insights={insights} />
       </div>
 
-      {/* 4. Total Points + 5. HT/FT Outlook */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <TotalPointsCard model={model} insights={insights} />
+        <TotalPointsCard model={model} bookieTotal={bookieTotal} />
         <HtFtCard insights={insights} home={home.nickName} away={away.nickName} />
       </div>
 
-      {/* 6. First Tryscorer Highlight */}
       <FirstTryscorerCard insights={insights} tryscorers={tryscorers} />
-
-      {/* 7. Anytime Tryscorers (max 5) */}
-      <AnytimeTryscorersCard insights={insights} tryscorers={tryscorers} />
-
-      {/* 8. Multi-try (doubles / hat-tricks) */}
+      <AnytimeTryscorersCard tryscorers={tryscorers} insights={insights} home={home} away={away} model={model} />
       <MultiTryscorerCard insights={insights} tryscorers={tryscorers} />
     </div>
   );
@@ -721,18 +713,18 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, hom
 /* ---------- Predictive model ---------- */
 
 type MatchModel = {
-  homeScore: number;        // 0-100 strength
-  awayScore: number;        // 0-100 strength
-  gap: number;              // homeScore - awayScore (positive = home favoured)
+  homeScore: number;
+  awayScore: number;
+  gap: number;
   winner: "home" | "away";
   confidence: "Low" | "Medium" | "High";
-  confidencePct: number;    // 0-100 visual scale
-  predictedHome: number;    // predicted points
+  confidencePct: number;
+  predictedHome: number;
   predictedAway: number;
   marginBucket: "1–12" | "13+";
-  totalLine: number;        // expected combined points
+  totalLine: number;
   totalLean: "Over" | "Under";
-  baselineTotal: number;    // NRL average
+  baselineTotal: number;
   components: {
     home: { attack: number; defence: number; winPct: number; margin: number; efficiency: number };
     away: { attack: number; defence: number; winPct: number; margin: number; efficiency: number };
@@ -746,46 +738,37 @@ function computeMatchModel(
   ar: LadderRow | undefined,
   insights: any,
 ): MatchModel {
-  // Defaults if ladder rows are missing — fall back to AI's predictedScore.
   const aiHome = Number(insights?.predictedScore?.home);
   const aiAway = Number(insights?.predictedScore?.away);
-
-  const baselineTotal = 42; // NRL average combined points per game
+  const baselineTotal = 42;
 
   const compFor = (row: LadderRow | undefined) => {
     if (!row || row.played <= 0) return { attack: 50, defence: 50, winPct: 50, margin: 50, efficiency: 50 };
-    const ppg = row.for / Math.max(1, row.played);          // points scored per game
-    const cpg = row.against / Math.max(1, row.played);      // points conceded per game
+    const ppg = row.for / Math.max(1, row.played);
+    const cpg = row.against / Math.max(1, row.played);
     const winPct = (row.wins / Math.max(1, row.played)) * 100;
-    const margin = (row.diff / Math.max(1, row.played));    // avg margin per game
-    // Map each metric onto 0-100 with realistic NRL ranges.
+    const margin = (row.diff / Math.max(1, row.played));
     const attack = clamp(((ppg - 12) / (32 - 12)) * 100, 0, 100);
     const defence = clamp((1 - (cpg - 12) / (32 - 12)) * 100, 0, 100);
     const win = clamp(winPct, 0, 100);
-    const mar = clamp(50 + margin * 2, 0, 100);             // ±25 margin → 0..100
-    // Efficiency proxy: better diff per game = cleaner completions/error count.
+    const mar = clamp(50 + margin * 2, 0, 100);
     const eff = clamp(50 + margin * 1.5, 0, 100);
     return { attack, defence, winPct: win, margin: mar, efficiency: eff };
   };
 
   const hc = compFor(hr);
   const ac = compFor(ar);
-
-  // Equal-weighted strength score (0-100).
   const strength = (c: typeof hc) => (c.attack + c.defence + c.winPct + c.margin + c.efficiency) / 5;
   let homeScore = strength(hc);
   let awayScore = strength(ac);
 
-  // Form adjustment from AI recent-form read (last ~5 games). Small weight.
-  // We use the predicted-score signal as a proxy for momentum, ±3 points max.
   if (Number.isFinite(aiHome) && Number.isFinite(aiAway)) {
     const aiGap = aiHome - aiAway;
     homeScore += clamp(aiGap * 0.15, -3, 3);
     awayScore += clamp(-aiGap * 0.15, -3, 3);
   }
 
-  // +5% home advantage.
-  homeScore *= 1.05;
+  homeScore *= 1.05; // home advantage
 
   const gap = homeScore - awayScore;
   const winner: "home" | "away" = gap >= 0 ? "home" : "away";
@@ -793,22 +776,16 @@ function computeMatchModel(
   const confidence: MatchModel["confidence"] = absGap >= 12 ? "High" : absGap >= 5 ? "Medium" : "Low";
   const confidencePct = clamp(50 + absGap * 3.2, 50, 95);
 
-  // Predicted score: blend AI score with model-derived score.
   let pHome = Number.isFinite(aiHome) ? aiHome : 22;
   let pAway = Number.isFinite(aiAway) ? aiAway : 18;
-  // Nudge so the predicted winner aligns with the strength model.
-  if (winner === "home" && pHome <= pAway) {
-    const swap = pHome; pHome = pAway; pAway = swap;
-  } else if (winner === "away" && pAway <= pHome) {
-    const swap = pHome; pHome = pAway; pAway = swap;
-  }
+  if (winner === "home" && pHome <= pAway) { const s = pHome; pHome = pAway; pAway = s; }
+  else if (winner === "away" && pAway <= pHome) { const s = pHome; pHome = pAway; pAway = s; }
   const predictedHome = Math.round(pHome);
   const predictedAway = Math.round(pAway);
 
   const predictedMargin = Math.abs(predictedHome - predictedAway);
   const marginBucket: MatchModel["marginBucket"] = (confidence === "High" || predictedMargin >= 13) ? "13+" : "1–12";
 
-  // Total line from attack vs opposition defence + baseline.
   const homeAttackVsAwayDef = (hc.attack + (100 - ac.defence)) / 2;
   const awayAttackVsHomeDef = (ac.attack + (100 - hc.defence)) / 2;
   const projected = baselineTotal * ((homeAttackVsAwayDef + awayAttackVsHomeDef) / 100);
@@ -834,6 +811,64 @@ function computeMatchModel(
 
 function clamp(n: number, lo: number, hi: number): number {
   return Math.min(hi, Math.max(lo, n));
+}
+
+/** Pull the most-common totals line from the bookmaker odds payload. */
+function pickBookmakerTotal(odds: OddsEvent | null):
+  { line: number; over: number; under: number; book: string } | null {
+  if (!odds) return null;
+  // line -> { totalPrice, count, bestBook { line, over, under, book, score } }
+  const lineCounts = new Map<number, number>();
+  type Best = { line: number; over: number; under: number; book: string; score: number };
+  let best: Best | null = null;
+
+  for (const b of odds.bookmakers) {
+    const totals = b.markets.find((m) => m.key === "totals");
+    if (!totals) continue;
+    const byLine = new Map<number, { over?: number; under?: number }>();
+    for (const o of totals.outcomes) {
+      if (typeof o.point !== "number") continue;
+      const slot = byLine.get(o.point) ?? {};
+      if (o.name?.toLowerCase() === "over") slot.over = o.price;
+      else if (o.name?.toLowerCase() === "under") slot.under = o.price;
+      byLine.set(o.point, slot);
+    }
+    for (const [line, p] of byLine) {
+      if (p.over == null || p.under == null) continue;
+      lineCounts.set(line, (lineCounts.get(line) ?? 0) + 1);
+      const score = p.over + p.under;
+      if (!best || score > best.score) {
+        best = { line, over: p.over, under: p.under, book: b.title, score };
+      }
+    }
+  }
+  if (!best) return null;
+  // Prefer the most common line if it differs from "best price" line
+  let mostCommonLine = best.line;
+  let max = 0;
+  for (const [line, count] of lineCounts) {
+    if (count > max) { max = count; mostCommonLine = line; }
+  }
+  if (mostCommonLine !== best.line) {
+    // re-scan for best over/under at the most-common line
+    let alt: Best | null = null;
+    for (const b of odds.bookmakers) {
+      const totals = b.markets.find((m) => m.key === "totals");
+      if (!totals) continue;
+      let over: number | undefined; let under: number | undefined;
+      for (const o of totals.outcomes) {
+        if (o.point !== mostCommonLine) continue;
+        if (o.name?.toLowerCase() === "over") over = o.price;
+        else if (o.name?.toLowerCase() === "under") under = o.price;
+      }
+      if (over != null && under != null) {
+        const score = over + under;
+        if (!alt || score > alt.score) alt = { line: mostCommonLine, over, under, book: b.title, score };
+      }
+    }
+    if (alt) best = alt;
+  }
+  return { line: best.line, over: best.over, under: best.under, book: best.book };
 }
 
 /* ---------- Cards ---------- */
@@ -865,9 +900,6 @@ function PredictedWinnerCard({ model, home, away }:
           <div className="text-lg font-black kbd">{model.awayScore}</div>
         </div>
       </div>
-      <p className="text-[11px] text-muted-foreground mt-3 leading-relaxed">
-        Strength scored equally across attack, defence, win %, average margin and efficiency. +5% home boost applied. Recent form lightly nudges the score.
-      </p>
     </Card>
   );
 }
@@ -880,11 +912,7 @@ function ConfidenceMeter({ pct, confidence }: { pct: number; confidence: string 
         <span className="text-[10px] font-bold kbd">{confidence}</span>
       </div>
       <div className="h-2 w-full rounded-full bg-surface-2 overflow-hidden">
-        <div
-          className="h-full bg-accent transition-all"
-          style={{ width: `${pct}%` }}
-          aria-label={`${pct}% confidence`}
-        />
+        <div className="h-full bg-accent transition-all" style={{ width: `${pct}%` }} aria-label={`${pct}% confidence`} />
       </div>
       <div className="mt-1 flex justify-between text-[9px] uppercase tracking-wider text-muted-foreground">
         <span>Low</span><span>Medium</span><span>High</span>
@@ -895,49 +923,103 @@ function ConfidenceMeter({ pct, confidence }: { pct: number; confidence: string 
 
 function StatsComparePanel({ home, away, homeRow, awayRow, model }:
   { home: TeamLite; away: TeamLite; homeRow?: LadderRow; awayRow?: LadderRow; model: MatchModel }) {
-  const ppg = (r?: LadderRow) => (r && r.played > 0 ? (r.for / r.played).toFixed(1) : "–");
-  const cpg = (r?: LadderRow) => (r && r.played > 0 ? (r.against / r.played).toFixed(1) : "–");
-  const winPct = (r?: LadderRow) => (r && r.played > 0 ? `${Math.round((r.wins / r.played) * 100)}%` : "–");
-  const margin = (r?: LadderRow) => {
-    if (!r || r.played <= 0) return "–";
-    const m = r.diff / r.played;
-    return `${m >= 0 ? "+" : ""}${m.toFixed(1)}`;
-  };
+  const hPlayed = Math.max(1, homeRow?.played ?? 0);
+  const aPlayed = Math.max(1, awayRow?.played ?? 0);
+
+  const rows: { label: string; hVal: number; aVal: number; hLabel: string; aLabel: string; lowerIsBetter?: boolean }[] = [
+    {
+      label: "Pts / game",
+      hVal: (homeRow?.for ?? 0) / hPlayed,
+      aVal: (awayRow?.for ?? 0) / aPlayed,
+      hLabel: homeRow ? ((homeRow.for / hPlayed).toFixed(1)) : "–",
+      aLabel: awayRow ? ((awayRow.for / aPlayed).toFixed(1)) : "–",
+    },
+    {
+      label: "Conceded / game",
+      hVal: (homeRow?.against ?? 0) / hPlayed,
+      aVal: (awayRow?.against ?? 0) / aPlayed,
+      hLabel: homeRow ? ((homeRow.against / hPlayed).toFixed(1)) : "–",
+      aLabel: awayRow ? ((awayRow.against / aPlayed).toFixed(1)) : "–",
+      lowerIsBetter: true,
+    },
+    {
+      label: "Win %",
+      hVal: homeRow ? (homeRow.wins / hPlayed) * 100 : 0,
+      aVal: awayRow ? (awayRow.wins / aPlayed) * 100 : 0,
+      hLabel: homeRow ? `${Math.round((homeRow.wins / hPlayed) * 100)}%` : "–",
+      aLabel: awayRow ? `${Math.round((awayRow.wins / aPlayed) * 100)}%` : "–",
+    },
+    {
+      label: "Avg margin",
+      hVal: 50 + ((homeRow?.diff ?? 0) / hPlayed) * 2,
+      aVal: 50 + ((awayRow?.diff ?? 0) / aPlayed) * 2,
+      hLabel: homeRow ? fmtMargin(homeRow.diff / hPlayed) : "–",
+      aLabel: awayRow ? fmtMargin(awayRow.diff / aPlayed) : "–",
+    },
+    {
+      label: "Ladder",
+      hVal: homeRow?.position ? 17 - homeRow.position : 0,
+      aVal: awayRow?.position ? 17 - awayRow.position : 0,
+      hLabel: homeRow?.position ? `${homeRow.position}` : "–",
+      aLabel: awayRow?.position ? `${awayRow.position}` : "–",
+    },
+    {
+      label: "Strength",
+      hVal: model.homeScore,
+      aVal: model.awayScore,
+      hLabel: `${model.homeScore}`,
+      aLabel: `${model.awayScore}`,
+    },
+  ];
 
   return (
     <Card title="Stats comparison" icon={BarChart3}>
-      <div className="grid grid-cols-[1fr_auto_1fr] gap-2 items-center">
+      <div className="grid grid-cols-[1fr_auto_1fr] gap-x-2 items-center mb-2">
         <div className="text-right text-xs font-bold truncate">{home.nickName}</div>
-        <div className="text-[10px] uppercase tracking-wider text-muted-foreground text-center">Metric</div>
+        <div className="text-[10px] uppercase tracking-wider text-muted-foreground text-center px-2">vs</div>
         <div className="text-left text-xs font-bold truncate">{away.nickName}</div>
-
-        <InsightCompareRow label="Record" h={homeRow ? `${homeRow.wins}W-${homeRow.losses}L` : "–"} a={awayRow ? `${awayRow.wins}W-${awayRow.losses}L` : "–"} hWin={(homeRow?.wins ?? 0) > (awayRow?.wins ?? 0)} aWin={(awayRow?.wins ?? 0) > (homeRow?.wins ?? 0)} />
-        <InsightCompareRow label="Ladder" h={homeRow?.position ? `${homeRow.position}` : "–"} a={awayRow?.position ? `${awayRow.position}` : "–"} hWin={(homeRow?.position ?? 99) < (awayRow?.position ?? 99)} aWin={(awayRow?.position ?? 99) < (homeRow?.position ?? 99)} />
-        <InsightCompareRow label="Pts / game" h={ppg(homeRow)} a={ppg(awayRow)} hWin={(homeRow?.for ?? 0) > (awayRow?.for ?? 0)} aWin={(awayRow?.for ?? 0) > (homeRow?.for ?? 0)} />
-        <InsightCompareRow label="Conceded / game" h={cpg(homeRow)} a={cpg(awayRow)} hWin={(homeRow?.against ?? 0) < (awayRow?.against ?? 0)} aWin={(awayRow?.against ?? 0) < (homeRow?.against ?? 0)} />
-        <InsightCompareRow label="Win %" h={winPct(homeRow)} a={winPct(awayRow)} hWin={(homeRow?.wins ?? 0) > (awayRow?.wins ?? 0)} aWin={(awayRow?.wins ?? 0) > (homeRow?.wins ?? 0)} />
-        <InsightCompareRow label="Avg margin" h={margin(homeRow)} a={margin(awayRow)} hWin={(homeRow?.diff ?? -99) > (awayRow?.diff ?? -99)} aWin={(awayRow?.diff ?? -99) > (homeRow?.diff ?? -99)} />
-        <InsightCompareRow label="Strength" h={`${model.homeScore}`} a={`${model.awayScore}`} hWin={model.homeScore > model.awayScore} aWin={model.awayScore > model.homeScore} />
+      </div>
+      <div className="space-y-2.5">
+        {rows.map((r) => (
+          <StatBarRow key={r.label} {...r} />
+        ))}
       </div>
     </Card>
   );
 }
 
-function InsightCompareRow({ label, h, a, hWin, aWin }: { label: string; h: string; a: string; hWin?: boolean; aWin?: boolean }) {
+function fmtMargin(m: number): string {
+  return `${m >= 0 ? "+" : ""}${m.toFixed(1)}`;
+}
+
+function StatBarRow({ label, hVal, aVal, hLabel, aLabel, lowerIsBetter }:
+  { label: string; hVal: number; aVal: number; hLabel: string; aLabel: string; lowerIsBetter?: boolean }) {
+  const total = Math.max(0.0001, hVal + aVal);
+  // For "lower is better" stats (conceded), flip the proportions so the better team's bar is bigger.
+  const hPct = lowerIsBetter ? clamp((aVal / total) * 100, 5, 95) : clamp((hVal / total) * 100, 5, 95);
+  const aPct = 100 - hPct;
+  const hBetter = lowerIsBetter ? hVal < aVal : hVal > aVal;
+  const aBetter = lowerIsBetter ? aVal < hVal : aVal > hVal;
   return (
-    <>
-      <div className={`kbd text-right text-sm font-bold py-1.5 ${hWin ? "text-accent" : "text-foreground"}`}>{h}</div>
-      <div className="text-[10px] uppercase tracking-wider text-muted-foreground text-center px-1.5">{label}</div>
-      <div className={`kbd text-left text-sm font-bold py-1.5 ${aWin ? "text-accent" : "text-foreground"}`}>{a}</div>
-    </>
+    <div>
+      <div className="grid grid-cols-[1fr_auto_1fr] gap-x-2 items-baseline">
+        <div className={`text-right text-sm font-black tabular-nums ${hBetter ? "text-accent" : "text-foreground"}`}>{hLabel}</div>
+        <div className="text-[10px] uppercase tracking-wider text-muted-foreground text-center px-2">{label}</div>
+        <div className={`text-left text-sm font-black tabular-nums ${aBetter ? "text-accent" : "text-foreground"}`}>{aLabel}</div>
+      </div>
+      <div className="mt-1 flex h-1.5 w-full rounded-full overflow-hidden bg-surface-2">
+        <div className={`${hBetter ? "bg-accent" : "bg-muted-foreground/40"} h-full transition-all`} style={{ width: `${hPct}%` }} />
+        <div className={`${aBetter ? "bg-accent" : "bg-muted-foreground/40"} h-full transition-all`} style={{ width: `${aPct}%` }} />
+      </div>
+    </div>
   );
 }
 
 function PredictedScoreCard({ model, home, away }:
-  { model: MatchModel; home: TeamLite; away: TeamLite; insights: any }) {
+  { model: MatchModel; home: TeamLite; away: TeamLite }) {
   return (
     <Card title="Predicted score" icon={Target}>
-      <div className="grid grid-cols-3 items-center gap-3 mb-3">
+      <div className="grid grid-cols-3 items-center gap-3">
         <div className="flex flex-col items-center text-center min-w-0">
           <TeamLogo themeKey={home.themeKey} name={home.nickName} size={36} />
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground mt-1 truncate w-full">{home.nickName}</div>
@@ -952,15 +1034,11 @@ function PredictedScoreCard({ model, home, away }:
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground mt-1 truncate w-full">{away.nickName}</div>
         </div>
       </div>
-      <p className="text-[11px] text-muted-foreground text-center leading-relaxed">
-        Projected from each side's attack vs opposition defence, blended with recent form.
-      </p>
     </Card>
   );
 }
 
-function MarginCard({ model, insights }: { model: MatchModel; insights: any }) {
-  const reasoning: string = insights?.margin?.reasoning ?? "";
+function MarginCard({ model }: { model: MatchModel; insights: any }) {
   return (
     <Card title="Winning margin" icon={Gauge}>
       <div className="text-center">
@@ -972,7 +1050,6 @@ function MarginCard({ model, insights }: { model: MatchModel; insights: any }) {
         <Bucket label="1–12" active={model.marginBucket === "1–12"} />
         <Bucket label="13+" active={model.marginBucket === "13+"} />
       </div>
-      {reasoning && <p className="text-[11px] text-muted-foreground mt-3 leading-relaxed">{reasoning}</p>}
     </Card>
   );
 }
@@ -985,30 +1062,44 @@ function Bucket({ label, active }: { label: string; active: boolean }) {
   );
 }
 
-function TotalPointsCard({ model, insights }: { model: MatchModel; insights: any }) {
-  const reasoning: string = insights?.total?.reasoning ?? "";
+function TotalPointsCard({ model, bookieTotal }:
+  { model: MatchModel; bookieTotal: { line: number; over: number; under: number; book: string } | null }) {
+  const projected = model.predictedHome + model.predictedAway;
+  // Use the bookmaker line when we have one — that's the market-set total.
+  const line = bookieTotal?.line ?? model.totalLine + 0.5;
+  const lean: "Over" | "Under" = projected >= line ? "Over" : "Under";
+
   return (
     <Card title="Total match points" icon={Compass}>
       <div className="text-center">
-        <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Combined estimate</div>
-        <div className="text-3xl font-black kbd mt-1">{model.predictedHome + model.predictedAway}</div>
+        <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Projected total</div>
+        <div className="text-3xl font-black kbd mt-1">{projected}</div>
         <div className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider px-2 py-1 rounded-md bg-accent/15 text-accent border border-accent/30">
-          {model.totalLean === "Over" ? <TrendingUp className="h-3 w-3" /> : <TrendingUp className="h-3 w-3 rotate-180" />}
-          {model.totalLean} {model.totalLine}.5
+          {lean === "Over" ? <TrendingUp className="h-3 w-3" /> : <TrendingUp className="h-3 w-3 rotate-180" />}
+          {lean} {line}
         </div>
       </div>
-      <div className="mt-3 text-[11px] text-muted-foreground leading-relaxed">
-        Baseline {model.baselineTotal} pts (NRL avg). Adjusted for both teams' attack vs defence and last-5 scoring trend.
-        {reasoning ? ` ${reasoning}` : ""}
-      </div>
+      {bookieTotal ? (
+        <div className="mt-3 grid grid-cols-2 gap-2 text-center">
+          <div className="bg-surface-2 rounded-lg p-2">
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Over {bookieTotal.line}</div>
+            <div className="text-sm font-black kbd">{bookieTotal.over.toFixed(2)}</div>
+          </div>
+          <div className="bg-surface-2 rounded-lg p-2">
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Under {bookieTotal.line}</div>
+            <div className="text-sm font-black kbd">{bookieTotal.under.toFixed(2)}</div>
+          </div>
+        </div>
+      ) : null}
+      {bookieTotal ? (
+        <div className="mt-2 text-[10px] uppercase tracking-wider text-muted-foreground text-center">Line via {bookieTotal.book}</div>
+      ) : null}
     </Card>
   );
 }
 
 function HtFtCard({ insights, home, away }: { insights: any; home: string; away: string }) {
   const pick: string = insights?.htft?.pick ?? "—";
-  const reasoning: string = insights?.htft?.reasoning ?? "";
-  // Derive HT leader and FT leader by parsing common shapes like "Home/Home", "Storm/Storm".
   const parts = pick.split(/\s*\/\s*/);
   const htLeader = parts[0] || "—";
   const ftLeader = parts[1] || parts[0] || "—";
@@ -1024,7 +1115,6 @@ function HtFtCard({ insights, home, away }: { insights: any; home: string; away:
           <div className="text-sm font-bold mt-1 truncate text-accent">{normaliseSideLabel(ftLeader, home, away)}</div>
         </div>
       </div>
-      {reasoning && <p className="text-[11px] text-muted-foreground mt-3 leading-relaxed">{reasoning}</p>}
     </Card>
   );
 }
@@ -1038,86 +1128,190 @@ function normaliseSideLabel(label: string, home: string, away: string): string {
 
 /* ---------- Tryscorer cards ---------- */
 
+function impliedProb(price: number): number {
+  return price > 0 ? 1 / price : 0;
+}
+
+/** Return team affiliation ("home" | "away" | null) for a player by matching against squad lists. */
+function affiliatePlayer(playerName: string, home: TeamWithPlayers, away: TeamWithPlayers): "home" | "away" | null {
+  const norm = (s: string) => s.toLowerCase().replace(/[^a-z]/g, "");
+  const target = norm(playerName);
+  if (!target) return null;
+  const matches = (squad?: { firstName: string; lastName: string }[]) => {
+    if (!squad) return false;
+    return squad.some((p) => {
+      const full = norm(`${p.firstName}${p.lastName}`);
+      const last = norm(p.lastName);
+      return full === target || target.includes(last) || full.includes(target);
+    });
+  };
+  if (matches(home.players)) return "home";
+  if (matches(away.players)) return "away";
+  return null;
+}
+
 function FirstTryscorerCard({ insights, tryscorers }: { insights: any; tryscorers: TryscorerMarkets | null }) {
   const aiPick: string = insights?.firstTryscorer?.pick ?? "Awaiting team list";
-  const aiReason: string = insights?.firstTryscorer?.reasoning ?? "Wingers and fullbacks carry the highest first-try probability based on positional data.";
-  const top = tryscorers?.first?.[0]?.player;
-  const headline = top || aiPick;
+  const top = tryscorers?.first?.[0];
+  const headline = top?.player || aiPick;
   return (
     <Card title="First tryscorer" icon={Flag} className="accent-glow">
       <div className="flex items-center gap-3">
         <div className="h-12 w-12 rounded-full bg-accent/15 text-accent flex items-center justify-center shrink-0">
           <Crown className="h-6 w-6" />
         </div>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Top pick</div>
           <div className="text-xl font-black truncate">{headline}</div>
         </div>
+        {top ? (
+          <div className="text-right shrink-0">
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Best</div>
+            <div className="text-lg font-black kbd">{top.price.toFixed(2)}</div>
+          </div>
+        ) : null}
       </div>
-      <p className="text-xs text-muted-foreground mt-3 leading-relaxed">{aiReason}</p>
     </Card>
   );
 }
 
-function AnytimeTryscorersCard({ insights, tryscorers }: { insights: any; tryscorers: TryscorerMarkets | null }) {
-  // Prefer real market list (already implied-prob ranked), fall back to AI picks.
-  type Pick = { name: string; note: string };
-  const live: Pick[] = (tryscorers?.anytime ?? []).slice(0, 5).map((p) => ({ name: p.player, note: "" }));
-  const aiList = Array.isArray(insights?.anytimeTryscorers) ? insights.anytimeTryscorers : [];
-  const ai: Pick[] = aiList.slice(0, 5).map((t: any) => ({ name: String(t.pick ?? ""), note: String(t.reasoning ?? "") }));
-  const list: Pick[] = (live.length >= 3 ? live : ai).slice(0, 5);
+type AnytimePick = { name: string; price: number; prob: number; team: "home" | "away" | null };
+
+/**
+ * Build a 6-player anytime tryscorer list balanced by team, with a tilt toward
+ * whichever side carries the better aggregate scoring odds (4 / 2 split when
+ * the favourite's combined implied probability is meaningfully higher).
+ */
+function buildAnytimeList(
+  tryscorers: TryscorerMarkets | null,
+  home: TeamWithPlayers,
+  away: TeamWithPlayers,
+  model: MatchModel,
+): AnytimePick[] {
+  const all = tryscorers?.anytime ?? [];
+  if (all.length === 0) return [];
+
+  const enriched: AnytimePick[] = all.map((t) => ({
+    name: t.player,
+    price: t.price,
+    prob: impliedProb(t.price),
+    team: affiliatePlayer(t.player, home, away),
+  }));
+
+  // Sort by probability (highest first)
+  enriched.sort((a, b) => b.prob - a.prob);
+
+  const homeList = enriched.filter((p) => p.team === "home");
+  const awayList = enriched.filter((p) => p.team === "away");
+  const unknown = enriched.filter((p) => p.team === null);
+
+  // Determine team strengths from the model + market favouritism
+  const homeStrength = model.homeScore + sumTopProbs(homeList, 3) * 50;
+  const awayStrength = model.awayScore + sumTopProbs(awayList, 3) * 50;
+  const diff = homeStrength - awayStrength;
+
+  let homeQuota = 3;
+  let awayQuota = 3;
+  if (diff > 4 && homeList.length >= 4) { homeQuota = 4; awayQuota = 2; }
+  else if (diff < -4 && awayList.length >= 4) { homeQuota = 2; awayQuota = 4; }
+
+  const result: AnytimePick[] = [];
+  result.push(...homeList.slice(0, homeQuota));
+  result.push(...awayList.slice(0, awayQuota));
+
+  // Backfill from unknown / opposing team if a side is short on data
+  while (result.length < 6) {
+    const next = [...homeList.slice(homeQuota), ...awayList.slice(awayQuota), ...unknown]
+      .find((p) => !result.includes(p));
+    if (!next) break;
+    result.push(next);
+  }
+
+  // Final order: highest probability first
+  return result.sort((a, b) => b.prob - a.prob).slice(0, 6);
+}
+
+function sumTopProbs(list: AnytimePick[], n: number): number {
+  return list.slice(0, n).reduce((acc, p) => acc + p.prob, 0);
+}
+
+function AnytimeTryscorersCard({ tryscorers, insights, home, away, model }:
+  { tryscorers: TryscorerMarkets | null; insights: any; home: TeamWithPlayers; away: TeamWithPlayers; model: MatchModel }) {
+  const list = buildAnytimeList(tryscorers, home, away, model);
+
+  // AI fallback when no live odds yet
+  if (list.length === 0) {
+    const aiList = Array.isArray(insights?.anytimeTryscorers) ? insights.anytimeTryscorers : [];
+    const fallback = aiList.slice(0, 6).map((t: any) => String(t.pick ?? "")).filter(Boolean);
+    return (
+      <Card title="Anytime tryscorers" icon={Sparkles}>
+        {fallback.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Tryscorer markets release with team lists.</p>
+        ) : (
+          <ol className="space-y-2">
+            {fallback.map((name: string, i: number) => (
+              <li key={i} className="flex items-center gap-3">
+                <span className="kbd shrink-0 h-6 w-6 rounded-full bg-accent text-accent-foreground text-[11px] font-bold flex items-center justify-center">{i + 1}</span>
+                <span className="text-sm font-bold truncate">{name}</span>
+              </li>
+            ))}
+          </ol>
+        )}
+      </Card>
+    );
+  }
 
   return (
     <Card title="Anytime tryscorers" icon={Sparkles}>
-      {list.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Tryscorer data unavailable until team lists are confirmed.</p>
-      ) : (
-        <ol className="space-y-2.5">
-          {list.map((p, i) => (
-            <li key={i} className="flex items-start gap-3">
-              <span className="kbd shrink-0 h-6 w-6 rounded-full bg-accent text-accent-foreground text-[11px] font-bold flex items-center justify-center">{i + 1}</span>
-              <div className="min-w-0 flex-1">
-                <div className="text-sm font-bold truncate">{p.name}</div>
-                {p.note && <div className="text-[11px] text-muted-foreground leading-relaxed mt-0.5">{p.note}</div>}
-              </div>
-            </li>
-          ))}
-        </ol>
-      )}
-      <p className="text-[11px] text-muted-foreground mt-3 leading-relaxed">
-        Ranked by position (wingers / fullbacks weighted highest), recent try form and expected team try output.
-      </p>
+      <div className="grid grid-cols-[auto_auto_1fr_auto_auto] gap-x-3 gap-y-2 items-center">
+        {list.map((p, i) => (
+          <Fragment key={`${p.name}-${i}`}>
+            <span className="kbd h-6 w-6 rounded-full bg-accent text-accent-foreground text-[11px] font-bold flex items-center justify-center">{i + 1}</span>
+            <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border ${teamChipTone(p.team, home, away)}`}>
+              {teamChipLabel(p.team, home, away)}
+            </span>
+            <span className="text-sm font-bold truncate">{p.name}</span>
+            <span className="text-[11px] kbd text-muted-foreground tabular-nums">{Math.round(p.prob * 100)}%</span>
+            <span className="text-sm kbd font-black tabular-nums">{p.price.toFixed(2)}</span>
+          </Fragment>
+        ))}
+      </div>
     </Card>
   );
+}
+
+function teamChipLabel(team: "home" | "away" | null, home: TeamLite, away: TeamLite): string {
+  if (team === "home") return home.nickName.slice(0, 3).toUpperCase();
+  if (team === "away") return away.nickName.slice(0, 3).toUpperCase();
+  return "—";
+}
+
+function teamChipTone(team: "home" | "away" | null, _home: TeamLite, _away: TeamLite): string {
+  if (team === "home") return "bg-accent/10 text-accent border-accent/30";
+  if (team === "away") return "bg-foreground/5 text-foreground border-border";
+  return "bg-surface-2 text-muted-foreground border-border";
 }
 
 function MultiTryscorerCard({ insights, tryscorers }: { insights: any; tryscorers: TryscorerMarkets | null }) {
   const live = (tryscorers?.multi ?? []).slice(0, 4);
   const aiPick: string = insights?.multiTryscorer?.pick ?? "";
-  const aiReason: string = insights?.multiTryscorer?.reasoning ?? "";
   return (
-    <Card title="Multi-try predictions (2+ / hat-tricks)" icon={Trophy}>
+    <Card title="Multi-try predictions (2+ tries)" icon={Trophy}>
       {live.length > 0 ? (
         <ul className="space-y-2">
           {live.map((p, i) => (
             <li key={i} className="flex items-center gap-3 text-sm">
               <span className="kbd w-5 text-center text-[11px] font-bold text-muted-foreground">{i + 1}</span>
               <span className="flex-1 font-medium truncate">{p.player}</span>
-              <span className="text-[10px] uppercase tracking-wider text-muted-foreground">2+ tries</span>
+              <span className="text-sm kbd font-black tabular-nums">{p.price.toFixed(2)}</span>
             </li>
           ))}
         </ul>
       ) : aiPick ? (
-        <div>
-          <div className="text-base font-bold">{aiPick}</div>
-          {aiReason && <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{aiReason}</p>}
-        </div>
+        <div className="text-base font-bold">{aiPick}</div>
       ) : (
-        <p className="text-sm text-muted-foreground">Multi-try projections release with team lists.</p>
+        <p className="text-sm text-muted-foreground">Multi-try markets release with team lists.</p>
       )}
-      <p className="text-[11px] text-muted-foreground mt-3 leading-relaxed">
-        Based on form, expected team try volume and the opposition's defensive weakness in that lane.
-      </p>
     </Card>
   );
 }

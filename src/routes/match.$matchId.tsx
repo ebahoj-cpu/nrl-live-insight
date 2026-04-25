@@ -125,12 +125,20 @@ function MatchInner() {
           </div>
           {details.weather && (
             <div className="flex items-center justify-center sm:justify-start gap-2 sm:col-span-2 pt-3 border-t border-border flex-wrap">
-              <CloudSun className="h-4 w-4 text-accent shrink-0" />
-              <span className="text-muted-foreground">
-                {details.weather.tempC}° {shortWeather(details.weather.condition)} · {details.weather.windKph} km/h wind · {details.weather.precipMm}mm rain
+              <span className="inline-flex items-center gap-1.5">
+                <CloudSun className="h-4 w-4 text-accent shrink-0" />
+                <span className="text-muted-foreground" suppressHydrationWarning>
+                  {details.weather.tempC}° {shortWeather(details.weather.condition)}
+                </span>
               </span>
-              <span className="text-muted-foreground">·</span>
-              <span className="font-semibold text-foreground">{details.weather.groundCondition} ground</span>
+              <span className="inline-flex items-center gap-1.5">
+                <Zap className="h-4 w-4 text-accent shrink-0" />
+                <span className="text-muted-foreground">{details.weather.windKph} km/h</span>
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <Activity className="h-4 w-4 text-accent shrink-0" />
+                <span className="text-muted-foreground">{details.weather.groundCondition}</span>
+              </span>
             </div>
           )}
         </div>

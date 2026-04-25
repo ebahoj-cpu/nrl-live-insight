@@ -8,6 +8,7 @@ import {
   ArrowLeft, Clock, MapPin, Users, BarChart3, Sparkles, ScrollText,
   Trophy, Target, Flag, Crown, TrendingUp, AlertCircle, CloudSun, Calendar, Zap, Hourglass,
   Coins, ThumbsUp, ThumbsDown, Wallet, Activity, Shield, Brain, Crosshair, Eye,
+  Timer, Ban,
 } from "lucide-react";
 
 const matchQO = (matchId: string) => queryOptions({

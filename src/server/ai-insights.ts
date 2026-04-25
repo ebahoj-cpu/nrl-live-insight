@@ -75,7 +75,70 @@ export type TryscorerScript = {
 };
 
 
+// Match Intelligence — analyst-style breakdown shown on the Insights tab.
+// NO betting language. NO probabilities. NO confidence scores. Pure tactical
+// + structural read of how the game is likely to unfold and why.
+export type TeamProfile = {
+  identity: string;          // 1-2 sentences: who they are this season (e.g. "high-tempo, edge-reliant attack with a fragile right edge")
+  attackRating: string;      // qualitative: "elite" | "strong" | "above average" | "average" | "below average" | "struggling"
+  defenceRating: string;     // same scale
+  formRead: string;          // 2-3 sentences: trajectory + quality of opposition + whether form is real or schedule-flattered
+  scoringPattern: string;    // 1-2 sentences: how their points typically come (set-piece, broken play, kicks, forwards, edges)
+  consistency: string;       // 1 sentence: volatile vs reliable, where the variance shows up
+};
+
+export type AttackingStructure = {
+  edgeBalance: string;       // 1-2 sentences: left edge vs right edge vs middle distribution
+  setPlayVsBroken: string;   // 1-2 sentences: structured set-play scoring vs broken-play / second-phase scoring
+  redZoneTendency: string;   // 1-2 sentences: what they do once inside 20m
+  forwardVsBacklineTries: string; // 1 sentence: where the tries come from
+  primaryPlaymakers: { name: string; role: string; influence: string }[]; // 2-3 named playmakers shaping the attack
+};
+
+export type DefensiveWeaknesses = {
+  missedTackleZones: string[];    // 1-3 short phrases: where missed tackles cluster
+  edgeFragility: string;          // 1-2 sentences: which edge is leaking and why
+  lineSpeedRuckIssues: string;    // 1-2 sentences: line speed and ruck defence problems
+  positionalMismatches: string[]; // 1-3 short phrases: specific positional liabilities
+  pressurePoints: string;         // 1-2 sentences: where the structure breaks down under sustained pressure
+};
+
+export type KeyMatchup = {
+  area: string;          // e.g. "Right edge attack vs left edge defence" or "Forward pack collisions"
+  homeSide: string;      // 1 sentence on what home team brings
+  awaySide: string;      // 1 sentence on what away team brings
+  edge: "home" | "away" | "even"; // who gains the structural advantage
+  why: string;           // 1-2 sentences explaining why
+};
+
+export type GameScriptPhase = {
+  window: string;        // "First 20" | "Second 20" | "Halftime" | "40-60" | "60-80"
+  read: string;          // 1-2 sentences: expected flow in this phase, anchored to specific structural signals
+};
+
+export type PlayerInfluencer = {
+  name: string;
+  team: "home" | "away";
+  role: string;          // "Tempo controller" | "Edge finisher" | "Forward momentum" | "Defensive anchor" | "Disruptor" | "Momentum shifter"
+  expectedImpact: string;// 1-2 sentences: HOW they will influence this specific game
+};
+
+export type MatchIntelligence = {
+  matchOverview: string;          // 3-4 sentences: narrative summary of expected game shape
+  teamProfile: { home: TeamProfile; away: TeamProfile };
+  attackingStructure: { home: AttackingStructure; away: AttackingStructure };
+  defensiveWeaknesses: { home: DefensiveWeaknesses; away: DefensiveWeaknesses };
+  keyMatchups: KeyMatchup[];      // 3-5 distinct matchups
+  gameScript: GameScriptPhase[];  // exactly 5 phases in order
+  playerInfluence: PlayerInfluencer[]; // 5-8 named influencers across both teams (mix of roles)
+  historicalContext: string;      // 2-3 sentences if relevant; can be empty string if not
+  contextualFactors: string[];    // 2-4 short bullets: venue, travel, weather, selection changes, momentum from disruptions
+  rareEventNote: string;          // 1 sentence ack of low-weight scenario modifiers (sin bin / early injury / blowout) — kept short
+  insightSummary: string;         // 2-3 sentences: final tactical takeaway of how the game is likely decided
+};
+
 export type Insights = {
+  intelligence: MatchIntelligence;
   predictedScore: { home: number; away: number };
   winner: { team: "home" | "away"; confidence: number; reasoning: string };
   margin: { value: number; bucket: string; reasoning: string };

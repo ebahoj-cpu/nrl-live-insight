@@ -950,7 +950,7 @@ function ScriptTab({ insights, insightsError, home, away }:
 
 function BetsTab({ insights, insightsError }: { insights: any; insightsError: string | null }) {
   if (insightsError && !insights) return <Empty msg={insightsError} />;
-  if (!insights?.betSuggestions?.length) return <Empty msg="Bet suggestions unavailable." />;
+  if (!insights?.betSuggestions?.length && !insights?.getTheaSpecial) return <Empty msg="Bet suggestions unavailable." />;
 
   const riskMeta: Record<string, { label: string; cls: string; desc: string; payout: string }> = {
     low:    { label: "Low risk",    cls: "border-accent/40 bg-accent/5",        desc: "Safer combo, modest return",       payout: "$100" },
@@ -959,10 +959,12 @@ function BetsTab({ insights, insightsError }: { insights: any; insightsError: st
   };
 
   const tierOrder: Record<string, number> = { low: 0, medium: 1, high: 2 };
-  const sorted = [...insights.betSuggestions].sort((a: any, b: any) => (tierOrder[a.risk] ?? 99) - (tierOrder[b.risk] ?? 99));
+  const sorted = [...(insights.betSuggestions || [])].sort((a: any, b: any) => (tierOrder[a.risk] ?? 99) - (tierOrder[b.risk] ?? 99));
 
   return (
     <div className="space-y-4">
+      {insights.getTheaSpecial && <GetTheaCard special={insights.getTheaSpecial} />}
+
       {sorted.map((b: any, i: number) => {
         const meta = riskMeta[b.risk] ?? riskMeta.medium;
         const target = b.targetPayout ? `$${Number(b.targetPayout).toLocaleString()}` : meta.payout;
@@ -982,10 +984,15 @@ function BetsTab({ insights, insightsError }: { insights: any; insightsError: st
             <h3 className="font-bold text-base mb-3">{b.title}</h3>
 
             <ul className="space-y-1.5 mb-4">
-              {b.legs.map((leg: string, li: number) => (
-                <li key={li} className="flex gap-2 text-sm">
-                  <span className="text-accent shrink-0">✓</span>
-                  <span>{leg}</span>
+              {b.legs.map((leg: any, li: number) => (
+                <li key={li} className="flex items-center justify-between gap-2 text-sm rounded-md bg-surface-2/40 px-2 py-1.5">
+                  <div className="flex gap-2 min-w-0">
+                    <span className="text-accent shrink-0">✓</span>
+                    <span className="truncate">{typeof leg === "string" ? leg : leg.pick}</span>
+                  </div>
+                  {typeof leg === "object" && leg.decimalOdds && (
+                    <span className="kbd text-[11px] font-bold text-accent shrink-0">${Number(leg.decimalOdds).toFixed(2)}</span>
+                  )}
                 </li>
               ))}
             </ul>
@@ -1009,6 +1016,59 @@ function BetsTab({ insights, insightsError }: { insights: any; insightsError: st
           </div>
         );
       })}
+    </div>
+  );
+}
+
+function GetTheaCard({ special }: { special: any }) {
+  const odds = Number(special.combinedOdds) || 0;
+  return (
+    <div className="relative overflow-hidden rounded-2xl border-2 border-accent bg-gradient-to-br from-accent/15 via-surface-2/60 to-danger/10 p-5 shadow-[0_0_40px_-10px_hsl(var(--accent))]">
+      <div className="absolute top-0 right-0 px-3 py-1 bg-accent text-accent-foreground text-[10px] font-black uppercase tracking-widest rounded-bl-xl">
+        ⚡ Special
+      </div>
+      <div className="flex items-center gap-2 mb-1">
+        <Sparkles className="h-5 w-5 text-accent" />
+        <div className="text-[10px] uppercase tracking-[0.25em] font-black text-accent">GET THEA</div>
+      </div>
+      <p className="text-[11px] text-muted-foreground mb-3 italic">
+        The single best $5 → $1,000 play of the slate, built from every angle: stats, weakness exploit, X-factor, weather, psychology.
+      </p>
+
+      <h3 className="font-black text-base mb-3 leading-tight">{special.title}</h3>
+
+      <ul className="space-y-1.5 mb-4">
+        {(special.legs || []).map((leg: any, li: number) => (
+          <li key={li} className="flex items-center justify-between gap-2 text-sm rounded-md bg-background/40 px-2.5 py-2 border border-accent/20">
+            <div className="flex gap-2 min-w-0">
+              <span className="text-accent shrink-0">⚡</span>
+              <span className="truncate font-semibold">{leg.pick}</span>
+            </div>
+            <span className="kbd text-[11px] font-bold text-accent shrink-0">${Number(leg.decimalOdds).toFixed(2)}</span>
+          </li>
+        ))}
+      </ul>
+
+      <div className="grid grid-cols-4 gap-2 mb-3 pt-3 border-t border-accent/30">
+        <div className="text-center">
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Odds</div>
+          <div className="text-lg font-black kbd text-accent">${odds.toFixed(2)}</div>
+        </div>
+        <div className="text-center">
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Stake</div>
+          <div className="text-lg font-black kbd">{special.stake}</div>
+        </div>
+        <div className="text-center">
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Return</div>
+          <div className="text-lg font-black kbd text-accent">{special.potentialReturn}</div>
+        </div>
+        <div className="text-center">
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Confidence</div>
+          <div className="text-lg font-black kbd">{Math.round(Number(special.confidence) || 0)}%</div>
+        </div>
+      </div>
+
+      <p className="text-xs text-muted-foreground leading-relaxed">{special.reasoning}</p>
     </div>
   );
 }

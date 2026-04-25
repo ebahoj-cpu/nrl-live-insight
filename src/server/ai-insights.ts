@@ -12,16 +12,33 @@ export type BettingAngle = {
 };
 
 
+export type BetLeg = {
+  pick: string;          // e.g. "Roosters to win"
+  decimalOdds: number;   // e.g. 1.45
+};
+
 export type BetSuggestion = {
   risk: "low" | "medium" | "high";
   title: string;          // e.g. "Roosters win + Tedesco anytime + Tupou 1-2 tries"
-  legs: string[];         // each leg of the multi
-  estimatedOdds: string;  // e.g. "$5.00"
+  legs: BetLeg[];         // each leg with its own decimal odds
+  combinedOdds: number;   // computed product of leg odds (server-recomputed for safety)
+  estimatedOdds: string;  // formatted, e.g. "$5.00"
   stake: string;          // e.g. "$20"
-  potentialReturn: string;// e.g. "$100"
+  potentialReturn: string;// e.g. "$100" (server-recomputed)
   targetPayout: "100" | "1000" | "10000"; // tier this bet is sized to deliver
   reasoning: string;      // why this combo
 };
+
+export type GetTheaSpecial = {
+  title: string;          // headline e.g. "GET THEA: Storm win + 13+ + Munster anytime + over 39.5"
+  legs: BetLeg[];         // 3-5 legs that multiply to ~200x
+  combinedOdds: number;   // ~200 to deliver $1,000 from $5
+  stake: string;          // "$5"
+  potentialReturn: string;// "$1,000"
+  reasoning: string;      // why this is THE bet of the slate (uses stats, form, weakness, weather)
+  confidence: number;     // 0-100 how confident the AI is
+};
+
 
 export type Insights = {
   predictedScore: { home: number; away: number };
@@ -49,6 +66,7 @@ export type Insights = {
     };
   };
   betSuggestions: BetSuggestion[];
+  getTheaSpecial: GetTheaSpecial;
   script: {
     headToHead: string;
     formAnalysis: string;
@@ -113,17 +131,27 @@ ALSO produce a "weaknessExploit" for EACH team. For each side identify:
 - tacticalPlan: 2-3 sentences on HOW this team weaponises that weakness — shape, ball-runners, kicking game, set-piece.
 - playersToWatch: exactly 3 NAMED squad players from THIS team most likely to score or directly influence scoring against that weakness — for each give role (e.g. "fullback", "right centre", "halfback") and a one-sentence why (form, matchup advantage, kick targets, line-running role into that channel). Use only players from the named squad above.
 
-FINALLY, generate exactly 3 betSuggestions — one for EACH target payout tier: $100, $1,000, and $10,000. Each suggestion is a small multi (2-4 legs) combining real squad players, head-to-head winner, margin BUCKETS, totals or tryscorer markets.
+FINALLY, generate exactly 3 betSuggestions — one for EACH target payout tier: $100, $1,000, and $10,000. Each suggestion is a small multi (2-4 legs) combining real squad players, head-to-head winner, margin BUCKETS, totals, HT/FT doubles, or tryscorer markets.
 
-CRITICAL betting rules:
+CRITICAL betting & ODDS-MATH rules:
 - DO NOT use handicap / line / spread markets like "Roosters -12.5". Lovable users do not bet handicap. Use winning-margin BUCKETS only: "1-12", "13+", "1-6", "7-12", "13-24", "25+".
 - Player try markets must use either "anytime tryscorer", "first tryscorer", or try-count buckets "1-2 tries" or "3+ tries". NEVER use a try line like "0.5".
+- Each leg MUST have its own realistic decimalOdds field. Estimate from the live odds summary above; for tryscorers use $4–$15 anytime, $11–$26 first; margin buckets ~$3–$8; HT/FT doubles ~$3.50–$9; over/under totals ~$1.85–$2.10.
+- combinedOdds MUST equal the PRODUCT of all leg decimalOdds (within ±5%). Do the math leg by leg. Example: 1.45 × 3.00 × 4.50 = 19.575 ≈ $19.50.
+- For the $100 tier aim for combined odds ≈ 5x; for $1,000 tier ≈ 50x (often need 4 legs incl. a margin + HT/FT or over/under booster); for $10,000 tier ≈ 500x (4 legs incl. multi-tryscorer or 3+ tries player).
+- Stake × combinedOdds MUST equal targetPayout (within ±10%). Stake usually $10–$50. If math doesn't reach the target, ADD another booster leg (HT/FT, over/under total, margin bucket, second anytime tryscorer) until it does.
 - Set "risk" to low for the $100 tier, medium for the $1,000 tier, high for the $10,000 tier.
-- Set "targetPayout" to exactly 100, 1000, or 10000 to match.
-- Pick a stake that, multiplied by combined estimated decimal odds, returns approximately the target payout (e.g. $20 stake @ $5.00 odds = $100; $20 stake @ $50 odds = $1,000; $20 stake @ $500 odds = $10,000). Stake should usually be $10–$50.
-- Estimate combined decimal odds by roughly multiplying the implied odds of each leg from the live odds shown.
-- Make legs sharp and specific (e.g. "Roosters to win", "Margin 13+", "Tedesco anytime tryscorer", "Tupou 1-2 tries"). NEVER invent players — only use named squad members above.
-- Explain in 1-2 sentences why each combo wins.`,
+- Set "targetPayout" to exactly "100", "1000", or "10000" to match.
+- NEVER invent players — only named squad members above.
+- Explain in 1-2 sentences why each combo wins.
+
+ON TOP OF THAT, generate ONE standalone "getTheaSpecial" — the GET THEA bet:
+- This is THE single best $5 → $1,000 (≈200x odds) opportunity you can construct from EVERYTHING on this fixture: stats, form, weakness exploit, weather, ladder pressure, psychological factors, X-factor, named squad.
+- 3-5 legs that are individually defensible but combine to ~200x. Use a mix: head-to-head winner + margin bucket + HT/FT + multi-tryscorer or first tryscorer + over/under booster.
+- Stake is exactly "$5", potentialReturn exactly "$1,000".
+- combinedOdds ≈ 200 (range 180–220), product of leg decimalOdds within ±5%.
+- reasoning: 3-4 sentences explaining WHY this is the play of the slate, citing weakness exploit, X-factor, weather/ground, psychological edge, and at least one named squad player.
+- confidence: 0-100 honest read. Be willing to go 25-45 — this is a long shot by design.`,
 
   ].filter(Boolean).join("\n");
 
@@ -274,29 +302,60 @@ CRITICAL betting rules:
               betSuggestions: {
                 type: "array",
                 minItems: 3, maxItems: 3,
-                description: "Exactly three multis: one targeting $100 payout (low risk), one targeting $1,000 payout (medium risk), one targeting $10,000 payout (high risk).",
+                description: "Exactly three multis: $100 (low risk, ~5x odds), $1,000 (medium, ~50x), $10,000 (high, ~500x). Stake × combinedOdds MUST equal targetPayout (±10%).",
                 items: {
                   type: "object",
                   properties: {
                     risk: { type: "string", enum: ["low", "medium", "high"] },
-                    title: { type: "string", description: "Short headline of the multi. NEVER use handicap markets like 'Roosters -12.5'." },
+                    title: { type: "string", description: "Short headline. NEVER use handicap markets like 'Roosters -12.5'." },
                     legs: {
                       type: "array",
-                      minItems: 2, maxItems: 4,
+                      minItems: 2, maxItems: 5,
                       items: {
-                        type: "string",
-                        description: "One leg of the multi. Allowed: head-to-head winner, margin BUCKETS ('1-12', '13+', '1-6', '7-12', '13-24', '25+'), total points over/under, HT/FT, anytime/first tryscorer, try-count buckets ('1-2 tries', '3+ tries'). NEVER handicap/spread/line markets. NEVER 'over 0.5 tries' style.",
+                        type: "object",
+                        properties: {
+                          pick: { type: "string", description: "One leg. Allowed: head-to-head winner, margin BUCKETS ('1-12', '13+', '1-6', '7-12', '13-24', '25+'), total points over/under, HT/FT, anytime/first tryscorer, try-count buckets ('1-2 tries', '3+ tries'). NEVER handicap/spread/line. NEVER 'over 0.5 tries'." },
+                          decimalOdds: { type: "number", description: "Realistic decimal odds for THIS leg. Tryscorer anytime $4-15, first $11-26, margin $3-8, HT/FT $3.5-9, over/under $1.85-2.10, head-to-head $1.20-3.50." },
+                        },
+                        required: ["pick", "decimalOdds"], additionalProperties: false,
                       },
                     },
-                    estimatedOdds: { type: "string", description: "Combined decimal odds, e.g. '$5.00', '$50.00', '$500.00'" },
+                    combinedOdds: { type: "number", description: "Product of all leg decimalOdds. MUST equal multiplied legs within ±5%." },
+                    estimatedOdds: { type: "string", description: "Combined decimal odds formatted, e.g. '$5.00', '$50.00', '$500.00'" },
                     stake: { type: "string", description: "Suggested stake, usually $10–$50, e.g. '$20'" },
-                    potentialReturn: { type: "string", description: "Estimated total return ≈ target payout tier, e.g. '$100', '$1,000', '$10,000'" },
-                    targetPayout: { type: "string", enum: ["100", "1000", "10000"], description: "Which payout tier this bet is sized for: '100', '1000', or '10000'" },
+                    potentialReturn: { type: "string", description: "stake × combinedOdds, formatted, e.g. '$100', '$1,000', '$10,000'" },
+                    targetPayout: { type: "string", enum: ["100", "1000", "10000"], description: "Which payout tier this bet is sized for" },
                     reasoning: { type: "string", description: "Why this combo wins — 1-2 sentences" },
                   },
-                  required: ["risk", "title", "legs", "estimatedOdds", "stake", "potentialReturn", "targetPayout", "reasoning"],
+                  required: ["risk", "title", "legs", "combinedOdds", "estimatedOdds", "stake", "potentialReturn", "targetPayout", "reasoning"],
                   additionalProperties: false,
                 },
+              },
+              getTheaSpecial: {
+                type: "object",
+                description: "THE bet of the slate: $5 stake → $1,000 return (~200x). 3-5 legs constructed from EVERYTHING (stats, weakness exploit, X-factor, weather, psychological).",
+                properties: {
+                  title: { type: "string", description: "Headline like 'GET THEA: Storm win + 13+ + Munster anytime + over 39.5'" },
+                  legs: {
+                    type: "array",
+                    minItems: 3, maxItems: 5,
+                    items: {
+                      type: "object",
+                      properties: {
+                        pick: { type: "string", description: "Leg pick. Same allowed markets as betSuggestions." },
+                        decimalOdds: { type: "number", description: "Realistic decimal odds for THIS leg." },
+                      },
+                      required: ["pick", "decimalOdds"], additionalProperties: false,
+                    },
+                  },
+                  combinedOdds: { type: "number", description: "Product of legs ≈ 200 (range 180-220)." },
+                  stake: { type: "string", description: "Exactly '$5'" },
+                  potentialReturn: { type: "string", description: "Exactly '$1,000'" },
+                  reasoning: { type: "string", description: "3-4 sentences: why this is the play of the slate, citing weakness exploit, X-factor, weather/ground, psychology, and named players." },
+                  confidence: { type: "number", minimum: 0, maximum: 100 },
+                },
+                required: ["title", "legs", "combinedOdds", "stake", "potentialReturn", "reasoning", "confidence"],
+                additionalProperties: false,
               },
               script: {
                 type: "object",
@@ -326,7 +385,7 @@ CRITICAL betting rules:
             required: [
               "predictedScore","winner","margin","total","htft",
               "firstTryscorer","anytimeTryscorers","multiTryscorer",
-              "keysToVictory","keyFactors","weaknessExploit","betSuggestions","script",
+              "keysToVictory","keyFactors","weaknessExploit","betSuggestions","getTheaSpecial","script",
             ],
             additionalProperties: false,
           },
@@ -343,5 +402,54 @@ CRITICAL betting rules:
   const data = await res.json() as any;
   const call = data.choices?.[0]?.message?.tool_calls?.[0];
   if (!call?.function?.arguments) throw new Error("AI returned no structured output");
-  return JSON.parse(call.function.arguments) as Insights;
+  const parsed = JSON.parse(call.function.arguments) as Insights;
+  return normaliseBetMath(parsed);
+}
+
+// Recompute combinedOdds = product(legs) and potentialReturn = stake × combinedOdds.
+// Guards against AI arithmetic mistakes — what we render always adds up.
+function normaliseBetMath(ins: Insights): Insights {
+  const parseStake = (s: string) => Number((s || "").replace(/[^0-9.]/g, "")) || 0;
+  const fmtOdds = (n: number) => `$${n.toFixed(2)}`;
+  const fmtMoney = (n: number) => {
+    if (n >= 1000) return `$${Math.round(n).toLocaleString("en-AU")}`;
+    return `$${n.toFixed(2)}`;
+  };
+
+  const fixMulti = <T extends { legs: BetLeg[]; stake: string; combinedOdds?: number }>(b: T) => {
+    const legs = (b.legs || []).map((l) => ({
+      pick: String(l.pick || ""),
+      decimalOdds: Math.max(1.01, Number(l.decimalOdds) || 1.01),
+    }));
+    const combined = legs.reduce((acc, l) => acc * l.decimalOdds, 1);
+    const stakeNum = parseStake(b.stake);
+    const ret = stakeNum * combined;
+    return { ...b, legs, combinedOdds: combined, _return: ret };
+  };
+
+  if (Array.isArray(ins.betSuggestions)) {
+    ins.betSuggestions = ins.betSuggestions.map((b) => {
+      const fixed = fixMulti(b);
+      return {
+        ...b,
+        legs: fixed.legs,
+        combinedOdds: fixed.combinedOdds,
+        estimatedOdds: fmtOdds(fixed.combinedOdds),
+        potentialReturn: fmtMoney(fixed._return),
+      };
+    });
+  }
+
+  if (ins.getTheaSpecial) {
+    const fixed = fixMulti(ins.getTheaSpecial);
+    ins.getTheaSpecial = {
+      ...ins.getTheaSpecial,
+      legs: fixed.legs,
+      combinedOdds: fixed.combinedOdds,
+      stake: ins.getTheaSpecial.stake || "$5",
+      potentialReturn: fmtMoney(fixed._return),
+    };
+  }
+
+  return ins;
 }

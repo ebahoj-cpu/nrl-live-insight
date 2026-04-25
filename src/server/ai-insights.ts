@@ -512,7 +512,84 @@ CRITICAL betting & ODDS-MATH rules — READ CAREFULLY:
 - HIT THE TARGET COMBINED ODDS for each category — if your draft is too low, swap a short favourite for a longer tryscorer or margin bucket; if too high, swap a long leg for a shorter one. The headline payout vs stake is the whole point of the bets tab.
 - NEVER invent players — only named squad members above. For tryscorer legs, prefer players that appear in the LIVE BOOKIE ODDS block.
 - DO NOT include first-tryscorer legs in any of gameScript / smallStake / mediumStake / bigStake / getThea / anytimeMulti / multiTryStack / pointsParty — first-tryscorer is RESERVED for the standalone "firstTryscorer" bet only.
-- Each bet's reasoning is 2-3 sentences citing specific stats / lineups / form / weakness exploit / X-factor — explain WHY this bet aligns with the rest of the analysis and WHERE the value sits.`,
+- Each bet's reasoning is 2-3 sentences citing specific stats / lineups / form / weakness exploit / X-factor — explain WHY this bet aligns with the rest of the analysis and WHERE the value sits.
+
+==============================================================================
+SCRIPT TAB — UNIFIED MATCH SIMULATION ENGINE (HIGH PRIORITY)
+==============================================================================
+Produce a "simulation" object that powers the Script tab. This is a UNIFIED
+match-simulation engine: you simulate ONE match, then derive EVERY market
+prediction from that same simulation. Markets are NOT analysed in isolation.
+The simulation drives winner, margin, total, HT/FT, anytime tryscorers,
+2+ tries, first tryscorer — all consistent with the same script.
+
+CORE PRINCIPLE — the simulation feeds everything. If your simulated profile
+says "second-half flood, dominant right-edge attack", then the recommended
+plays MUST lean into that (e.g. over the total + right-edge tryscorer +
+HT-away/FT-home if the underdog leads at the break). Every play declares
+WHICH simulation lever it leans on (scriptAlignment).
+
+Produce these simulation fields:
+
+1. profile — the simulated game shape:
+   - tempo: "fast" | "moderate" | "slow" (tied to ruck speed, kicking exchange, weather)
+   - tempoNote: 1 sentence on WHY (cite real signal: weather / squad mobility / recent style)
+   - dominance: "home" | "away" | "even"
+   - dominanceNote: 1 sentence on HOW (cite a specific structural edge)
+   - territoryBalance: 1 sentence e.g. "55-45 home — repeat sets through right edge after 50 mins"
+   - scoringPattern: "early-burst" | "late-burst" | "spread" | "second-half-flood" | "first-half-flood"
+   - scoringPatternNote: 1 sentence on WHEN points come and why (fitness, bench, edge fatigue)
+   - edgeAttack: { left, right, middle each one of "high"|"medium"|"low", note (1 sentence) }
+   - defensiveZones: 2-4 short phrases naming where each side's defence breaks (be team-specific)
+   - expectedTotalRange: { low, high, midpoint } — total points band the simulation expects
+
+2. summary — 2-3 sentences: the match in one analyst read.
+
+3. recommendedPlays — 6-10 cross-market plays, ordered by edgePct desc.
+   Cover a MIX of markets (winner, margin, total, HT/FT, anytime tryscorer,
+   2+ tries, first tryscorer). For EACH play:
+   - market (one of the enum values listed in the schema)
+   - pick (clear human-readable e.g. "Storm to win", "Storm 13+ margin", "Over 44.5 total points", "Storm/Storm HT/FT", "Munster anytime tryscorer", "Hughes 2+ tries", "Coates first tryscorer")
+   - decimalOdds (use the EXACT real bookie price from LIVE BOOKIE ODDS when listed; null if not)
+   - modelProbability (0-100, derived from your simulation — NOT the bookie price)
+   - impliedProbability (0-100 — round(100/decimalOdds, 1); 0 if no price)
+   - edgePct (modelProbability - impliedProbability — positive = value, negative = avoid)
+   - confidence ("high" | "medium" | "low") — based on signal convergence
+   - rationale: 1-2 sentences tying back to the simulation profile
+   - scriptAlignment: 1 short phrase naming the simulation lever (e.g. "second-half flood", "right-edge attack", "underdog dominance window 40-60min")
+   Include at least one negative-edge play marked low confidence (a trap to AVOID), so the user sees which markets the model fades.
+
+4. rankedTryscorers — 4-8 named players (from named squads), ordered by
+   totalScore desc. For EACH player:
+   - name (named squad only)
+   - team ("home" | "away")
+   - position
+   - market ("anytime" | "first" | "2+") — the BEST market for THIS player
+   - decimalOdds (EXACT from LIVE BOOKIE ODDS for that market; null if not)
+   - scores object with each component 0-100:
+     * pais — Player Attacking Impact (line breaks, busts, metres, assists, last 3-5 game form)
+     * ttcp — Team Try Creation Profile fit (edge balance, red-zone usage, role chain)
+     * matchupExploit — opposition defensive weakness against this player's lane
+     * scriptFit — game script alignment (tempo, dominance, scoring pattern)
+     * value — odds inefficiency: model probability vs implied. 100 = huge value, 50 = fair, 0 = badly overbet.
+   - totalScore: 0-100 — weighted blend (PAIS 30%, TTCP 20%, matchup 20%, scriptFit 20%, value 10%)
+   - confidence ("high" | "medium" | "low") — high requires 4-of-5 components above 60
+   - rationale: 1-2 sentences naming convergent signals
+   - stackable: true if script supports multiple scorers from this player's team
+   ONLY include players supported by multiple aligned signals.
+
+5. correlatedAngle — 1-2 sentences identifying which 2-3 of the recommended
+   plays SHARE the same script (e.g. "If the second-half flood lands, over 44.5 + Storm 13+ + Coates anytime all hit together — same simulation").
+
+6. scriptCaveat — 1 sentence on the scenario that breaks the simulation
+   (early sin bin, late weather change, key spine injury, blowout flip).
+
+HARD RULES for the simulation block:
+- All recommendedPlays AND rankedTryscorers MUST be consistent with profile + summary.
+- modelProbability is YOUR number, NOT the implied price.
+- USE EXACT bookie prices from LIVE BOOKIE ODDS where listed.
+- Tryscorer scores must be honest — explicit weak components are fine.
+- Stack only when the simulation supports it (same edge / same scoring window).`,
 
   ].filter(Boolean).join("\n");
 

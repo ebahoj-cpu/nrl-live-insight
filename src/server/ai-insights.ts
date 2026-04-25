@@ -1861,19 +1861,21 @@ function buildFallbackBets(input: {
       category: "ultra",
       title: `Ultra — extreme script outcome`,
       legs: [
-        { pick: `${input.winnerName} winning margin 13+`, decimalOdds: 1.95 },
         { pick: `${input.winnerName} winning margin ${input.marginBucket === "13+" ? "13-24" : input.marginBucket}`, decimalOdds: marginOdds },
         { pick: input.htftPick, decimalOdds: 2.6 },
         { pick: totalPickLabel, decimalOdds: totalOddsApprox },
         { pick: `${aA.name} 2+ tries`, decimalOdds: multiB },
         { pick: `${aB.name} 2+ tries`, decimalOdds: multiC },
-        { pick: `${input.multiTryName} 2+ tries`, decimalOdds: input.multiTryPrice },
+        // Only add the multi-try star if it isn't already represented above.
+        ...(input.multiTryName && input.multiTryName !== aA.name && input.multiTryName !== aB.name
+          ? [{ pick: `${input.multiTryName} 2+ tries`, decimalOdds: input.multiTryPrice }]
+          : [{ pick: `${aD.name} anytime tryscorer`, decimalOdds: aD.price }]),
       ],
       combinedOdds: 1,
       estimatedOdds: "$0.00",
       stake: "$10",
       potentialReturn: "$0.00",
-      reasoning: `Extreme variance scenario — needs ${input.winnerName} to fully impose the script, with multiple finishers cashing doubles. Big margins + HT/FT + stacked 2+ tries — the rare game where everything aligns.`,
+      reasoning: `Extreme variance scenario — needs ${input.winnerName} to fully impose the script, with multiple finishers cashing doubles.`,
       hitRateScore: scriptStrength === "strong" ? 14 : 8,
       scriptAlignment: `extreme dominance + scoring flood`,
     },

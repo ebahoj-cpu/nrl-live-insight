@@ -641,6 +641,105 @@ function buildToolDef() {
             required: ["underdog", "upsetOdds", "probability", "reasoning", "keyFactors", "suggestedPlay"],
             additionalProperties: false,
           },
+          gameFlow: {
+            type: "object",
+            description: "Quarter-by-quarter script: how the game likely unfolds with HT score, momentum swings and HT/FT double pick.",
+            properties: {
+              openingTen: { type: "string", description: "1-2 sentences on the first 10 minutes — who starts hot, early field position." },
+              firstHalf: { type: "string", description: "2-3 sentences on how the first 40 plays out." },
+              halftimeScore: {
+                type: "object",
+                properties: { home: { type: "number" }, away: { type: "number" } },
+                required: ["home", "away"], additionalProperties: false,
+              },
+              halftimeLeader: { type: "string", enum: ["home", "away", "draw"] },
+              secondHalf: { type: "string", description: "2-3 sentences on the second 40." },
+              momentumSwings: {
+                type: "array", minItems: 2, maxItems: 4,
+                items: { type: "string", description: "Time-stamped swing e.g. '10-20min: Storm grab early lead'." },
+              },
+              halftimeDouble: {
+                type: "object",
+                properties: {
+                  pick: { type: "string", description: "HT/FT pick e.g. 'Storm / Storm' or 'Draw / Storm'." },
+                  reasoning: { type: "string" },
+                  confidence: { type: "number", minimum: 0, maximum: 100 },
+                },
+                required: ["pick", "reasoning", "confidence"], additionalProperties: false,
+              },
+              closing: { type: "string", description: "1-2 sentences on the final 10." },
+            },
+            required: ["openingTen", "firstHalf", "halftimeScore", "halftimeLeader", "secondHalf", "momentumSwings", "halftimeDouble", "closing"],
+            additionalProperties: false,
+          },
+          tryscorerScript: {
+            type: "object",
+            description: "Tryscoring script — 3-4 picks per team with real prices when available, plus 1-2 trap players to avoid.",
+            properties: {
+              home: {
+                type: "object",
+                properties: {
+                  picks: {
+                    type: "array", minItems: 3, maxItems: 4,
+                    items: {
+                      type: "object",
+                      properties: {
+                        name: { type: "string", description: "Named home squad player." },
+                        market: { type: "string", enum: ["first", "anytime", "2+"] },
+                        price: { type: ["number", "null"], description: "Exact price from LIVE BOOKIE ODDS, else null." },
+                        reasoning: { type: "string", description: "1-2 sentences on form, matchup, role." },
+                      },
+                      required: ["name", "market", "price", "reasoning"], additionalProperties: false,
+                    },
+                  },
+                  avoid: {
+                    type: "array", minItems: 1, maxItems: 2,
+                    items: {
+                      type: "object",
+                      properties: {
+                        name: { type: "string" },
+                        reasoning: { type: "string", description: "Why fade this name this week — 1 sentence." },
+                      },
+                      required: ["name", "reasoning"], additionalProperties: false,
+                    },
+                  },
+                },
+                required: ["picks", "avoid"], additionalProperties: false,
+              },
+              away: {
+                type: "object",
+                properties: {
+                  picks: {
+                    type: "array", minItems: 3, maxItems: 4,
+                    items: {
+                      type: "object",
+                      properties: {
+                        name: { type: "string", description: "Named away squad player." },
+                        market: { type: "string", enum: ["first", "anytime", "2+"] },
+                        price: { type: ["number", "null"] },
+                        reasoning: { type: "string" },
+                      },
+                      required: ["name", "market", "price", "reasoning"], additionalProperties: false,
+                    },
+                  },
+                  avoid: {
+                    type: "array", minItems: 1, maxItems: 2,
+                    items: {
+                      type: "object",
+                      properties: {
+                        name: { type: "string" },
+                        reasoning: { type: "string" },
+                      },
+                      required: ["name", "reasoning"], additionalProperties: false,
+                    },
+                  },
+                },
+                required: ["picks", "avoid"], additionalProperties: false,
+              },
+              summary: { type: "string", description: "2-3 sentences on the overall tryscoring picture." },
+            },
+            required: ["home", "away", "summary"], additionalProperties: false,
+          },
           script: {
             type: "object",
             properties: {
@@ -669,7 +768,8 @@ function buildToolDef() {
         required: [
           "predictedScore","winner","margin","total","htft",
           "firstTryscorer","anytimeTryscorers","multiTryscorer",
-          "keysToVictory","keyFactors","weaknessExploit","betSuggestions","getTheaSpecial","upset","script",
+          "keysToVictory","keyFactors","weaknessExploit","betSuggestions","getTheaSpecial","upset",
+          "gameFlow","tryscorerScript","script",
         ],
         additionalProperties: false,
       },

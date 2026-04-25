@@ -85,6 +85,7 @@ function Header() {
   const router = useRouter();
   const fetching = useIsFetching();
   const refresh = () => router.invalidate();
+  const [menuOpen, setMenuOpen] = useState(false);
   return (
     <header className="sticky top-0 z-30 backdrop-blur-xl bg-background/70 border-b border-border">
       <div className="mx-auto max-w-6xl px-4 sm:px-6 h-16 flex items-center justify-between">
@@ -96,16 +97,87 @@ function Header() {
             LINE<span className="text-accent">BREAK</span>
           </span>
         </Link>
-        <button
-          onClick={refresh}
-          aria-label="Refresh data"
-          className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-1.5 text-sm font-medium hover:bg-surface-2 transition"
-        >
-          <RotateCw className={`h-4 w-4 ${fetching ? "animate-spin-slow" : ""}`} />
-          <span className="hidden sm:inline">Refresh</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={refresh}
+            aria-label="Refresh data"
+            className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-1.5 text-sm font-medium hover:bg-surface-2 transition"
+          >
+            <RotateCw className={`h-4 w-4 ${fetching ? "animate-spin-slow" : ""}`} />
+            <span className="hidden sm:inline">Refresh</span>
+          </button>
+          <button
+            onClick={() => setMenuOpen((v) => !v)}
+            aria-label="Open fixtures menu"
+            aria-expanded={menuOpen}
+            className="inline-flex items-center justify-center h-9 w-9 rounded-full border border-border bg-surface hover:bg-surface-2 transition"
+          >
+            {menuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+          </button>
+        </div>
       </div>
+      {menuOpen && <FixturesMenu onClose={() => setMenuOpen(false)} />}
     </header>
+  );
+}
+
+function FixturesMenu({ onClose }: { onClose: () => void }) {
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["fixtures", "current"],
+    queryFn: () => getCurrentRoundFixtures({ data: {} }),
+    staleTime: 5 * 60_000,
+  });
+
+  // Close on Escape
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose]);
+
+  return (
+    <>
+      {/* backdrop */}
+      <button
+        type="button"
+        aria-label="Close fixtures menu"
+        onClick={onClose}
+        className="fixed inset-0 top-16 bg-background/40 backdrop-blur-sm z-20"
+      />
+      <div className="absolute right-0 sm:right-4 top-full mt-2 w-[min(92vw,360px)] rounded-2xl border border-border bg-surface shadow-2xl z-30 overflow-hidden">
+        <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+          <div>
+            <div className="text-[10px] uppercase tracking-[0.2em] text-accent font-bold">This Round</div>
+            <div className="text-sm font-bold">{data ? `Round ${data.round}` : "Fixtures"}</div>
+          </div>
+          {data && <div className="text-[11px] text-muted-foreground kbd">{data.fixtures.length} games</div>}
+        </div>
+        <div className="max-h-[70vh] overflow-y-auto p-2">
+          {isLoading && (
+            <div className="p-6 text-center text-xs text-muted-foreground">Loading fixtures…</div>
+          )}
+          {error && (
+            <div className="p-6 text-center text-xs text-danger">Couldn't load fixtures</div>
+          )}
+          {data && data.fixtures.length === 0 && (
+            <div className="p-6 text-center text-xs text-muted-foreground">No fixtures this round.</div>
+          )}
+          {data && data.fixtures.map((f) => (
+            <Link
+              key={f.matchId}
+              to="/match/$matchId"
+              params={{ matchId: f.matchId }}
+              onClick={onClose}
+              className="flex items-center justify-center gap-3 px-3 py-2.5 rounded-xl hover:bg-surface-2 transition"
+            >
+              <TeamLogo themeKey={f.homeTeam.themeKey} name={f.homeTeam.nickName} size={36} />
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">v</span>
+              <TeamLogo themeKey={f.awayTeam.themeKey} name={f.awayTeam.nickName} size={36} />
+            </Link>
+          ))}
+        </div>
+      </div>
+    </>
   );
 }
 

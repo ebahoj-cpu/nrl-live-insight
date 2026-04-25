@@ -12,16 +12,33 @@ export type BettingAngle = {
 };
 
 
+export type BetLeg = {
+  pick: string;          // e.g. "Roosters to win"
+  decimalOdds: number;   // e.g. 1.45
+};
+
 export type BetSuggestion = {
   risk: "low" | "medium" | "high";
   title: string;          // e.g. "Roosters win + Tedesco anytime + Tupou 1-2 tries"
-  legs: string[];         // each leg of the multi
-  estimatedOdds: string;  // e.g. "$5.00"
+  legs: BetLeg[];         // each leg with its own decimal odds
+  combinedOdds: number;   // computed product of leg odds (server-recomputed for safety)
+  estimatedOdds: string;  // formatted, e.g. "$5.00"
   stake: string;          // e.g. "$20"
-  potentialReturn: string;// e.g. "$100"
+  potentialReturn: string;// e.g. "$100" (server-recomputed)
   targetPayout: "100" | "1000" | "10000"; // tier this bet is sized to deliver
   reasoning: string;      // why this combo
 };
+
+export type GetTheaSpecial = {
+  title: string;          // headline e.g. "GET THEA: Storm win + 13+ + Munster anytime + over 39.5"
+  legs: BetLeg[];         // 3-5 legs that multiply to ~200x
+  combinedOdds: number;   // ~200 to deliver $1,000 from $5
+  stake: string;          // "$5"
+  potentialReturn: string;// "$1,000"
+  reasoning: string;      // why this is THE bet of the slate (uses stats, form, weakness, weather)
+  confidence: number;     // 0-100 how confident the AI is
+};
+
 
 export type Insights = {
   predictedScore: { home: number; away: number };

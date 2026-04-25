@@ -2,8 +2,9 @@
 // Uses tool-calling for structured output. Receives ONLY real data summaries.
 
 const GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
-const MODEL = "google/gemini-2.5-flash";
-const TIMEOUT_MS = 35_000; // hard cap so the whole match page never hangs
+const MODEL = "google/gemini-2.5-pro";
+const FALLBACK_MODEL = "google/gemini-2.5-flash";
+const TIMEOUT_MS = 90_000; // pro model with large schema needs more headroom
 
 export type BettingAngle = {
   market: string;

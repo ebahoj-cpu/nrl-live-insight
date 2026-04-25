@@ -1923,7 +1923,59 @@ function BetCard({ categoryKey, bet }: { categoryKey: BetCategoryKey; bet: any }
     </div>
   );
 }
-
+// Accent class helpers — kept verbose so Tailwind doesn't tree-shake them.
+function accentBorder(a: string) {
+  switch (a) {
+    case "accent": return "border-accent/50";
+    case "danger": return "border-danger/50";
+    case "emerald-500": return "border-emerald-500/50";
+    case "yellow-500": return "border-yellow-500/50";
+    case "orange-500": return "border-orange-500/50";
+    case "sky-500": return "border-sky-500/50";
+    case "rose-500": return "border-rose-500/50";
+    case "fuchsia-500": return "border-fuchsia-500/50";
+    default: return "border-border";
+  }
+}
+function accentTint(a: string) {
+  switch (a) {
+    case "accent": return "bg-gradient-to-br from-accent/10 via-surface-2/40 to-transparent";
+    case "danger": return "bg-gradient-to-br from-danger/10 via-surface-2/40 to-transparent";
+    case "emerald-500": return "bg-gradient-to-br from-emerald-500/10 via-surface-2/40 to-transparent";
+    case "yellow-500": return "bg-gradient-to-br from-yellow-500/10 via-surface-2/40 to-transparent";
+    case "orange-500": return "bg-gradient-to-br from-orange-500/10 via-surface-2/40 to-transparent";
+    case "sky-500": return "bg-gradient-to-br from-sky-500/10 via-surface-2/40 to-transparent";
+    case "rose-500": return "bg-gradient-to-br from-rose-500/10 via-surface-2/40 to-transparent";
+    case "fuchsia-500": return "bg-gradient-to-br from-fuchsia-500/10 via-surface-2/40 to-transparent";
+    default: return "bg-surface-2/30";
+  }
+}
+function accentText(a: string) {
+  switch (a) {
+    case "accent": return "text-accent";
+    case "danger": return "text-danger";
+    case "emerald-500": return "text-emerald-500";
+    case "yellow-500": return "text-yellow-500";
+    case "orange-500": return "text-orange-500";
+    case "sky-500": return "text-sky-500";
+    case "rose-500": return "text-rose-500";
+    case "fuchsia-500": return "text-fuchsia-500";
+    default: return "text-foreground";
+  }
+}
+function accentBadge(a: string) {
+  switch (a) {
+    case "accent": return "bg-accent text-accent-foreground";
+    case "danger": return "bg-danger text-white";
+    case "emerald-500": return "bg-emerald-500 text-white";
+    case "yellow-500": return "bg-yellow-500 text-yellow-950";
+    case "orange-500": return "bg-orange-500 text-white";
+    case "sky-500": return "bg-sky-500 text-white";
+    case "rose-500": return "bg-rose-500 text-white";
+    case "fuchsia-500": return "bg-fuchsia-500 text-white";
+    default: return "bg-muted text-foreground";
+  }
+}
 
 function formatDate(utc: string) {
   if (!utc) return "TBC";

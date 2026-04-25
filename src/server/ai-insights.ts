@@ -562,13 +562,39 @@ function buildToolDef() {
             required: ["title", "legs", "combinedOdds", "stake", "potentialReturn", "reasoning", "confidence"],
             additionalProperties: false,
           },
+          upset: {
+            type: "object",
+            description: "The most credible underdog scenario for this match.",
+            properties: {
+              underdog: { type: "string", description: "Underdog team nickname (longer h2h price)." },
+              upsetOdds: { type: "number", description: "EXACT real h2h price for the underdog from the LIVE BOOKIE ODDS block." },
+              probability: { type: "number", minimum: 0, maximum: 100, description: "Honest 0-100 read of upset likelihood." },
+              reasoning: { type: "string", description: "3-5 sentences explaining why the upset can land." },
+              keyFactors: {
+                type: "array", minItems: 2, maxItems: 4,
+                items: { type: "string", description: "Concrete factor — form, injury, matchup, weather, motivation, travel." },
+              },
+              suggestedPlay: {
+                type: "object",
+                properties: {
+                  pick: { type: "string", description: "e.g. 'Eels to win'" },
+                  decimalOdds: { type: "number", description: "Same as upsetOdds." },
+                  stake: { type: "string", description: "e.g. '$20'" },
+                  potentialReturn: { type: "string", description: "stake × decimalOdds, formatted, e.g. '$60'" },
+                },
+                required: ["pick", "decimalOdds", "stake", "potentialReturn"], additionalProperties: false,
+              },
+            },
+            required: ["underdog", "upsetOdds", "probability", "reasoning", "keyFactors", "suggestedPlay"],
+            additionalProperties: false,
+          },
           script: {
             type: "object",
             properties: {
               headToHead: { type: "string", description: "3-5 sentences: recent H2H meetings, score trends, venue history at this ground, who has owned the rivalry, tactical patterns deciding recent matchups." },
               formAnalysis: { type: "string", description: "3-5 sentences: last-5 trajectories, attack vs defence, points-for/against trend, quality of opposition, whether form is real or schedule-inflated." },
               xFactor: { type: "string", description: "Single biggest swing variable — one player, matchup, or tactical lever — and what tips the game when it fires." },
-              psychological: { type: "string", description: "4-6 sentences covering ladder positioning pressure, occasion (Anzac, Magic, Heritage, derby, retirement game), expected sell-out / crowd, recent emotional peaks, home vs away mentality, and stadium voodoo / hoodoos." },
+              psychological: { type: "string", description: "4-6 sentences covering ladder positioning pressure, occasion, expected sell-out / crowd, recent emotional peaks, home vs away mentality, and stadium voodoo / hoodoos." },
               milestones: {
                 type: "array",
                 minItems: 1, maxItems: 4,
@@ -590,7 +616,7 @@ function buildToolDef() {
         required: [
           "predictedScore","winner","margin","total","htft",
           "firstTryscorer","anytimeTryscorers","multiTryscorer",
-          "keysToVictory","keyFactors","weaknessExploit","betSuggestions","getTheaSpecial","script",
+          "keysToVictory","keyFactors","weaknessExploit","betSuggestions","getTheaSpecial","upset","script",
         ],
         additionalProperties: false,
       },

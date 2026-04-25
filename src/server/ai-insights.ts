@@ -479,7 +479,7 @@ CORE RULES — every tier:
 - Quote LIVE BOOKIE ODDS prices EXACTLY for any leg that matches a listed market.
 - combinedOdds MUST equal product(legs) within ±5%.
 - Default stake is "$10" per slip — the user can override in the UI.
-- Each slip records `hitRateScore` (0-100, where 100 = simulation strongly converges on every leg) and `scriptAlignment` (one short phrase naming the simulation lever, e.g. "second-half flood + dominant right-edge").
+- Each slip records 'hitRateScore' (0-100, where 100 = simulation strongly converges on every leg) and 'scriptAlignment' (one short phrase naming the simulation lever, e.g. "second-half flood + dominant right-edge").
 - NEVER force bets in low-confidence games — if the simulation does not support the tier, drop a leg rather than reach. Lower legCount + cleaner picks > more legs + weak picks.
 - Build the slips so the implied combined odds make sense for the tier (LOW lands often / smaller payout, ULTRA rare hit / large payout). Do NOT artificially inflate odds.
 
@@ -517,8 +517,8 @@ CRITICAL betting & ODDS-MATH rules:
 - Player try markets must use "anytime tryscorer", "first tryscorer", or "2+ tries" / "3+ tries" — NEVER "over 0.5".
 - combinedOdds MUST equal the PRODUCT of all leg decimalOdds (within ±5%).
 - NEVER invent players — only named squad members above. Prefer players that appear in LIVE BOOKIE ODDS.
-- Each slip's `reasoning` is 2-3 sentences citing the simulation lever, named players, and which markets converge — explain WHY the slip lands AND what would break it.
-- Each slip's `title` is short and informative: e.g. "Storm dominance — 3-leg safe build", "High-correlation right-edge stack", "Ultra: scoring-flood scenario".
+- Each slip's 'reasoning' is 2-3 sentences citing the simulation lever, named players, and which markets converge — explain WHY the slip lands AND what would break it.
+- Each slip's 'title' is short and informative: e.g. "Storm dominance — 3-leg safe build", "High-correlation right-edge stack", "Ultra: scoring-flood scenario".
 
 The four bets MUST share script DNA — they are different RISK appetites on the SAME match simulation, not four unrelated slip ideas.
 

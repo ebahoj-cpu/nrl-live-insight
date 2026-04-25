@@ -963,6 +963,18 @@ function ScriptTab({ insights, insightsError, insightsLoading, home, away }:
         <p className="text-sm leading-relaxed">{s.xFactor}</p>
       </Card>
 
+      {insights.gameFlow && (
+        <GameFlowCard flow={insights.gameFlow} home={homeName} away={awayName} />
+      )}
+
+      {insights.tryscorerScript && (
+        <TryscorerScriptCard
+          script={insights.tryscorerScript}
+          home={home}
+          away={away}
+        />
+      )}
+
       {s.psychological && (
         <Card title="Psychological" icon={Brain}>
           <p className="text-sm leading-relaxed text-muted-foreground whitespace-pre-line">{s.psychological}</p>

@@ -138,5 +138,65 @@ export function normaliseInsights(ins: Insights, homeName: string, awayName: str
     if (typeof ins.intelligence.matchOverview !== "string") ins.intelligence.matchOverview = "";
   }
 
+  // Simulation — guarantee the unified Match Simulation Engine block exists
+  // so the Script tab always renders. AI output is preferred; this is a safety net.
+  if (!ins.simulation) {
+    ins.simulation = {
+      profile: {
+        tempo: "moderate",
+        tempoNote: `Tempo expected to settle into a moderate ruck speed once both packs absorb the opening 10.`,
+        dominance: "even",
+        dominanceNote: `Neither side has a clear structural edge — the third quarter usually decides this matchup.`,
+        territoryBalance: `Roughly 50-50 territory split — the side that wins the post-halftime restart owns the middle 20.`,
+        scoringPattern: "spread",
+        scoringPatternNote: `Tries projected to spread evenly across both halves rather than cluster in one window.`,
+        edgeAttack: { left: "medium", right: "medium", middle: "medium", note: `Both sides project balanced edge volume.` },
+        defensiveZones: [
+          `Edge defence slow to slide on second-phase ball after fatigue sets in.`,
+          `Ruck speed thins in the third quarter when bench rotations come on.`,
+          `Back-three exposure on contestable bombs.`,
+        ],
+        expectedTotalRange: { low: 36, high: 52, midpoint: 44 },
+      },
+      summary: `${homeName} host ${awayName} in a contest the simulation expects to be decided by the third-quarter battle.`,
+      recommendedPlays: [],
+      rankedTryscorers: [],
+      correlatedAngle: `Plays will refresh once full insights generate.`,
+      scriptCaveat: `An early sin bin or a key spine injury would shift the script materially.`,
+    };
+  } else {
+    if (!ins.simulation.profile) {
+      ins.simulation.profile = {
+        tempo: "moderate", tempoNote: "", dominance: "even", dominanceNote: "",
+        territoryBalance: "", scoringPattern: "spread", scoringPatternNote: "",
+        edgeAttack: { left: "medium", right: "medium", middle: "medium", note: "" },
+        defensiveZones: [], expectedTotalRange: { low: 36, high: 52, midpoint: 44 },
+      } as any;
+    }
+    if (!Array.isArray(ins.simulation.recommendedPlays)) ins.simulation.recommendedPlays = [];
+    if (!Array.isArray(ins.simulation.rankedTryscorers)) ins.simulation.rankedTryscorers = [];
+    if (!Array.isArray(ins.simulation.profile.defensiveZones)) ins.simulation.profile.defensiveZones = [];
+    if (typeof ins.simulation.summary !== "string") ins.simulation.summary = "";
+    if (typeof ins.simulation.correlatedAngle !== "string") ins.simulation.correlatedAngle = "";
+    if (typeof ins.simulation.scriptCaveat !== "string") ins.simulation.scriptCaveat = "";
+
+    // Recompute implied + edge for any plays that omitted them
+    ins.simulation.recommendedPlays = ins.simulation.recommendedPlays.map((p) => {
+      const implied = p.decimalOdds ? Math.round((100 / p.decimalOdds) * 10) / 10 : 0;
+      const edge = Math.round((Number(p.modelProbability || 0) - implied) * 10) / 10;
+      const conf: "high" | "medium" | "low" = p.confidence ?? (edge >= 8 ? "high" : edge >= 2 ? "medium" : "low");
+      return { ...p, impliedProbability: implied, edgePct: edge, confidence: conf };
+    }).sort((a, b) => b.edgePct - a.edgePct);
+
+    // Recompute totalScore for any tryscorers if missing
+    ins.simulation.rankedTryscorers = ins.simulation.rankedTryscorers.map((t) => {
+      const s = t.scores ?? { pais: 50, ttcp: 50, matchupExploit: 50, scriptFit: 50, value: 50 };
+      const total = Math.round((s.pais * 0.3 + s.ttcp * 0.2 + s.matchupExploit * 0.2 + s.scriptFit * 0.2 + s.value * 0.1) * 10) / 10;
+      const above60 = [s.pais, s.ttcp, s.matchupExploit, s.scriptFit, s.value].filter((v) => v >= 60).length;
+      const conf: "high" | "medium" | "low" = t.confidence ?? (above60 >= 4 ? "high" : above60 >= 2 ? "medium" : "low");
+      return { ...t, scores: s, totalScore: t.totalScore ?? total, confidence: conf };
+    }).sort((a, b) => b.totalScore - a.totalScore);
+  }
+
   return ins;
 }

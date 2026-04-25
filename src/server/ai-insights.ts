@@ -658,7 +658,7 @@ FINALLY, generate the "bets" object — EXACTLY FOUR betting slips, one per risk
 CORE RULES — every tier:
 - Each leg must be supported by AT LEAST one of: the simulation profile, a ranked tryscorer (PAIS/TTCP/matchupExploit/scriptFit), a recommendedPlay with positive edge, or the weaknessExploit / gameFlow analysis.
 - Same-game multi correlation must be moderate (not strict, not loose). Stronger script = tighter correlation; weaker script = slightly more diversified legs.
-- NEVER include contradictory legs (e.g. "home to win" + "away leads at half" without supporting HT/FT). NEVER duplicate logical markets (e.g. winner + winning-margin where the margin already implies the winner — pick ONE).
+- NEVER include contradictory legs (e.g. "home to win" + "away leads at half" without supporting HT/FT). NEVER duplicate logical markets (e.g. winner + winning-margin where the margin already implies the winner — pick ONE). NEVER include the same player in the same market twice in one slip (e.g. "Brian To'o 2+ tries" cannot appear twice). NEVER include the same player with overlapping try markets (e.g. "Brian To'o anytime tryscorer" + "Brian To'o 2+ tries" — pick ONE). Each leg in a slip MUST be a UNIQUE market+pick combination.
 - Quote LIVE BOOKIE ODDS prices EXACTLY for any leg that matches a listed market.
 - combinedOdds MUST equal product(legs) within ±5%.
 - Default stake is "$10" per slip — the user can override in the UI.

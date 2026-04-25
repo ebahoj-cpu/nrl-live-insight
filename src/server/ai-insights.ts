@@ -40,14 +40,15 @@ export type BetPlay = {
 
 export type BetCategoryKey =
   | "gameScript"
-  | "lowRisk"
-  | "mediumRisk"
-  | "highRisk"
+  | "smallStake"
+  | "mediumStake"
+  | "bigStake"
   | "getThea"
+  | "anytimeMulti"
+  | "multiTryStack"
+  | "pointsParty"
   | "upset"
-  | "bookieWant"
   | "bookieFear"
-  | "anytime"
   | "firstTryscorer";
 
 export type GameFlow = {

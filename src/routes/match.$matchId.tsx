@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
-import { useSuspenseQuery, queryOptions } from "@tanstack/react-query";
-import { getMatchPage } from "@/server/index.functions";
+import { useSuspenseQuery, useQuery, queryOptions } from "@tanstack/react-query";
+import { getMatchPage, getMatchInsights } from "@/server/index.functions";
 import { TeamLogo } from "@/components/TeamLogo";
 import type { TryscorerMarkets, TryscorerOdds } from "@/server/odds";
 import { Suspense, useState } from "react";
@@ -13,6 +13,13 @@ import {
 const matchQO = (matchId: string) => queryOptions({
   queryKey: ["match", matchId],
   queryFn: () => getMatchPage({ data: { matchId } }),
+});
+
+const insightsQO = (matchId: string) => queryOptions({
+  queryKey: ["match-insights", matchId],
+  queryFn: () => getMatchInsights({ data: { matchId } }),
+  staleTime: 60 * 60_000,
+  retry: 1,
 });
 
 export const Route = createFileRoute("/match/$matchId")({

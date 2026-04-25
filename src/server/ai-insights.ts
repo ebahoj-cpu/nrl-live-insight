@@ -373,6 +373,13 @@ export async function generateInsights(payload: {
   oddsSummary: string;
   realOdds?: RealOdds;
   weatherSummary?: string;
+  // NEW — official late-mail ins/outs from NRL.com weekly team-list article.
+  homeTeamNews?: { ins: string[]; outs: string[]; blurb: string } | null;
+  awayTeamNews?: { ins: string[]; outs: string[]; blurb: string } | null;
+  // NEW — most-recent meeting head-to-head stat groups (NRL.com match-centre stats).
+  // These are real numbers (possession%, completions, missed tackles, line breaks,
+  // run metres, etc.) the AI can cite directly instead of guessing.
+  statGroups?: { title: string; stats: { title: string; type: string; units?: string; homeValue: { value: number; numerator?: number; denominator?: number }; awayValue: { value: number; numerator?: number; denominator?: number } }[] }[];
 }): Promise<Insights> {
   const key = process.env.LOVABLE_API_KEY;
   if (!key) throw new Error("LOVABLE_API_KEY not configured");
@@ -382,6 +389,23 @@ export async function generateInsights(payload: {
 
   const fmtSquad = (s: typeof payload.homeSquad) =>
     s.map((p) => `${p.position}: ${p.firstName} ${p.lastName}${p.isCaptain ? " (C)" : ""}`).join("; ") || "n/a";
+
+  const fmtNews = (n?: { ins: string[]; outs: string[]; blurb: string } | null) =>
+    !n ? "Not yet published" : `INS: ${n.ins.join(", ") || "none"} | OUTS: ${n.outs.join(", ") || "none"}${n.blurb ? ` | LATE MAIL: ${n.blurb}` : ""}`;
+
+  // Compress stat groups into a tight scoreboard the AI can cite. Skip empty groups.
+  const fmtStats = (groups?: typeof payload.statGroups) => {
+    if (!groups || groups.length === 0) return "No prior-meeting stats available";
+    const lines: string[] = [];
+    for (const g of groups) {
+      for (const s of g.stats) {
+        const h = s.type === "Percentage" ? `${s.homeValue.value.toFixed(0)}%` : s.homeValue.numerator != null ? `${s.homeValue.numerator}/${s.homeValue.denominator}` : `${s.homeValue.value}`;
+        const a = s.type === "Percentage" ? `${s.awayValue.value.toFixed(0)}%` : s.awayValue.numerator != null ? `${s.awayValue.numerator}/${s.awayValue.denominator}` : `${s.awayValue.value}`;
+        lines.push(`${s.title}: ${payload.homeName} ${h} vs ${payload.awayName} ${a}`);
+      }
+    }
+    return lines.join(" | ");
+  };
 
   // Build a precise real-odds block — the AI MUST quote these prices exactly,
   // not invent fictional ones. This is what's been wrong vs TAB.
@@ -393,11 +417,15 @@ export async function generateInsights(payload: {
     awayRow ? `${payload.awayName}: ${awayRow.wins}W-${awayRow.losses}L, PF ${awayRow.for}, PA ${awayRow.against}, diff ${awayRow.diff}, pos ${payload.awayPosition ?? "?"}.` : "",
     `${payload.homeName} named squad (NRL.com official): ${fmtSquad(payload.homeSquad)}`,
     `${payload.awayName} named squad (NRL.com official): ${fmtSquad(payload.awaySquad)}`,
+    `${payload.homeName} late mail (NRL.com team lists): ${fmtNews(payload.homeTeamNews)}`,
+    `${payload.awayName} late mail (NRL.com team lists): ${fmtNews(payload.awayTeamNews)}`,
+    `Most-recent head-to-head match stats (NRL.com match-centre): ${fmtStats(payload.statGroups)}`,
     `Home recent form: ${payload.homeRecentForm.map((f) => `${f.result} ${f.summary} ${f.score}`).join("; ") || "n/a"}`,
     `Away recent form: ${payload.awayRecentForm.map((f) => `${f.result} ${f.summary} ${f.score}`).join("; ") || "n/a"}`,
     `Live AU bookie odds summary: ${payload.oddsSummary}`,
     realOddsBlock,
     payload.weatherSummary ? `Forecast at venue at kickoff: ${payload.weatherSummary}` : "",
+    `EVIDENCE DISCIPLINE — every claim you make MUST tie back to a specific number above (PF/PA, head-to-head stats, recent-form scoreline) OR a named player from the squads / late-mail. If you do not have a stat to support a claim, drop the claim. Saying "Knights have a strong forward pack" without citing a specific stat (e.g. run metres, post-contact metres, missed tackles inflicted) is BANNED.`,
     `You are writing for a sharp NRL bettor. Output FEWER, BETTER, SHARPER insights — not more text. Every line you produce must pass this test: "If this insight was removed, would the user lose meaningful betting value?" If no, do NOT write it.
 
 GLOBAL INSIGHT RULES (apply to EVERY field, every section):

@@ -2,7 +2,7 @@ import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useSuspenseQuery, useQuery, queryOptions } from "@tanstack/react-query";
 import { getMatchPage, getMatchInsights } from "@/server/index.functions";
 import { TeamLogo } from "@/components/TeamLogo";
-import type { TryscorerMarkets, TryscorerOdds } from "@/server/odds";
+import type { TryscorerMarkets, TryscorerOdds, OddsEvent } from "@/server/odds";
 import { Suspense, useState } from "react";
 import {
   ArrowLeft, Clock, MapPin, Users, BarChart3, Sparkles,

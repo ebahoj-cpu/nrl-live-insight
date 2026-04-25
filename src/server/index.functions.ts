@@ -9,12 +9,18 @@
 //     in memory so we degrade to cached data instead of empty state.
 
 import { createServerFn } from "@tanstack/react-start";
-import { cached, peekCache, TTL, insightsTtlMs } from "./cache";
+import { cached, TTL, insightsTtlMs } from "./cache";
 import { fetchDraw, fetchLadder, fetchMatchDetails, fetchMatchRecap, type NrlMatchRecap } from "./nrl";
 import { fetchNrlOdds, fetchEventOdds, fetchTryscorerOdds, type OddsEvent, type TryscorerMarkets } from "./odds";
-import { generateInsights, type RealOdds } from "./ai-insights";
+import { generateInsights, type RealOdds, type Insights } from "./ai-insights";
 import { fetchVenueWeather, type WeatherSnapshot } from "./weather";
 import { findTeam } from "@/lib/teams";
+import { readSharedInsights, readAnySharedInsights, writeSharedInsights } from "./insights-store";
+
+// In-flight generation lock — if multiple visitors hit the same uncached match
+// simultaneously within a single worker, only one actually invokes the AI;
+// the rest await the same promise and read the freshly persisted DB row.
+const inFlight = new Map<string, Promise<Insights | null>>();
 
 // ---------- Last-good snapshots (graceful degradation) ----------
 // Survive across requests within a worker; replaced only on success.
@@ -149,9 +155,10 @@ export const getMatchPage = createServerFn({ method: "GET" })
     }
 
     // AI insights — DO NOT generate inline (would exceed Worker request timeout
-    // and abort the whole page). Only return cache hits; client calls
-    // getMatchInsights() to lazily generate them in the background.
-    const cachedInsights = peekCache(`insights:${data.matchId}`);
+    // and abort the whole page). Read the shared DB cache so every visitor sees
+    // the same payload; if no fresh row exists, the client lazily calls
+    // getMatchInsights() to generate (single-flight) and persist it.
+    const stored = await readSharedInsights(data.matchId);
 
     return {
       details: { ...details, weather },
@@ -161,7 +168,7 @@ export const getMatchPage = createServerFn({ method: "GET" })
       tryscorers,
       tryscorersError,
       ladder,
-      insights: cachedInsights ?? null,
+      insights: stored?.payload ?? null,
       insightsError: null,
       recentRecaps: { home: homeRecaps, away: awayRecaps },
       generatedAt: new Date().toISOString(),
@@ -178,32 +185,45 @@ export const getMatchInsights = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     const season = currentSeason();
     try {
-      const [details, ladder] = await Promise.all([
-        cached(`match:${data.matchId}`, TTL.match, () => fetchMatchDetails(data.matchId)),
-        cached(`ladder:${season}`, TTL.ladder, () => fetchLadder(season)),
-      ]);
-      const homeNick = findTeam(details.homeTeam.nickName)?.nickname ?? details.homeTeam.nickName;
-      const awayNick = findTeam(details.awayTeam.nickName)?.nickname ?? details.awayTeam.nickName;
-      const oddsResult = await safeOdds();
-      const odds = oddsResult.data.find((e) => {
-        const eh = e.homeNickname; const ea = e.awayNickname;
-        return (eh === homeNick && ea === awayNick) || (eh === awayNick && ea === homeNick);
-      }) ?? null;
-      const weather = await safeWeather(data.matchId, details.venue, details.venueCity, details.kickoffUtc);
-
-      // Real tryscorer odds + structured h2h/totals — passed to AI so it
-      // quotes EXACT bookie prices instead of inventing them.
-      let tryscorers: TryscorerMarkets | null = null;
-      if (odds) {
-        const r = await safeTryscorers(odds.id);
-        tryscorers = r.data;
+      // 1) Fast-path: shared DB cache hit. Every visitor reads the same row.
+      if (!data.refresh) {
+        const stored = await readSharedInsights(data.matchId);
+        if (stored) return { insights: stored.payload, insightsError: null as string | null };
       }
-      const realOdds = odds ? buildRealOdds(odds, homeNick, awayNick, tryscorers) : undefined;
 
-      const insights = await cached(
-        `insights:${data.matchId}`,
-        insightsTtlMs(details.kickoffUtc),
-        () => generateInsights({
+      // 2) Single-flight: if another request for the same match is already
+      //    generating, await it instead of firing a duplicate AI call.
+      const lockKey = data.matchId;
+      const existing = inFlight.get(lockKey);
+      if (existing && !data.refresh) {
+        const insights = await existing;
+        if (insights) return { insights, insightsError: null as string | null };
+      }
+
+      const job = (async (): Promise<Insights | null> => {
+        const [details, ladder] = await Promise.all([
+          cached(`match:${data.matchId}`, TTL.match, () => fetchMatchDetails(data.matchId)),
+          cached(`ladder:${season}`, TTL.ladder, () => fetchLadder(season)),
+        ]);
+        const homeNick = findTeam(details.homeTeam.nickName)?.nickname ?? details.homeTeam.nickName;
+        const awayNick = findTeam(details.awayTeam.nickName)?.nickname ?? details.awayTeam.nickName;
+        const oddsResult = await safeOdds();
+        const odds = oddsResult.data.find((e) => {
+          const eh = e.homeNickname; const ea = e.awayNickname;
+          return (eh === homeNick && ea === awayNick) || (eh === awayNick && ea === homeNick);
+        }) ?? null;
+        const weather = await safeWeather(data.matchId, details.venue, details.venueCity, details.kickoffUtc);
+
+        // Real tryscorer odds + structured h2h/totals — passed to AI so it
+        // quotes EXACT bookie prices instead of inventing them.
+        let tryscorers: TryscorerMarkets | null = null;
+        if (odds) {
+          const r = await safeTryscorers(odds.id);
+          tryscorers = r.data;
+        }
+        const realOdds = odds ? buildRealOdds(odds, homeNick, awayNick, tryscorers) : undefined;
+
+        const generated = await generateInsights({
           homeName: details.homeTeam.nickName,
           awayName: details.awayTeam.nickName,
           venue: details.venue,
@@ -220,11 +240,24 @@ export const getMatchInsights = createServerFn({ method: "GET" })
           oddsSummary: odds ? summariseOdds(odds, homeNick, awayNick) : "No live odds available",
           realOdds,
           weatherSummary: weather ? `${weather.tempC}°C, ${weather.condition}, ${weather.windKph} km/h wind, ${weather.precipMm}mm rain (${weather.groundCondition} ground)` : "Weather unavailable",
-        }),
-        { bypass: data.refresh },
-      );
-      return { insights, insightsError: null as string | null };
+        });
+
+        // Persist to the shared DB cache so every visitor gets the same payload.
+        await writeSharedInsights(data.matchId, generated, insightsTtlMs(details.kickoffUtc));
+        return generated;
+      })();
+
+      inFlight.set(lockKey, job);
+      try {
+        const insights = await job;
+        return { insights, insightsError: null as string | null };
+      } finally {
+        inFlight.delete(lockKey);
+      }
     } catch (e) {
+      // Last-ditch fallback: serve stale DB row if we have one rather than nothing.
+      const stale = await readAnySharedInsights(data.matchId);
+      if (stale) return { insights: stale.payload, insightsError: null as string | null };
       return { insights: null, insightsError: e instanceof Error ? e.message : "AI insights unavailable" };
     }
   });

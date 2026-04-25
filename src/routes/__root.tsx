@@ -168,11 +168,17 @@ function FixturesMenu({ onClose }: { onClose: () => void }) {
               to="/match/$matchId"
               params={{ matchId: f.matchId }}
               onClick={onClose}
-              className="flex items-center justify-center gap-3 px-3 py-2.5 rounded-xl hover:bg-surface-2 transition"
+              className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 px-3 py-2.5 rounded-xl hover:bg-surface-2 transition"
             >
-              <TeamLogo themeKey={f.homeTeam.themeKey} name={f.homeTeam.nickName} size={36} />
-              <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">v</span>
-              <TeamLogo themeKey={f.awayTeam.themeKey} name={f.awayTeam.nickName} size={36} />
+              <div className="flex items-center gap-2 justify-end min-w-0">
+                <span className="text-xs font-semibold truncate text-right">{f.homeTeam.nickName}</span>
+                <TeamLogo themeKey={f.homeTeam.themeKey} name={f.homeTeam.nickName} size={28} />
+              </div>
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold px-1">v</span>
+              <div className="flex items-center gap-2 justify-start min-w-0">
+                <TeamLogo themeKey={f.awayTeam.themeKey} name={f.awayTeam.nickName} size={28} />
+                <span className="text-xs font-semibold truncate">{f.awayTeam.nickName}</span>
+              </div>
             </Link>
           ))}
         </div>

@@ -900,9 +900,6 @@ function ScriptTab({ insights, insightsError, home, away }:
 
       {s.psychological && (
         <Card title="Psychological" icon={Brain}>
-          <p className="text-[11px] text-muted-foreground mb-3 italic">
-            Ladder pressure · occasion · crowd · home/away mentality · stadium hoodoos.
-          </p>
           <p className="text-sm leading-relaxed text-muted-foreground whitespace-pre-line">{s.psychological}</p>
         </Card>
       )}

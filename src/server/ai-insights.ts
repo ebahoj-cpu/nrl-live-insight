@@ -137,8 +137,67 @@ export type MatchIntelligence = {
   insightSummary: string;         // 2-3 sentences: final tactical takeaway of how the game is likely decided
 };
 
+// Match Simulation Engine — drives the Script tab. ONE unified simulation
+// produces every market prediction (winner, margin, total, HT/FT, tryscorers).
+// All recommended plays + ranked tryscorers MUST be derived from the same
+// simulated game script — never analysed in isolation.
+export type SimulationProfile = {
+  tempo: "fast" | "moderate" | "slow";
+  tempoNote: string;                // 1 sentence: WHY this tempo (rucks, kicking exchange, weather)
+  dominance: "home" | "away" | "even";
+  dominanceNote: string;            // 1 sentence: WHO controls the contest and how
+  territoryBalance: string;         // 1 sentence: e.g. "55-45 home — repeat sets through right edge"
+  scoringPattern: "early-burst" | "late-burst" | "spread" | "second-half-flood" | "first-half-flood";
+  scoringPatternNote: string;       // 1 sentence: when the points come and why
+  edgeAttack: { left: "high" | "medium" | "low"; right: "high" | "medium" | "low"; middle: "high" | "medium" | "low"; note: string };
+  defensiveZones: string[];         // 2-4 short phrases: where each team's defence is most likely to break
+  expectedTotalRange: { low: number; high: number; midpoint: number };
+};
+
+export type MarketPlay = {
+  market: "match-winner" | "winning-margin" | "total-points" | "ht-ft" | "first-tryscorer" | "anytime-tryscorer" | "2-plus-tries" | "score-anytime-points";
+  pick: string;                     // e.g. "Storm to win", "Storm 13+", "Over 44.5", "Storm/Storm", "Munster anytime"
+  decimalOdds: number | null;       // bookie price (null if not available — UI hides edge)
+  modelProbability: number;         // 0-100 — derived from the simulation
+  impliedProbability: number;       // 0-100 — from the bookie price (100/odds), 0 if no price
+  edgePct: number;                  // modelProbability - impliedProbability (positive = value)
+  confidence: "high" | "medium" | "low";
+  rationale: string;                // 1-2 sentences tying back to the simulation
+  scriptAlignment: string;          // 1 short phrase: which simulation lever this leans on (e.g. "edge attack right", "second-half flood")
+};
+
+export type RankedTryscorer = {
+  name: string;
+  team: "home" | "away";
+  position: string;
+  market: "anytime" | "first" | "2+";
+  decimalOdds: number | null;
+  // Component scores — each 0-100. Final score is weighted blend.
+  scores: {
+    pais: number;            // Player Attacking Impact (line breaks, busts, metres, assists, form)
+    ttcp: number;            // Team Try Creation Profile fit (edge balance, red zone, role)
+    matchupExploit: number;  // Defensive weakness against this player's lane
+    scriptFit: number;       // How well game script supports this scorer
+    value: number;           // Odds inefficiency (model vs implied)
+  };
+  totalScore: number;        // 0-100 weighted total
+  confidence: "high" | "medium" | "low";
+  rationale: string;         // 1-2 sentences citing aligned signals (PAIS + matchup + script)
+  stackable: boolean;        // True if game script supports stacking with team-mates
+};
+
+export type MatchSimulation = {
+  profile: SimulationProfile;
+  summary: string;                  // 2-3 sentences: the match in one read — what the simulation expects
+  recommendedPlays: MarketPlay[];   // 6-10 plays across markets, ranked by edge and script alignment
+  rankedTryscorers: RankedTryscorer[]; // 4-8 ranked players, ordered by totalScore desc
+  correlatedAngle: string;          // 1-2 sentences: which 2-3 plays correlate (one script supports them all)
+  scriptCaveat: string;             // 1 sentence: the scenario that breaks the simulation (sin bin, weather change, key injury)
+};
+
 export type Insights = {
   intelligence: MatchIntelligence;
+  simulation: MatchSimulation;
   predictedScore: { home: number; away: number };
   winner: { team: "home" | "away"; confidence: number; reasoning: string };
   margin: { value: number; bucket: string; reasoning: string };

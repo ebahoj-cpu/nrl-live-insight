@@ -101,6 +101,12 @@
   border: 1px solid var(--border);
   border-radius: var(--radius);
 }
+.card-surface {
+  /* Slightly lighter than .glass for stronger contrast on the page bg */
+  background: linear-gradient(180deg, oklch(0.245 0 0 / 0.95), oklch(0.205 0 0 / 0.95));
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
 .accent-glow {
   box-shadow:
     0 0 0 1px color-mix(in oklab, var(--accent) 35%, transparent),

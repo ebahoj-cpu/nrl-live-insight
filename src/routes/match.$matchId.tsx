@@ -90,9 +90,7 @@ function MatchInner() {
           {(() => {
             const hs = details.homeTeam.score;
             const as = details.awayTeam.score;
-            const finished = typeof hs === "number" && typeof as === "number" && /^(FullTime|Final|Completed)$/i.test(details.matchState);
             const live = typeof hs === "number" && typeof as === "number" && /^(InProgress|Live|HalfTime)$/i.test(details.matchState);
-            if (finished) return <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-md bg-surface-2 text-muted-foreground">Full Time</span>;
             if (live) return <span className="inline-flex items-center gap-1 text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-md bg-danger/15 text-danger"><span className="h-1.5 w-1.5 rounded-full bg-danger animate-pulse" />Live</span>;
             return null;
           })()}
@@ -113,23 +111,23 @@ function MatchInner() {
           <TeamColumn name={details.awayTeam.nickName} themeKey={details.awayTeam.themeKey} position={details.awayTeam.position} />
         </div>
 
-        <div className="mt-6 pt-5 border-t border-border grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-          <div className="inline-flex items-center gap-2">
+        <div className="mt-6 pt-5 border-t border-border space-y-2 text-sm text-center sm:text-left sm:grid sm:grid-cols-2 sm:gap-3 sm:space-y-0">
+          <div className="inline-flex items-center justify-center sm:justify-start gap-2 flex-wrap">
             <Calendar className="h-4 w-4 text-accent shrink-0" />
             <span className="text-muted-foreground">{formatDate(details.kickoffUtc)}</span>
             <span className="text-muted-foreground">·</span>
             <Clock className="h-4 w-4 text-accent shrink-0" />
             <span className="text-muted-foreground kbd">{formatTime(details.kickoffUtc)}</span>
           </div>
-          <div className="inline-flex items-center gap-2 sm:justify-end sm:text-right">
+          <div className="flex items-center justify-center sm:justify-end gap-2">
             <MapPin className="h-4 w-4 text-accent shrink-0" />
             <span className="text-muted-foreground truncate">{details.venue}{details.venueCity ? `, ${details.venueCity}` : ""}</span>
           </div>
           {details.weather && (
-            <div className="inline-flex items-center gap-2 sm:col-span-2 pt-3 border-t border-border">
+            <div className="flex items-center justify-center sm:justify-start gap-2 sm:col-span-2 pt-3 border-t border-border flex-wrap">
               <CloudSun className="h-4 w-4 text-accent shrink-0" />
               <span className="text-muted-foreground">
-                {details.weather.tempC}° {details.weather.condition} · {details.weather.windKph} km/h wind · {details.weather.precipMm}mm rain
+                {details.weather.tempC}° {shortWeather(details.weather.condition)} · {details.weather.windKph} km/h wind · {details.weather.precipMm}mm rain
               </span>
               <span className="text-muted-foreground">·</span>
               <span className="font-semibold text-foreground">{details.weather.groundCondition} ground</span>
@@ -138,7 +136,7 @@ function MatchInner() {
         </div>
       </section>
 
-      {/* Tabs */}
+      {/* Tabs — icon-only on mobile, icon+label on sm+ */}
       <nav className="mt-6 grid grid-cols-5 gap-1 p-1 glass" role="tablist">
         <TabButton active={tab === "lineup"} onClick={() => setTab("lineup")} icon={Users} label="Lineup" />
         <TabButton active={tab === "stats"} onClick={() => setTab("stats")} icon={BarChart3} label="Stats" />
@@ -186,30 +184,37 @@ function TabButton({ active, onClick, icon: Icon, label }:
       role="tab"
       aria-selected={active}
       onClick={onClick}
+      title={label}
+      aria-label={label}
       className={`inline-flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs sm:text-sm font-semibold transition ${
         active ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:text-foreground"
       }`}
     >
       <Icon className="h-4 w-4" />
-      <span>{label}</span>
+      <span className="hidden sm:inline">{label}</span>
     </button>
   );
 }
 
-function TeamColumn({ name, themeKey, position }: { name: string; themeKey: string; position?: string }) {
+function TeamColumn({ name, themeKey }: { name: string; themeKey: string; position?: string }) {
   return (
-    <div className="flex flex-col items-center text-center">
-      <TeamLogo themeKey={themeKey} name={name} size={84} />
-      <div className="mt-3 text-base sm:text-lg font-bold">{name}</div>
-      {position && <div className="text-xs text-muted-foreground">{position}</div>}
+    <div className="flex items-center justify-center gap-2 sm:gap-3 min-w-0">
+      <div className="text-sm sm:text-lg font-bold truncate text-right">{name}</div>
+      <TeamLogo themeKey={themeKey} name={name} size={48} />
     </div>
   );
+}
+
+function shortWeather(c: string): string {
+  if (!c) return "";
+  const words = c.trim().split(/\s+/);
+  return words.length <= 2 ? c : words.slice(0, 2).join(" ");
 }
 
 function Card({ title, icon: Icon, children, className = "" }:
   { title: string; icon?: typeof Users; children: React.ReactNode; className?: string }) {
   return (
-    <section className={`glass p-5 ${className}`}>
+    <section className={`card-surface p-5 ${className}`}>
       <div className="flex items-center gap-2 mb-4">
         {Icon && <Icon className="h-4 w-4 text-accent" />}
         <h3 className="font-bold text-sm uppercase tracking-wider">{title}</h3>
@@ -463,9 +468,9 @@ function SeasonStats({ team, row }: { team: any; row?: any }) {
         <div className="text-xs text-muted-foreground mb-4">No 2026 ladder data yet.</div>
       )}
 
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center justify-between mb-1">
         <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Form · Last 5</div>
-        {team.recentForm.length > 0 && (
+        {team.recentForm.length > 0 ? (
           <div className="flex gap-1">
             {team.recentForm.slice(0, 5).map((f: any, i: number) => (
               <span
@@ -483,20 +488,10 @@ function SeasonStats({ team, row }: { team: any; row?: any }) {
               </span>
             ))}
           </div>
+        ) : (
+          <div className="text-[11px] text-muted-foreground">—</div>
         )}
       </div>
-      {team.recentForm.length === 0 ? (
-        <div className="text-xs text-muted-foreground">No recent matches.</div>
-      ) : (
-        <div className="space-y-1.5">
-          {team.recentForm.slice(0, 5).map((f: any, i: number) => (
-            <div key={i} className="flex items-center justify-between text-xs py-1 border-b border-border last:border-0">
-              <span className="text-muted-foreground truncate pr-2">{f.summary}</span>
-              <span className={`kbd font-bold shrink-0 ${f.result === "Won" ? "text-accent" : f.result === "Lost" ? "text-danger" : ""}`}>{f.score}</span>
-            </div>
-          ))}
-        </div>
-      )}
     </Card>
   );
 }

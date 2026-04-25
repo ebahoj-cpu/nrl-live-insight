@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
-import { useSuspenseQuery, queryOptions } from "@tanstack/react-query";
-import { getMatchPage } from "@/server/index.functions";
+import { useSuspenseQuery, useQuery, queryOptions } from "@tanstack/react-query";
+import { getMatchPage, getMatchInsights } from "@/server/index.functions";
 import { TeamLogo } from "@/components/TeamLogo";
 import type { TryscorerMarkets, TryscorerOdds } from "@/server/odds";
 import { Suspense, useState } from "react";
@@ -13,6 +13,13 @@ import {
 const matchQO = (matchId: string) => queryOptions({
   queryKey: ["match", matchId],
   queryFn: () => getMatchPage({ data: { matchId } }),
+});
+
+const insightsQO = (matchId: string) => queryOptions({
+  queryKey: ["match-insights", matchId],
+  queryFn: () => getMatchInsights({ data: { matchId } }),
+  staleTime: 60 * 60_000,
+  retry: 1,
 });
 
 export const Route = createFileRoute("/match/$matchId")({
@@ -52,7 +59,18 @@ function MatchPage() {
 function MatchInner() {
   const { matchId } = Route.useParams();
   const { data } = useSuspenseQuery(matchQO(matchId));
-  const { details, ladder, insights, insightsError, tryscorers, oddsError, oddsStale, tryscorersError, recentRecaps } = data as any;
+  const { details, ladder, tryscorers, oddsError, oddsStale, tryscorersError, recentRecaps } = data as any;
+
+  // Lazy AI insights — fetched in background after the page renders.
+  // Initial value comes from the page payload (cache hit on the server).
+  const insightsQ = useQuery({
+    ...insightsQO(matchId),
+    initialData: (data as any).insights ? { insights: (data as any).insights, insightsError: null } : undefined,
+  });
+  const insights = insightsQ.data?.insights ?? null;
+  const insightsError = insightsQ.data?.insightsError ?? (insightsQ.error as Error | null)?.message ?? null;
+  const insightsLoading = insightsQ.isFetching && !insights;
+
   const [tab, setTab] = useState<TabKey>("lineup");
 
   const homeRow = ladder.find((r: any) => r.nickname === details.homeTeam.nickName);
@@ -134,7 +152,8 @@ function MatchInner() {
         {tab === "insights" && (
           <InsightsTab
             insights={insights}
-            insightsError={insightsError}
+            insightsError={insightsLoading ? null : insightsError}
+            insightsLoading={insightsLoading}
             home={details.homeTeam.nickName}
             away={details.awayTeam.nickName}
             tryscorers={tryscorers}
@@ -145,10 +164,10 @@ function MatchInner() {
           />
         )}
         {tab === "script" && (
-          <ScriptTab insights={insights} insightsError={insightsError} home={details.homeTeam} away={details.awayTeam} />
+          <ScriptTab insights={insights} insightsError={insightsLoading ? null : insightsError} insightsLoading={insightsLoading} home={details.homeTeam} away={details.awayTeam} />
         )}
         {tab === "bets" && (
-          <BetsTab insights={insights} insightsError={insightsError} />
+          <BetsTab insights={insights} insightsError={insightsLoading ? null : insightsError} insightsLoading={insightsLoading} />
         )}
       </div>
 
@@ -203,6 +222,18 @@ function Empty({ msg }: { msg: string }) {
   return (
     <div className="glass p-6 text-center text-sm text-muted-foreground inline-flex items-center justify-center gap-2 w-full">
       <AlertCircle className="h-4 w-4" /> {msg}
+    </div>
+  );
+}
+
+function InsightsLoading() {
+  return (
+    <div className="glass p-8 text-center text-sm text-muted-foreground">
+      <div className="inline-flex items-center gap-3">
+        <Sparkles className="h-5 w-5 text-accent animate-pulse" />
+        <span>Generating AI insights — this can take 20–40 seconds…</span>
+      </div>
+      <p className="text-[11px] mt-2 opacity-70">Cached for an hour after first load.</p>
     </div>
   );
 }
@@ -568,8 +599,9 @@ function Stat({ label, value, accent, danger }: { label: string; value: string; 
 
 /* ================= INSIGHTS TAB ================= */
 
-function InsightsTab({ insights, insightsError, home, away, tryscorers, tryscorersError, oddsError, oddsStale, kickoffUtc }:
-  { insights: any; insightsError: string | null; home: string; away: string; tryscorers: TryscorerMarkets | null; tryscorersError: string | null; oddsError: string | null; oddsStale: boolean; kickoffUtc: string }) {
+function InsightsTab({ insights, insightsError, insightsLoading, home, away, tryscorers, tryscorersError, oddsError, oddsStale, kickoffUtc }:
+  { insights: any; insightsError: string | null; insightsLoading?: boolean; home: string; away: string; tryscorers: TryscorerMarkets | null; tryscorersError: string | null; oddsError: string | null; oddsStale: boolean; kickoffUtc: string }) {
+  if (insightsLoading) return <InsightsLoading />;
   if (insightsError && !insights) return <Empty msg={insightsError} />;
   if (!insights) return <Empty msg="Insights unavailable." />;
 
@@ -872,8 +904,9 @@ function WeaknessExploitCard({ team, opponent, data }: {
 
 /* ================= SCRIPT TAB ================= */
 
-function ScriptTab({ insights, insightsError, home, away }:
-  { insights: any; insightsError: string | null; home: any; away: any }) {
+function ScriptTab({ insights, insightsError, insightsLoading, home, away }:
+  { insights: any; insightsError: string | null; insightsLoading?: boolean; home: any; away: any }) {
+  if (insightsLoading) return <InsightsLoading />;
   if (insightsError) return <Empty msg={insightsError} />;
   if (!insights?.script) return <Empty msg="Script unavailable." />;
 
@@ -945,7 +978,8 @@ function ScriptTab({ insights, insightsError, home, away }:
 
 /* ================= BETS TAB ================= */
 
-function BetsTab({ insights, insightsError }: { insights: any; insightsError: string | null }) {
+function BetsTab({ insights, insightsError, insightsLoading }: { insights: any; insightsError: string | null; insightsLoading?: boolean }) {
+  if (insightsLoading) return <InsightsLoading />;
   if (insightsError && !insights) return <Empty msg={insightsError} />;
   if (!insights?.betSuggestions?.length && !insights?.getTheaSpecial) return <Empty msg="Bet suggestions unavailable." />;
 

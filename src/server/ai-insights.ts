@@ -1,6 +1,8 @@
 // AI-generated betting insights via Lovable AI Gateway.
 // Uses tool-calling for structured output. Receives ONLY real data summaries.
 
+import { dedupeInsights } from "./dedupe-insights";
+
 const GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
 // Use the strongest reasoning model — insights are generated ONCE per match
 // and cached until ~1h before kickoff, so the extra latency/cost is paid once
@@ -171,7 +173,44 @@ export async function generateInsights(payload: {
     `Live AU bookie odds summary: ${payload.oddsSummary}`,
     realOddsBlock,
     payload.weatherSummary ? `Forecast at venue at kickoff: ${payload.weatherSummary}` : "",
-    `Provide a sharp, complete NRL betting analysis covering: winner, margin, HT/FT double, total points, first/anytime tryscorers, and multi-tryscorer angles.
+    `You are writing for a sharp NRL bettor. Output FEWER, BETTER, SHARPER insights — not more text. Every line you produce must pass this test: "If this insight was removed, would the user lose meaningful betting value?" If no, do NOT write it.
+
+GLOBAL INSIGHT RULES (apply to EVERY field, every section):
+1. UNIQUE — never restate the same idea twice. No paraphrased duplicates. If two sections would say "team X is in good form", only the strongest version survives, and it must add WHY that form is or isn't reliable for THIS bet.
+2. EVIDENCE-BASED — every insight must cite something concrete from the data above: a stat (W-L, PF, PA, diff, ladder pos), a recent-form scoreline, a named squad player, a bookie price, a weather signal. No floating opinions.
+3. CONTEXTUAL — explain why it matters for THIS specific game, not as a generic team summary.
+4. DECISION-RELEVANT — must change a bet decision (winner, margin bucket, total, HT/FT, tryscorer market, line shopping, stake sizing).
+5. NON-OBVIOUS — skip surface-level reads the user can already infer (e.g. "the favourite is favoured", "tries usually come from wingers").
+6. ASYMMETRIC — never produce mirror-image content for both teams. If a key, weakness, or tactical plan reads identical with names swapped, REWRITE both sides so they target different channels, different phases, different named players, different markets.
+
+SECTION DIFFERENTIATION (each section serves a DIFFERENT purpose — overlap is forbidden):
+- script.headToHead: rivalry / venue history pattern only. NOT current form.
+- script.formAnalysis: trajectory + quality of opposition faced + whether form is real or schedule-inflated. Must include a "form is misleading because…" angle when applicable. NOT rivalry. NOT player picks.
+- script.xFactor: ONE single swing variable (one named player OR one matchup OR one tactical lever). Must NOT repeat anything from formAnalysis.
+- script.psychological: external pressure / occasion / venue mentality only. NOT form, NOT rivalry trends.
+- keysToVictory: 3 levers per team. Each side's 3 keys must use DIFFERENT levers (set-piece attack vs defensive structure vs game management). Cannot repeat what xFactor or weaknessExploit already said.
+- weaknessExploit: defensive flaws of the OPPOSITION + how to attack them. Tied to specific markets that benefit. Must NOT restate keysToVictory.
+- keyFactors: meta-level swing factors NOT covered above (referee tendencies, travel, late-mail risk, market movement, weather impact translated to a market). Cap at 3-4. If a candidate factor was already implied above, drop it.
+- gameFlow: time-window-pinned predictions only (opening 10, halves, momentum swings at specific minute marks). NOT generic "team X is better" — every bullet must reference a window AND tie to an HT/FT or live-betting angle.
+- tryscorerScript: per-player tryscoring rationale. Must cite role/edge/set-piece usage. Avoid players who only profile generically — pick spots where the matchup actually creates the chance.
+- bets: market construction only. Reasoning must reference WHICH upstream insight (xFactor / weaknessExploit / gameFlow / bookieScript) the bet leans on, and WHY the market is mispriced or aligned.
+
+ANTI-REPETITION ENFORCEMENT:
+- Before finalising any string, scan everything you have written. If two strings share the same core point (≥60% semantic overlap), KEEP the strongest version and rewrite the other to add new information or DELETE it (drop array items rather than dilute).
+- Never restate ladder position, W-L record, or recent-form summary in more than one section.
+- Never repeat a player's name across keysToVictory + weaknessExploit.playersToWatch + tryscorerScript with the SAME reason. If the same player appears, each mention must justify a DIFFERENT market.
+
+INSIGHT QUALITY BAR (examples):
+- BAD: "Storm are a strong attacking team."
+- GOOD: "Storm rank top-3 in red-zone conversion but face the league's #1 goal-line defence — anytime tryscorer prices on Storm outside backs are shorter than the matchup justifies; lean unders on Storm individual try lines."
+- BAD: "Raiders are in good form."
+- GOOD: "Raiders' 4-from-5 was built against opponents averaging 12th on the ladder; their h2h price is shorter than that schedule warrants — fade the favourite multi, take the underdog covering on +12.5."
+- BAD: "Rain may affect the game."
+- GOOD: "Forecast 4mm rain compresses attacking width and rewards middle-dominant packs — value lives on UNDER the main total and on forward anytime tries (named: <player>) over outside-back markets."
+
+That is the minimum standard for EVERY string you emit.
+
+Now produce the structured payload below. Be concise: one strong sentence beats three weak ones.
 
 CRITICAL — every insight must serve a BETTOR reading this to land bets. Tie every observation to a specific market: who wins, who covers, who scores, when momentum swings, where the value sits.
 
@@ -245,26 +284,30 @@ CRITICAL betting & ODDS-MATH rules — READ CAREFULLY:
 
   const toolDef = buildToolDef();
   const messages = [
-    { role: "system", content: "You are a professional NRL analyst and betting tipster. Use only the data provided. Never invent stats, players, or odds. When real bookie odds are provided for a market, quote them EXACTLY — do not estimate. You MUST respond by calling the emit_insights tool exactly once with a single argument named payload, where payload is a raw JSON string containing the full insights object requested by the user prompt. No markdown, no code fences, no extra wrapper fields inside payload. Be concise in prose fields to stay within token limits." },
+    { role: "system", content: "You are a sharp NRL betting analyst writing for serious punters. Behave like a professional analyst, NOT a content generator. PRINCIPLES: (1) Every insight must be unique, evidence-based, contextual, decision-relevant, and non-obvious — if removing it costs no betting value, do not write it. (2) Never produce mirror-image content for the two teams; asymmetry is mandatory. (3) Never repeat the same point across sections; each section has a distinct purpose. (4) Prefer one sharp insight over three weak ones — fewer, better, sharper. (5) Use ONLY the data provided — never invent stats, players, or odds. When real bookie odds are provided, quote them EXACTLY. (6) Tie every observation to a specific betting market (h2h, margin bucket, total, HT/FT, anytime/first/2+ tryscorer). You MUST respond by calling emit_insights exactly once with one argument named payload — a raw JSON string for the insights object. No markdown, no code fences. Be terse in prose fields." },
     { role: "user", content: prompt },
   ];
 
   // Try the Pro model first for the best analysis. If it fails (timeout, rate
   // limit, parse error), retry once with the fast Flash model. Only after both
   // miss do we fall back to the deterministic local summary.
+  // Pipeline: AI -> applyRealOdds (real prices) -> dedupeInsights (anti-repetition)
+  // -> normaliseBetMath (recompute combined odds + payouts).
+  const finish = (parsed: Insights) =>
+    normaliseBetMath(dedupeInsights(applyRealOdds(parsed, payload.realOdds, payload.homeName, payload.awayName)));
   try {
     const parsed = await callGateway(key, MODEL, messages, toolDef, TIMEOUT_MS);
-    return normaliseBetMath(applyRealOdds(parsed, payload.realOdds, payload.homeName, payload.awayName));
+    return finish(parsed);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.warn(`AI insights: ${MODEL} failed (${msg}); retrying with ${FALLBACK_MODEL}`);
     try {
       const parsed = await callGateway(key, FALLBACK_MODEL, messages, toolDef, 15_000);
-      return normaliseBetMath(applyRealOdds(parsed, payload.realOdds, payload.homeName, payload.awayName));
+      return finish(parsed);
     } catch (e2) {
       const msg2 = e2 instanceof Error ? e2.message : String(e2);
       console.warn(`AI insights: ${FALLBACK_MODEL} also failed (${msg2}); using local fallback`);
-      return normaliseBetMath(applyRealOdds(buildFallbackInsights(payload), payload.realOdds, payload.homeName, payload.awayName));
+      return finish(buildFallbackInsights(payload));
     }
   }
 }

@@ -10,6 +10,15 @@ import type { Insights } from "./ai-insights";
 
 const TABLE = "match_insights";
 
+// Bump when the AI prompt / schema changes so stale repetitive payloads
+// generated under the old prompt are bypassed automatically. Old rows simply
+// expire normally; new rows are written under the new key.
+const PROMPT_VERSION = "v2-sharp";
+
+function key(matchId: string): string {
+  return `${matchId}::${PROMPT_VERSION}`;
+}
+
 export type StoredInsights = {
   payload: Insights;
   generatedAt: string;
@@ -21,7 +30,7 @@ export async function readSharedInsights(matchId: string): Promise<StoredInsight
     const { data, error } = await supabaseAdmin
       .from(TABLE as never)
       .select("payload, generated_at, expires_at")
-      .eq("match_id" as never, matchId as never)
+      .eq("match_id" as never, key(matchId) as never)
       .maybeSingle();
     if (error || !data) return null;
     const row = data as { payload: unknown; generated_at: string; expires_at: string };
@@ -44,7 +53,7 @@ export async function readAnySharedInsights(matchId: string): Promise<StoredInsi
     const { data, error } = await supabaseAdmin
       .from(TABLE as never)
       .select("payload, generated_at, expires_at")
-      .eq("match_id" as never, matchId as never)
+      .eq("match_id" as never, key(matchId) as never)
       .maybeSingle();
     if (error || !data) return null;
     const row = data as { payload: unknown; generated_at: string; expires_at: string };
@@ -70,7 +79,7 @@ export async function writeSharedInsights(
       .from(TABLE as never)
       .upsert(
         {
-          match_id: matchId,
+          match_id: key(matchId),
           payload: payload as unknown as Record<string, unknown>,
           generated_at: now.toISOString(),
           expires_at: expiresAt.toISOString(),

@@ -59,7 +59,18 @@ function MatchPage() {
 function MatchInner() {
   const { matchId } = Route.useParams();
   const { data } = useSuspenseQuery(matchQO(matchId));
-  const { details, ladder, insights, insightsError, tryscorers, oddsError, oddsStale, tryscorersError, recentRecaps } = data as any;
+  const { details, ladder, tryscorers, oddsError, oddsStale, tryscorersError, recentRecaps } = data as any;
+
+  // Lazy AI insights — fetched in background after the page renders.
+  // Initial value comes from the page payload (cache hit on the server).
+  const insightsQ = useQuery({
+    ...insightsQO(matchId),
+    initialData: (data as any).insights ? { insights: (data as any).insights, insightsError: null } : undefined,
+  });
+  const insights = insightsQ.data?.insights ?? null;
+  const insightsError = insightsQ.data?.insightsError ?? (insightsQ.error as Error | null)?.message ?? null;
+  const insightsLoading = insightsQ.isFetching && !insights;
+
   const [tab, setTab] = useState<TabKey>("lineup");
 
   const homeRow = ladder.find((r: any) => r.nickname === details.homeTeam.nickName);

@@ -687,7 +687,7 @@ function buildWeaknessExploit(
 ) {
   const watch = players.slice(0, 3);
   const isFavoured = teamForm >= oppForm;
-  const ladderEdge = (teamPos ?? 99) < (oppPos ?? 99);
+  const ladderEdge = (Number(teamPos) || 99) < (Number(oppPos) || 99);
   const star = playerName(players[0], team);
   const second = playerName(players[1], team);
 

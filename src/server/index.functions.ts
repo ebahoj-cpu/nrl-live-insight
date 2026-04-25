@@ -9,12 +9,18 @@
 //     in memory so we degrade to cached data instead of empty state.
 
 import { createServerFn } from "@tanstack/react-start";
-import { cached, peekCache, TTL, insightsTtlMs } from "./cache";
+import { cached, TTL, insightsTtlMs } from "./cache";
 import { fetchDraw, fetchLadder, fetchMatchDetails, fetchMatchRecap, type NrlMatchRecap } from "./nrl";
 import { fetchNrlOdds, fetchEventOdds, fetchTryscorerOdds, type OddsEvent, type TryscorerMarkets } from "./odds";
-import { generateInsights, type RealOdds } from "./ai-insights";
+import { generateInsights, type RealOdds, type Insights } from "./ai-insights";
 import { fetchVenueWeather, type WeatherSnapshot } from "./weather";
 import { findTeam } from "@/lib/teams";
+import { readSharedInsights, readAnySharedInsights, writeSharedInsights } from "./insights-store";
+
+// In-flight generation lock — if multiple visitors hit the same uncached match
+// simultaneously within a single worker, only one actually invokes the AI;
+// the rest await the same promise and read the freshly persisted DB row.
+const inFlight = new Map<string, Promise<Insights | null>>();
 
 // ---------- Last-good snapshots (graceful degradation) ----------
 // Survive across requests within a worker; replaced only on success.

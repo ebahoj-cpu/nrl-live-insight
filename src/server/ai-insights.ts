@@ -41,6 +41,15 @@ export type GetTheaSpecial = {
   confidence: number;     // 0-100 how confident the AI is
 };
 
+export type UpsetPlay = {
+  underdog: string;        // team nickname tipped to upset
+  upsetOdds: number;       // real h2h price for the underdog
+  probability: number;     // 0-100 honest read
+  reasoning: string;       // 3-5 sentences why it could land
+  keyFactors: string[];    // 2-4 bullet reasons (form, injuries, matchup, weather, motivation)
+  suggestedPlay: { pick: string; decimalOdds: number; stake: string; potentialReturn: string };
+};
+
 
 export type Insights = {
   predictedScore: { home: number; away: number };

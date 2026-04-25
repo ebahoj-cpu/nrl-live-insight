@@ -240,6 +240,9 @@ export const getMatchInsights = createServerFn({ method: "GET" })
           oddsSummary: odds ? summariseOdds(odds, homeNick, awayNick) : "No live odds available",
           realOdds,
           weatherSummary: weather ? `${weather.tempC}°C, ${weather.condition}, ${weather.windKph} km/h wind, ${weather.precipMm}mm rain (${weather.groundCondition} ground)` : "Weather unavailable",
+          homeTeamNews: details.teamNews?.home ?? null,
+          awayTeamNews: details.teamNews?.away ?? null,
+          statGroups: details.statGroups,
         });
 
         // Persist to the shared DB cache so every visitor gets the same payload.

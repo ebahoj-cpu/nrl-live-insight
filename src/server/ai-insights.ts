@@ -2,8 +2,12 @@
 // Uses tool-calling for structured output. Receives ONLY real data summaries.
 
 const GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
-const MODEL = "google/gemini-3-flash-preview";
-const TIMEOUT_MS = 11_000; // stay comfortably inside the server function timeout budget
+// Use the strongest reasoning model — insights are generated ONCE per match
+// and cached until ~1h before kickoff, so the extra latency/cost is paid once
+// and the user gets the sharpest possible read for their bets.
+const MODEL = "google/gemini-2.5-pro";
+const FALLBACK_MODEL = "google/gemini-3-flash-preview";
+const TIMEOUT_MS = 55_000; // pro model needs more headroom; still inside Worker budget
 
 export type BettingAngle = {
   market: string;

@@ -550,90 +550,52 @@ function buildToolDef() {
             },
             required: ["home", "away"], additionalProperties: false,
           },
-          betSuggestions: {
-            type: "array",
-            minItems: 3, maxItems: 3,
-            description: "Exactly three multis: $100 (low risk, ~5x odds), $1,000 (medium, ~50x), $10,000 (high, ~500x). Stake × combinedOdds MUST equal targetPayout (±10%).",
-            items: {
+          bets: (() => {
+            const betPlay = (desc: string, minLegs: number, maxLegs: number, stakeHint: string) => ({
               type: "object",
+              description: desc,
               properties: {
-                risk: { type: "string", enum: ["low", "medium", "high"] },
                 title: { type: "string", description: "Short headline. NEVER use handicap markets like 'Roosters -12.5'." },
                 legs: {
                   type: "array",
-                  minItems: 2, maxItems: 5,
+                  minItems: minLegs, maxItems: maxLegs,
                   items: {
                     type: "object",
                     properties: {
                       pick: { type: "string", description: "One leg. Allowed: head-to-head winner, margin BUCKETS ('1-12', '13+', '1-6', '7-12', '13-24', '25+'), total points over/under, HT/FT, anytime/first tryscorer, try-count buckets ('1-2 tries', '3+ tries'). NEVER handicap/spread/line. NEVER 'over 0.5 tries'." },
-                      decimalOdds: { type: "number", description: "Realistic decimal odds for THIS leg. Tryscorer anytime $4-15, first $11-26, margin $3-8, HT/FT $3.5-9, over/under $1.85-2.10, head-to-head $1.20-3.50." },
+                      decimalOdds: { type: "number", description: "Decimal odds — quote LIVE BOOKIE ODDS exactly when the leg matches. Tryscorer anytime $4-15, first $11-26, margin $3-8, HT/FT $3.5-9, over/under $1.85-2.10, head-to-head $1.20-3.50." },
                     },
                     required: ["pick", "decimalOdds"], additionalProperties: false,
                   },
                 },
-                combinedOdds: { type: "number", description: "Product of all leg decimalOdds. MUST equal multiplied legs within ±5%." },
-                estimatedOdds: { type: "string", description: "Combined decimal odds formatted, e.g. '$5.00', '$50.00', '$500.00'" },
-                stake: { type: "string", description: "Suggested stake, usually $10–$50, e.g. '$20'" },
-                potentialReturn: { type: "string", description: "stake × combinedOdds, formatted, e.g. '$100', '$1,000', '$10,000'" },
-                targetPayout: { type: "string", enum: ["100", "1000", "10000"], description: "Which payout tier this bet is sized for" },
-                reasoning: { type: "string", description: "Why this combo wins — 1-2 sentences" },
+                combinedOdds: { type: "number", description: "Product of all leg decimalOdds." },
+                estimatedOdds: { type: "string", description: "Combined decimal odds formatted, e.g. '$5.00'." },
+                stake: { type: "string", description: `Suggested stake (default ${stakeHint}).` },
+                potentialReturn: { type: "string", description: "stake × combinedOdds, formatted, e.g. '$100'." },
+                reasoning: { type: "string", description: "2-3 sentences citing stats / lineups / form / weakness exploit / X-factor — why this bet aligns with the rest of the analysis." },
               },
-              required: ["risk", "title", "legs", "combinedOdds", "estimatedOdds", "stake", "potentialReturn", "targetPayout", "reasoning"],
+              required: ["title", "legs", "combinedOdds", "estimatedOdds", "stake", "potentialReturn", "reasoning"],
               additionalProperties: false,
-            },
-          },
-          getTheaSpecial: {
-            type: "object",
-            description: "THE bet of the slate: $5 stake → $1,000 return (~200x). 3-5 legs constructed from EVERYTHING (stats, weakness exploit, X-factor, weather, psychological).",
-            properties: {
-              title: { type: "string", description: "Headline like 'GET THEA: Storm win + 13+ + Munster anytime + over 39.5'" },
-              legs: {
-                type: "array",
-                minItems: 3, maxItems: 5,
-                items: {
-                  type: "object",
-                  properties: {
-                    pick: { type: "string", description: "Leg pick. Same allowed markets as betSuggestions." },
-                    decimalOdds: { type: "number", description: "Realistic decimal odds for THIS leg." },
-                  },
-                  required: ["pick", "decimalOdds"], additionalProperties: false,
-                },
+            });
+            return {
+              type: "object",
+              description: "Ten bet plays — every one in the same shape so the UI renders identical cards. Reasoning must align with the rest of the analysis.",
+              properties: {
+                gameScript:     betPlay("Cleanest read of the match: 4-6 legs that match your own predictions (winner + margin bucket + total + HT/FT + 1 tryscorer per team).", 4, 6, "$10"),
+                lowRisk:        betPlay("Low risk / low return — ~$100 from $5 stake (combinedOdds ~20). 2-3 favourite-leaning legs.", 2, 3, "$5"),
+                mediumRisk:     betPlay("Medium risk — ~$500 from $5 stake (combinedOdds ~100). 3-4 legs.", 3, 4, "$5"),
+                highRisk:       betPlay("High risk — ~$1,000 from $5 stake (combinedOdds ~200). 4-5 legs incl. HT/FT and a multi-tryscorer.", 4, 5, "$5"),
+                getThea:        betPlay("GET THEA — ~$10,000 from $5 stake (combinedOdds ~2000). 4-5 long legs built from weakness exploit, X-factor, named players.", 4, 5, "$5"),
+                upset:          betPlay("Single underdog play AGAINST the market: 1 leg = '<underdog> to win' at the EXACT real h2h underdog price.", 1, 1, "$20"),
+                bookieWant:     betPlay("Result the bookies WANT to land (low public liability — matches script.bookieScript.wantToWin). 1-2 aligned legs.", 1, 2, "$10"),
+                bookieFear:     betPlay("Result the bookies FEAR (heavy public exposure — script.bookieScript.wantToLose). 2-3 legs leaning into the bookies' nightmare.", 2, 3, "$10"),
+                anytime:        betPlay("Pure anytime tryscorer multi: 3-4 legs ALL '<player> anytime tryscorer' from tryscorerScript picks (mix both teams). Real anytime prices only.", 3, 4, "$10"),
+                firstTryscorer: betPlay("STANDALONE single bet: 1 leg = '<player> first tryscorer' using the LIVE BOOKIE ODDS first-tryscorer price.", 1, 1, "$5"),
               },
-              combinedOdds: { type: "number", description: "Product of legs ≈ 200 (range 180-220)." },
-              stake: { type: "string", description: "Exactly '$5'" },
-              potentialReturn: { type: "string", description: "Exactly '$1,000'" },
-              reasoning: { type: "string", description: "3-4 sentences: why this is the play of the slate, citing weakness exploit, X-factor, weather/ground, psychology, and named players." },
-              confidence: { type: "number", minimum: 0, maximum: 100 },
-            },
-            required: ["title", "legs", "combinedOdds", "stake", "potentialReturn", "reasoning", "confidence"],
-            additionalProperties: false,
-          },
-          upset: {
-            type: "object",
-            description: "The most credible underdog scenario for this match.",
-            properties: {
-              underdog: { type: "string", description: "Underdog team nickname (longer h2h price)." },
-              upsetOdds: { type: "number", description: "EXACT real h2h price for the underdog from the LIVE BOOKIE ODDS block." },
-              probability: { type: "number", minimum: 0, maximum: 100, description: "Honest 0-100 read of upset likelihood." },
-              reasoning: { type: "string", description: "3-5 sentences explaining why the upset can land." },
-              keyFactors: {
-                type: "array", minItems: 2, maxItems: 4,
-                items: { type: "string", description: "Concrete factor — form, injury, matchup, weather, motivation, travel." },
-              },
-              suggestedPlay: {
-                type: "object",
-                properties: {
-                  pick: { type: "string", description: "e.g. 'Eels to win'" },
-                  decimalOdds: { type: "number", description: "Same as upsetOdds." },
-                  stake: { type: "string", description: "e.g. '$20'" },
-                  potentialReturn: { type: "string", description: "stake × decimalOdds, formatted, e.g. '$60'" },
-                },
-                required: ["pick", "decimalOdds", "stake", "potentialReturn"], additionalProperties: false,
-              },
-            },
-            required: ["underdog", "upsetOdds", "probability", "reasoning", "keyFactors", "suggestedPlay"],
-            additionalProperties: false,
-          },
+              required: ["gameScript","lowRisk","mediumRisk","highRisk","getThea","upset","bookieWant","bookieFear","anytime","firstTryscorer"],
+              additionalProperties: false,
+            };
+          })(),
           gameFlow: {
             type: "object",
             description: "Quarter-by-quarter script: how the game likely unfolds with HT score, momentum swings and HT/FT double pick.",

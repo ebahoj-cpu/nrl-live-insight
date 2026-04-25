@@ -160,8 +160,9 @@ ON TOP OF THAT, generate ONE standalone "getTheaSpecial" — the GET THEA bet:
     headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
     body: JSON.stringify({
       model: MODEL,
+      max_tokens: 8000,
       messages: [
-        { role: "system", content: "You are a professional NRL analyst and betting tipster. Use only the data provided. Never invent stats or players. Each pick must include a one-sentence reasoning the user can act on." },
+        { role: "system", content: "You are a professional NRL analyst and betting tipster. Use only the data provided. Never invent stats or players. Each pick must include a one-sentence reasoning the user can act on. You MUST respond by calling the emit_insights tool with ALL required fields. Be concise in prose fields to stay within token limits." },
         { role: "user", content: prompt },
       ],
       tools: [{

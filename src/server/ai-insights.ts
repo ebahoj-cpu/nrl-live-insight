@@ -400,7 +400,13 @@ ON TOP OF THAT, generate ONE standalone "getTheaSpecial" — the GET THEA bet:
       }],
       tool_choice: { type: "function", function: { name: "emit_insights" } },
     }),
-  });
+    });
+  } catch (e) {
+    clearTimeout(t);
+    if (ac.signal.aborted) throw new Error(`AI insights timed out after ${TIMEOUT_MS / 1000}s`);
+    throw e;
+  }
+  clearTimeout(t);
 
   if (res.status === 429) throw new Error("AI rate limit exceeded; try again shortly");
   if (res.status === 402) throw new Error("AI credits exhausted; add credits in Settings → Workspace → Usage");

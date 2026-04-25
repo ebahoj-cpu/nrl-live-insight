@@ -952,10 +952,15 @@ function ScriptTab({ insights, insightsError, insightsLoading, home, away }:
   return (
     <div className="space-y-4">
       <Card title="Head to head" icon={ScrollText}>
-        <div className="flex items-center justify-center gap-6 mb-4">
-          <TeamLogo themeKey={home.themeKey} name={home.nickName} size={48} />
-          <span className="text-muted-foreground text-sm font-bold">vs</span>
-          <TeamLogo themeKey={away.themeKey} name={away.nickName} size={48} />
+        <div className="flex items-center justify-center gap-10 mb-4">
+          <div className="flex flex-col items-center gap-2">
+            <TeamLogo themeKey={home.themeKey} name={home.nickName} size={56} />
+            <span className="text-xs font-bold uppercase tracking-wider">{home.nickName}</span>
+          </div>
+          <div className="flex flex-col items-center gap-2">
+            <TeamLogo themeKey={away.themeKey} name={away.nickName} size={56} />
+            <span className="text-xs font-bold uppercase tracking-wider">{away.nickName}</span>
+          </div>
         </div>
         <p className="text-sm leading-relaxed text-muted-foreground">{s.headToHead}</p>
       </Card>

@@ -723,7 +723,7 @@ function buildToolDef() {
         required: [
           "predictedScore","winner","margin","total","htft",
           "firstTryscorer","anytimeTryscorers","multiTryscorer",
-          "keysToVictory","keyFactors","weaknessExploit","betSuggestions","getTheaSpecial","upset",
+          "keysToVictory","keyFactors","weaknessExploit","bets",
           "gameFlow","tryscorerScript","script",
         ],
         additionalProperties: false,

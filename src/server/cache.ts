@@ -20,6 +20,13 @@ export async function cached<T>(
   return v;
 }
 
+// Non-async cache lookup — returns value if fresh, else undefined. Never triggers fn.
+export function peekCache<T>(key: string): T | undefined {
+  const hit = store.get(key) as Entry<T> | undefined;
+  if (hit && hit.exp > Date.now()) return hit.v;
+  return undefined;
+}
+
 export const TTL = {
   fixtures: 15 * 60_000,
   ladder: 30 * 60_000,

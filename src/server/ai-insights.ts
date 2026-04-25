@@ -33,23 +33,18 @@ export type BetPlay = {
   legs: BetLeg[];
   combinedOdds: number;
   estimatedOdds: string;
-  stake: string;
-  potentialReturn: string;
+  stake: string;             // default suggested stake (e.g. "$10") — UI allows override
+  potentialReturn: string;   // computed from default stake — UI recomputes on change
   reasoning: string;
+  // New fields for the risk-tier slip engine
+  hitRateScore?: number;     // 0-100 — how likely the slip is to land (script convergence)
+  scriptAlignment?: string;  // 1 short phrase: which simulation lever the slip leans on
+  legCount?: number;         // convenience — server-set
 };
 
-export type BetCategoryKey =
-  | "gameScript"
-  | "smallStake"
-  | "mediumStake"
-  | "bigStake"
-  | "getThea"
-  | "anytimeMulti"
-  | "multiTryStack"
-  | "pointsParty"
-  | "upset"
-  | "bookieFear"
-  | "firstTryscorer";
+// Risk tiers — replaces the legacy 11-category bet system.
+// Every match produces ONE slip per tier, derived from the unified simulation.
+export type BetCategoryKey = "low" | "medium" | "high" | "ultra";
 
 export type GameFlow = {
   openingTen: string;          // who starts hot, who is slow out the blocks

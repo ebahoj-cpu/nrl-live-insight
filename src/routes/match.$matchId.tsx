@@ -978,7 +978,8 @@ function ScriptTab({ insights, insightsError, insightsLoading, home, away }:
 
 /* ================= BETS TAB ================= */
 
-function BetsTab({ insights, insightsError }: { insights: any; insightsError: string | null }) {
+function BetsTab({ insights, insightsError, insightsLoading }: { insights: any; insightsError: string | null; insightsLoading?: boolean }) {
+  if (insightsLoading) return <InsightsLoading />;
   if (insightsError && !insights) return <Empty msg={insightsError} />;
   if (!insights?.betSuggestions?.length && !insights?.getTheaSpecial) return <Empty msg="Bet suggestions unavailable." />;
 

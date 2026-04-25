@@ -94,7 +94,7 @@ export type Insights = {
     };
   };
   // All bets live here in one consistent shape — rendered as identical cards on the Bets tab.
-  bets: Record<BetCategoryKey, BetPlay>;
+  bets: BetPlay[];
   gameFlow: GameFlow;
   tryscorerScript: TryscorerScript;
   script: {

@@ -152,7 +152,8 @@ function MatchInner() {
         {tab === "insights" && (
           <InsightsTab
             insights={insights}
-            insightsError={insightsError}
+            insightsError={insightsLoading ? null : insightsError}
+            insightsLoading={insightsLoading}
             home={details.homeTeam.nickName}
             away={details.awayTeam.nickName}
             tryscorers={tryscorers}
@@ -163,10 +164,10 @@ function MatchInner() {
           />
         )}
         {tab === "script" && (
-          <ScriptTab insights={insights} insightsError={insightsError} home={details.homeTeam} away={details.awayTeam} />
+          <ScriptTab insights={insights} insightsError={insightsLoading ? null : insightsError} insightsLoading={insightsLoading} home={details.homeTeam} away={details.awayTeam} />
         )}
         {tab === "bets" && (
-          <BetsTab insights={insights} insightsError={insightsError} />
+          <BetsTab insights={insights} insightsError={insightsLoading ? null : insightsError} insightsLoading={insightsLoading} />
         )}
       </div>
 

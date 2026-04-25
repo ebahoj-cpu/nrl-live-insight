@@ -194,10 +194,10 @@ ALSO produce a "matchFix" — a tongue-in-cheek "how the NRL would script this g
 - conspiracyRating: 0-100 "how scripted does this feel?" meter (most matches sit 30-60 — a marquee finals race or grand-final rematch can sit higher).
 
 
-ALSO produce a "weaknessExploit" for EACH team. For each side identify:
-- opponentWeaknesses: an array of EXACTLY 3 distinct, specific defensive flaws in the OPPOSITION based on recent form / known matchup data. Each one a concrete short phrase, e.g. "Right-edge defence leaking tries — missed tackle % at left centre", "Ruck speed drops sharply in second half", "Vulnerable under high bombs on left wing", "Slow line-speed against shape plays from scrum".
-- targetAreas: an array of 1-3 specific channels / phases / parts of the field to attack — e.g. "Right edge 20m channel", "Inside ball off the ruck", "Bomb contests on the left wing", "Short side from scrum".
-- tacticalPlan: 2-3 sentences on HOW this team weaponises those weaknesses — shape, ball-runners, kicking game, set-piece.
+ALSO produce a "weaknessExploit" for EACH team. The two teams' exploit blocks MUST be DIFFERENT — they target different channels, different phases, different named players, because the two opponents have genuinely different defensive profiles. Do NOT produce mirror-image content with names swapped. For each side identify:
+- opponentWeaknesses: an array of EXACTLY 3 distinct, specific defensive flaws in the OPPOSITION based on recent form / known matchup data. Each one a concrete short phrase, e.g. "Right-edge defence leaking tries — missed tackle % at left centre", "Ruck speed drops sharply in second half", "Vulnerable under high bombs on left wing", "Slow line-speed against shape plays from scrum". The home team's "opponentWeaknesses" describe the AWAY team's flaws; the away team's "opponentWeaknesses" describe the HOME team's flaws — and these should NOT overlap unless both sides genuinely share the same flaw.
+- targetAreas: an array of 1-3 specific channels / phases / parts of the field to attack — e.g. "Right edge 20m channel", "Inside ball off the ruck", "Bomb contests on the left wing", "Short side from scrum". Make these concrete and asymmetric across the two teams.
+- tacticalPlan: 2-3 sentences on HOW this team weaponises those weaknesses — shape, ball-runners, kicking game, set-piece. Tie directly to BETTING value (which markets light up if this plan hits — e.g. "boosts our anytime tryscorer for [name] and over 22.5 first-half points").
 - playersToWatch: exactly 3 NAMED squad players from THIS team most likely to score or directly influence scoring against those weaknesses — for each give role and a one-sentence why. Use only players from the named squad above.
 
 ALSO produce a "gameFlow" object — a quarter-by-quarter script of how the match likely unfolds:

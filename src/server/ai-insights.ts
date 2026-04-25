@@ -600,6 +600,25 @@ function buildFallbackInsights(payload: {
   const preferredWinner = `${winnerName} — the cleaner TV story is a marketable side staying relevant, keeping the broadcast talking points alive into next week.`;
 
   return {
+    intelligence: buildFallbackIntelligence({
+      homeName: payload.homeName,
+      awayName: payload.awayName,
+      venue: payload.venue,
+      homeRow,
+      awayRow,
+      homeFormScore,
+      awayFormScore,
+      homeCore,
+      awayCore,
+      winnerTeam,
+      winnerName,
+      loserName,
+      predictedHome: homeScore,
+      predictedAway: awayScore,
+      wetWeather,
+      windy,
+      weatherSummary: payload.weatherSummary,
+    }),
     predictedScore: { home: homeScore, away: awayScore },
     winner: {
       team: winnerTeam,

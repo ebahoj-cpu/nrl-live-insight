@@ -214,7 +214,7 @@ function shortWeather(c: string): string {
 function Card({ title, icon: Icon, children, className = "" }:
   { title: string; icon?: typeof Users; children: React.ReactNode; className?: string }) {
   return (
-    <section className={`glass p-5 ${className}`}>
+    <section className={`card-surface p-5 ${className}`}>
       <div className="flex items-center gap-2 mb-4">
         {Icon && <Icon className="h-4 w-4 text-accent" />}
         <h3 className="font-bold text-sm uppercase tracking-wider">{title}</h3>

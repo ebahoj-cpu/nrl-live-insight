@@ -287,6 +287,65 @@ export type Insights = {
       conspiracyRating: number;    // 0-100 tongue-in-cheek "how scripted does this feel?" meter
     };
   };
+  // ---- 7-card analyst Script tab ----
+  scriptAnalyst: ScriptAnalyst;
+};
+
+// 7-card analyst layout that powers the Script tab UI.
+// Every block must be grounded in the same unified simulation as the rest of the Insights payload.
+export type ScriptAnalyst = {
+  // Card 1 — Match Overview
+  overview: {
+    ladderContext: string;          // 1-2 sentences: ladder positions, points differential
+    formContext: string;            // 1-2 sentences: recent form (last 3-5)
+    headToHead: string;             // 1-2 sentences: H2H + venue impact
+    stylisticContrast: string;      // 1-2 sentences: defensive grind vs attacking flair, etc.
+    contestSummary: string;         // ONE sentence: expected contest dynamic
+  };
+  // Card 2 — What's On The Line
+  stakes: {
+    home: { implications: string; pressure: string; narrative: string; psychology: string };
+    away: { implications: string; pressure: string; narrative: string; psychology: string };
+  };
+  // Card 3 — Home Team Winning Script
+  homeWinningScript: {
+    opening: string;                // how they start (tempo, field position, defensive intent)
+    tacticalFocus: string;          // dominate middle / target edge / kicking control
+    keyDrivers: string[];           // 2-4 named players that drive this script
+    closingOut: string;             // how they maintain control and close the match
+  };
+  // Card 4 — Away Team Winning Script
+  awayWinningScript: {
+    opening: string;                // weather pressure vs fast start
+    tacticalFocus: string;          // mid-game adjustments
+    keyMatchups: string[];          // 2-4 matchups they must win
+    endgame: string;                // chasing vs protecting a lead
+  };
+  // Card 5 — Ideal Game Narrative (neutral / league perspective)
+  idealNarrative: {
+    storyline: string;              // most compelling version of the match
+    starMoments: string[];          // 2-4 star-player moments / key beats
+    finishType: string;             // dramatic / high-quality finish
+    fanAngle: string;               // why this benefits engagement & spectacle
+  };
+  // Card 6 — Market / Betting Lean Narrative (analytical, NOT conspiracy)
+  marketLean: {
+    favouriteVsUnderdog: string;    // 1-2 sentences on the dynamic
+    coverLikelihood: string;        // likelihood of covering the line
+    totalsAngle: string;            // scoring trends vs total points line
+    valueOrRisk: string;            // 1-2 sentences on where value or risk sits
+  };
+  // Card 7 — Match Predictions
+  predictions: {
+    winner: { team: "home" | "away"; reasoning: string };
+    margin: { range: string; reasoning: string };
+    predictedScore: { home: number; away: number; reasoning: string };
+    totalPoints: { lean: "over" | "under"; line: number; reasoning: string };
+    htft: { pick: string; reasoning: string };
+    firstTryscorer: { name: string; reasoning: string };
+    scoringPool: { name: string; reasoning: string }[];   // 3-6 first/second/third-try candidates
+    anytimeTryscorers: { name: string; reasoning: string }[]; // 3-6 anytime picks
+  };
 };
 
 export type RealOdds = {

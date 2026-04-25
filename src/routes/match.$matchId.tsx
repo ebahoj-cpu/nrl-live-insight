@@ -478,9 +478,7 @@ function SeasonStats({ team, row }: { team: any; row?: any }) {
           <Stat label="PF" value={String(row.for)} />
           <Stat label="Diff" value={fmtSigned(row.diff)} accent={row.diff > 0} danger={row.diff < 0} />
         </div>
-      ) : (
-        <div className="text-xs text-muted-foreground mb-4">No 2026 ladder data yet.</div>
-      )}
+      ) : null}
 
       <div className="flex items-center justify-between mb-1">
         <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Form · Last 5</div>

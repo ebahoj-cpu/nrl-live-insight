@@ -164,6 +164,7 @@ function MatchInner() {
             awayRow={awayRow}
             tryscorers={tryscorers}
             tryscorersError={tryscorersError}
+            odds={odds}
           />
         )}
       </div>

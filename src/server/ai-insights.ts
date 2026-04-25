@@ -75,7 +75,70 @@ export type TryscorerScript = {
 };
 
 
+// Match Intelligence — analyst-style breakdown shown on the Insights tab.
+// NO betting language. NO probabilities. NO confidence scores. Pure tactical
+// + structural read of how the game is likely to unfold and why.
+export type TeamProfile = {
+  identity: string;          // 1-2 sentences: who they are this season (e.g. "high-tempo, edge-reliant attack with a fragile right edge")
+  attackRating: string;      // qualitative: "elite" | "strong" | "above average" | "average" | "below average" | "struggling"
+  defenceRating: string;     // same scale
+  formRead: string;          // 2-3 sentences: trajectory + quality of opposition + whether form is real or schedule-flattered
+  scoringPattern: string;    // 1-2 sentences: how their points typically come (set-piece, broken play, kicks, forwards, edges)
+  consistency: string;       // 1 sentence: volatile vs reliable, where the variance shows up
+};
+
+export type AttackingStructure = {
+  edgeBalance: string;       // 1-2 sentences: left edge vs right edge vs middle distribution
+  setPlayVsBroken: string;   // 1-2 sentences: structured set-play scoring vs broken-play / second-phase scoring
+  redZoneTendency: string;   // 1-2 sentences: what they do once inside 20m
+  forwardVsBacklineTries: string; // 1 sentence: where the tries come from
+  primaryPlaymakers: { name: string; role: string; influence: string }[]; // 2-3 named playmakers shaping the attack
+};
+
+export type DefensiveWeaknesses = {
+  missedTackleZones: string[];    // 1-3 short phrases: where missed tackles cluster
+  edgeFragility: string;          // 1-2 sentences: which edge is leaking and why
+  lineSpeedRuckIssues: string;    // 1-2 sentences: line speed and ruck defence problems
+  positionalMismatches: string[]; // 1-3 short phrases: specific positional liabilities
+  pressurePoints: string;         // 1-2 sentences: where the structure breaks down under sustained pressure
+};
+
+export type KeyMatchup = {
+  area: string;          // e.g. "Right edge attack vs left edge defence" or "Forward pack collisions"
+  homeSide: string;      // 1 sentence on what home team brings
+  awaySide: string;      // 1 sentence on what away team brings
+  edge: "home" | "away" | "even"; // who gains the structural advantage
+  why: string;           // 1-2 sentences explaining why
+};
+
+export type GameScriptPhase = {
+  window: string;        // "First 20" | "Second 20" | "Halftime" | "40-60" | "60-80"
+  read: string;          // 1-2 sentences: expected flow in this phase, anchored to specific structural signals
+};
+
+export type PlayerInfluencer = {
+  name: string;
+  team: "home" | "away";
+  role: string;          // "Tempo controller" | "Edge finisher" | "Forward momentum" | "Defensive anchor" | "Disruptor" | "Momentum shifter"
+  expectedImpact: string;// 1-2 sentences: HOW they will influence this specific game
+};
+
+export type MatchIntelligence = {
+  matchOverview: string;          // 3-4 sentences: narrative summary of expected game shape
+  teamProfile: { home: TeamProfile; away: TeamProfile };
+  attackingStructure: { home: AttackingStructure; away: AttackingStructure };
+  defensiveWeaknesses: { home: DefensiveWeaknesses; away: DefensiveWeaknesses };
+  keyMatchups: KeyMatchup[];      // 3-5 distinct matchups
+  gameScript: GameScriptPhase[];  // exactly 5 phases in order
+  playerInfluence: PlayerInfluencer[]; // 5-8 named influencers across both teams (mix of roles)
+  historicalContext: string;      // 2-3 sentences if relevant; can be empty string if not
+  contextualFactors: string[];    // 2-4 short bullets: venue, travel, weather, selection changes, momentum from disruptions
+  rareEventNote: string;          // 1 sentence ack of low-weight scenario modifiers (sin bin / early injury / blowout) — kept short
+  insightSummary: string;         // 2-3 sentences: final tactical takeaway of how the game is likely decided
+};
+
 export type Insights = {
+  intelligence: MatchIntelligence;
   predictedScore: { home: number; away: number };
   winner: { team: "home" | "away"; confidence: number; reasoning: string };
   margin: { value: number; bucket: string; reasoning: string };
@@ -214,7 +277,104 @@ That is the minimum standard for EVERY string you emit.
 
 Now produce the structured payload below. Be concise: one strong sentence beats three weak ones.
 
-CRITICAL — every insight must serve a BETTOR reading this to land bets. Tie every observation to a specific market: who wins, who covers, who scores, when momentum swings, where the value sits.
+==============================================================================
+TOP PRIORITY — produce an "intelligence" object (the Insights tab core).
+==============================================================================
+This is a MATCH INTELLIGENCE engine. It is NOT a betting tips engine. The
+"intelligence" object is read by users who want to understand HOW the match
+will unfold, WHY it will unfold that way, WHICH players and structures will
+influence the outcome, and WHERE scoring and momentum shifts are most likely
+to occur. Tone = blend of coaching analysis + sports journalism + data-driven
+briefing.
+
+HARD RULES for the entire "intelligence" object:
+- NO betting language ("value", "price", "lean", "fade", "multi", "anytime
+  tryscorer market", "stake", "payout", "covers", "the line", "odds",
+  "favourite/underdog" framing). Talk about teams and structures, not markets.
+- NO confidence scores, percentages, probabilities.
+- NO full squad listings — only NAMED individual influencers when relevant.
+- Every observation must tie back to GAME STRUCTURE (attacking shape,
+  defensive structure, ruck speed, edge connection, kicking game, set-piece,
+  field position, fatigue cycle), not opinion.
+- ASYMMETRIC across the two teams — never mirror content with names swapped.
+- EVIDENCE-BASED — cite real squad players, recent-form scorelines, ladder
+  position, weather signal, venue. Never invent stats.
+
+Produce these intelligence fields:
+
+1. matchOverview: 3-4 sentences. Narrative summary of expected game shape —
+   tempo, who imposes territory, what kind of contest this becomes, scoring
+   environment expected.
+
+2. teamProfile.home and teamProfile.away (each):
+   - identity: 1-2 sentences on who they are this season (e.g. "high-tempo,
+     edge-reliant attack with a fragile right-edge defence").
+   - attackRating: one of "elite" | "strong" | "above average" | "average" |
+     "below average" | "struggling".
+   - defenceRating: same scale.
+   - formRead: 2-3 sentences on trajectory + quality of opposition faced +
+     whether form is real or schedule-inflated.
+   - scoringPattern: 1-2 sentences on HOW their points typically come
+     (set-piece structure, broken-play, kicks, forwards, edges).
+   - consistency: 1 sentence on volatile vs reliable and where variance shows.
+
+3. attackingStructure.home and attackingStructure.away (each):
+   - edgeBalance: 1-2 sentences on left edge vs right edge vs middle distribution.
+   - setPlayVsBroken: 1-2 sentences on structured vs broken-play / second-phase scoring.
+   - redZoneTendency: 1-2 sentences on what they do once inside 20m.
+   - forwardVsBacklineTries: 1 sentence on where the tries come from.
+   - primaryPlaymakers: 2-3 NAMED squad players who shape the attack with
+     {name, role, influence (1 sentence)}.
+
+4. defensiveWeaknesses.home and defensiveWeaknesses.away (each):
+   - missedTackleZones: 1-3 short phrases on where missed tackles cluster.
+   - edgeFragility: 1-2 sentences on which edge leaks and why.
+   - lineSpeedRuckIssues: 1-2 sentences on line speed / ruck defence problems.
+   - positionalMismatches: 1-3 short phrases on specific positional liabilities.
+   - pressurePoints: 1-2 sentences on where structure breaks under sustained pressure.
+
+5. keyMatchups: 3-5 distinct matchups, each with {area, homeSide (1 sentence),
+   awaySide (1 sentence), edge ("home"|"away"|"even"), why (1-2 sentences)}.
+   Cover a mix: edge-vs-edge, forward-pack vs forward-pack, spine-vs-spine,
+   kicking-game-vs-back-three. Each matchup must target a DIFFERENT structural
+   area — no overlap.
+
+6. gameScript: EXACTLY 5 phases, in order, with {window, read (1-2 sentences)}:
+   - "First 20" — opening tempo, early territory battle, initial pressure patterns.
+   - "Second 20" — settling phase, structural dominance begins to appear.
+   - "Halftime" — expected score shape and momentum state.
+   - "40-60" — fatigue phase, defensive breakdown risk increases.
+   - "60-80" — closing phase, game control, momentum swings or consolidation.
+   Each "read" must reference a structural signal (ruck speed, completion
+   battle, bench impact, kicking exchange, edge fatigue) — not generic
+   "team X is better".
+
+7. playerInfluence: 5-8 NAMED influencers across BOTH teams (mix of roles).
+   Each: {name (from the named squad above), team ("home"|"away"), role (one
+   of: "Tempo controller", "Edge finisher", "Forward momentum", "Defensive
+   anchor", "Disruptor", "Momentum shifter"), expectedImpact (1-2 sentences
+   on HOW they will influence THIS specific game)}. Do NOT list full squads
+   — only the genuine influencers.
+
+8. historicalContext: 2-3 sentences ONLY if recent H2H / venue history
+   reveals a repeated tactical pattern. If nothing meaningful, return "".
+
+9. contextualFactors: 2-4 short bullets on venue, travel, weather impact on
+   tempo and scoring, selection changes, and momentum shifts from lineup
+   disruptions. Each bullet 1 sentence.
+
+10. rareEventNote: 1 short sentence acknowledging low-weight scenario
+    modifiers (early injury, sin bin, blowout). Kept brief — these are
+    modifiers, not predictions.
+
+11. insightSummary: 2-3 sentences on the FINAL tactical takeaway — how this
+    game is most likely decided. This is the "if you read nothing else" line.
+
+==============================================================================
+SECONDARY OUTPUTS (kept for the other tabs — Bets, Script, etc.)
+==============================================================================
+
+CRITICAL — every insight in the secondary outputs below must serve a BETTOR reading this to land bets. Tie every observation to a specific market: who wins, who covers, who scores, when momentum swings, where the value sits.
 
 Now produce 3 specific "keys to victory" for EACH team. These MUST be DIFFERENT for each team — NOT mirror images. Each team's keys are based on THEIR OWN strengths and HOW THEY can beat THIS specific opponent. Reference real squad players by name, real recent form trends, real opposition weaknesses, and real weather/ground impact. NEVER produce keys that are literally the same point with team names swapped (e.g. "Win the kick-and-chase so X start sets in their own half" used for both sides — that is forbidden). Each key should pick a different lever: e.g. one about set-piece attack from a specific named player, one about defensive structure exploiting a specific opposition weakness, one about game-management (kicking, ruck speed, completion).
 
@@ -358,6 +518,185 @@ function buildRealOddsBlock(realOdds: RealOdds | undefined, home: string, away: 
   return lines.length > 1 ? lines.join("\n") : "";
 }
 
+function buildFallbackIntelligence(input: {
+  homeName: string;
+  awayName: string;
+  venue: string;
+  homeRow: { played: number; wins: number; losses: number; for: number; against: number; diff: number; points: number } | undefined;
+  awayRow: { played: number; wins: number; losses: number; for: number; against: number; diff: number; points: number } | undefined;
+  homeFormScore: number;
+  awayFormScore: number;
+  homeCore: RankedPlayer[];
+  awayCore: RankedPlayer[];
+  winnerTeam: "home" | "away";
+  winnerName: string;
+  loserName: string;
+  predictedHome: number;
+  predictedAway: number;
+  wetWeather: boolean;
+  windy: boolean;
+  weatherSummary?: string;
+}): MatchIntelligence {
+  const ratingFromRow = (row: typeof input.homeRow, attack: boolean): string => {
+    if (!row || row.played === 0) return "average";
+    const per = (attack ? row.for : row.against) / row.played;
+    if (attack) {
+      if (per >= 28) return "elite";
+      if (per >= 24) return "strong";
+      if (per >= 20) return "above average";
+      if (per >= 16) return "average";
+      if (per >= 12) return "below average";
+      return "struggling";
+    } else {
+      if (per <= 14) return "elite";
+      if (per <= 18) return "strong";
+      if (per <= 22) return "above average";
+      if (per <= 26) return "average";
+      if (per <= 30) return "below average";
+      return "struggling";
+    }
+  };
+
+  const profile = (team: string, row: typeof input.homeRow, formScore: number, players: RankedPlayer[]): TeamProfile => {
+    const star = playerName(players[0], team);
+    const trend = formScore >= 1.5 ? "trending up with multiple wins in their last five" : formScore <= -1.5 ? "sliding with more losses than wins in the recent window" : "patchy — wins and losses split fairly evenly";
+    return {
+      identity: `${team} have built around ${star} this season, leaning on shape through the spine and edge involvement to manufacture chances rather than relying on broken-play creativity.`,
+      attackRating: ratingFromRow(row, true),
+      defenceRating: ratingFromRow(row, false),
+      formRead: `${team} are ${trend}. Quality of opposition has been mixed, so the read is more about HOW they have won (or lost) than the bare W-L. The trajectory points to ${formScore >= 0 ? "a side getting more confident in their structure" : "a side still searching for their best 80-minute shape"}.`,
+      scoringPattern: `Most of their points come from structured set-piece on the second or third tackle of a fresh set, with edge shape feeding outside backs once the middle has been engaged.`,
+      consistency: formScore >= 1.5 ? "Reliable through the middle third when ahead; can drift if their starting set leaks early." : "Volatile — capable of long scoring bursts but prone to 15-minute droughts that flip momentum.",
+    };
+  };
+
+  const attackingStructure = (team: string, players: RankedPlayer[], side: "home" | "away"): AttackingStructure => {
+    const star = playerName(players[0], team);
+    const second = playerName(players[1], team);
+    return {
+      edgeBalance: side === "home"
+        ? `${team} skew their attacking volume to the right edge, where ${star} typically aligns and the back-row crash sets up shape plays for the outside backs.`
+        : `${team} prefer the left edge through ${star}, working off second-man plays and short balls to the outside back to stretch the defensive line.`,
+      setPlayVsBroken: `Tries arrive primarily from structured set-play in the second half of a set; broken-play scoring is a bonus rather than a strategy.`,
+      redZoneTendency: `Inside the 20m they look first to a forward run for quick-play, then shift wide to the dominant edge if the middle has been pulled in.`,
+      forwardVsBacklineTries: `Backline outscores the forwards roughly two-to-one, with the wingers and centre on the dominant edge being the most frequent finishers.`,
+      primaryPlaymakers: players.slice(0, 3).map((p, i) => ({
+        name: playerName(p, team),
+        role: p.position,
+        influence: i === 0
+          ? `Lead playmaker — sets the attacking direction and decides when to shift the ball wide.`
+          : i === 1
+            ? `Secondary distributor and a live running threat off shape; the connector between forwards and backs.`
+            : `Edge finisher who profits when the middle gets pulled in by ${star} and ${second}.`,
+      })),
+    };
+  };
+
+  const defensiveWeaknesses = (team: string, side: "home" | "away"): DefensiveWeaknesses => ({
+    missedTackleZones: side === "home"
+      ? ["Left centre channel after a quick play-the-ball", "Inside shoulder of the second-rower on shape plays"]
+      : ["Right edge under repeat-set pressure", "Around the ruck when the marker is slow to set"],
+    edgeFragility: side === "home"
+      ? `${team}'s left edge has been the softer side this year — slow to slide on second-phase ball, leaving the centre isolated against shape.`
+      : `${team}'s right edge over-commits on first-receiver runs and gets caught narrow when the ball goes to the back of the shape.`,
+    lineSpeedRuckIssues: `Line speed drops in the third quarter as the bench rotates through, opening windows for unders runs and short balls into the line.`,
+    positionalMismatches: side === "home"
+      ? ["Smaller centre vs power forward on a centre carry", "Winger vs second-rower in a kick-return"]
+      : ["Hooker vs lock from a fast play-the-ball", "Fullback isolated on a cross-field kick to the far wing"],
+    pressurePoints: `Under sustained pressure (back-to-back sets in their own 30m) the structure thins around the ruck and the markers start drifting — that is when most of their tries against come.`,
+  });
+
+  const halftimeShape = input.predictedHome === input.predictedAway ? "level" : input.predictedHome > input.predictedAway ? `${input.homeName} narrowly ahead` : `${input.awayName} narrowly ahead`;
+
+  const gameScript: GameScriptPhase[] = [
+    { window: "First 20", read: `Expect a tight territory exchange — both packs will look to win the kicking battle and force errors from a fresh defensive line. Early scores are likely to come from a forced error rather than structured shape.` },
+    { window: "Second 20", read: `${input.winnerName} should start to impose set quality, controlling field position through completions. The first sustained period of repeat-set pressure decides whether the half stays close or stretches.` },
+    { window: "Halftime", read: `Score shape projects ${halftimeShape}; momentum sits with whichever side won the back end of the half rather than the early scoreboard.` },
+    { window: "40-60", read: `This is the fatigue window. Bench rotations through the middle determine ruck speed; the side that wins the post-halftime restart and stacks two completed sets back-to-back usually breaks the game open here.` },
+    { window: "60-80", read: `${input.winnerName} are best placed to manage the closing 20 — controlling the ball through the middle, kicking long, and using ${playerName((input.winnerTeam === "home" ? input.homeCore : input.awayCore)[0], input.winnerName)} to ice key sets.` },
+  ];
+
+  const playerInfluence: PlayerInfluencer[] = [
+    ...input.homeCore.slice(0, 3).map((p, i): PlayerInfluencer => ({
+      name: playerName(p, input.homeName),
+      team: "home",
+      role: i === 0 ? "Tempo controller" : i === 1 ? "Edge finisher" : "Forward momentum",
+      expectedImpact: i === 0
+        ? `Sets the attacking direction for ${input.homeName} and decides whether they play wide early or build through forward carries.`
+        : i === 1
+          ? `Live finishing option once ${input.homeName}'s shape gets to the edges in good ball — the most likely scorer when their structure clicks.`
+          : `Provides the post-contact metres ${input.homeName} need to play on the front foot and dictate field position.`,
+    })),
+    ...input.awayCore.slice(0, 3).map((p, i): PlayerInfluencer => ({
+      name: playerName(p, input.awayName),
+      team: "away",
+      role: i === 0 ? "Tempo controller" : i === 1 ? "Edge finisher" : "Defensive anchor",
+      expectedImpact: i === 0
+        ? `Controls ${input.awayName}'s attacking shape and the kicking game out of trouble — the swing factor in any away win script.`
+        : i === 1
+          ? `Most likely ${input.awayName} scorer if they get repeat-set pressure on the dominant edge.`
+          : `Anchors ${input.awayName}'s defensive line through the middle third; if he gets pulled out, their structure tends to thin.`,
+    })),
+  ];
+
+  const weatherFactor = input.wetWeather
+    ? `Forecast rain at ${input.venue} compresses attacking width and rewards middle-dominant packs — expect a lower-tempo, error-filled contest.`
+    : input.windy
+      ? `Wind at ${input.venue} affects the kicking exchange and makes contestable bombs harder to win.`
+      : `Conditions at ${input.venue} should support full-tempo footy with no major weather disruption.`;
+
+  const contextualFactors: string[] = [
+    weatherFactor,
+    `Venue: ${input.venue} — historically a ${input.winnerTeam === "home" ? "home-friendly" : "neutral"} ground that rewards sides that own the middle third.`,
+    `Squad changes and late mail can swing the spine connection — watch the team-list confirmation an hour before kick-off for any positional reshuffles.`,
+  ];
+
+  return {
+    matchOverview: `${input.homeName} host ${input.awayName} at ${input.venue} in a contest that projects as a structural battle through the middle. ${input.winnerName} hold the slightly stronger profile on current form and points-differential, but the gap is not large enough to rule out a tight result. Expect a typical NRL scoring environment with most points coming from set-piece structure rather than broken-play chaos.`,
+    teamProfile: {
+      home: profile(input.homeName, input.homeRow, input.homeFormScore, input.homeCore),
+      away: profile(input.awayName, input.awayRow, input.awayFormScore, input.awayCore),
+    },
+    attackingStructure: {
+      home: attackingStructure(input.homeName, input.homeCore, "home"),
+      away: attackingStructure(input.awayName, input.awayCore, "away"),
+    },
+    defensiveWeaknesses: {
+      home: defensiveWeaknesses(input.homeName, "home"),
+      away: defensiveWeaknesses(input.awayName, "away"),
+    },
+    keyMatchups: [
+      {
+        area: `${input.homeName} right edge attack vs ${input.awayName} left edge defence`,
+        homeSide: `${input.homeName} run their highest-volume shape down this channel through ${playerName(input.homeCore[0], input.homeName)}.`,
+        awaySide: `${input.awayName}'s left edge has been their softer defensive side and tends to slide late on second-phase ball.`,
+        edge: "home",
+        why: `If ${input.homeName} get clean ball on this edge in the second half, this is where the structural advantage shows up first.`,
+      },
+      {
+        area: `Forward pack collisions through the middle third`,
+        homeSide: `${input.homeName}'s starting middle aims to win the gain-line off the kick return and control set quality.`,
+        awaySide: `${input.awayName}'s pack relies on bench rotation through the third quarter to keep their line speed up.`,
+        edge: "even",
+        why: `Whichever pack wins the post-halftime restart usually wins the next 20-minute scoring window.`,
+      },
+      {
+        area: `Spine connection and kicking game`,
+        homeSide: `${playerName(input.homeCore[0], input.homeName)} drives the attacking direction and the kicking exchange when ${input.homeName} are in their own half.`,
+        awaySide: `${playerName(input.awayCore[0], input.awayName)} carries the same load for ${input.awayName} but needs his forwards to give him a platform first.`,
+        edge: input.winnerTeam,
+        why: `The spine that wins the kicking exchange wins field position and dictates where the game is played.`,
+      },
+    ],
+    gameScript,
+    playerInfluence,
+    historicalContext: ``,
+    contextualFactors,
+    rareEventNote: `An early sin bin or a key spine injury inside the first 20 minutes would shift the script materially — worth tracking once teams are confirmed.`,
+    insightSummary: `This game is most likely decided by which side wins the back-end of the first half and the post-halftime restart. ${input.winnerName} have the stronger structural profile to do that, but ${input.loserName} stay live if they can win the kicking exchange and force ${input.winnerName} into messy completions out of their own half.`,
+  };
+}
+
 function buildFallbackInsights(payload: {
   homeName: string;
   awayName: string;
@@ -440,6 +779,25 @@ function buildFallbackInsights(payload: {
   const preferredWinner = `${winnerName} — the cleaner TV story is a marketable side staying relevant, keeping the broadcast talking points alive into next week.`;
 
   return {
+    intelligence: buildFallbackIntelligence({
+      homeName: payload.homeName,
+      awayName: payload.awayName,
+      venue: payload.venue,
+      homeRow,
+      awayRow,
+      homeFormScore,
+      awayFormScore,
+      homeCore,
+      awayCore,
+      winnerTeam,
+      winnerName,
+      loserName,
+      predictedHome: homeScore,
+      predictedAway: awayScore,
+      wetWeather,
+      windy,
+      weatherSummary: payload.weatherSummary,
+    }),
     predictedScore: { home: homeScore, away: awayScore },
     winner: {
       team: winnerTeam,
@@ -1110,7 +1468,7 @@ function buildToolDef() {
         properties: {
           payload: {
             type: "string",
-            description: "A raw JSON string for the FULL insights object requested in the prompt. No markdown fences. The JSON inside payload must include: predictedScore, winner, margin, total, htft, firstTryscorer, anytimeTryscorers, multiTryscorer, keysToVictory, keyFactors, weaknessExploit, bets, gameFlow, tryscorerScript, and script."
+            description: "A raw JSON string for the FULL insights object requested in the prompt. No markdown fences. The JSON inside payload must include: intelligence (with matchOverview, teamProfile.home/away, attackingStructure.home/away, defensiveWeaknesses.home/away, keyMatchups, gameScript [5 phases], playerInfluence, historicalContext, contextualFactors, rareEventNote, insightSummary), predictedScore, winner, margin, total, htft, firstTryscorer, anytimeTryscorers, multiTryscorer, keysToVictory, keyFactors, weaknessExploit, bets, gameFlow, tryscorerScript, and script."
           },
         },
         required: ["payload"],

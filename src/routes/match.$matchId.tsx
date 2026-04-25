@@ -8,7 +8,7 @@ import {
   ArrowLeft, Clock, MapPin, Users, BarChart3, Sparkles, ScrollText,
   Trophy, Target, Flag, Crown, TrendingUp, AlertCircle, CloudSun, Calendar, Zap, Hourglass,
   Coins, ThumbsUp, ThumbsDown, Wallet, Activity, Shield, Brain, Crosshair, Eye,
-  Timer, Ban,
+  Timer, Ban, Swords, Compass, Layers, Gauge, Radar, BookOpen,
 } from "lucide-react";
 
 const matchQO = (matchId: string) => queryOptions({
@@ -605,108 +605,313 @@ function Stat({ label, value, accent, danger }: { label: string; value: string; 
 
 /* ================= INSIGHTS TAB ================= */
 
-function InsightsTab({ insights, insightsError, insightsLoading, home, away, tryscorers, tryscorersError, oddsError, oddsStale, kickoffUtc }:
+function InsightsTab({ insights, insightsError, insightsLoading, home, away, tryscorers, oddsError, oddsStale, kickoffUtc }:
   { insights: any; insightsError: string | null; insightsLoading?: boolean; home: string; away: string; tryscorers: TryscorerMarkets | null; tryscorersError: string | null; oddsError: string | null; oddsStale: boolean; kickoffUtc: string }) {
   if (insightsLoading) return <InsightsLoading />;
   if (insightsError && !insights) return <Empty msg={insightsError} />;
   if (!insights) return <Empty msg="Insights unavailable." />;
 
-  const winnerName = insights.winner.team === "home" ? home : away;
+  // The Insights tab is the MATCH INTELLIGENCE engine — pure tactical /
+  // structural read. Betting picks live on the Bets tab; narrative / script
+  // lives on the Script tab. We render strictly the intelligence object here.
+  const intel = insights.intelligence;
+
+  if (!intel) {
+    return (
+      <Empty msg="Match intelligence regenerating — check back in a moment." />
+    );
+  }
 
   return (
     <div className="space-y-4">
       {(oddsError || oddsStale) && (
         <div className="glass p-3 text-xs text-muted-foreground inline-flex items-center gap-2 w-full">
           <AlertCircle className="h-3.5 w-3.5 text-accent" />
-          {oddsStale ? "Showing last cached odds — live feed temporarily unavailable." : "Live odds temporarily unavailable. Insights still based on form & ladder."}
+          {oddsStale ? "Showing last cached odds — live feed temporarily unavailable." : "Live odds temporarily unavailable. Intelligence still based on form, structure & squad."}
         </div>
       )}
 
-      {/* 1. Winning team + 2. Winning margin */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card title="Winning team" icon={Trophy} className="accent-glow">
-          <div className="text-2xl font-black mb-2">{winnerName}</div>
-          <p className="text-xs text-muted-foreground">{insights.winner.reasoning}</p>
-        </Card>
-        <Card title="Winning margin" icon={Target}>
-          <div className="text-2xl font-black mb-2">{winnerName} by {insights.margin.bucket}</div>
-          <p className="text-xs text-muted-foreground">{insights.margin.reasoning}</p>
-        </Card>
-      </div>
-
-      {/* 3. Predicted result */}
-      <Card title="Predicted result" icon={Sparkles}>
-        <div className="grid grid-cols-3 gap-4 items-center">
-          <div className="text-center">
-            <div className="text-xs text-muted-foreground">{home}</div>
-            <div className="text-4xl font-black kbd">{insights.predictedScore.home}</div>
-          </div>
-          <div className="text-center">
-            <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Final score</div>
-            <div className="text-sm font-bold mt-1 text-accent">{winnerName}</div>
-          </div>
-          <div className="text-center">
-            <div className="text-xs text-muted-foreground">{away}</div>
-            <div className="text-4xl font-black kbd">{insights.predictedScore.away}</div>
-          </div>
-        </div>
+      {/* 1. MATCH OVERVIEW */}
+      <Card title="Match overview" icon={BookOpen} className="accent-glow">
+        <p className="text-sm leading-relaxed">{intel.matchOverview}</p>
       </Card>
 
-      {/* 4. Total points + 5. HT/FT */}
+      {/* 2. TEAM PROFILE — both sides */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <PickCard
-          icon={TrendingUp}
-          market={`Total points ${insights.total.line}`}
-          pick={insights.total.pick.toUpperCase()}
-          reasoning={insights.total.reasoning}
-        />
-        <PickCard
-          icon={Clock}
-          market="Half-time / Full-time"
-          pick={insights.htft.pick}
-          reasoning={insights.htft.reasoning}
-        />
+        <TeamProfileCard team={home} profile={intel.teamProfile?.home} />
+        <TeamProfileCard team={away} profile={intel.teamProfile?.away} />
       </div>
 
-      {/* 6. First tryscorer + 7. Top 5 anytime + 8. Multi tryscorer */}
+      {/* 3. ATTACKING STRUCTURE */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <AttackingStructureCard team={home} data={intel.attackingStructure?.home} />
+        <AttackingStructureCard team={away} data={intel.attackingStructure?.away} />
+      </div>
+
+      {/* 4. DEFENSIVE WEAKNESSES */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <DefensiveWeaknessCard team={home} data={intel.defensiveWeaknesses?.home} />
+        <DefensiveWeaknessCard team={away} data={intel.defensiveWeaknesses?.away} />
+      </div>
+
+      {/* 5. KEY MATCHUPS */}
+      {Array.isArray(intel.keyMatchups) && intel.keyMatchups.length > 0 && (
+        <KeyMatchupsCard matchups={intel.keyMatchups} home={home} away={away} />
+      )}
+
+      {/* 6. GAME SCRIPT — 5 phases */}
+      <GameScriptPhasesCard phases={intel.gameScript ?? []} />
+
+      {/* 7. PLAYER INFLUENCE MAPPING */}
+      {Array.isArray(intel.playerInfluence) && intel.playerInfluence.length > 0 && (
+        <PlayerInfluenceCard influencers={intel.playerInfluence} home={home} away={away} />
+      )}
+
+      {/* 8. HISTORICAL CONTEXT (only if meaningful) */}
+      {typeof intel.historicalContext === "string" && intel.historicalContext.trim().length > 0 && (
+        <Card title="Historical context" icon={ScrollText}>
+          <p className="text-sm leading-relaxed text-muted-foreground">{intel.historicalContext}</p>
+        </Card>
+      )}
+
+      {/* 9. CONTEXTUAL FACTORS */}
+      {Array.isArray(intel.contextualFactors) && intel.contextualFactors.length > 0 && (
+        <Card title="Contextual factors" icon={Compass}>
+          <ul className="space-y-2 text-sm">
+            {intel.contextualFactors.map((c: string, i: number) => (
+              <li key={i} className="flex gap-2">
+                <span className="text-accent shrink-0">›</span>
+                <span className="leading-relaxed">{c}</span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
+
+      {/* 10. RARE EVENT NOTE — kept brief, low-weight modifier */}
+      {typeof intel.rareEventNote === "string" && intel.rareEventNote.trim().length > 0 && (
+        <div className="glass p-3 text-xs text-muted-foreground inline-flex items-start gap-2 w-full">
+          <AlertCircle className="h-3.5 w-3.5 text-accent shrink-0 mt-0.5" />
+          <span className="leading-relaxed">{intel.rareEventNote}</span>
+        </div>
+      )}
+
+      {/* 11. INSIGHT SUMMARY — final tactical takeaway */}
+      {typeof intel.insightSummary === "string" && intel.insightSummary.trim().length > 0 && (
+        <Card title="Insight summary" icon={Sparkles} className="accent-glow">
+          <p className="text-sm leading-relaxed">{intel.insightSummary}</p>
+        </Card>
+      )}
+
+      {/* Live tryscorer markets — kept as a real-data widget when team lists are out.
+          Pure read of bookie tryscorer pricing; not betting analysis or picks. */}
       <TryscorersSection
         tryscorers={tryscorers}
-        aiAnytime={insights.anytimeTryscorers}
-        aiFirst={insights.firstTryscorer}
-        aiMulti={insights.multiTryscorer}
+        aiAnytime={insights.anytimeTryscorers ?? []}
+        aiFirst={insights.firstTryscorer ?? { pick: "Awaiting team list", reasoning: "Tryscorer markets open ~24h before kickoff." }}
+        aiMulti={insights.multiTryscorer ?? { pick: "Awaiting team list", reasoning: "" }}
         kickoffUtc={kickoffUtc}
       />
-
-      {/* 9. Keys to victory — both teams */}
-      {insights.keysToVictory && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <KeysCard team={home} keys={insights.keysToVictory.home} />
-          <KeysCard team={away} keys={insights.keysToVictory.away} />
-        </div>
-      )}
-
-      {/* 9b. Weakness exploit — opposition flaws + 3 players to watch */}
-      {insights.weaknessExploit && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <WeaknessExploitCard team={home} opponent={away} data={insights.weaknessExploit.home} />
-          <WeaknessExploitCard team={away} opponent={home} data={insights.weaknessExploit.away} />
-        </div>
-      )}
-
-      {/* Key factors */}
-      <Card title="Key factors" icon={TrendingUp}>
-        <ul className="space-y-2 text-sm">
-          {insights.keyFactors.map((k: string, i: number) => (
-            <li key={i} className="flex gap-2">
-              <span className="text-accent">›</span>
-              <span>{k}</span>
-            </li>
-          ))}
-        </ul>
-      </Card>
     </div>
   );
 }
+
+/* ---------- Match-intelligence card components ---------- */
+
+const RATING_TONE: Record<string, string> = {
+  elite: "text-accent",
+  strong: "text-accent",
+  "above average": "text-foreground",
+  average: "text-muted-foreground",
+  "below average": "text-danger",
+  struggling: "text-danger",
+};
+
+function RatingPill({ label, value }: { label: string; value?: string }) {
+  const v = (value ?? "average").toLowerCase();
+  const tone = RATING_TONE[v] ?? "text-muted-foreground";
+  return (
+    <div className="bg-surface-2 rounded-lg px-3 py-2 flex items-center justify-between gap-3">
+      <span className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</span>
+      <span className={`text-xs font-bold uppercase tracking-wider ${tone}`}>{value || "average"}</span>
+    </div>
+  );
+}
+
+function TeamProfileCard({ team, profile }: { team: string; profile: any }) {
+  if (!profile) return null;
+  return (
+    <Card title={`${team} — profile`} icon={Gauge}>
+      <p className="text-sm leading-relaxed mb-3">{profile.identity}</p>
+      <div className="grid grid-cols-2 gap-2 mb-3">
+        <RatingPill label="Attack" value={profile.attackRating} />
+        <RatingPill label="Defence" value={profile.defenceRating} />
+      </div>
+      <div className="space-y-2">
+        <ProfileRow label="Form read" body={profile.formRead} />
+        <ProfileRow label="Scoring pattern" body={profile.scoringPattern} />
+        <ProfileRow label="Consistency" body={profile.consistency} />
+      </div>
+    </Card>
+  );
+}
+
+function ProfileRow({ label, body }: { label: string; body?: string }) {
+  if (!body) return null;
+  return (
+    <div>
+      <div className="text-[10px] uppercase tracking-wider text-accent font-bold mb-1">{label}</div>
+      <p className="text-xs text-muted-foreground leading-relaxed">{body}</p>
+    </div>
+  );
+}
+
+function AttackingStructureCard({ team, data }: { team: string; data: any }) {
+  if (!data) return null;
+  return (
+    <Card title={`${team} — attacking structure`} icon={Swords}>
+      <div className="space-y-3 text-sm">
+        <ProfileRow label="Edge balance" body={data.edgeBalance} />
+        <ProfileRow label="Set-play vs broken-play" body={data.setPlayVsBroken} />
+        <ProfileRow label="Red zone tendency" body={data.redZoneTendency} />
+        <ProfileRow label="Where the tries come from" body={data.forwardVsBacklineTries} />
+        {Array.isArray(data.primaryPlaymakers) && data.primaryPlaymakers.length > 0 && (
+          <div className="pt-1 border-t border-border/40">
+            <div className="text-[10px] uppercase tracking-wider text-accent font-bold mb-2">Primary playmakers</div>
+            <ul className="space-y-2">
+              {data.primaryPlaymakers.map((p: any, i: number) => (
+                <li key={i} className="text-xs">
+                  <div className="font-semibold">
+                    {p.name} <span className="text-muted-foreground font-normal">· {p.role}</span>
+                  </div>
+                  <div className="text-muted-foreground leading-relaxed mt-0.5">{p.influence}</div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+function DefensiveWeaknessCard({ team, data }: { team: string; data: any }) {
+  if (!data) return null;
+  return (
+    <Card title={`${team} — defensive weaknesses`} icon={Radar}>
+      <div className="space-y-3 text-sm">
+        {Array.isArray(data.missedTackleZones) && data.missedTackleZones.length > 0 && (
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-danger font-bold mb-2">Missed tackle zones</div>
+            <ul className="flex flex-wrap gap-1.5">
+              {data.missedTackleZones.map((z: string, i: number) => (
+                <li key={i} className="text-xs px-2 py-1 rounded-md bg-danger/10 text-danger font-semibold border border-danger/20">{z}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+        <ProfileRow label="Edge fragility" body={data.edgeFragility} />
+        <ProfileRow label="Line speed & ruck issues" body={data.lineSpeedRuckIssues} />
+        {Array.isArray(data.positionalMismatches) && data.positionalMismatches.length > 0 && (
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-danger font-bold mb-2">Positional mismatches</div>
+            <ul className="flex flex-wrap gap-1.5">
+              {data.positionalMismatches.map((m: string, i: number) => (
+                <li key={i} className="text-xs px-2 py-1 rounded-md bg-danger/10 text-danger font-semibold border border-danger/20">{m}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+        <ProfileRow label="Pressure points" body={data.pressurePoints} />
+      </div>
+    </Card>
+  );
+}
+
+function KeyMatchupsCard({ matchups, home, away }: { matchups: any[]; home: string; away: string }) {
+  return (
+    <Card title="Key matchups" icon={Crosshair}>
+      <ol className="space-y-4">
+        {matchups.map((m: any, i: number) => {
+          const edgeLabel = m.edge === "home" ? home : m.edge === "away" ? away : "Even";
+          const edgeTone = m.edge === "even" ? "bg-surface-2 text-muted-foreground" : "bg-accent text-accent-foreground";
+          return (
+            <li key={i} className="bg-surface-2 rounded-xl p-3">
+              <div className="flex items-start justify-between gap-3 mb-2">
+                <div className="text-sm font-bold leading-tight">{m.area}</div>
+                <span className={`text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-md shrink-0 ${edgeTone}`}>
+                  Edge: {edgeLabel}
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
+                <div className="bg-surface rounded-lg p-2">
+                  <div className="text-[10px] uppercase tracking-wider text-accent font-bold mb-1">{home}</div>
+                  <p className="text-xs text-muted-foreground leading-relaxed">{m.homeSide}</p>
+                </div>
+                <div className="bg-surface rounded-lg p-2">
+                  <div className="text-[10px] uppercase tracking-wider text-accent font-bold mb-1">{away}</div>
+                  <p className="text-xs text-muted-foreground leading-relaxed">{m.awaySide}</p>
+                </div>
+              </div>
+              {m.why && <p className="text-xs leading-relaxed">{m.why}</p>}
+            </li>
+          );
+        })}
+      </ol>
+    </Card>
+  );
+}
+
+function GameScriptPhasesCard({ phases }: { phases: any[] }) {
+  if (!phases || phases.length === 0) return null;
+  return (
+    <Card title="Game script — phase by phase" icon={Hourglass}>
+      <ol className="relative border-l border-border pl-4 space-y-4">
+        {phases.map((p: any, i: number) => (
+          <li key={i} className="relative">
+            <span className="absolute -left-[22px] top-1 h-3 w-3 rounded-full bg-accent ring-4 ring-background" />
+            <div className="text-[10px] uppercase tracking-widest text-accent font-bold mb-1">{p.window}</div>
+            <p className="text-sm leading-relaxed text-muted-foreground">{p.read}</p>
+          </li>
+        ))}
+      </ol>
+    </Card>
+  );
+}
+
+const ROLE_TONE: Record<string, { dot: string; text: string }> = {
+  "Tempo controller": { dot: "bg-accent", text: "text-accent" },
+  "Edge finisher": { dot: "bg-accent", text: "text-accent" },
+  "Forward momentum": { dot: "bg-foreground/60", text: "text-foreground" },
+  "Defensive anchor": { dot: "bg-foreground/60", text: "text-foreground" },
+  "Disruptor": { dot: "bg-danger", text: "text-danger" },
+  "Momentum shifter": { dot: "bg-danger", text: "text-danger" },
+};
+
+function PlayerInfluenceCard({ influencers, home, away }: { influencers: any[]; home: string; away: string }) {
+  return (
+    <Card title="Player influence" icon={Layers}>
+      <ul className="space-y-3">
+        {influencers.map((p: any, i: number) => {
+          const tone = ROLE_TONE[p.role] ?? { dot: "bg-muted-foreground", text: "text-muted-foreground" };
+          const teamLabel = p.team === "home" ? home : away;
+          return (
+            <li key={i} className="bg-surface-2 rounded-lg p-3">
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className={`h-2 w-2 rounded-full ${tone.dot}`} />
+                <span className="text-sm font-bold">{p.name}</span>
+                <span className="text-[10px] uppercase tracking-wider text-muted-foreground">· {teamLabel}</span>
+                <span className={`ml-auto text-[10px] uppercase tracking-wider font-bold ${tone.text}`}>{p.role}</span>
+              </div>
+              <p className="text-xs text-muted-foreground leading-relaxed">{p.expectedImpact}</p>
+            </li>
+          );
+        })}
+      </ul>
+    </Card>
+  );
+}
+
 
 function TryscorersSection({ tryscorers, aiAnytime, aiFirst, aiMulti, kickoffUtc }: {
   tryscorers: TryscorerMarkets | null;

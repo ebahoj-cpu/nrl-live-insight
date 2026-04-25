@@ -725,15 +725,6 @@ function SeasonOverviewCard({ team, data }: { team: string; side: "home" | "away
   );
 }
 
-function Stat({ label, value }: { label: string; value?: string }) {
-  return (
-    <div className="bg-surface-2 rounded-lg px-2 py-2 text-center">
-      <div className="text-[9px] uppercase tracking-wider text-muted-foreground">{label}</div>
-      <div className="text-xs font-bold mt-0.5 leading-tight">{value || "—"}</div>
-    </div>
-  );
-}
-
 function KeysCard({ team, keys }: { team: string; opponent: string; keys?: any[] }) {
   const list = Array.isArray(keys) ? keys.slice(0, 3) : [];
   return (

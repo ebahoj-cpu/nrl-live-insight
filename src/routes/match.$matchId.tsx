@@ -1273,13 +1273,11 @@ function AnytimeTryscorersCard({ tryscorers, home, away, model }:
 
   return (
     <Card title="Anytime tryscorers" icon={Sparkles}>
-      <div className="flex items-center gap-2 mb-3 text-[10px] uppercase tracking-wider">
-        {board.hasLive ? (
+      {board.hasLive ? (
+        <div className="flex items-center gap-2 mb-3 text-[10px] uppercase tracking-wider">
           <span className="px-2 py-0.5 rounded-md bg-accent/15 text-accent border border-accent/30 font-bold">Live odds{board.book ? ` · ${board.book}` : ""}</span>
-        ) : (
-          <span className="px-2 py-0.5 rounded-md bg-surface-2 text-muted-foreground border border-border font-bold">Model · markets release with team lists</span>
-        )}
-      </div>
+        </div>
+      ) : null}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <TryscorerTeamColumn title={home.nickName} picks={board.home} accent />
         <TryscorerTeamColumn title={away.nickName} picks={board.away} />

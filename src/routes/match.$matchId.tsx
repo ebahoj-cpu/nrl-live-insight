@@ -1178,66 +1178,31 @@ function FirstTryscorerCard({ insights, tryscorers }: { insights: any; tryscorer
 type AnytimePick = { name: string; price: number; prob: number; team: "home" | "away" | null };
 
 /**
- * Build a 6-player anytime tryscorer list balanced by team, with a tilt toward
- * whichever side carries the better aggregate scoring odds (4 / 2 split when
- * the favourite's combined implied probability is meaningfully higher).
+ * Return every priced anytime tryscorer for the fixture, ordered by implied
+ * probability (highest first). Each pick is tagged with its team so the UI
+ * can colour-code home / away.
  */
 function buildAnytimeList(
   tryscorers: TryscorerMarkets | null,
   home: TeamWithPlayers,
   away: TeamWithPlayers,
-  model: MatchModel,
 ): AnytimePick[] {
   const all = tryscorers?.anytime ?? [];
   if (all.length === 0) return [];
 
-  const enriched: AnytimePick[] = all.map((t) => ({
-    name: t.player,
-    price: t.price,
-    prob: impliedProb(t.price),
-    team: affiliatePlayer(t.player, home, away),
-  }));
-
-  // Sort by probability (highest first)
-  enriched.sort((a, b) => b.prob - a.prob);
-
-  const homeList = enriched.filter((p) => p.team === "home");
-  const awayList = enriched.filter((p) => p.team === "away");
-  const unknown = enriched.filter((p) => p.team === null);
-
-  // Determine team strengths from the model + market favouritism
-  const homeStrength = model.homeScore + sumTopProbs(homeList, 3) * 50;
-  const awayStrength = model.awayScore + sumTopProbs(awayList, 3) * 50;
-  const diff = homeStrength - awayStrength;
-
-  let homeQuota = 3;
-  let awayQuota = 3;
-  if (diff > 4 && homeList.length >= 4) { homeQuota = 4; awayQuota = 2; }
-  else if (diff < -4 && awayList.length >= 4) { homeQuota = 2; awayQuota = 4; }
-
-  const result: AnytimePick[] = [];
-  result.push(...homeList.slice(0, homeQuota));
-  result.push(...awayList.slice(0, awayQuota));
-
-  // Backfill from unknown / opposing team if a side is short on data
-  while (result.length < 6) {
-    const next = [...homeList.slice(homeQuota), ...awayList.slice(awayQuota), ...unknown]
-      .find((p) => !result.includes(p));
-    if (!next) break;
-    result.push(next);
-  }
-
-  // Final order: highest probability first
-  return result.sort((a, b) => b.prob - a.prob).slice(0, 6);
+  return all
+    .map((t) => ({
+      name: t.player,
+      price: t.price,
+      prob: impliedProb(t.price),
+      team: affiliatePlayer(t.player, home, away),
+    }))
+    .sort((a, b) => b.prob - a.prob);
 }
 
-function sumTopProbs(list: AnytimePick[], n: number): number {
-  return list.slice(0, n).reduce((acc, p) => acc + p.prob, 0);
-}
-
-function AnytimeTryscorersCard({ tryscorers, insights, home, away, model }:
+function AnytimeTryscorersCard({ tryscorers, insights, home, away }:
   { tryscorers: TryscorerMarkets | null; insights: any; home: TeamWithPlayers; away: TeamWithPlayers; model: MatchModel }) {
-  const list = buildAnytimeList(tryscorers, home, away, model);
+  const list = buildAnytimeList(tryscorers, home, away);
 
   // AI fallback when no live odds yet
   if (list.length === 0) {

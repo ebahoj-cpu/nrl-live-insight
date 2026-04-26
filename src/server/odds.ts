@@ -113,9 +113,10 @@ export async function fetchTryscorerOdds(eventId: string): Promise<TryscorerMark
 
   const sortByPrice = (a: TryscorerOdds, b: TryscorerOdds) => a.price - b.price;
   const out: TryscorerMarkets = {
-    first: Array.from(best.first.values()).sort(sortByPrice).slice(0, 8),
-    anytime: Array.from(best.anytime.values()).sort(sortByPrice).slice(0, 12),
-    multi: Array.from(best.multi.values()).sort(sortByPrice).slice(0, 6),
+    first: Array.from(best.first.values()).sort(sortByPrice).slice(0, 12),
+    // Return ALL anytime tryscorers (typically 30-36 players across both squads).
+    anytime: Array.from(best.anytime.values()).sort(sortByPrice),
+    multi: Array.from(best.multi.values()).sort(sortByPrice).slice(0, 12),
     hasAny: false,
     lastUpdate,
   };

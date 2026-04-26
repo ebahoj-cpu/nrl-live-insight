@@ -1335,8 +1335,168 @@ function MultiTryscorerCard({ insights, tryscorers }: { insights: any; tryscorer
 }
 
 
+/* ---------- Form-based tryscorer suggestions (forwards welcome) ---------- */
 
-function formatDate(utc: string) {
+function FormTryscorersCard({ insights, home, away }:
+  { insights: any; home: TeamWithPlayers; away: TeamWithPlayers }) {
+  const pool: { name: string; reasoning: string }[] = [
+    ...(insights?.scriptAnalyst?.predictions?.anytimeTryscorers ?? []),
+    ...(insights?.scriptAnalyst?.predictions?.scoringPool ?? []),
+  ];
+
+  // De-duplicate by name (case insensitive) preserving order.
+  const seen = new Set<string>();
+  const merged = pool.filter((p) => {
+    const k = (p.name || "").toLowerCase().trim();
+    if (!k || seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+
+  // Split by team using squad lookup; players that don't match either side
+  // (generic "Knights winger" placeholders) get bucketed by simple text match.
+  const homePicks: { name: string; reasoning: string }[] = [];
+  const awayPicks: { name: string; reasoning: string }[] = [];
+  for (const p of merged) {
+    const aff = affiliatePlayer(p.name, home, away);
+    if (aff === "home") homePicks.push(p);
+    else if (aff === "away") awayPicks.push(p);
+    else {
+      const lc = p.name.toLowerCase();
+      if (lc.includes(home.nickName.toLowerCase())) homePicks.push(p);
+      else if (lc.includes(away.nickName.toLowerCase())) awayPicks.push(p);
+    }
+  }
+
+  if (homePicks.length === 0 && awayPicks.length === 0) return null;
+
+  return (
+    <Card title="Form-based tryscorer suggestions" icon={Activity}>
+      <p className="text-xs text-muted-foreground mb-3">
+        Picks weighted by recent form, season output and matchup — not the shortest-priced favourites.
+        Forwards and second-rowers included where the script suits them.
+      </p>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <FormPickColumn title={home.nickName} picks={homePicks.slice(0, 4)} accent />
+        <FormPickColumn title={away.nickName} picks={awayPicks.slice(0, 4)} />
+      </div>
+    </Card>
+  );
+}
+
+function FormPickColumn({ title, picks, accent }:
+  { title: string; picks: { name: string; reasoning: string }[]; accent?: boolean }) {
+  return (
+    <div>
+      <div className={`text-[10px] uppercase tracking-wider font-bold mb-2 ${accent ? "text-accent" : "text-muted-foreground"}`}>{title}</div>
+      {picks.length === 0 ? (
+        <p className="text-xs text-muted-foreground">No form-based picks yet.</p>
+      ) : (
+        <ul className="space-y-2.5">
+          {picks.map((p, i) => (
+            <li key={`${p.name}-${i}`} className="bg-surface-2 rounded-lg p-2.5">
+              <div className="flex items-center gap-2">
+                <span className="kbd h-5 w-5 rounded-full bg-background text-[10px] font-bold flex items-center justify-center shrink-0">{i + 1}</span>
+                <span className="text-sm font-bold flex-1">{p.name}</span>
+              </div>
+              {p.reasoning ? (
+                <p className="mt-1.5 text-[11px] text-muted-foreground leading-snug">{p.reasoning}</p>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/* ---------- Game Script: Home / Away / Matchfix ---------- */
+
+function GameScriptCards({ insights, home, away }:
+  { insights: any; home: TeamLite; away: TeamLite }) {
+  const sa = insights?.scriptAnalyst;
+  const homeScript = sa?.homeWinningScript;
+  const awayScript = sa?.awayWinningScript;
+  const matchFix = insights?.script?.matchFix;
+  if (!homeScript && !awayScript && !matchFix) return null;
+
+  return (
+    <div className="space-y-4">
+      {homeScript ? (
+        <ScriptCard
+          title={`${home.nickName} script`}
+          icon={Compass}
+          paragraphs={scriptParagraphs(homeScript, home.nickName, away.nickName)}
+        />
+      ) : null}
+      {awayScript ? (
+        <ScriptCard
+          title={`${away.nickName} script`}
+          icon={Compass}
+          paragraphs={scriptParagraphs(awayScript, away.nickName, home.nickName)}
+        />
+      ) : null}
+      {matchFix ? <MatchfixCard matchFix={matchFix} /> : null}
+    </div>
+  );
+}
+
+function scriptParagraphs(s: any, _team: string, _opp: string): string[] {
+  const out: string[] = [];
+  if (s.opening) out.push(s.opening);
+  if (s.tacticalFocus) out.push(s.tacticalFocus);
+  if (s.closingOut) out.push(s.closingOut);
+  else if (s.endgame) out.push(s.endgame);
+  return out;
+}
+
+function ScriptCard({ title, icon, paragraphs }:
+  { title: string; icon: any; paragraphs: string[] }) {
+  return (
+    <Card title={title} icon={icon}>
+      <div className="space-y-2 text-sm leading-relaxed text-foreground/90">
+        {paragraphs.map((p, i) => <p key={i}>{p}</p>)}
+      </div>
+    </Card>
+  );
+}
+
+function MatchfixCard({ matchFix }: { matchFix: any }) {
+  return (
+    <Card title="Matchfix script" icon={Eye}>
+      <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2 font-bold">
+        Tongue-in-cheek "how the league would script this for ratings"
+      </p>
+      <div className="space-y-2 text-sm leading-relaxed text-foreground/90">
+        {matchFix.preferredWinner ? (
+          <p><span className="font-bold text-accent">Preferred winner: </span>{matchFix.preferredWinner}</p>
+        ) : null}
+        {matchFix.ratingsAngle ? <p>{matchFix.ratingsAngle}</p> : null}
+        {matchFix.narrativeMoment ? (
+          <p><span className="font-bold">Narrative beat: </span>{matchFix.narrativeMoment}</p>
+        ) : null}
+      </div>
+      {Array.isArray(matchFix.refereeNudges) && matchFix.refereeNudges.length > 0 ? (
+        <ul className="mt-3 space-y-1 text-[12px] text-muted-foreground">
+          {matchFix.refereeNudges.slice(0, 5).map((n: string, i: number) => (
+            <li key={i} className="flex gap-2"><span className="text-accent">•</span><span>{n}</span></li>
+          ))}
+        </ul>
+      ) : null}
+      {typeof matchFix.conspiracyRating === "number" ? (
+        <div className="mt-3 flex items-center gap-2">
+          <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Scripted feel</span>
+          <div className="flex-1 h-1.5 rounded-full bg-surface-2 overflow-hidden">
+            <div className="h-full bg-accent" style={{ width: `${Math.max(0, Math.min(100, matchFix.conspiracyRating))}%` }} />
+          </div>
+          <span className="text-[11px] kbd font-bold tabular-nums">{Math.round(matchFix.conspiracyRating)}%</span>
+        </div>
+      ) : null}
+    </Card>
+  );
+}
+
+
   if (!utc) return "TBC";
   const d = new Date(utc);
   return new Intl.DateTimeFormat("en-AU", {

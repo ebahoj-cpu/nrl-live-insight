@@ -1239,22 +1239,38 @@ function AnytimeTryscorersCard({ tryscorers, insights, home, away }:
     );
   }
 
+  const homeTop = list.filter((p) => p.team === "home").slice(0, 3);
+  const awayTop = list.filter((p) => p.team === "away").slice(0, 3);
+
   return (
     <Card title="Anytime tryscorers" icon={Sparkles}>
-      <div className="grid grid-cols-[auto_auto_1fr_auto_auto] gap-x-3 gap-y-2 items-center">
-        {list.map((p, i) => (
-          <Fragment key={`${p.name}-${i}`}>
-            <span className="kbd h-6 w-6 rounded-full bg-accent text-accent-foreground text-[11px] font-bold flex items-center justify-center">{i + 1}</span>
-            <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border ${teamChipTone(p.team, home, away)}`}>
-              {teamChipLabel(p.team, home, away)}
-            </span>
-            <span className="text-sm font-bold truncate">{p.name}</span>
-            <span className="text-[11px] kbd text-muted-foreground tabular-nums">{Math.round(p.prob * 100)}%</span>
-            <span className="text-sm kbd font-black tabular-nums">{p.price.toFixed(2)}</span>
-          </Fragment>
-        ))}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <TryscorerTeamColumn title={home.nickName} picks={homeTop} accent />
+        <TryscorerTeamColumn title={away.nickName} picks={awayTop} />
       </div>
     </Card>
+  );
+}
+
+function TryscorerTeamColumn({ title, picks, accent }: { title: string; picks: AnytimePick[]; accent?: boolean }) {
+  return (
+    <div>
+      <div className={`text-[10px] uppercase tracking-wider font-bold mb-2 ${accent ? "text-accent" : "text-muted-foreground"}`}>{title}</div>
+      {picks.length === 0 ? (
+        <p className="text-xs text-muted-foreground">No priced players.</p>
+      ) : (
+        <ul className="space-y-1.5">
+          {picks.map((p, i) => (
+            <li key={`${p.name}-${i}`} className="flex items-center gap-2">
+              <span className="kbd h-5 w-5 rounded-full bg-surface-2 text-[10px] font-bold flex items-center justify-center shrink-0">{i + 1}</span>
+              <span className="text-sm font-semibold truncate flex-1">{p.name}</span>
+              <span className="text-[11px] kbd text-muted-foreground tabular-nums">{Math.round(p.prob * 100)}%</span>
+              <span className="text-sm kbd font-black tabular-nums">{p.price.toFixed(2)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 

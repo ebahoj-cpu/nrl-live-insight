@@ -708,7 +708,7 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, hom
       <AnytimeTryscorersCard tryscorers={tryscorers} insights={insights} home={home} away={away} model={model} />
       <MultiTryscorerCard insights={insights} tryscorers={tryscorers} />
       <FormTryscorersCard insights={insights} home={home} away={away} />
-      <GameScriptCards insights={insights} home={home} away={away} />
+      
     </div>
   );
 }
@@ -1410,91 +1410,6 @@ function FormPickColumn({ title, picks, accent }:
   );
 }
 
-/* ---------- Game Script: Home / Away / Matchfix ---------- */
-
-function GameScriptCards({ insights, home, away }:
-  { insights: any; home: TeamLite; away: TeamLite }) {
-  const sa = insights?.scriptAnalyst;
-  const homeScript = sa?.homeWinningScript;
-  const awayScript = sa?.awayWinningScript;
-  const matchFix = insights?.script?.matchFix;
-  if (!homeScript && !awayScript && !matchFix) return null;
-
-  return (
-    <div className="space-y-4">
-      {homeScript ? (
-        <ScriptCard
-          title={`${home.nickName} script`}
-          icon={Compass}
-          paragraphs={scriptParagraphs(homeScript, home.nickName, away.nickName)}
-        />
-      ) : null}
-      {awayScript ? (
-        <ScriptCard
-          title={`${away.nickName} script`}
-          icon={Compass}
-          paragraphs={scriptParagraphs(awayScript, away.nickName, home.nickName)}
-        />
-      ) : null}
-      {matchFix ? <MatchfixCard matchFix={matchFix} /> : null}
-    </div>
-  );
-}
-
-function scriptParagraphs(s: any, _team: string, _opp: string): string[] {
-  const out: string[] = [];
-  if (s.opening) out.push(s.opening);
-  if (s.tacticalFocus) out.push(s.tacticalFocus);
-  if (s.closingOut) out.push(s.closingOut);
-  else if (s.endgame) out.push(s.endgame);
-  return out;
-}
-
-function ScriptCard({ title, icon, paragraphs }:
-  { title: string; icon: any; paragraphs: string[] }) {
-  return (
-    <Card title={title} icon={icon}>
-      <div className="space-y-2 text-sm leading-relaxed text-foreground/90">
-        {paragraphs.map((p, i) => <p key={i}>{p}</p>)}
-      </div>
-    </Card>
-  );
-}
-
-function MatchfixCard({ matchFix }: { matchFix: any }) {
-  return (
-    <Card title="Matchfix script" icon={Eye}>
-      <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2 font-bold">
-        Tongue-in-cheek "how the league would script this for ratings"
-      </p>
-      <div className="space-y-2 text-sm leading-relaxed text-foreground/90">
-        {matchFix.preferredWinner ? (
-          <p><span className="font-bold text-accent">Preferred winner: </span>{matchFix.preferredWinner}</p>
-        ) : null}
-        {matchFix.ratingsAngle ? <p>{matchFix.ratingsAngle}</p> : null}
-        {matchFix.narrativeMoment ? (
-          <p><span className="font-bold">Narrative beat: </span>{matchFix.narrativeMoment}</p>
-        ) : null}
-      </div>
-      {Array.isArray(matchFix.refereeNudges) && matchFix.refereeNudges.length > 0 ? (
-        <ul className="mt-3 space-y-1 text-[12px] text-muted-foreground">
-          {matchFix.refereeNudges.slice(0, 5).map((n: string, i: number) => (
-            <li key={i} className="flex gap-2"><span className="text-accent">•</span><span>{n}</span></li>
-          ))}
-        </ul>
-      ) : null}
-      {typeof matchFix.conspiracyRating === "number" ? (
-        <div className="mt-3 flex items-center gap-2">
-          <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Scripted feel</span>
-          <div className="flex-1 h-1.5 rounded-full bg-surface-2 overflow-hidden">
-            <div className="h-full bg-accent" style={{ width: `${Math.max(0, Math.min(100, matchFix.conspiracyRating))}%` }} />
-          </div>
-          <span className="text-[11px] kbd font-bold tabular-nums">{Math.round(matchFix.conspiracyRating)}%</span>
-        </div>
-      ) : null}
-    </Card>
-  );
-}
 
 const formatDate = (utc: string): string => {
   if (!utc) return "TBC";

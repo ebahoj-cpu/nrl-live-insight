@@ -74,21 +74,24 @@ async function safeRecaps(recentForm: { url?: string }[], refresh?: boolean): Pr
 
 // ---------- Fixtures + current round ----------
 export const getCurrentRoundFixtures = createServerFn({ method: "GET" })
-  .inputValidator((i: { refresh?: boolean } | undefined) => i ?? {})
+  .inputValidator((i: { refresh?: boolean; round?: number } | undefined) => i ?? {})
   .handler(async ({ data }) => {
     const season = currentSeason();
+    const cacheKey = `fixtures:${season}:${data.round ?? "current"}`;
     return cached(
-      `fixtures:current:${season}`,
+      cacheKey,
       TTL.fixtures,
       async () => {
         const all = await fetchDraw(season);
         const currentRound = all.find((f) => f.isCurrentRound)?.roundNumber ?? all[0]?.roundNumber ?? 1;
-        const fixtures = all.filter((f) => f.roundNumber === currentRound);
+        const selectedRound = data.round ?? currentRound;
+        const fixtures = all.filter((f) => f.roundNumber === selectedRound);
         const enriched = await Promise.all(fixtures.map(async (f) => {
           const weather = await safeWeather(f.matchId, f.venue, f.venueCity, f.kickoffUtc, data.refresh);
           return { ...f, weather };
         }));
-        return { season, round: currentRound, fixtures: enriched };
+        const rounds = Array.from(new Set(all.map((f) => f.roundNumber).filter((r) => r > 0))).sort((a, b) => a - b);
+        return { season, round: selectedRound, currentRound, rounds, fixtures: enriched };
       },
       { bypass: data.refresh },
     );

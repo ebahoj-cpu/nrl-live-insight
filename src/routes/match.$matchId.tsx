@@ -1139,13 +1139,20 @@ function normaliseSideLabel(label: string, home: string, away: string): string {
   return label.trim() || "—";
 }
 
-/* ---------- Tryscorer cards ---------- */
+/* ---------- Tryscorer model ---------- */
 
 function impliedProb(price: number): number {
   return price > 0 ? 1 / price : 0;
 }
 
-/** Return team affiliation ("home" | "away" | null) for a player by matching against squad lists. */
+function priceFromProb(prob: number): number {
+  if (prob <= 0) return 99;
+  // Add a small bookie margin so estimated prices look realistic.
+  const fair = 1 / prob;
+  return Math.max(1.5, Math.min(26, fair * 1.08));
+}
+
+/** Lookup a player in a squad by surname / full-name match. */
 function affiliatePlayer(playerName: string, home: TeamWithPlayers, away: TeamWithPlayers): "home" | "away" | null {
   const norm = (s: string) => s.toLowerCase().replace(/[^a-z]/g, "");
   const target = norm(playerName);
@@ -1155,12 +1162,116 @@ function affiliatePlayer(playerName: string, home: TeamWithPlayers, away: TeamWi
     return squad.some((p) => {
       const full = norm(`${p.firstName}${p.lastName}`);
       const last = norm(p.lastName);
-      return full === target || target.includes(last) || full.includes(target);
+      if (!last) return false;
+      return full === target || target === last || target.endsWith(last) || full.includes(target) || target.includes(last);
     });
   };
   if (matches(home.players)) return "home";
   if (matches(away.players)) return "away";
   return null;
+}
+
+/** Position weight for try-scoring likelihood (higher = more likely to score). */
+function positionWeight(rawPos: string): number {
+  const p = (rawPos || "").toLowerCase();
+  if (/wing/.test(p)) return 1.00;
+  if (/full ?back|fullback|fb\b/.test(p)) return 0.85;
+  if (/centre|center/.test(p)) return 0.75;
+  if (/five|5\/?8|stand ?off/.test(p)) return 0.55;
+  if (/half|halfback/.test(p)) return 0.50;
+  if (/lock/.test(p)) return 0.40;
+  if (/second ?row|backrow|2nd row|edge/.test(p)) return 0.45;
+  if (/hooker|dummy ?half/.test(p)) return 0.30;
+  if (/prop|front ?row/.test(p)) return 0.20;
+  return 0.35; // bench / unknown
+}
+
+type AnytimePick = {
+  name: string;
+  price: number;
+  prob: number;
+  team: "home" | "away";
+  source: "live" | "model";
+  book?: string;
+};
+
+/**
+ * Build the canonical anytime tryscorer list: 3 from each team.
+ * Uses live bookmaker prices when published, otherwise estimates from
+ * position weighting + the model's predicted try output for each side.
+ */
+function buildTeamTryscorers(
+  team: "home" | "away",
+  squad: TeamWithPlayers,
+  predictedPoints: number,
+  liveByName: Map<string, { price: number; book: string }>,
+): AnytimePick[] {
+  const players = squad.players ?? [];
+  if (players.length === 0) return [];
+
+  // Estimate team try volume from predicted points (≈ 4 pts per try after conversions).
+  const expectedTries = Math.max(1.5, Math.min(6, predictedPoints / 4.5));
+
+  // Weight every player by position; first 17 (named squad) only.
+  const named = players.slice(0, 17);
+  const weights = named.map((p) => ({ player: p, w: positionWeight(p.position) }));
+  const totalW = weights.reduce((s, x) => s + x.w, 0) || 1;
+
+  const picks: AnytimePick[] = weights.map(({ player, w }) => {
+    const fullName = `${player.firstName} ${player.lastName}`.trim();
+    const live = liveByName.get(fullName.toLowerCase()) ?? liveByName.get(player.lastName.toLowerCase());
+    let prob: number;
+    let price: number;
+    let source: "live" | "model" = "model";
+    let book: string | undefined;
+
+    if (live) {
+      price = live.price;
+      prob = impliedProb(price);
+      source = "live";
+      book = live.book;
+    } else {
+      // Model probability: share of expected tries × conversion rate.
+      const share = w / totalW;
+      // Probability that THIS player scores at least one try ≈ 1 - (1 - share)^expectedTries
+      prob = 1 - Math.pow(1 - share, expectedTries);
+      prob = Math.min(0.78, Math.max(0.06, prob));
+      price = priceFromProb(prob);
+    }
+
+    return { name: fullName, price, prob, team, source, book };
+  });
+
+  return picks.sort((a, b) => b.prob - a.prob).slice(0, 3);
+}
+
+function buildAnytimeBoard(
+  tryscorers: TryscorerMarkets | null,
+  home: TeamWithPlayers,
+  away: TeamWithPlayers,
+  model: MatchModel,
+): { home: AnytimePick[]; away: AnytimePick[]; hasLive: boolean; book: string | null } {
+  // Index live odds by both full name and surname for robust matching.
+  const liveByName = new Map<string, { price: number; book: string }>();
+  let book: string | null = null;
+  for (const t of tryscorers?.anytime ?? []) {
+    const full = t.player.toLowerCase().trim();
+    liveByName.set(full, { price: t.price, book: t.book });
+    const parts = full.split(/\s+/);
+    const last = parts[parts.length - 1];
+    if (last && !liveByName.has(last)) liveByName.set(last, { price: t.price, book: t.book });
+    if (!book) book = t.book;
+  }
+
+  const homePicks = buildTeamTryscorers("home", home, model.predictedHome, liveByName);
+  const awayPicks = buildTeamTryscorers("away", away, model.predictedAway, liveByName);
+
+  return {
+    home: homePicks,
+    away: awayPicks,
+    hasLive: (tryscorers?.anytime?.length ?? 0) > 0,
+    book,
+  };
 }
 
 function FirstTryscorerCard({ insights, tryscorers }: { insights: any; tryscorers: TryscorerMarkets | null }) {

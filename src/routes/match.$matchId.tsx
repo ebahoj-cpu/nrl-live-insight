@@ -1495,21 +1495,22 @@ function MatchfixCard({ matchFix }: { matchFix: any }) {
     </Card>
   );
 }
-function formatDate(utc: string) {
+
+const formatDate = (utc: string): string => {
   if (!utc) return "TBC";
   const d = new Date(utc);
   return new Intl.DateTimeFormat("en-AU", {
     timeZone: "Pacific/Auckland",
     weekday: "short", day: "numeric", month: "short",
   }).format(d);
-}
+};
 
-function formatTime(utc: string) {
+const formatTime = (utc: string): string => {
   if (!utc) return "";
   const d = new Date(utc);
   return new Intl.DateTimeFormat("en-AU", {
     timeZone: "Pacific/Auckland",
     hour: "numeric", minute: "2-digit", hour12: true,
   }).format(d).toLowerCase();
-}
+};
 

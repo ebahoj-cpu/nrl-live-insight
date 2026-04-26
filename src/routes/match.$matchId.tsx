@@ -1320,7 +1320,7 @@ function MultiTryscorerCard({ insights, tryscorers }: { insights: any; tryscorer
             <li key={i} className="flex items-center gap-3 text-sm">
               <span className="kbd w-5 text-center text-[11px] font-bold text-muted-foreground">{i + 1}</span>
               <span className="flex-1 font-medium truncate">{p.player}</span>
-              <span className="text-sm kbd font-black tabular-nums">{p.price.toFixed(2)}</span>
+              <span className="text-xs font-black tabular-nums px-2 py-0.5 rounded-full bg-accent/15 text-accent border border-accent/30">{p.price.toFixed(2)}</span>
             </li>
           ))}
         </ul>

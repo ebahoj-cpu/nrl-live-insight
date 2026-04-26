@@ -900,22 +900,7 @@ function PredictedWinnerCard({ model, home, away }:
   );
 }
 
-function ConfidenceMeter({ pct, confidence }: { pct: number; confidence: string }) {
-  return (
-    <div className="mt-4">
-      <div className="flex items-center justify-between mb-1.5">
-        <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Confidence scale</span>
-        <span className="text-[10px] font-bold kbd">{confidence}</span>
-      </div>
-      <div className="h-2 w-full rounded-full bg-surface-2 overflow-hidden">
-        <div className="h-full bg-accent transition-all" style={{ width: `${pct}%` }} aria-label={`${pct}% confidence`} />
-      </div>
-      <div className="mt-1 flex justify-between text-[9px] uppercase tracking-wider text-muted-foreground">
-        <span>Low</span><span>Medium</span><span>High</span>
-      </div>
-    </div>
-  );
-}
+
 
 function StatsComparePanel({ home, away, homeRow, awayRow, model }:
   { home: TeamLite; away: TeamLite; homeRow?: LadderRow; awayRow?: LadderRow; model: MatchModel }) {

@@ -148,15 +148,15 @@ function MatchInner() {
       <nav className="mt-6 grid grid-cols-4 gap-1 p-1 glass" role="tablist">
         <TabButton active={tab === "lineup"} onClick={() => setTab("lineup")} icon={Users} label="Lineup" />
         <TabButton active={tab === "stats"} onClick={() => setTab("stats")} icon={BarChart3} label="Stats" />
-        <TabButton active={tab === "betinsights"} onClick={() => setTab("betinsights")} icon={Target} label="Insights" />
-        <TabButton active={tab === "insights"} onClick={() => setTab("insights")} icon={Sparkles} label="Script" />
+        <TabButton active={tab === "insights"} onClick={() => setTab("insights")} icon={Target} label="Insights" />
+        <TabButton active={tab === "script"} onClick={() => setTab("script")} icon={Sparkles} label="Script" />
       </nav>
 
       <div className="mt-6">
         {tab === "lineup" && <LineupTab home={details.homeTeam} away={details.awayTeam} officials={details.officials} teamNews={details.teamNews} />}
         {tab === "stats" && <StatsTab home={details.homeTeam} away={details.awayTeam} homeRow={homeRow} awayRow={awayRow} statGroups={details.statGroups} recentRecaps={recentRecaps} />}
-        {tab === "betinsights" && (
-          <BetInsightsTab
+        {tab === "insights" && (
+          <InsightsTab
             insights={insights}
             insightsError={insightsLoading ? null : insightsError}
             insightsLoading={insightsLoading}
@@ -164,13 +164,13 @@ function MatchInner() {
             away={details.awayTeam}
             homeRow={homeRow}
             awayRow={awayRow}
+            tryscorers={tryscorers}
+            tryscorersError={tryscorersError}
             odds={odds}
-            teamNews={details.teamNews}
-            weather={details.weather}
           />
         )}
-        {tab === "insights" && (
-          <InsightsTab
+        {tab === "script" && (
+          <ScriptTab
             insights={insights}
             insightsError={insightsLoading ? null : insightsError}
             insightsLoading={insightsLoading}

@@ -693,7 +693,7 @@ type TeamLite = { nickName: string; themeKey: string };
 
 type TeamWithPlayers = TeamLite & { players?: { firstName: string; lastName: string; position: string }[] };
 
-function InsightsTab({ insights, insightsError, insightsLoading, home, away, homeRow, awayRow, tryscorers, odds }:
+function ScriptTab({ insights, insightsError, insightsLoading, home, away, homeRow, awayRow, tryscorers, odds }:
   { insights: any; insightsError: string | null; insightsLoading?: boolean; home: TeamWithPlayers; away: TeamWithPlayers;
     homeRow?: LadderRow; awayRow?: LadderRow; tryscorers: TryscorerMarkets | null; tryscorersError: string | null;
     odds?: OddsEvent | null }) {

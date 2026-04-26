@@ -73,28 +73,82 @@ async function safeRecaps(recentForm: { url?: string }[], refresh?: boolean): Pr
 }
 
 // ---------- Fixtures + current round ----------
+// NRL.com's draw endpoint only returns ONE round at a time. To support the
+// round selector (past + upcoming), we:
+//   1. Hit the default endpoint to learn `currentRound`.
+//   2. If the user asked for a different round, fetch that round directly.
+//   3. Build the rounds list by sweeping 1..currentRound+8 (cached 6h, so the
+//      sweep only runs once per worker every 6 hours).
+const ROUNDS_TTL = 6 * 60 * 60_000;
+const SEASON_ROUNDS = 27; // NRL regular season caps at 27 rounds
+
 export const getCurrentRoundFixtures = createServerFn({ method: "GET" })
   .inputValidator((i: { refresh?: boolean; round?: number } | undefined) => i ?? {})
   .handler(async ({ data }) => {
     const season = currentSeason();
-    const cacheKey = `fixtures:${season}:${data.round ?? "current"}`;
-    return cached(
-      cacheKey,
+
+    // Step 1 — default fetch: reveals current round + its fixtures.
+    const defaultDraw = await cached(
+      `fixtures:${season}:current`,
       TTL.fixtures,
+      () => fetchDraw(season),
+      { bypass: data.refresh },
+    );
+    const currentRound = defaultDraw.find((f) => f.isCurrentRound)?.roundNumber ?? defaultDraw[0]?.roundNumber ?? 1;
+    const selectedRound = data.round ?? currentRound;
+
+    // Step 2 — fetch the requested round (skip the call if it matches default).
+    const fixtures = selectedRound === currentRound
+      ? defaultDraw.filter((f) => f.roundNumber === currentRound)
+      : await cached(
+          `fixtures:${season}:r${selectedRound}`,
+          TTL.fixtures,
+          () => fetchDraw(season, selectedRound),
+          { bypass: data.refresh },
+        );
+
+    // Step 3 — build the rounds index. Sweep 1..currentRound+8, capped at 27.
+    // Long-cached: only re-runs every 6h per worker.
+    const rounds = await cached(
+      `fixtures:${season}:rounds-index`,
+      ROUNDS_TTL,
       async () => {
-        const all = await fetchDraw(season);
-        const currentRound = all.find((f) => f.isCurrentRound)?.roundNumber ?? all[0]?.roundNumber ?? 1;
-        const selectedRound = data.round ?? currentRound;
-        const fixtures = all.filter((f) => f.roundNumber === selectedRound);
-        const enriched = await Promise.all(fixtures.map(async (f) => {
-          const weather = await safeWeather(f.matchId, f.venue, f.venueCity, f.kickoffUtc, data.refresh);
-          return { ...f, weather };
-        }));
-        const rounds = Array.from(new Set(all.map((f) => f.roundNumber).filter((r) => r > 0))).sort((a, b) => a - b);
-        return { season, round: selectedRound, currentRound, rounds, fixtures: enriched };
+        const upper = Math.min(SEASON_ROUNDS, currentRound + 8);
+        const probes = await Promise.all(
+          Array.from({ length: upper }, (_, i) => i + 1).map(async (r) => {
+            try {
+              const list = await cached(
+                `fixtures:${season}:r${r}`,
+                ROUNDS_TTL,
+                () => fetchDraw(season, r),
+              );
+              return list.length > 0 ? r : null;
+            } catch {
+              return null;
+            }
+          }),
+        );
+        return probes.filter((r): r is number => r != null);
       },
       { bypass: data.refresh },
     );
+
+    // Always include the current + selected round even if the index missed them.
+    const roundSet = new Set(rounds);
+    roundSet.add(currentRound);
+    if (selectedRound) roundSet.add(selectedRound);
+    const rounds2 = Array.from(roundSet).sort((a, b) => a - b);
+
+    // Per-fixture weather (cheap & cached). Squad / team-list data is NOT
+    // touched here — that's only fetched on the match-detail page when a
+    // user clicks in, so upcoming rounds appear with matchups + venues +
+    // kickoffs only (no rosters until NRL.com publishes team lists).
+    const enriched = await Promise.all(fixtures.map(async (f) => {
+      const weather = await safeWeather(f.matchId, f.venue, f.venueCity, f.kickoffUtc, data.refresh);
+      return { ...f, weather };
+    }));
+
+    return { season, round: selectedRound, currentRound, rounds: rounds2, fixtures: enriched };
   });
 
 // ---------- Ladder ----------

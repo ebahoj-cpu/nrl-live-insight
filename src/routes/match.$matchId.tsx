@@ -148,7 +148,7 @@ function MatchInner() {
       <nav className="mt-6 grid grid-cols-3 gap-1 p-1 glass" role="tablist">
         <TabButton active={tab === "lineup"} onClick={() => setTab("lineup")} icon={Users} label="Lineup" />
         <TabButton active={tab === "stats"} onClick={() => setTab("stats")} icon={BarChart3} label="Stats" />
-        <TabButton active={tab === "insights"} onClick={() => setTab("insights")} icon={Sparkles} label="Insights" />
+        <TabButton active={tab === "insights"} onClick={() => setTab("insights")} icon={Sparkles} label="Script" />
       </nav>
 
       <div className="mt-6">
@@ -1300,8 +1300,7 @@ function TryscorerTeamColumn({ title, picks, accent }: { title: string; picks: A
             <li key={`${p.name}-${i}`} className="flex items-center gap-2">
               <span className="kbd h-5 w-5 rounded-full bg-surface-2 text-[10px] font-bold flex items-center justify-center shrink-0">{i + 1}</span>
               <span className="text-sm font-semibold truncate flex-1">{p.name}</span>
-              <span className="text-[11px] kbd text-muted-foreground tabular-nums">{Math.round(p.prob * 100)}%</span>
-              <span className="text-sm kbd font-black tabular-nums">{p.price.toFixed(2)}</span>
+              <span className="text-xs font-black tabular-nums px-2 py-0.5 rounded-full bg-accent/15 text-accent border border-accent/30">{p.price.toFixed(2)}</span>
             </li>
           ))}
         </ul>
@@ -1321,7 +1320,7 @@ function MultiTryscorerCard({ insights, tryscorers }: { insights: any; tryscorer
             <li key={i} className="flex items-center gap-3 text-sm">
               <span className="kbd w-5 text-center text-[11px] font-bold text-muted-foreground">{i + 1}</span>
               <span className="flex-1 font-medium truncate">{p.player}</span>
-              <span className="text-sm kbd font-black tabular-nums">{p.price.toFixed(2)}</span>
+              <span className="text-xs font-black tabular-nums px-2 py-0.5 rounded-full bg-accent/15 text-accent border border-accent/30">{p.price.toFixed(2)}</span>
             </li>
           ))}
         </ul>

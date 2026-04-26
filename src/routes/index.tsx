@@ -1,12 +1,19 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useSuspenseQuery, queryOptions } from "@tanstack/react-query";
+import { zodValidator, fallback } from "@tanstack/zod-adapter";
+import { z } from "zod";
 import { getCurrentRoundFixtures, getOdds } from "@/server/index.functions";
 import { MatchCard } from "@/components/MatchCard";
-import { Suspense } from "react";
+import { Suspense, useState, useRef, useEffect } from "react";
+import { ChevronDown, Check } from "lucide-react";
 
-const fixturesQO = () => queryOptions({
-  queryKey: ["fixtures", "current"],
-  queryFn: () => getCurrentRoundFixtures({ data: {} }),
+const searchSchema = z.object({
+  round: fallback(z.number().int().positive(), 0).default(0),
+});
+
+const fixturesQO = (round?: number) => queryOptions({
+  queryKey: ["fixtures", round ?? "current"],
+  queryFn: () => getCurrentRoundFixtures({ data: round ? { round } : {} }),
 });
 const oddsQO = () => queryOptions({
   queryKey: ["odds"],
@@ -14,8 +21,10 @@ const oddsQO = () => queryOptions({
 });
 
 export const Route = createFileRoute("/")({
-  loader: ({ context: { queryClient } }) => {
-    void queryClient.ensureQueryData(fixturesQO());
+  validateSearch: zodValidator(searchSchema),
+  loaderDeps: ({ search }) => ({ round: search.round || undefined }),
+  loader: ({ context: { queryClient }, deps }) => {
+    void queryClient.ensureQueryData(fixturesQO(deps.round));
     void queryClient.ensureQueryData(oddsQO());
   },
   component: HomePage,
@@ -36,16 +45,40 @@ function HomePage() {
 }
 
 function Fixtures() {
-  const fx = useSuspenseQuery(fixturesQO()).data;
+  const { round: roundParam } = Route.useSearch();
+  const round = roundParam || undefined;
+  const fx = useSuspenseQuery(fixturesQO(round)).data;
   const oddsList = useSuspenseQuery(oddsQO()).data;
+  const navigate = useNavigate({ from: "/" });
+
+  const isHistorical = fx.round < fx.currentRound;
+  const isUpcoming = fx.round > fx.currentRound;
 
   return (
     <div className="pt-8">
-      <header className="mb-8">
-        <div className="text-[11px] uppercase tracking-[0.25em] text-accent font-bold">Season {fx.season}</div>
-        <h1 className="font-display font-extrabold text-lg sm:text-xl tracking-tight mt-1">
-          NRL Fixtures · Round {fx.round}
-        </h1>
+      <header className="mb-8 flex items-end justify-between gap-4 flex-wrap">
+        <div>
+          <div className="text-[11px] uppercase tracking-[0.25em] text-accent font-bold">Season {fx.season}</div>
+          <h1 className="font-display font-extrabold text-lg sm:text-xl tracking-tight mt-1 flex items-center gap-2 flex-wrap">
+            <span>NRL Fixtures · Round</span>
+            <RoundSelector
+              current={fx.round}
+              currentRound={fx.currentRound}
+              rounds={fx.rounds}
+              onChange={(r) => navigate({ search: (prev) => ({ ...prev, round: r === fx.currentRound ? 0 : r }) })}
+            />
+          </h1>
+          {isHistorical && (
+            <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold mt-2">
+              Historical · results
+            </div>
+          )}
+          {isUpcoming && (
+            <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold mt-2">
+              Upcoming fixtures
+            </div>
+          )}
+        </div>
       </header>
 
       {fx.fixtures.length === 0 ? (
@@ -63,6 +96,75 @@ function Fixtures() {
               );
             }) ?? null;
             return <MatchCard key={f.matchId} fixture={f} odds={matched} />;
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RoundSelector({ current, currentRound, rounds, onChange }: {
+  current: number; currentRound: number; rounds: number[]; onChange: (r: number) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDocClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("mousedown", onDocClick);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDocClick);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative inline-block">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-accent/15 border border-accent/30 text-accent font-black tabular-nums hover:bg-accent/25 transition-colors text-base sm:text-lg"
+      >
+        <span>{current}</span>
+        <ChevronDown className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <div
+          role="listbox"
+          className="absolute left-0 top-[calc(100%+6px)] z-30 w-44 max-h-72 overflow-y-auto rounded-xl glass shadow-2xl py-1.5 ring-1 ring-border/40"
+        >
+          {rounds.map((r) => {
+            const selected = r === current;
+            const isCurrent = r === currentRound;
+            const past = r < currentRound;
+            return (
+              <button
+                key={r}
+                role="option"
+                aria-selected={selected}
+                onClick={() => { onChange(r); setOpen(false); }}
+                className={`w-full text-left px-3 py-1.5 flex items-center justify-between gap-2 text-sm hover:bg-surface-2 transition-colors ${selected ? "text-accent font-bold" : "text-foreground"}`}
+              >
+                <span className="flex items-center gap-2">
+                  <span className="tabular-nums">Round {r}</span>
+                  {isCurrent && (
+                    <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-accent/20 text-accent font-bold">Live</span>
+                  )}
+                  {past && !isCurrent && (
+                    <span className="text-[9px] uppercase tracking-wider text-muted-foreground">Past</span>
+                  )}
+                </span>
+                {selected && <Check className="h-3.5 w-3.5" />}
+              </button>
+            );
           })}
         </div>
       )}

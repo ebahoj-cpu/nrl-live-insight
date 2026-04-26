@@ -1299,65 +1299,22 @@ function FirstTryscorerCard({ insights, tryscorers }: { insights: any; tryscorer
   );
 }
 
-type AnytimePick = { name: string; price: number; prob: number; team: "home" | "away" | null };
-
-/**
- * Return every priced anytime tryscorer for the fixture, ordered by implied
- * probability (highest first). Each pick is tagged with its team so the UI
- * can colour-code home / away.
- */
-function buildAnytimeList(
-  tryscorers: TryscorerMarkets | null,
-  home: TeamWithPlayers,
-  away: TeamWithPlayers,
-): AnytimePick[] {
-  const all = tryscorers?.anytime ?? [];
-  if (all.length === 0) return [];
-
-  return all
-    .map((t) => ({
-      name: t.player,
-      price: t.price,
-      prob: impliedProb(t.price),
-      team: affiliatePlayer(t.player, home, away),
-    }))
-    .sort((a, b) => b.prob - a.prob);
-}
-
-function AnytimeTryscorersCard({ tryscorers, insights, home, away }:
+function AnytimeTryscorersCard({ tryscorers, home, away, model }:
   { tryscorers: TryscorerMarkets | null; insights: any; home: TeamWithPlayers; away: TeamWithPlayers; model: MatchModel }) {
-  const list = buildAnytimeList(tryscorers, home, away);
-
-  // AI fallback when no live odds yet
-  if (list.length === 0) {
-    const aiList = Array.isArray(insights?.anytimeTryscorers) ? insights.anytimeTryscorers : [];
-    const fallback = aiList.slice(0, 6).map((t: any) => String(t.pick ?? "")).filter(Boolean);
-    return (
-      <Card title="Anytime tryscorers" icon={Sparkles}>
-        {fallback.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Tryscorer markets release with team lists.</p>
-        ) : (
-          <ol className="space-y-2">
-            {fallback.map((name: string, i: number) => (
-              <li key={i} className="flex items-center gap-3">
-                <span className="kbd shrink-0 h-6 w-6 rounded-full bg-accent text-accent-foreground text-[11px] font-bold flex items-center justify-center">{i + 1}</span>
-                <span className="text-sm font-bold truncate">{name}</span>
-              </li>
-            ))}
-          </ol>
-        )}
-      </Card>
-    );
-  }
-
-  const homeTop = list.filter((p) => p.team === "home").slice(0, 3);
-  const awayTop = list.filter((p) => p.team === "away").slice(0, 3);
+  const board = buildAnytimeBoard(tryscorers, home, away, model);
 
   return (
     <Card title="Anytime tryscorers" icon={Sparkles}>
+      <div className="flex items-center gap-2 mb-3 text-[10px] uppercase tracking-wider">
+        {board.hasLive ? (
+          <span className="px-2 py-0.5 rounded-md bg-accent/15 text-accent border border-accent/30 font-bold">Live odds{board.book ? ` · ${board.book}` : ""}</span>
+        ) : (
+          <span className="px-2 py-0.5 rounded-md bg-surface-2 text-muted-foreground border border-border font-bold">Model · markets release with team lists</span>
+        )}
+      </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <TryscorerTeamColumn title={home.nickName} picks={homeTop} accent />
-        <TryscorerTeamColumn title={away.nickName} picks={awayTop} />
+        <TryscorerTeamColumn title={home.nickName} picks={board.home} accent />
+        <TryscorerTeamColumn title={away.nickName} picks={board.away} />
       </div>
     </Card>
   );
@@ -1368,7 +1325,7 @@ function TryscorerTeamColumn({ title, picks, accent }: { title: string; picks: A
     <div>
       <div className={`text-[10px] uppercase tracking-wider font-bold mb-2 ${accent ? "text-accent" : "text-muted-foreground"}`}>{title}</div>
       {picks.length === 0 ? (
-        <p className="text-xs text-muted-foreground">No priced players.</p>
+        <p className="text-xs text-muted-foreground">Squad not yet available.</p>
       ) : (
         <ul className="space-y-1.5">
           {picks.map((p, i) => (
@@ -1383,18 +1340,6 @@ function TryscorerTeamColumn({ title, picks, accent }: { title: string; picks: A
       )}
     </div>
   );
-}
-
-function teamChipLabel(team: "home" | "away" | null, home: TeamLite, away: TeamLite): string {
-  if (team === "home") return home.nickName.slice(0, 3).toUpperCase();
-  if (team === "away") return away.nickName.slice(0, 3).toUpperCase();
-  return "—";
-}
-
-function teamChipTone(team: "home" | "away" | null, _home: TeamLite, _away: TeamLite): string {
-  if (team === "home") return "bg-accent/10 text-accent border-accent/30";
-  if (team === "away") return "bg-foreground/5 text-foreground border-border";
-  return "bg-surface-2 text-muted-foreground border-border";
 }
 
 function MultiTryscorerCard({ insights, tryscorers }: { insights: any; tryscorers: TryscorerMarkets | null }) {

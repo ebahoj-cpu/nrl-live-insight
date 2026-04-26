@@ -178,6 +178,7 @@ function MatchInner() {
             homeRow={homeRow}
             awayRow={awayRow}
             tryscorers={tryscorers}
+            odds={odds}
           />
         )}
       </div>

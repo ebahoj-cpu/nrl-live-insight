@@ -1495,8 +1495,7 @@ function MatchfixCard({ matchFix }: { matchFix: any }) {
     </Card>
   );
 }
-
-
+function formatDate(utc: string) {
   if (!utc) return "TBC";
   const d = new Date(utc);
   return new Intl.DateTimeFormat("en-AU", {

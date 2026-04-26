@@ -145,11 +145,10 @@ function MatchInner() {
       </section>
 
       {/* Tabs — icon-only on mobile, icon+label on sm+ */}
-      <nav className="mt-6 grid grid-cols-4 gap-1 p-1 glass" role="tablist">
+      <nav className="mt-6 grid grid-cols-3 gap-1 p-1 glass" role="tablist">
         <TabButton active={tab === "lineup"} onClick={() => setTab("lineup")} icon={Users} label="Lineup" />
         <TabButton active={tab === "stats"} onClick={() => setTab("stats")} icon={BarChart3} label="Stats" />
         <TabButton active={tab === "insights"} onClick={() => setTab("insights")} icon={Sparkles} label="Insights" />
-        <TabButton active={tab === "builder"} onClick={() => setTab("builder")} icon={Layers} label="Bet Builder" />
       </nav>
 
       <div className="mt-6">
@@ -166,19 +165,6 @@ function MatchInner() {
             awayRow={awayRow}
             tryscorers={tryscorers}
             tryscorersError={tryscorersError}
-            odds={odds}
-          />
-        )}
-        {tab === "builder" && (
-          <BetBuilderTab
-            insights={insights}
-            insightsError={insightsLoading ? null : insightsError}
-            insightsLoading={insightsLoading}
-            home={details.homeTeam}
-            away={details.awayTeam}
-            homeRow={homeRow}
-            awayRow={awayRow}
-            tryscorers={tryscorers}
             odds={odds}
           />
         )}

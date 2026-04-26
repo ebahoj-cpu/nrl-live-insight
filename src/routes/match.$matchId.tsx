@@ -2,7 +2,8 @@ import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useSuspenseQuery, useQuery, queryOptions } from "@tanstack/react-query";
 import { getMatchPage, getMatchInsights } from "@/server/index.functions";
 import { TeamLogo } from "@/components/TeamLogo";
-import type { TryscorerMarkets, TryscorerOdds, OddsEvent } from "@/server/odds";
+import type { TryscorerMarkets, OddsEvent } from "@/server/odds";
+import { bestH2H } from "@/server/odds";
 import { Fragment, Suspense, useState } from "react";
 import {
   ArrowLeft, Clock, MapPin, Users, BarChart3, Sparkles,
@@ -178,6 +179,7 @@ function MatchInner() {
             homeRow={homeRow}
             awayRow={awayRow}
             tryscorers={tryscorers}
+            odds={odds}
           />
         )}
       </div>
@@ -1139,13 +1141,20 @@ function normaliseSideLabel(label: string, home: string, away: string): string {
   return label.trim() || "—";
 }
 
-/* ---------- Tryscorer cards ---------- */
+/* ---------- Tryscorer model ---------- */
 
 function impliedProb(price: number): number {
   return price > 0 ? 1 / price : 0;
 }
 
-/** Return team affiliation ("home" | "away" | null) for a player by matching against squad lists. */
+function priceFromProb(prob: number): number {
+  if (prob <= 0) return 99;
+  // Add a small bookie margin so estimated prices look realistic.
+  const fair = 1 / prob;
+  return Math.max(1.5, Math.min(26, fair * 1.08));
+}
+
+/** Lookup a player in a squad by surname / full-name match. */
 function affiliatePlayer(playerName: string, home: TeamWithPlayers, away: TeamWithPlayers): "home" | "away" | null {
   const norm = (s: string) => s.toLowerCase().replace(/[^a-z]/g, "");
   const target = norm(playerName);
@@ -1155,12 +1164,116 @@ function affiliatePlayer(playerName: string, home: TeamWithPlayers, away: TeamWi
     return squad.some((p) => {
       const full = norm(`${p.firstName}${p.lastName}`);
       const last = norm(p.lastName);
-      return full === target || target.includes(last) || full.includes(target);
+      if (!last) return false;
+      return full === target || target === last || target.endsWith(last) || full.includes(target) || target.includes(last);
     });
   };
   if (matches(home.players)) return "home";
   if (matches(away.players)) return "away";
   return null;
+}
+
+/** Position weight for try-scoring likelihood (higher = more likely to score). */
+function positionWeight(rawPos: string): number {
+  const p = (rawPos || "").toLowerCase();
+  if (/wing/.test(p)) return 1.00;
+  if (/full ?back|fullback|fb\b/.test(p)) return 0.85;
+  if (/centre|center/.test(p)) return 0.75;
+  if (/five|5\/?8|stand ?off/.test(p)) return 0.55;
+  if (/half|halfback/.test(p)) return 0.50;
+  if (/lock/.test(p)) return 0.40;
+  if (/second ?row|backrow|2nd row|edge/.test(p)) return 0.45;
+  if (/hooker|dummy ?half/.test(p)) return 0.30;
+  if (/prop|front ?row/.test(p)) return 0.20;
+  return 0.35; // bench / unknown
+}
+
+type AnytimePick = {
+  name: string;
+  price: number;
+  prob: number;
+  team: "home" | "away";
+  source: "live" | "model";
+  book?: string;
+};
+
+/**
+ * Build the canonical anytime tryscorer list: 3 from each team.
+ * Uses live bookmaker prices when published, otherwise estimates from
+ * position weighting + the model's predicted try output for each side.
+ */
+function buildTeamTryscorers(
+  team: "home" | "away",
+  squad: TeamWithPlayers,
+  predictedPoints: number,
+  liveByName: Map<string, { price: number; book: string }>,
+): AnytimePick[] {
+  const players = squad.players ?? [];
+  if (players.length === 0) return [];
+
+  // Estimate team try volume from predicted points (≈ 4 pts per try after conversions).
+  const expectedTries = Math.max(1.5, Math.min(6, predictedPoints / 4.5));
+
+  // Weight every player by position; first 17 (named squad) only.
+  const named = players.slice(0, 17);
+  const weights = named.map((p) => ({ player: p, w: positionWeight(p.position) }));
+  const totalW = weights.reduce((s, x) => s + x.w, 0) || 1;
+
+  const picks: AnytimePick[] = weights.map(({ player, w }) => {
+    const fullName = `${player.firstName} ${player.lastName}`.trim();
+    const live = liveByName.get(fullName.toLowerCase()) ?? liveByName.get(player.lastName.toLowerCase());
+    let prob: number;
+    let price: number;
+    let source: "live" | "model" = "model";
+    let book: string | undefined;
+
+    if (live) {
+      price = live.price;
+      prob = impliedProb(price);
+      source = "live";
+      book = live.book;
+    } else {
+      // Model probability: share of expected tries × conversion rate.
+      const share = w / totalW;
+      // Probability that THIS player scores at least one try ≈ 1 - (1 - share)^expectedTries
+      prob = 1 - Math.pow(1 - share, expectedTries);
+      prob = Math.min(0.78, Math.max(0.06, prob));
+      price = priceFromProb(prob);
+    }
+
+    return { name: fullName, price, prob, team, source, book };
+  });
+
+  return picks.sort((a, b) => b.prob - a.prob).slice(0, 3);
+}
+
+function buildAnytimeBoard(
+  tryscorers: TryscorerMarkets | null,
+  home: TeamWithPlayers,
+  away: TeamWithPlayers,
+  model: MatchModel,
+): { home: AnytimePick[]; away: AnytimePick[]; hasLive: boolean; book: string | null } {
+  // Index live odds by both full name and surname for robust matching.
+  const liveByName = new Map<string, { price: number; book: string }>();
+  let book: string | null = null;
+  for (const t of tryscorers?.anytime ?? []) {
+    const full = t.player.toLowerCase().trim();
+    liveByName.set(full, { price: t.price, book: t.book });
+    const parts = full.split(/\s+/);
+    const last = parts[parts.length - 1];
+    if (last && !liveByName.has(last)) liveByName.set(last, { price: t.price, book: t.book });
+    if (!book) book = t.book;
+  }
+
+  const homePicks = buildTeamTryscorers("home", home, model.predictedHome, liveByName);
+  const awayPicks = buildTeamTryscorers("away", away, model.predictedAway, liveByName);
+
+  return {
+    home: homePicks,
+    away: awayPicks,
+    hasLive: (tryscorers?.anytime?.length ?? 0) > 0,
+    book,
+  };
 }
 
 function FirstTryscorerCard({ insights, tryscorers }: { insights: any; tryscorers: TryscorerMarkets | null }) {
@@ -1188,65 +1301,22 @@ function FirstTryscorerCard({ insights, tryscorers }: { insights: any; tryscorer
   );
 }
 
-type AnytimePick = { name: string; price: number; prob: number; team: "home" | "away" | null };
-
-/**
- * Return every priced anytime tryscorer for the fixture, ordered by implied
- * probability (highest first). Each pick is tagged with its team so the UI
- * can colour-code home / away.
- */
-function buildAnytimeList(
-  tryscorers: TryscorerMarkets | null,
-  home: TeamWithPlayers,
-  away: TeamWithPlayers,
-): AnytimePick[] {
-  const all = tryscorers?.anytime ?? [];
-  if (all.length === 0) return [];
-
-  return all
-    .map((t) => ({
-      name: t.player,
-      price: t.price,
-      prob: impliedProb(t.price),
-      team: affiliatePlayer(t.player, home, away),
-    }))
-    .sort((a, b) => b.prob - a.prob);
-}
-
-function AnytimeTryscorersCard({ tryscorers, insights, home, away }:
+function AnytimeTryscorersCard({ tryscorers, home, away, model }:
   { tryscorers: TryscorerMarkets | null; insights: any; home: TeamWithPlayers; away: TeamWithPlayers; model: MatchModel }) {
-  const list = buildAnytimeList(tryscorers, home, away);
-
-  // AI fallback when no live odds yet
-  if (list.length === 0) {
-    const aiList = Array.isArray(insights?.anytimeTryscorers) ? insights.anytimeTryscorers : [];
-    const fallback = aiList.slice(0, 6).map((t: any) => String(t.pick ?? "")).filter(Boolean);
-    return (
-      <Card title="Anytime tryscorers" icon={Sparkles}>
-        {fallback.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Tryscorer markets release with team lists.</p>
-        ) : (
-          <ol className="space-y-2">
-            {fallback.map((name: string, i: number) => (
-              <li key={i} className="flex items-center gap-3">
-                <span className="kbd shrink-0 h-6 w-6 rounded-full bg-accent text-accent-foreground text-[11px] font-bold flex items-center justify-center">{i + 1}</span>
-                <span className="text-sm font-bold truncate">{name}</span>
-              </li>
-            ))}
-          </ol>
-        )}
-      </Card>
-    );
-  }
-
-  const homeTop = list.filter((p) => p.team === "home").slice(0, 3);
-  const awayTop = list.filter((p) => p.team === "away").slice(0, 3);
+  const board = buildAnytimeBoard(tryscorers, home, away, model);
 
   return (
     <Card title="Anytime tryscorers" icon={Sparkles}>
+      <div className="flex items-center gap-2 mb-3 text-[10px] uppercase tracking-wider">
+        {board.hasLive ? (
+          <span className="px-2 py-0.5 rounded-md bg-accent/15 text-accent border border-accent/30 font-bold">Live odds{board.book ? ` · ${board.book}` : ""}</span>
+        ) : (
+          <span className="px-2 py-0.5 rounded-md bg-surface-2 text-muted-foreground border border-border font-bold">Model · markets release with team lists</span>
+        )}
+      </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <TryscorerTeamColumn title={home.nickName} picks={homeTop} accent />
-        <TryscorerTeamColumn title={away.nickName} picks={awayTop} />
+        <TryscorerTeamColumn title={home.nickName} picks={board.home} accent />
+        <TryscorerTeamColumn title={away.nickName} picks={board.away} />
       </div>
     </Card>
   );
@@ -1257,7 +1327,7 @@ function TryscorerTeamColumn({ title, picks, accent }: { title: string; picks: A
     <div>
       <div className={`text-[10px] uppercase tracking-wider font-bold mb-2 ${accent ? "text-accent" : "text-muted-foreground"}`}>{title}</div>
       {picks.length === 0 ? (
-        <p className="text-xs text-muted-foreground">No priced players.</p>
+        <p className="text-xs text-muted-foreground">Squad not yet available.</p>
       ) : (
         <ul className="space-y-1.5">
           {picks.map((p, i) => (
@@ -1272,18 +1342,6 @@ function TryscorerTeamColumn({ title, picks, accent }: { title: string; picks: A
       )}
     </div>
   );
-}
-
-function teamChipLabel(team: "home" | "away" | null, home: TeamLite, away: TeamLite): string {
-  if (team === "home") return home.nickName.slice(0, 3).toUpperCase();
-  if (team === "away") return away.nickName.slice(0, 3).toUpperCase();
-  return "—";
-}
-
-function teamChipTone(team: "home" | "away" | null, _home: TeamLite, _away: TeamLite): string {
-  if (team === "home") return "bg-accent/10 text-accent border-accent/30";
-  if (team === "away") return "bg-foreground/5 text-foreground border-border";
-  return "bg-surface-2 text-muted-foreground border-border";
 }
 
 function MultiTryscorerCard({ insights, tryscorers }: { insights: any; tryscorers: TryscorerMarkets | null }) {
@@ -1326,125 +1384,185 @@ type WinnerOption = "win" | "win-1-12" | "win-13";
 type TotalOption = "over" | "under";
 type HtFtOption = "HH" | "HA" | "AH" | "AA";
 
-function BetBuilderTab({ insights, insightsError, insightsLoading, home, away, homeRow, awayRow, tryscorers }: {
+type SlipLeg = {
+  id: string;          // unique key (group:variant)
+  group: string;       // mutex group — adding a new leg in the same group replaces it
+  label: string;
+  detail?: string;
+  price: number;
+  source: "live" | "model";
+};
+
+function BetBuilderTab({ insights, insightsError, insightsLoading, home, away, homeRow, awayRow, tryscorers, odds }: {
   insights: any; insightsError: string | null; insightsLoading?: boolean;
   home: TeamWithPlayers; away: TeamWithPlayers;
   homeRow?: LadderRow; awayRow?: LadderRow;
   tryscorers: TryscorerMarkets | null;
+  odds?: OddsEvent | null;
 }) {
   if (insightsLoading) return <InsightsLoading />;
   if (insightsError && !insights) return <Empty msg={insightsError} />;
   if (!insights) return <Empty msg="Bet Builder needs Insights data to run." />;
 
   const model = computeMatchModel(home.nickName, away.nickName, homeRow, awayRow, insights);
-  const list = buildAnytimeList(tryscorers, home, away);
-  const aiAnytime: string[] = Array.isArray(insights?.anytimeTryscorers)
-    ? insights.anytimeTryscorers.map((t: any) => String(t.pick ?? "")).filter(Boolean)
-    : [];
-  // Use live priced tryscorers if available, else fall back to AI list.
-  const rankedNames: string[] = list.length > 0 ? list.map((p) => p.name) : aiAnytime;
+  const board = buildAnytimeBoard(tryscorers, home, away, model);
+  const allTryscorers = [...board.home, ...board.away].sort((a, b) => b.prob - a.prob);
 
   const winnerName = model.winner === "home" ? home.nickName : away.nickName;
+  const loserName = model.winner === "home" ? away.nickName : home.nickName;
   const modelHtFt: HtFtOption = inferHtFt(insights, home.nickName, away.nickName, model);
 
-  const [risk, setRisk] = useState<RiskLevel>("low");
-  const meta = RISK_META[risk];
-  const requiredTries = meta.tries;
+  // Live H2H prices
+  const h2h = odds ? bestH2H(odds) : { home: null, away: null };
+  const winnerLive = model.winner === "home" ? h2h.home : h2h.away;
+  const loserLive  = model.winner === "home" ? h2h.away : h2h.home;
 
-  // Default selections — always model-driven.
-  const [winnerPick, setWinnerPick] = useState<WinnerOption>(model.marginBucket === "13+" ? "win-13" : "win-1-12");
-  const [totalPick, setTotalPick] = useState<TotalOption>(model.totalLean === "Over" ? "over" : "under");
-  const [htftPick, setHtftPick] = useState<HtFtOption>(modelHtFt);
-  const [tryPicks, setTryPicks] = useState<string[]>(() => rankedNames.slice(0, requiredTries));
+  // Estimate winner-by-margin prices from H2H + a bucket multiplier when not live.
+  const baseWinnerPrice = winnerLive?.price ?? estimatePriceFromConfidence(model.confidencePct);
+  const winPrices = {
+    win: baseWinnerPrice,
+    "win-1-12": +(baseWinnerPrice * 1.85).toFixed(2),
+    "win-13": +(baseWinnerPrice * 2.6).toFixed(2),
+    "loser": loserLive?.price ?? +(estimatePriceFromConfidence(100 - model.confidencePct)).toFixed(2),
+  };
 
-  // When risk changes, re-seed try picks from top of ranked list.
-  function onRiskChange(next: RiskLevel) {
-    setRisk(next);
-    setTryPicks(rankedNames.slice(0, RISK_META[next].tries));
-  }
+  // Totals — prefer bookmaker line/prices.
+  const bookieTotal = pickBookmakerTotal(odds ?? null);
+  const totalLine = bookieTotal?.line ?? model.totalLine + 0.5;
+  const overPrice  = bookieTotal?.over  ?? +(1.92).toFixed(2);
+  const underPrice = bookieTotal?.under ?? +(1.92).toFixed(2);
 
-  function toggleTryPick(name: string) {
-    setTryPicks((cur) => {
-      if (cur.includes(name)) return cur.filter((n) => n !== name);
-      if (cur.length >= requiredTries) return [...cur.slice(1), name];
-      return [...cur, name];
+  // HT/FT estimated prices — same-side ~3.0, comeback ~12.
+  const htftPrice = (opt: HtFtOption): number => {
+    const sameSide = opt[0] === opt[1];
+    const matchesModel = opt === modelHtFt;
+    if (sameSide) return matchesModel ? 3.20 : 4.50;
+    return matchesModel ? 8.00 : 13.00;
+  };
+
+  // ======= SLIP STATE =======
+  const [stake, setStake] = useState<number>(10);
+  const [legs, setLegs] = useState<SlipLeg[]>(() => ([
+    { id: `winner:${model.marginBucket === "13+" ? "win-13" : "win-1-12"}`,
+      group: "winner",
+      label: model.marginBucket === "13+" ? `${winnerName} by 13+` : `${winnerName} by 1–12`,
+      detail: `Confidence ${model.confidencePct}%`,
+      price: model.marginBucket === "13+" ? winPrices["win-13"] : winPrices["win-1-12"],
+      source: winnerLive ? "live" : "model" },
+    { id: `total:${model.totalLean === "Over" ? "over" : "under"}`,
+      group: "total",
+      label: `${model.totalLean} ${totalLine}`,
+      detail: `Projected ${model.predictedHome + model.predictedAway} pts`,
+      price: model.totalLean === "Over" ? overPrice : underPrice,
+      source: bookieTotal ? "live" : "model" },
+  ]));
+
+  function setLeg(leg: SlipLeg) {
+    setLegs((cur) => {
+      const filtered = cur.filter((l) => l.group !== leg.group);
+      // toggle off if same id
+      if (cur.some((l) => l.id === leg.id)) return filtered;
+      return [...filtered, leg];
     });
   }
 
-  // Anytime tryscorer selection pool — Low risk locked to top 5.
-  const tryscorerPool = risk === "low" ? rankedNames.slice(0, 5) : rankedNames;
+  function toggleTryscorer(p: AnytimePick) {
+    const id = `try:${p.name}`;
+    setLegs((cur) => {
+      const existing = cur.find((l) => l.id === id);
+      if (existing) return cur.filter((l) => l.id !== id);
+      return [...cur, {
+        id,
+        group: id, // unique group per player so multiple can stack
+        label: `${p.name} anytime`,
+        detail: `${p.team === "home" ? home.nickName : away.nickName} · ${Math.round(p.prob * 100)}%`,
+        price: p.price,
+        source: p.source,
+      }];
+    });
+  }
 
-  // Combo suggestions (2 / 4 / 6) — always top of ranked list, deduped.
-  const combos = [2, 4, 6].map((n) => rankedNames.slice(0, n));
+  function removeLeg(id: string) { setLegs((cur) => cur.filter((l) => l.id !== id)); }
+  function clearSlip() { setLegs([]); }
+
+  const isActive = (id: string) => legs.some((l) => l.id === id);
+  const tryIds = new Set(legs.filter((l) => l.id.startsWith("try:")).map((l) => l.id));
+
+  // Multi calculation
+  const combinedOdds = legs.reduce((acc, l) => acc * l.price, 1);
+  const projectedReturn = stake * combinedOdds;
+  const projectedProfit = projectedReturn - stake;
 
   return (
     <div className="space-y-4">
-      {/* Risk selector */}
-      <Card title="Choose risk level" icon={Gauge}>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-          {(Object.keys(RISK_META) as RiskLevel[]).map((r) => {
-            const m = RISK_META[r];
-            const active = r === risk;
-            return (
-              <button
-                key={r}
-                onClick={() => onRiskChange(r)}
-                className={`text-left rounded-xl p-3 border transition ${active ? m.tone : "border-border bg-surface-2 text-muted-foreground hover:text-foreground"}`}
-              >
-                <div className="flex items-center gap-2">
-                  <span className={`h-2 w-2 rounded-full ${m.dot}`} />
-                  <span className="text-xs font-bold uppercase tracking-wider">{m.label}</span>
-                </div>
-                <div className="text-[11px] mt-1 opacity-80">{m.tagline}</div>
-                <div className="text-[10px] mt-1 opacity-70">{m.tries} tryscorer{m.tries === 1 ? "" : "s"}</div>
-              </button>
-            );
-          })}
-        </div>
-      </Card>
+      {/* Live odds banner */}
+      <div className="text-[11px] uppercase tracking-wider flex items-center gap-2">
+        {h2h.home || h2h.away || bookieTotal ? (
+          <span className="px-2 py-0.5 rounded-md bg-accent/15 text-accent border border-accent/30 font-bold">Live odds {h2h.home?.book ?? bookieTotal?.book}</span>
+        ) : (
+          <span className="px-2 py-0.5 rounded-md bg-surface-2 text-muted-foreground border border-border font-bold">Model-estimated prices</span>
+        )}
+        <span className="text-muted-foreground">Click any market to add to your slip.</span>
+      </div>
 
       {/* Winner market */}
       <Card title="1. Winner market" icon={Trophy}>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
           <PickButton
-            active={winnerPick === "win"}
-            onClick={() => setWinnerPick("win")}
+            active={isActive("winner:win")}
+            onClick={() => setLeg({ id: "winner:win", group: "winner", label: `${winnerName} to win`, detail: `Confidence ${model.confidencePct}%`, price: winPrices.win, source: winnerLive ? "live" : "model" })}
             title={`${winnerName} win`}
             subtitle={`Confidence ${model.confidencePct}%`}
-            recommended={false}
+            price={winPrices.win}
+            recommended={model.marginBucket !== "13+" && model.marginBucket !== "1–12"}
           />
           <PickButton
-            active={winnerPick === "win-1-12"}
-            onClick={() => setWinnerPick("win-1-12")}
+            active={isActive("winner:win-1-12")}
+            onClick={() => setLeg({ id: "winner:win-1-12", group: "winner", label: `${winnerName} by 1–12`, detail: "Tight margin", price: winPrices["win-1-12"], source: "model" })}
             title={`${winnerName} by 1–12`}
             subtitle="Tight margin"
+            price={winPrices["win-1-12"]}
             recommended={model.marginBucket === "1–12"}
           />
           <PickButton
-            active={winnerPick === "win-13"}
-            onClick={() => setWinnerPick("win-13")}
+            active={isActive("winner:win-13")}
+            onClick={() => setLeg({ id: "winner:win-13", group: "winner", label: `${winnerName} by 13+`, detail: "Comfortable win", price: winPrices["win-13"], source: "model" })}
             title={`${winnerName} by 13+`}
             subtitle="Comfortable win"
+            price={winPrices["win-13"]}
             recommended={model.marginBucket === "13+"}
           />
         </div>
+        {loserLive && (
+          <div className="mt-2">
+            <PickButton
+              active={isActive("winner:loser")}
+              onClick={() => setLeg({ id: "winner:loser", group: "winner", label: `${loserName} to win (upset)`, detail: "Against the model", price: winPrices.loser, source: "live" })}
+              title={`${loserName} upset`}
+              subtitle="Against the model"
+              price={winPrices.loser}
+            />
+          </div>
+        )}
       </Card>
 
       {/* Total points */}
       <Card title="2. Total points" icon={TrendingUp}>
         <div className="grid grid-cols-2 gap-2">
           <PickButton
-            active={totalPick === "over"}
-            onClick={() => setTotalPick("over")}
-            title={`Over ${model.totalLine}`}
+            active={isActive("total:over")}
+            onClick={() => setLeg({ id: "total:over", group: "total", label: `Over ${totalLine}`, detail: `Projected ${model.predictedHome + model.predictedAway}`, price: overPrice, source: bookieTotal ? "live" : "model" })}
+            title={`Over ${totalLine}`}
             subtitle={`Projected ${model.predictedHome + model.predictedAway} pts`}
+            price={overPrice}
             recommended={model.totalLean === "Over"}
           />
           <PickButton
-            active={totalPick === "under"}
-            onClick={() => setTotalPick("under")}
-            title={`Under ${model.totalLine}`}
+            active={isActive("total:under")}
+            onClick={() => setLeg({ id: "total:under", group: "total", label: `Under ${totalLine}`, detail: `Projected ${model.predictedHome + model.predictedAway}`, price: underPrice, source: bookieTotal ? "live" : "model" })}
+            title={`Under ${totalLine}`}
             subtitle={`Projected ${model.predictedHome + model.predictedAway} pts`}
+            price={underPrice}
             recommended={model.totalLean === "Under"}
           />
         </div>
@@ -1453,107 +1571,148 @@ function BetBuilderTab({ insights, insightsError, insightsLoading, home, away, h
       {/* HT/FT */}
       <Card title="3. Half-time / full-time" icon={Hourglass}>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          {(["HH","HA","AH","AA"] as HtFtOption[]).map((opt) => (
-            <PickButton
-              key={opt}
-              active={htftPick === opt}
-              onClick={() => setHtftPick(opt)}
-              title={htftLabel(opt, home.nickName, away.nickName)}
-              subtitle={htftDescription(opt)}
-              recommended={modelHtFt === opt}
-            />
-          ))}
+          {(["HH","HA","AH","AA"] as HtFtOption[]).map((opt) => {
+            const price = htftPrice(opt);
+            return (
+              <PickButton
+                key={opt}
+                active={isActive(`htft:${opt}`)}
+                onClick={() => setLeg({ id: `htft:${opt}`, group: "htft", label: `HT/FT: ${htftLabel(opt, home.nickName, away.nickName)}`, detail: htftDescription(opt), price, source: "model" })}
+                title={htftLabel(opt, home.nickName, away.nickName)}
+                subtitle={htftDescription(opt)}
+                price={price}
+                recommended={modelHtFt === opt}
+              />
+            );
+          })}
         </div>
       </Card>
 
-      {/* Anytime tryscorers */}
-      <Card title={`4. Anytime tryscorers (pick ${requiredTries})`} icon={Flag}>
-        {tryscorerPool.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Tryscorer model awaiting team-list odds.</p>
+      {/* Anytime tryscorers — 3 per team */}
+      <Card title="4. Anytime tryscorers" icon={Flag}>
+        <div className="text-[11px] text-muted-foreground mb-3">Tap any player to add to your slip.</div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <TryscorerPickColumn title={home.nickName} picks={board.home} active={tryIds} onPick={toggleTryscorer} accent />
+          <TryscorerPickColumn title={away.nickName} picks={board.away} active={tryIds} onPick={toggleTryscorer} />
+        </div>
+      </Card>
+
+      {/* Slip with calculated returns */}
+      <Card title="Your bet slip" icon={Sparkles} className="accent-glow">
+        {legs.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-4">No selections yet — pick markets above to build your multi.</p>
         ) : (
           <>
-            {risk === "low" && (
-              <div className="text-[11px] text-muted-foreground mb-2">Top 5 highest probability picks only.</div>
-            )}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {tryscorerPool.map((name, i) => {
-                const selected = tryPicks.includes(name);
-                const meta = list.find((p) => p.name === name);
-                const probLabel = meta ? `${Math.round(meta.prob * 100)}% · ${meta.team === "home" ? home.nickName : meta.team === "away" ? away.nickName : "—"}` : `Rank #${i + 1}`;
-                return (
+            <ul className="space-y-2 mb-4">
+              {legs.map((l) => (
+                <li key={l.id} className="flex items-center gap-3 rounded-lg border border-border bg-surface-2 p-2.5">
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-bold truncate">{l.label}</div>
+                    {l.detail && <div className="text-[11px] text-muted-foreground truncate">{l.detail}</div>}
+                  </div>
+                  <div className="text-right shrink-0">
+                    <div className="text-sm font-black kbd tabular-nums">{l.price.toFixed(2)}</div>
+                    <div className="text-[9px] uppercase tracking-wider text-muted-foreground">{l.source === "live" ? "Live" : "Model"}</div>
+                  </div>
                   <button
-                    key={name}
-                    onClick={() => toggleTryPick(name)}
-                    className={`flex items-center gap-3 text-left rounded-lg p-2.5 border transition ${selected ? "border-accent bg-accent/10" : "border-border bg-surface-2 hover:border-accent/40"}`}
+                    onClick={() => removeLeg(l.id)}
+                    className="text-[11px] font-bold text-muted-foreground hover:text-danger px-2 py-1 rounded shrink-0"
+                    aria-label="Remove leg"
                   >
-                    <span className={`h-5 w-5 rounded-full flex items-center justify-center shrink-0 ${selected ? "bg-accent text-accent-foreground" : "bg-surface text-muted-foreground"}`}>
-                      {selected ? <Check className="h-3 w-3" /> : <span className="text-[10px] font-bold">{i + 1}</span>}
-                    </span>
-                    <span className="flex-1 min-w-0">
-                      <span className="block text-sm font-semibold truncate">{name}</span>
-                      <span className="block text-[10px] text-muted-foreground truncate">{probLabel}</span>
-                    </span>
+                    ✕
                   </button>
-                );
-              })}
+                </li>
+              ))}
+            </ul>
+
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <div>
+                <label className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground block mb-1">Stake ($)</label>
+                <input
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={stake}
+                  onChange={(e) => setStake(Math.max(0, Number(e.target.value) || 0))}
+                  className="w-full rounded-lg bg-surface-2 border border-border px-3 py-2 text-base font-black kbd tabular-nums focus:outline-none focus:border-accent"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground block mb-1">Multi odds</label>
+                <div className="rounded-lg bg-surface-2 border border-border px-3 py-2 text-base font-black kbd tabular-nums">{combinedOdds.toFixed(2)}</div>
+              </div>
             </div>
-            <div className="mt-3 text-[11px] text-muted-foreground">
-              Selected {tryPicks.length} / {requiredTries}
+
+            <div className="rounded-lg border border-accent/40 bg-accent/10 p-3 grid grid-cols-2 gap-3">
+              <div>
+                <div className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground">Projected return</div>
+                <div className="text-2xl font-black kbd text-accent tabular-nums">${projectedReturn.toFixed(2)}</div>
+              </div>
+              <div className="text-right">
+                <div className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground">Profit</div>
+                <div className="text-2xl font-black kbd tabular-nums">+${projectedProfit.toFixed(2)}</div>
+              </div>
             </div>
+
+            <button
+              onClick={clearSlip}
+              className="mt-3 w-full text-xs uppercase tracking-wider font-bold text-muted-foreground hover:text-danger py-2"
+            >
+              Clear slip
+            </button>
           </>
         )}
       </Card>
 
-      {/* Slip preview */}
-      <Card title="Your bet builder slip" icon={Sparkles} className="accent-glow">
-        <div className="space-y-2 text-sm">
-          <SlipRow label="Risk" value={meta.label} />
-          <SlipRow label="Winner" value={winnerLabel(winnerPick, winnerName)} />
-          <SlipRow label="Total" value={`${totalPick === "over" ? "Over" : "Under"} ${model.totalLine}`} />
-          <SlipRow label="HT/FT" value={htftLabel(htftPick, home.nickName, away.nickName)} />
-          <SlipRow label={`Tryscorers (${tryPicks.length})`} value={tryPicks.length === 0 ? "—" : tryPicks.join(", ")} />
-        </div>
-      </Card>
-
-      {/* Combo suggestions */}
-      <Card title="Tryscorer combo suggestions" icon={Layers}>
-        {rankedNames.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Combos require ranked tryscorer data.</p>
-        ) : (
-          <div className="space-y-3">
-            {combos.map((legs, idx) => (
-              <div key={idx} className="rounded-lg border border-border bg-surface-2 p-3">
-                <div className="flex items-center justify-between mb-1.5">
-                  <div className="text-[11px] uppercase tracking-wider font-bold text-accent">{legs.length}-leg anytime combo</div>
-                  <div className="text-[10px] text-muted-foreground">Top probability stack</div>
-                </div>
-                {legs.length < (idx === 0 ? 2 : idx === 1 ? 4 : 6) ? (
-                  <div className="text-[11px] text-muted-foreground">Not enough ranked players yet.</div>
-                ) : (
-                  <ol className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
-                    {legs.map((name, i) => (
-                      <li key={`${name}-${i}`} className="flex items-center gap-2 text-sm">
-                        <span className="kbd h-5 w-5 rounded-full bg-accent/15 text-accent text-[10px] font-bold flex items-center justify-center">{i + 1}</span>
-                        <span className="font-semibold truncate">{name}</span>
-                      </li>
-                    ))}
-                  </ol>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
-
       <p className="text-[11px] text-muted-foreground text-center">
-        Selections are model-driven from the Insights tab. No bookmaker odds applied.
+        Live prices are best-available across AU bookmakers via the odds feed. Model prices are estimates from the Insights model. 18+ · Bet responsibly.
       </p>
     </div>
   );
 }
 
-function PickButton({ active, onClick, title, subtitle, recommended }:
-  { active: boolean; onClick: () => void; title: string; subtitle?: string; recommended?: boolean }) {
+function TryscorerPickColumn({ title, picks, active, onPick, accent }:
+  { title: string; picks: AnytimePick[]; active: Set<string>; onPick: (p: AnytimePick) => void; accent?: boolean }) {
+  return (
+    <div>
+      <div className={`text-[10px] uppercase tracking-wider font-bold mb-2 ${accent ? "text-accent" : "text-muted-foreground"}`}>{title}</div>
+      {picks.length === 0 ? (
+        <p className="text-xs text-muted-foreground">Squad not yet available.</p>
+      ) : (
+        <ul className="space-y-1.5">
+          {picks.map((p) => {
+            const id = `try:${p.name}`;
+            const selected = active.has(id);
+            return (
+              <li key={p.name}>
+                <button
+                  onClick={() => onPick(p)}
+                  className={`w-full flex items-center gap-2 text-left rounded-lg p-2 border transition ${selected ? "border-accent bg-accent/10" : "border-border bg-surface-2 hover:border-accent/40"}`}
+                >
+                  <span className={`h-5 w-5 rounded-full flex items-center justify-center shrink-0 ${selected ? "bg-accent text-accent-foreground" : "bg-surface text-muted-foreground"}`}>
+                    {selected ? <Check className="h-3 w-3" /> : <Flag className="h-3 w-3" />}
+                  </span>
+                  <span className="flex-1 min-w-0 text-sm font-semibold truncate">{p.name}</span>
+                  <span className="text-[10px] kbd text-muted-foreground tabular-nums">{Math.round(p.prob * 100)}%</span>
+                  <span className="text-sm kbd font-black tabular-nums">{p.price.toFixed(2)}</span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function estimatePriceFromConfidence(confidencePct: number): number {
+  // 50% conf → 1.92, 75% → 1.40, 95% → 1.10
+  const prob = Math.max(0.05, Math.min(0.95, confidencePct / 100));
+  return Math.max(1.05, +(1 / prob * 0.95).toFixed(2));
+}
+
+function PickButton({ active, onClick, title, subtitle, price, recommended }:
+  { active: boolean; onClick: () => void; title: string; subtitle?: string; price?: number; recommended?: boolean }) {
   return (
     <button
       onClick={onClick}
@@ -1562,8 +1721,11 @@ function PickButton({ active, onClick, title, subtitle, recommended }:
       {recommended && (
         <span className="absolute top-1.5 right-1.5 text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-accent text-accent-foreground">Model</span>
       )}
-      <div className="text-sm font-bold truncate">{title}</div>
+      <div className="text-sm font-bold truncate pr-12">{title}</div>
       {subtitle && <div className="text-[11px] text-muted-foreground mt-0.5 truncate">{subtitle}</div>}
+      {typeof price === "number" && (
+        <div className="mt-2 text-base font-black kbd tabular-nums">{price.toFixed(2)}</div>
+      )}
     </button>
   );
 }

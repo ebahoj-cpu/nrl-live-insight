@@ -8,7 +8,7 @@ import { Suspense, useState, useRef, useEffect } from "react";
 import { ChevronDown, Check } from "lucide-react";
 
 const searchSchema = z.object({
-  round: fallback(z.number().int().positive().optional(), undefined),
+  round: fallback(z.number().int().positive(), 0).default(0),
 });
 
 const fixturesQO = (round?: number) => queryOptions({
@@ -22,7 +22,7 @@ const oddsQO = () => queryOptions({
 
 export const Route = createFileRoute("/")({
   validateSearch: zodValidator(searchSchema),
-  loaderDeps: ({ search }) => ({ round: search.round }),
+  loaderDeps: ({ search }) => ({ round: search.round || undefined }),
   loader: ({ context: { queryClient }, deps }) => {
     void queryClient.ensureQueryData(fixturesQO(deps.round));
     void queryClient.ensureQueryData(oddsQO());
@@ -45,7 +45,8 @@ function HomePage() {
 }
 
 function Fixtures() {
-  const { round } = Route.useSearch();
+  const { round: roundParam } = Route.useSearch();
+  const round = roundParam || undefined;
   const fx = useSuspenseQuery(fixturesQO(round)).data;
   const oddsList = useSuspenseQuery(oddsQO()).data;
   const navigate = useNavigate({ from: "/" });
@@ -64,7 +65,7 @@ function Fixtures() {
               current={fx.round}
               currentRound={fx.currentRound}
               rounds={fx.rounds}
-              onChange={(r) => navigate({ search: (prev) => ({ ...prev, round: r === fx.currentRound ? undefined : r }) })}
+              onChange={(r) => navigate({ search: (prev) => ({ ...prev, round: r === fx.currentRound ? 0 : r }) })}
             />
           </h1>
           {isHistorical && (

@@ -1425,6 +1425,314 @@ function FormPickColumn({ title, picks, accent }:
 }
 
 
+/* ============================================================
+   Insights tab — data-driven bet recommendations
+   Pure presentation layer over `insights` + odds + ladder + news.
+   ============================================================ */
+
+function BetInsightsTab({ insights, insightsError, insightsLoading, home, away, homeRow, awayRow, odds, teamNews, weather }:
+  { insights: any; insightsError: string | null; insightsLoading?: boolean;
+    home: TeamWithPlayers; away: TeamWithPlayers;
+    homeRow?: LadderRow; awayRow?: LadderRow;
+    odds?: OddsEvent | null;
+    teamNews?: { home: any; away: any } | null;
+    weather?: any; }) {
+  if (insightsLoading) return <InsightsLoading />;
+  if (insightsError && !insights) return <Empty msg={insightsError} />;
+  if (!insights) return <Empty msg="Insights unavailable." />;
+
+  const model = computeMatchModel(home.nickName, away.nickName, homeRow, awayRow, insights);
+  const bestOdds = odds ? bestH2H(odds) : { home: null, away: null };
+  const winnerKey: "home" | "away" = insights?.winner?.team === "away" ? "away" : "home";
+  const underdogKey: "home" | "away" = winnerKey === "home" ? "away" : "home";
+  const favTeam = winnerKey === "home" ? home : away;
+  const dogTeam = winnerKey === "home" ? away : home;
+  const favRow = winnerKey === "home" ? homeRow : awayRow;
+  const dogRow = winnerKey === "home" ? awayRow : homeRow;
+  const favPrice = winnerKey === "home" ? bestOdds.home : bestOdds.away;
+  const dogPrice = winnerKey === "home" ? bestOdds.away : bestOdds.home;
+  const favScript = winnerKey === "home" ? insights?.scriptAnalyst?.homeWinningScript : insights?.scriptAnalyst?.awayWinningScript;
+  const dogScript = underdogKey === "home" ? insights?.scriptAnalyst?.homeWinningScript : insights?.scriptAnalyst?.awayWinningScript;
+  const dogStakes = underdogKey === "home" ? insights?.scriptAnalyst?.stakes?.home : insights?.scriptAnalyst?.stakes?.away;
+
+  const marginRange: string = insights?.scriptAnalyst?.predictions?.margin?.range ?? insights?.margin?.bucket ?? "1–12";
+  const totalLine = Number(insights?.scriptAnalyst?.predictions?.totalPoints?.line ?? insights?.total?.line ?? model.totalLine);
+  const totalLean = (insights?.scriptAnalyst?.predictions?.totalPoints?.lean ?? insights?.total?.pick ?? model.totalLean.toLowerCase()) as "over" | "under" | string;
+
+  // Implied probability vs model confidence — value flag
+  const impliedFav = favPrice ? 1 / favPrice.price : null;
+  const impliedDog = dogPrice ? 1 / dogPrice.price : null;
+  const modelConfFav = clamp(Number(insights?.winner?.confidence ?? model.confidencePct) / 100, 0, 1);
+  const valueEdge = impliedFav != null ? modelConfFav - impliedFav : null;
+  let valueFlag: { tone: "positive" | "neutral" | "negative"; label: string; detail: string } = {
+    tone: "neutral", label: "Fair price", detail: "Model is in line with TAB's read.",
+  };
+  if (valueEdge != null) {
+    if (valueEdge >= 0.08) valueFlag = { tone: "positive", label: "Value on favourite", detail: `Model rates ${favTeam.nickName} ~${Math.round(modelConfFav * 100)}% vs implied ~${Math.round(impliedFav! * 100)}%.` };
+    else if (valueEdge <= -0.06) valueFlag = { tone: "negative", label: "Value on underdog", detail: `TAB rates ${favTeam.nickName} more highly than the model. ${dogTeam.nickName} at $${dogPrice?.price.toFixed(2) ?? "—"} is the play.` };
+    else valueFlag = { tone: "neutral", label: "Fair price", detail: `Model: ${Math.round(modelConfFav * 100)}% · Implied: ${Math.round(impliedFav! * 100)}%.` };
+  }
+
+  // Build form streaks
+  const homeForm = formStreak((home as any).recentForm);
+  const awayForm = formStreak((away as any).recentForm);
+
+  // Underdog rationale — pull strongest non-favourite signals
+  const dogReasons: string[] = [];
+  if (dogScript?.tacticalFocus) dogReasons.push(dogScript.tacticalFocus);
+  if (dogStakes?.psychology) dogReasons.push(dogStakes.psychology);
+  if (dogScript?.opening) dogReasons.push(dogScript.opening);
+
+  // Risks
+  const risks: string[] = [];
+  const dogOuts = underdogKey === "home" ? teamNews?.home?.outs : teamNews?.away?.outs;
+  const favOuts = winnerKey === "home" ? teamNews?.home?.outs : teamNews?.away?.outs;
+  if (favOuts?.length) risks.push(`${favTeam.nickName} missing ${favOuts.slice(0, 3).join(", ")} — depth question for the favourite.`);
+  if (dogOuts?.length) risks.push(`${dogTeam.nickName} missing ${dogOuts.slice(0, 3).join(", ")} — caps the upset case.`);
+  if (weather?.precipMm > 4) risks.push(`Wet conditions (${weather.precipMm}mm forecast) — raises variance, favours under and tightens margin.`);
+  if (weather?.windKph > 30) risks.push(`Strong wind (${weather.windKph} km/h) — kicking game suffers, totals exposed.`);
+  if (insights?.script?.xFactor) risks.push(insights.script.xFactor);
+
+  return (
+    <div className="space-y-4">
+      <BetInsightsHeader insights={insights} />
+
+      {/* Headline bet */}
+      <Card title="Headline bet" icon={Target}>
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div className="min-w-0 flex-1">
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold mb-1">Top pick</div>
+            <div className="text-base sm:text-lg font-black leading-tight">
+              {favTeam.nickName} to win{marginBucketLine(marginRange) ? ` · ${marginBucketLine(marginRange)}` : ""}
+            </div>
+            <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
+              {insights?.winner?.reasoning ?? insights?.scriptAnalyst?.predictions?.winner?.reasoning ?? "Model leans favourite based on form, ladder, and matchup."}
+            </p>
+          </div>
+          <div className="flex flex-col items-end gap-1 shrink-0">
+            {favPrice ? (
+              <span className="text-lg font-black tabular-nums px-3 py-1.5 rounded-full bg-accent/15 text-accent border border-accent/30">
+                ${favPrice.price.toFixed(2)}
+              </span>
+            ) : null}
+            <span className="text-[10px] uppercase tracking-wider text-muted-foreground">{favPrice?.book ?? "TAB"}</span>
+          </div>
+        </div>
+
+        {/* Supporting bullets */}
+        <ul className="mt-4 space-y-2 text-sm">
+          {favScript?.tacticalFocus && <BulletInsight icon={Compass} text={favScript.tacticalFocus} />}
+          {insights?.script?.formAnalysis && <BulletInsight icon={Activity} text={insights.script.formAnalysis} />}
+          {insights?.script?.headToHead && <BulletInsight icon={Trophy} text={insights.script.headToHead} />}
+          {insights?.script?.psychological && <BulletInsight icon={Sparkles} text={insights.script.psychological} />}
+        </ul>
+
+        {/* Value flag */}
+        {favPrice && (
+          <div className={`mt-4 rounded-lg p-3 text-xs flex items-start gap-2 border ${
+            valueFlag.tone === "positive" ? "bg-success/10 text-success border-success/30" :
+            valueFlag.tone === "negative" ? "bg-warning/10 text-warning border-warning/30" :
+            "bg-surface-2 text-muted-foreground border-border/40"
+          }`}>
+            <Gauge className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+            <div>
+              <div className="font-bold uppercase tracking-wider text-[10px] mb-0.5">TAB read · {valueFlag.label}</div>
+              <div>{valueFlag.detail}</div>
+            </div>
+          </div>
+        )}
+      </Card>
+
+      {/* Underdog play */}
+      <Card title="Underdog watch" icon={Flag}>
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div className="min-w-0 flex-1">
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold mb-1">Upset case</div>
+            <div className="text-base sm:text-lg font-black leading-tight">{dogTeam.nickName} +{marginCover(marginRange)} or outright</div>
+            <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
+              {dogScript?.endgame ?? dogScript?.closingOut ?? insights?.scriptAnalyst?.marketLean?.favouriteVsUnderdog ?? "Underdog has a viable path if the early script flips."}
+            </p>
+          </div>
+          <div className="flex flex-col items-end gap-1 shrink-0">
+            {dogPrice ? (
+              <span className="text-lg font-black tabular-nums px-3 py-1.5 rounded-full bg-warning/15 text-warning border border-warning/30">
+                ${dogPrice.price.toFixed(2)}
+              </span>
+            ) : null}
+            <span className="text-[10px] uppercase tracking-wider text-muted-foreground">{dogPrice?.book ?? "TAB"}</span>
+          </div>
+        </div>
+
+        {dogReasons.length > 0 && (
+          <ul className="mt-4 space-y-2 text-sm">
+            {dogReasons.slice(0, 3).map((r, i) => (
+              <BulletInsight key={i} icon={ThumbsUp} text={r} />
+            ))}
+          </ul>
+        )}
+      </Card>
+
+      {/* Form & psychology */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Card title="Form & momentum" icon={TrendingUp}>
+          <div className="space-y-3">
+            <FormLine label={home.nickName} streak={homeForm} row={homeRow} />
+            <FormLine label={away.nickName} streak={awayForm} row={awayRow} />
+          </div>
+          {insights?.script?.formAnalysis && (
+            <p className="mt-3 text-xs text-muted-foreground leading-relaxed">{insights.script.formAnalysis}</p>
+          )}
+        </Card>
+
+        <Card title="Psychology & matchup" icon={Sparkles}>
+          <ul className="space-y-2 text-sm">
+            {insights?.script?.psychological && <BulletInsight icon={Sparkles} text={insights.script.psychological} />}
+            {insights?.script?.headToHead && <BulletInsight icon={Trophy} text={insights.script.headToHead} />}
+            {insights?.scriptAnalyst?.stakes?.home?.pressure && (
+              <BulletInsight icon={ThumbsDown} text={`${home.nickName}: ${insights.scriptAnalyst.stakes.home.pressure}`} />
+            )}
+            {insights?.scriptAnalyst?.stakes?.away?.pressure && (
+              <BulletInsight icon={ThumbsDown} text={`${away.nickName}: ${insights.scriptAnalyst.stakes.away.pressure}`} />
+            )}
+          </ul>
+        </Card>
+      </div>
+
+      {/* Secondary markets */}
+      <Card title="Secondary plays" icon={BarChart3}>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <SecondaryPlay
+            label="Margin"
+            pick={`${favTeam.nickName} ${marginRange}`}
+            note={insights?.scriptAnalyst?.predictions?.margin?.reasoning ?? insights?.margin?.reasoning ?? ""}
+          />
+          <SecondaryPlay
+            label="Total points"
+            pick={`${capitalise(String(totalLean))} ${totalLine}`}
+            note={insights?.scriptAnalyst?.predictions?.totalPoints?.reasoning ?? insights?.total?.reasoning ?? ""}
+          />
+          <SecondaryPlay
+            label="HT/FT"
+            pick={insights?.htft?.pick ?? insights?.scriptAnalyst?.predictions?.htft?.pick ?? "—"}
+            note={insights?.htft?.reasoning ?? insights?.scriptAnalyst?.predictions?.htft?.reasoning ?? ""}
+          />
+        </div>
+      </Card>
+
+      {/* Key risks */}
+      {risks.length > 0 && (
+        <Card title="Risks & red flags" icon={AlertCircle}>
+          <ul className="space-y-2 text-sm">
+            {risks.map((r, i) => (
+              <BulletInsight key={i} icon={AlertCircle} text={r} tone="warn" />
+            ))}
+          </ul>
+        </Card>
+      )}
+
+      <p className="text-[10px] text-muted-foreground text-center px-4 leading-relaxed">
+        Insights are model-driven from current form, ladder, head-to-head, and TAB market data. They are decision support — not guarantees. Bet responsibly.
+      </p>
+    </div>
+  );
+}
+
+function BetInsightsHeader({ insights }: { insights: any }) {
+  const conf = Number(insights?.winner?.confidence ?? 0);
+  const tone = conf >= 70 ? "high" : conf >= 55 ? "med" : "low";
+  return (
+    <div className="glass p-4 flex items-center justify-between gap-3">
+      <div className="flex items-center gap-2">
+        <Target className="h-4 w-4 text-accent" />
+        <div>
+          <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">TAB Insights</div>
+          <div className="text-sm font-bold">Data-driven picks · updated with live odds</div>
+        </div>
+      </div>
+      <span className={`text-[10px] uppercase tracking-wider px-2 py-1 rounded-md font-bold border ${
+        tone === "high" ? "bg-success/15 text-success border-success/30" :
+        tone === "med" ? "bg-accent/15 text-accent border-accent/30" :
+        "bg-surface-2 text-muted-foreground border-border/40"
+      }`}>{tone === "high" ? "High conviction" : tone === "med" ? "Lean" : "Coin flip"}</span>
+    </div>
+  );
+}
+
+function BulletInsight({ icon: Icon, text, tone = "default" }:
+  { icon: typeof Sparkles; text: string; tone?: "default" | "warn" }) {
+  return (
+    <li className="flex items-start gap-2">
+      <Icon className={`h-3.5 w-3.5 mt-0.5 shrink-0 ${tone === "warn" ? "text-warning" : "text-accent"}`} />
+      <span className="leading-relaxed text-foreground/90">{text}</span>
+    </li>
+  );
+}
+
+function FormLine({ label, streak, row }:
+  { label: string; streak: { wins: number; losses: number; chips: ("W" | "L" | "D")[] }; row?: LadderRow }) {
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-sm font-bold">{label}</span>
+        <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
+          {row ? `${row.wins}-${row.losses}` : ""} · last 5: {streak.wins}W-{streak.losses}L
+        </span>
+      </div>
+      <div className="flex gap-1">
+        {streak.chips.map((c, i) => (
+          <span key={i} className={`h-5 w-5 rounded text-[10px] font-black inline-flex items-center justify-center ${
+            c === "W" ? "bg-success/20 text-success" : c === "L" ? "bg-danger/15 text-danger" : "bg-surface-2 text-muted-foreground"
+          }`}>{c}</span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SecondaryPlay({ label, pick, note }: { label: string; pick: string; note: string }) {
+  return (
+    <div className="rounded-lg bg-surface-2 p-3 border border-border/40">
+      <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">{label}</div>
+      <div className="text-sm font-black mt-0.5">{pick}</div>
+      {note && <div className="text-[11px] text-muted-foreground mt-1.5 leading-relaxed">{note}</div>}
+    </div>
+  );
+}
+
+function formStreak(recentForm: { result?: string }[] = []): { wins: number; losses: number; chips: ("W" | "L" | "D")[] } {
+  const last5 = (recentForm ?? []).slice(0, 5);
+  let wins = 0, losses = 0;
+  const chips: ("W" | "L" | "D")[] = [];
+  for (const f of last5) {
+    const r = String(f?.result ?? "").toUpperCase();
+    if (r.startsWith("W")) { wins++; chips.push("W"); }
+    else if (r.startsWith("L")) { losses++; chips.push("L"); }
+    else chips.push("D");
+  }
+  return { wins, losses, chips };
+}
+
+function marginBucketLine(bucket: string): string {
+  if (!bucket) return "";
+  // Display "13+" or "1-12" as "13+ margin" / "1-12 margin"
+  return `${bucket.replace("–", "-")} margin`;
+}
+
+function marginCover(bucket: string): number {
+  // Translate predicted margin bucket into a sensible underdog cover line
+  const b = String(bucket).replace("–", "-");
+  if (b.startsWith("1-12") || b === "1-12") return 12.5;
+  if (b.startsWith("13") || b.includes("13+") || b === "13-24") return 12.5;
+  if (b.startsWith("25")) return 18.5;
+  return 12.5;
+}
+
+function capitalise(s: string): string {
+  if (!s) return s;
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+
 const formatDate = (utc: string): string => {
   if (!utc) return "TBC";
   const d = new Date(utc);

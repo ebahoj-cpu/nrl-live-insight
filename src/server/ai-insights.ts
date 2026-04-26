@@ -5,12 +5,18 @@ import { dedupeInsights } from "./dedupe-insights";
 import { normaliseInsights } from "./normalise-insights";
 
 const GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
-// Use the strongest reasoning model — insights are generated ONCE per match
-// and cached until ~1h before kickoff, so the extra latency/cost is paid once
-// and the user gets the sharpest possible read for their bets.
-const MODEL = "google/gemini-2.5-pro";
-const FALLBACK_MODEL = "google/gemini-3-flash-preview";
-const TIMEOUT_MS = 55_000; // pro model needs more headroom; still inside Worker budget
+// Model selection: Pro was timing out at 55s on EVERY call (the schema is huge),
+// which silently dropped every match into the deterministic local fallback —
+// producing the same templated copy across all matches with only team/player
+// names swapped. Switch to Flash as the PRIMARY (fast tool-call generation,
+// usually 12-25s for this payload), with Pro as the heavy retry, then a final
+// short fallback. Insights are cached per match so we can spend more time once.
+const MODEL = "google/gemini-2.5-flash";
+const FALLBACK_MODEL = "google/gemini-2.5-pro";
+const FINAL_FALLBACK_MODEL = "google/gemini-3-flash-preview";
+const TIMEOUT_MS = 45_000;          // flash typically finishes well inside this
+const FALLBACK_TIMEOUT_MS = 70_000; // pro retry — give it real headroom
+const FINAL_TIMEOUT_MS = 30_000;    // last-chance fast model
 
 export type BettingAngle = {
   market: string;

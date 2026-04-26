@@ -877,7 +877,6 @@ function pickBookmakerTotal(odds: OddsEvent | null):
 function PredictedWinnerCard({ model, home, away }:
   { model: MatchModel; home: TeamLite; away: TeamLite }) {
   const winnerTeam = model.winner === "home" ? home : away;
-  const tone = model.confidence === "High" ? "text-accent" : model.confidence === "Medium" ? "text-foreground" : "text-muted-foreground";
   return (
     <Card title="Predicted winner" icon={Trophy} className="accent-glow">
       <div className="flex items-center gap-4">
@@ -885,13 +884,9 @@ function PredictedWinnerCard({ model, home, away }:
         <div className="flex-1 min-w-0">
           <div className="text-[11px] uppercase tracking-widest text-muted-foreground">Forecast winner</div>
           <div className="text-2xl font-black truncate">{winnerTeam.nickName}</div>
-          <div className={`mt-1 text-xs font-bold ${tone}`}>
-            {model.confidence} confidence · {model.confidencePct}%
-          </div>
         </div>
       </div>
-      <ConfidenceMeter pct={model.confidencePct} confidence={model.confidence} />
-      <div className="mt-3 grid grid-cols-2 gap-2 text-center">
+      <div className="mt-4 grid grid-cols-2 gap-2 text-center">
         <div className="bg-surface-2 rounded-lg p-2">
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground truncate">{home.nickName} strength</div>
           <div className="text-lg font-black kbd">{model.homeScore}</div>

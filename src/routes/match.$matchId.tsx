@@ -8,7 +8,7 @@ import { Fragment, Suspense, useState } from "react";
 import {
   ArrowLeft, Clock, MapPin, Users, BarChart3, Sparkles,
   Trophy, Target, Flag, Crown, TrendingUp, AlertCircle, CloudSun, Calendar, Zap, Hourglass,
-  ThumbsUp, ThumbsDown, Activity, Shield, Eye, Compass, Gauge, Check,
+  ThumbsUp, ThumbsDown, Activity, Shield, Compass, Gauge, Check,
 } from "lucide-react";
 
 const matchQO = (matchId: string) => queryOptions({

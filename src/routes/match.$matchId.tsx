@@ -707,6 +707,8 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, hom
       <FirstTryscorerCard insights={insights} tryscorers={tryscorers} />
       <AnytimeTryscorersCard tryscorers={tryscorers} insights={insights} home={home} away={away} model={model} />
       <MultiTryscorerCard insights={insights} tryscorers={tryscorers} />
+      <FormTryscorersCard insights={insights} home={home} away={away} />
+      <GameScriptCards insights={insights} home={home} away={away} />
     </div>
   );
 }

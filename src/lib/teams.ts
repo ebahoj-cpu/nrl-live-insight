@@ -76,7 +76,7 @@ export function findTeam(input: string): CanonicalTeam | null {
 
 // Clubs whose NRL.com theme does NOT publish a `badge-light.svg` variant.
 // For these we always fall back to the standard `badge.svg`.
-const NO_LIGHT_BADGE = new Set(["roosters", "eels"]);
+const NO_LIGHT_BADGE = new Set(["roosters", "eels", "titans"]);
 
 export function logoUrl(themeKey: string, light = false): string {
   const useLight = light && !NO_LIGHT_BADGE.has(themeKey);

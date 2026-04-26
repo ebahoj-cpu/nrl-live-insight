@@ -7,7 +7,7 @@ import { Fragment, Suspense, useState } from "react";
 import {
   ArrowLeft, Clock, MapPin, Users, BarChart3, Sparkles,
   Trophy, Target, Flag, Crown, TrendingUp, AlertCircle, CloudSun, Calendar, Zap, Hourglass,
-  ThumbsUp, ThumbsDown, Activity, Shield, Eye, Compass, Gauge,
+  ThumbsUp, ThumbsDown, Activity, Shield, Eye, Compass, Gauge, Layers, Check,
 } from "lucide-react";
 
 const matchQO = (matchId: string) => queryOptions({
@@ -46,7 +46,7 @@ export const Route = createFileRoute("/match/$matchId")({
   },
 });
 
-type TabKey = "lineup" | "stats" | "insights";
+type TabKey = "lineup" | "stats" | "insights" | "builder";
 
 function MatchPage() {
   return (
@@ -144,10 +144,11 @@ function MatchInner() {
       </section>
 
       {/* Tabs — icon-only on mobile, icon+label on sm+ */}
-      <nav className="mt-6 grid grid-cols-3 gap-1 p-1 glass" role="tablist">
+      <nav className="mt-6 grid grid-cols-4 gap-1 p-1 glass" role="tablist">
         <TabButton active={tab === "lineup"} onClick={() => setTab("lineup")} icon={Users} label="Lineup" />
         <TabButton active={tab === "stats"} onClick={() => setTab("stats")} icon={BarChart3} label="Stats" />
         <TabButton active={tab === "insights"} onClick={() => setTab("insights")} icon={Sparkles} label="Insights" />
+        <TabButton active={tab === "builder"} onClick={() => setTab("builder")} icon={Layers} label="Bet Builder" />
       </nav>
 
       <div className="mt-6">
@@ -165,6 +166,18 @@ function MatchInner() {
             tryscorers={tryscorers}
             tryscorersError={tryscorersError}
             odds={odds}
+          />
+        )}
+        {tab === "builder" && (
+          <BetBuilderTab
+            insights={insights}
+            insightsError={insightsLoading ? null : insightsError}
+            insightsLoading={insightsLoading}
+            home={details.homeTeam}
+            away={details.awayTeam}
+            homeRow={homeRow}
+            awayRow={awayRow}
+            tryscorers={tryscorers}
           />
         )}
       </div>
@@ -1226,22 +1239,38 @@ function AnytimeTryscorersCard({ tryscorers, insights, home, away }:
     );
   }
 
+  const homeTop = list.filter((p) => p.team === "home").slice(0, 3);
+  const awayTop = list.filter((p) => p.team === "away").slice(0, 3);
+
   return (
     <Card title="Anytime tryscorers" icon={Sparkles}>
-      <div className="grid grid-cols-[auto_auto_1fr_auto_auto] gap-x-3 gap-y-2 items-center">
-        {list.map((p, i) => (
-          <Fragment key={`${p.name}-${i}`}>
-            <span className="kbd h-6 w-6 rounded-full bg-accent text-accent-foreground text-[11px] font-bold flex items-center justify-center">{i + 1}</span>
-            <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border ${teamChipTone(p.team, home, away)}`}>
-              {teamChipLabel(p.team, home, away)}
-            </span>
-            <span className="text-sm font-bold truncate">{p.name}</span>
-            <span className="text-[11px] kbd text-muted-foreground tabular-nums">{Math.round(p.prob * 100)}%</span>
-            <span className="text-sm kbd font-black tabular-nums">{p.price.toFixed(2)}</span>
-          </Fragment>
-        ))}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <TryscorerTeamColumn title={home.nickName} picks={homeTop} accent />
+        <TryscorerTeamColumn title={away.nickName} picks={awayTop} />
       </div>
     </Card>
+  );
+}
+
+function TryscorerTeamColumn({ title, picks, accent }: { title: string; picks: AnytimePick[]; accent?: boolean }) {
+  return (
+    <div>
+      <div className={`text-[10px] uppercase tracking-wider font-bold mb-2 ${accent ? "text-accent" : "text-muted-foreground"}`}>{title}</div>
+      {picks.length === 0 ? (
+        <p className="text-xs text-muted-foreground">No priced players.</p>
+      ) : (
+        <ul className="space-y-1.5">
+          {picks.map((p, i) => (
+            <li key={`${p.name}-${i}`} className="flex items-center gap-2">
+              <span className="kbd h-5 w-5 rounded-full bg-surface-2 text-[10px] font-bold flex items-center justify-center shrink-0">{i + 1}</span>
+              <span className="text-sm font-semibold truncate flex-1">{p.name}</span>
+              <span className="text-[11px] kbd text-muted-foreground tabular-nums">{Math.round(p.prob * 100)}%</span>
+              <span className="text-sm kbd font-black tabular-nums">{p.price.toFixed(2)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 
@@ -1282,7 +1311,312 @@ function MultiTryscorerCard({ insights, tryscorers }: { insights: any; tryscorer
 }
 
 
-/* (Script + Bets tabs removed — Insights tab is now the single predictive view) */
+/* ================= BET BUILDER TAB ================= */
+
+type RiskLevel = "low" | "medium" | "high" | "ultra";
+
+const RISK_META: Record<RiskLevel, { label: string; tagline: string; tries: number; tone: string; dot: string }> = {
+  low:    { label: "Low Risk",        tagline: "Safer model picks",       tries: 1, tone: "border-emerald-500/40 bg-emerald-500/10 text-emerald-400", dot: "bg-emerald-500" },
+  medium: { label: "Medium Risk",     tagline: "Balanced selections",     tries: 2, tone: "border-amber-500/40 bg-amber-500/10 text-amber-400",       dot: "bg-amber-500" },
+  high:   { label: "High Risk",       tagline: "Stretches the model",     tries: 4, tone: "border-orange-500/40 bg-orange-500/10 text-orange-400",    dot: "bg-orange-500" },
+  ultra:  { label: "Ultra High Risk", tagline: "Top probability stack",   tries: 5, tone: "border-rose-500/40 bg-rose-500/10 text-rose-400",          dot: "bg-rose-500" },
+};
+
+type WinnerOption = "win" | "win-1-12" | "win-13";
+type TotalOption = "over" | "under";
+type HtFtOption = "HH" | "HA" | "AH" | "AA";
+
+function BetBuilderTab({ insights, insightsError, insightsLoading, home, away, homeRow, awayRow, tryscorers }: {
+  insights: any; insightsError: string | null; insightsLoading?: boolean;
+  home: TeamWithPlayers; away: TeamWithPlayers;
+  homeRow?: LadderRow; awayRow?: LadderRow;
+  tryscorers: TryscorerMarkets | null;
+}) {
+  if (insightsLoading) return <InsightsLoading />;
+  if (insightsError && !insights) return <Empty msg={insightsError} />;
+  if (!insights) return <Empty msg="Bet Builder needs Insights data to run." />;
+
+  const model = computeMatchModel(home.nickName, away.nickName, homeRow, awayRow, insights);
+  const list = buildAnytimeList(tryscorers, home, away);
+  const aiAnytime: string[] = Array.isArray(insights?.anytimeTryscorers)
+    ? insights.anytimeTryscorers.map((t: any) => String(t.pick ?? "")).filter(Boolean)
+    : [];
+  // Use live priced tryscorers if available, else fall back to AI list.
+  const rankedNames: string[] = list.length > 0 ? list.map((p) => p.name) : aiAnytime;
+
+  const winnerName = model.winner === "home" ? home.nickName : away.nickName;
+  const modelHtFt: HtFtOption = inferHtFt(insights, home.nickName, away.nickName, model);
+
+  const [risk, setRisk] = useState<RiskLevel>("low");
+  const meta = RISK_META[risk];
+  const requiredTries = meta.tries;
+
+  // Default selections — always model-driven.
+  const [winnerPick, setWinnerPick] = useState<WinnerOption>(model.marginBucket === "13+" ? "win-13" : "win-1-12");
+  const [totalPick, setTotalPick] = useState<TotalOption>(model.totalLean === "Over" ? "over" : "under");
+  const [htftPick, setHtftPick] = useState<HtFtOption>(modelHtFt);
+  const [tryPicks, setTryPicks] = useState<string[]>(() => rankedNames.slice(0, requiredTries));
+
+  // When risk changes, re-seed try picks from top of ranked list.
+  function onRiskChange(next: RiskLevel) {
+    setRisk(next);
+    setTryPicks(rankedNames.slice(0, RISK_META[next].tries));
+  }
+
+  function toggleTryPick(name: string) {
+    setTryPicks((cur) => {
+      if (cur.includes(name)) return cur.filter((n) => n !== name);
+      if (cur.length >= requiredTries) return [...cur.slice(1), name];
+      return [...cur, name];
+    });
+  }
+
+  // Anytime tryscorer selection pool — Low risk locked to top 5.
+  const tryscorerPool = risk === "low" ? rankedNames.slice(0, 5) : rankedNames;
+
+  // Combo suggestions (2 / 4 / 6) — always top of ranked list, deduped.
+  const combos = [2, 4, 6].map((n) => rankedNames.slice(0, n));
+
+  return (
+    <div className="space-y-4">
+      {/* Risk selector */}
+      <Card title="Choose risk level" icon={Gauge}>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+          {(Object.keys(RISK_META) as RiskLevel[]).map((r) => {
+            const m = RISK_META[r];
+            const active = r === risk;
+            return (
+              <button
+                key={r}
+                onClick={() => onRiskChange(r)}
+                className={`text-left rounded-xl p-3 border transition ${active ? m.tone : "border-border bg-surface-2 text-muted-foreground hover:text-foreground"}`}
+              >
+                <div className="flex items-center gap-2">
+                  <span className={`h-2 w-2 rounded-full ${m.dot}`} />
+                  <span className="text-xs font-bold uppercase tracking-wider">{m.label}</span>
+                </div>
+                <div className="text-[11px] mt-1 opacity-80">{m.tagline}</div>
+                <div className="text-[10px] mt-1 opacity-70">{m.tries} tryscorer{m.tries === 1 ? "" : "s"}</div>
+              </button>
+            );
+          })}
+        </div>
+      </Card>
+
+      {/* Winner market */}
+      <Card title="1. Winner market" icon={Trophy}>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <PickButton
+            active={winnerPick === "win"}
+            onClick={() => setWinnerPick("win")}
+            title={`${winnerName} win`}
+            subtitle={`Confidence ${model.confidencePct}%`}
+            recommended={false}
+          />
+          <PickButton
+            active={winnerPick === "win-1-12"}
+            onClick={() => setWinnerPick("win-1-12")}
+            title={`${winnerName} by 1–12`}
+            subtitle="Tight margin"
+            recommended={model.marginBucket === "1–12"}
+          />
+          <PickButton
+            active={winnerPick === "win-13"}
+            onClick={() => setWinnerPick("win-13")}
+            title={`${winnerName} by 13+`}
+            subtitle="Comfortable win"
+            recommended={model.marginBucket === "13+"}
+          />
+        </div>
+      </Card>
+
+      {/* Total points */}
+      <Card title="2. Total points" icon={TrendingUp}>
+        <div className="grid grid-cols-2 gap-2">
+          <PickButton
+            active={totalPick === "over"}
+            onClick={() => setTotalPick("over")}
+            title={`Over ${model.totalLine}`}
+            subtitle={`Projected ${model.predictedHome + model.predictedAway} pts`}
+            recommended={model.totalLean === "Over"}
+          />
+          <PickButton
+            active={totalPick === "under"}
+            onClick={() => setTotalPick("under")}
+            title={`Under ${model.totalLine}`}
+            subtitle={`Projected ${model.predictedHome + model.predictedAway} pts`}
+            recommended={model.totalLean === "Under"}
+          />
+        </div>
+      </Card>
+
+      {/* HT/FT */}
+      <Card title="3. Half-time / full-time" icon={Hourglass}>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {(["HH","HA","AH","AA"] as HtFtOption[]).map((opt) => (
+            <PickButton
+              key={opt}
+              active={htftPick === opt}
+              onClick={() => setHtftPick(opt)}
+              title={htftLabel(opt, home.nickName, away.nickName)}
+              subtitle={htftDescription(opt)}
+              recommended={modelHtFt === opt}
+            />
+          ))}
+        </div>
+      </Card>
+
+      {/* Anytime tryscorers */}
+      <Card title={`4. Anytime tryscorers (pick ${requiredTries})`} icon={Flag}>
+        {tryscorerPool.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Tryscorer model awaiting team-list odds.</p>
+        ) : (
+          <>
+            {risk === "low" && (
+              <div className="text-[11px] text-muted-foreground mb-2">Top 5 highest probability picks only.</div>
+            )}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {tryscorerPool.map((name, i) => {
+                const selected = tryPicks.includes(name);
+                const meta = list.find((p) => p.name === name);
+                const probLabel = meta ? `${Math.round(meta.prob * 100)}% · ${meta.team === "home" ? home.nickName : meta.team === "away" ? away.nickName : "—"}` : `Rank #${i + 1}`;
+                return (
+                  <button
+                    key={name}
+                    onClick={() => toggleTryPick(name)}
+                    className={`flex items-center gap-3 text-left rounded-lg p-2.5 border transition ${selected ? "border-accent bg-accent/10" : "border-border bg-surface-2 hover:border-accent/40"}`}
+                  >
+                    <span className={`h-5 w-5 rounded-full flex items-center justify-center shrink-0 ${selected ? "bg-accent text-accent-foreground" : "bg-surface text-muted-foreground"}`}>
+                      {selected ? <Check className="h-3 w-3" /> : <span className="text-[10px] font-bold">{i + 1}</span>}
+                    </span>
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-sm font-semibold truncate">{name}</span>
+                      <span className="block text-[10px] text-muted-foreground truncate">{probLabel}</span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="mt-3 text-[11px] text-muted-foreground">
+              Selected {tryPicks.length} / {requiredTries}
+            </div>
+          </>
+        )}
+      </Card>
+
+      {/* Slip preview */}
+      <Card title="Your bet builder slip" icon={Sparkles} className="accent-glow">
+        <div className="space-y-2 text-sm">
+          <SlipRow label="Risk" value={meta.label} />
+          <SlipRow label="Winner" value={winnerLabel(winnerPick, winnerName)} />
+          <SlipRow label="Total" value={`${totalPick === "over" ? "Over" : "Under"} ${model.totalLine}`} />
+          <SlipRow label="HT/FT" value={htftLabel(htftPick, home.nickName, away.nickName)} />
+          <SlipRow label={`Tryscorers (${tryPicks.length})`} value={tryPicks.length === 0 ? "—" : tryPicks.join(", ")} />
+        </div>
+      </Card>
+
+      {/* Combo suggestions */}
+      <Card title="Tryscorer combo suggestions" icon={Layers}>
+        {rankedNames.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Combos require ranked tryscorer data.</p>
+        ) : (
+          <div className="space-y-3">
+            {combos.map((legs, idx) => (
+              <div key={idx} className="rounded-lg border border-border bg-surface-2 p-3">
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="text-[11px] uppercase tracking-wider font-bold text-accent">{legs.length}-leg anytime combo</div>
+                  <div className="text-[10px] text-muted-foreground">Top probability stack</div>
+                </div>
+                {legs.length < (idx === 0 ? 2 : idx === 1 ? 4 : 6) ? (
+                  <div className="text-[11px] text-muted-foreground">Not enough ranked players yet.</div>
+                ) : (
+                  <ol className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
+                    {legs.map((name, i) => (
+                      <li key={`${name}-${i}`} className="flex items-center gap-2 text-sm">
+                        <span className="kbd h-5 w-5 rounded-full bg-accent/15 text-accent text-[10px] font-bold flex items-center justify-center">{i + 1}</span>
+                        <span className="font-semibold truncate">{name}</span>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+
+      <p className="text-[11px] text-muted-foreground text-center">
+        Selections are model-driven from the Insights tab. No bookmaker odds applied.
+      </p>
+    </div>
+  );
+}
+
+function PickButton({ active, onClick, title, subtitle, recommended }:
+  { active: boolean; onClick: () => void; title: string; subtitle?: string; recommended?: boolean }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`relative text-left rounded-lg p-3 border transition ${active ? "border-accent bg-accent/10" : "border-border bg-surface-2 hover:border-accent/40"}`}
+    >
+      {recommended && (
+        <span className="absolute top-1.5 right-1.5 text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-accent text-accent-foreground">Model</span>
+      )}
+      <div className="text-sm font-bold truncate">{title}</div>
+      {subtitle && <div className="text-[11px] text-muted-foreground mt-0.5 truncate">{subtitle}</div>}
+    </button>
+  );
+}
+
+function SlipRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-start justify-between gap-3 border-b border-border last:border-0 pb-2 last:pb-0">
+      <span className="text-[11px] uppercase tracking-wider font-bold text-muted-foreground shrink-0">{label}</span>
+      <span className="text-sm font-semibold text-right">{value}</span>
+    </div>
+  );
+}
+
+function htftLabel(opt: HtFtOption, home: string, away: string): string {
+  const map: Record<HtFtOption, [string, string]> = {
+    HH: [home, home], HA: [home, away], AH: [away, home], AA: [away, away],
+  };
+  const [ht, ft] = map[opt];
+  return `${ht} / ${ft}`;
+}
+
+function htftDescription(opt: HtFtOption): string {
+  switch (opt) {
+    case "HH": return "Home leads, home wins";
+    case "AA": return "Away leads, away wins";
+    case "HA": return "Home leads, away comeback";
+    case "AH": return "Away leads, home comeback";
+  }
+}
+
+function winnerLabel(opt: WinnerOption, winner: string): string {
+  if (opt === "win") return `${winner} to win`;
+  if (opt === "win-1-12") return `${winner} by 1–12`;
+  return `${winner} by 13+`;
+}
+
+function inferHtFt(insights: any, home: string, away: string, model: MatchModel): HtFtOption {
+  const pick: string = String(insights?.htft?.pick ?? "");
+  const parts = pick.split(/\s*\/\s*/).map((p) => p.trim().toLowerCase());
+  const side = (s: string): "H" | "A" | null => {
+    if (!s) return null;
+    if (s === "home" || s === "h" || s === home.toLowerCase()) return "H";
+    if (s === "away" || s === "a" || s === away.toLowerCase()) return "A";
+    return null;
+  };
+  const ht = side(parts[0] ?? "");
+  const ft = side(parts[1] ?? parts[0] ?? "");
+  if (ht && ft) return `${ht}${ft}` as HtFtOption;
+  // Fallback to model winner with HT = same as FT
+  const w = model.winner === "home" ? "H" : "A";
+  return `${w}${w}` as HtFtOption;
+}
+
 
 function formatDate(utc: string) {
   if (!utc) return "TBC";

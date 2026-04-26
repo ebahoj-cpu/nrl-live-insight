@@ -880,12 +880,19 @@ HARD RULES for scriptAnalyst:
     const msg = e instanceof Error ? e.message : String(e);
     console.warn(`AI insights: ${MODEL} failed (${msg}); retrying with ${FALLBACK_MODEL}`);
     try {
-      const parsed = await callGateway(key, FALLBACK_MODEL, messages, toolDef, 15_000);
+      const parsed = await callGateway(key, FALLBACK_MODEL, messages, toolDef, FALLBACK_TIMEOUT_MS);
       return finish(parsed);
     } catch (e2) {
       const msg2 = e2 instanceof Error ? e2.message : String(e2);
-      console.warn(`AI insights: ${FALLBACK_MODEL} also failed (${msg2}); using local fallback`);
-      return finish(buildFallbackInsights(payload));
+      console.warn(`AI insights: ${FALLBACK_MODEL} failed (${msg2}); retrying with ${FINAL_FALLBACK_MODEL}`);
+      try {
+        const parsed = await callGateway(key, FINAL_FALLBACK_MODEL, messages, toolDef, FINAL_TIMEOUT_MS);
+        return finish(parsed);
+      } catch (e3) {
+        const msg3 = e3 instanceof Error ? e3.message : String(e3);
+        console.warn(`AI insights: ${FINAL_FALLBACK_MODEL} also failed (${msg3}); using local fallback`);
+        return finish(buildFallbackInsights(payload));
+      }
     }
   }
 }

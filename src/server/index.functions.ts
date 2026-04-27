@@ -304,6 +304,27 @@ export const getMatchInsights = createServerFn({ method: "GET" })
           statGroups: details.statGroups,
         });
 
+        // Deterministic engine — runs alongside AI and is attached to payload.
+        try {
+          const snap = await getSeasonSnapshot(season);
+          const deterministic = generateDeterministicInsights({
+            homeNickname: details.homeTeam.nickName,
+            awayNickname: details.awayTeam.nickName,
+            homeThemeKey: details.homeTeam.themeKey,
+            awayThemeKey: details.awayTeam.themeKey,
+            homeSquad: details.homeTeam.players,
+            awaySquad: details.awayTeam.players,
+            ladder,
+            snapshot: snap,
+            weather,
+            tryscorers,
+            venue: details.venue,
+          });
+          (generated as unknown as { deterministic: DeterministicInsights }).deterministic = deterministic;
+        } catch (err) {
+          console.warn("deterministic engine failed:", err);
+        }
+
         // Persist to the shared DB cache so every visitor gets the same payload.
         await writeSharedInsights(data.matchId, generated, insightsTtlMs(details.kickoffUtc));
         return generated;

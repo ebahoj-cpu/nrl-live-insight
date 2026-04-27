@@ -16,6 +16,8 @@ import { generateInsights, type RealOdds, type Insights } from "./ai-insights";
 import { fetchVenueWeather, type WeatherSnapshot } from "./weather";
 import { findTeam } from "@/lib/teams";
 import { readSharedInsights, readAnySharedInsights, writeSharedInsights } from "./insights-store";
+import { getSeasonSnapshot } from "./season-stats";
+import { generateDeterministicInsights, type DeterministicInsights } from "./insights-engine";
 
 // In-flight generation lock — if multiple visitors hit the same uncached match
 // simultaneously within a single worker, only one actually invokes the AI;

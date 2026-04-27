@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as MatchMatchIdRouteImport } from './routes/match.$matchId'
+import { Route as ApiPublicHooksPrecomputeInsightsRouteImport } from './routes/api/public/hooks/precompute-insights'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -22,31 +23,45 @@ const MatchMatchIdRoute = MatchMatchIdRouteImport.update({
   path: '/match/$matchId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicHooksPrecomputeInsightsRoute =
+  ApiPublicHooksPrecomputeInsightsRouteImport.update({
+    id: '/api/public/hooks/precompute-insights',
+    path: '/api/public/hooks/precompute-insights',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/match/$matchId': typeof MatchMatchIdRoute
+  '/api/public/hooks/precompute-insights': typeof ApiPublicHooksPrecomputeInsightsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/match/$matchId': typeof MatchMatchIdRoute
+  '/api/public/hooks/precompute-insights': typeof ApiPublicHooksPrecomputeInsightsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/match/$matchId': typeof MatchMatchIdRoute
+  '/api/public/hooks/precompute-insights': typeof ApiPublicHooksPrecomputeInsightsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/match/$matchId'
+  fullPaths: '/' | '/match/$matchId' | '/api/public/hooks/precompute-insights'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/match/$matchId'
-  id: '__root__' | '/' | '/match/$matchId'
+  to: '/' | '/match/$matchId' | '/api/public/hooks/precompute-insights'
+  id:
+    | '__root__'
+    | '/'
+    | '/match/$matchId'
+    | '/api/public/hooks/precompute-insights'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   MatchMatchIdRoute: typeof MatchMatchIdRoute
+  ApiPublicHooksPrecomputeInsightsRoute: typeof ApiPublicHooksPrecomputeInsightsRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -65,12 +80,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MatchMatchIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/precompute-insights': {
+      id: '/api/public/hooks/precompute-insights'
+      path: '/api/public/hooks/precompute-insights'
+      fullPath: '/api/public/hooks/precompute-insights'
+      preLoaderRoute: typeof ApiPublicHooksPrecomputeInsightsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   MatchMatchIdRoute: MatchMatchIdRoute,
+  ApiPublicHooksPrecomputeInsightsRoute: ApiPublicHooksPrecomputeInsightsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

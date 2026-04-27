@@ -1431,7 +1431,7 @@ function FormPickColumn({ title, picks, accent }:
    Every field is unique-per-fixture (driven by AI payload).
    ============================================================ */
 
-function InsightsTab({ insights, insightsError, insightsLoading, home, away, homeRow, awayRow, tryscorers, odds }:
+function InsightsTab({ insights, insightsError, insightsLoading, home, away, tryscorers, odds }:
   { insights: any; insightsError: string | null; insightsLoading?: boolean;
     home: TeamWithPlayers; away: TeamWithPlayers;
     homeRow?: LadderRow; awayRow?: LadderRow;
@@ -1441,164 +1441,128 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, hom
   if (insightsError && !insights) return <Empty msg={insightsError} />;
   if (!insights) return <Empty msg="Insights unavailable." />;
 
-  const model = computeMatchModel(home.nickName, away.nickName, homeRow, awayRow, insights);
-  const winnerKey: "home" | "away" = insights?.winner?.team === "away" ? "away" : (model.winner ?? "home");
-  const winnerTeam = winnerKey === "home" ? home : away;
+  const det = insights?.deterministic;
+  if (!det) return <Empty msg="Stats engine output not yet computed for this fixture." />;
+
+  const winnerNick: string = det.matchWinner?.nickname ?? home.nickName;
+  const winnerSide: "home" | "away" = det.matchWinner?.team ?? "home";
+  const winnerTeam = winnerSide === "home" ? home : away;
   const bestOdds = odds ? bestH2H(odds) : { home: null, away: null };
-  const winnerPrice = winnerKey === "home" ? bestOdds.home : bestOdds.away;
+  const winnerPrice = winnerSide === "home" ? bestOdds.home : bestOdds.away;
 
-  // ---- 1. MATCH SUMMARY INSIGHT ----
-  const matchOverview: string =
-    insights?.intelligence?.matchOverview ||
-    insights?.simulation?.summary ||
-    insights?.scriptAnalyst?.overview?.contestSummary ||
-    "";
-
-  // ---- 2. KEY TEAM EDGE ANALYSIS ----
-  const homeStrengths: { title: string; detail: string }[] = (insights?.intelligence?.strengths?.home ?? []).slice(0, 3);
-  const awayStrengths: { title: string; detail: string }[] = (insights?.intelligence?.strengths?.away ?? []).slice(0, 3);
-  const homeWeaknesses: { title: string; detail: string }[] = (insights?.intelligence?.weaknesses?.home ?? []).slice(0, 3);
-  const awayWeaknesses: { title: string; detail: string }[] = (insights?.intelligence?.weaknesses?.away ?? []).slice(0, 3);
-
-  // ---- 3. GAME SCRIPT BREAKDOWN — exactly 4 phases per spec ----
-  const phases: { window: string; read: string }[] = (insights?.intelligence?.gameScript ?? []) as { window: string; read: string }[];
-  const phase = (label: RegExp, fallback: string): { window: string; read: string } => {
-    const found = phases.find((p) => label.test(p.window || ""));
-    if (found) return found;
-    return { window: fallback, read: "" };
-  };
-  const scriptPhases: { window: string; read: string }[] = [
-    phase(/first\s*20|0\s*-\s*20|opening/i, "First 20 minutes"),
-    phase(/second\s*20|20\s*-\s*40/i, "Second 20 minutes"),
-    phase(/40\s*-\s*60|third|middle/i, "40–60 minutes"),
-    phase(/60\s*-\s*80|closing|final|last/i, "60–80 minutes"),
-  ].filter((p) => p.read);
-
-  // ---- 4. BETTING OUTLOOK ----
-  const marginBucket: string = insights?.margin?.bucket ?? insights?.scriptAnalyst?.predictions?.margin?.range ?? model.marginBucket;
-  const totalLine: number = Number(insights?.total?.line ?? insights?.scriptAnalyst?.predictions?.totalPoints?.line ?? model.totalLine);
-  const totalLean: string = String(insights?.total?.pick ?? insights?.scriptAnalyst?.predictions?.totalPoints?.lean ?? model.totalLean).toLowerCase();
-  const htft: string = insights?.htft?.pick ?? insights?.scriptAnalyst?.predictions?.htft?.pick ?? "—";
-
-  // ---- 5. PLAYER TRY SCORING INSIGHTS ----
-  const liveByName = new Map<string, { price: number; book: string }>();
-  for (const t of tryscorers?.anytime ?? []) {
-    const full = t.player.toLowerCase().trim();
-    liveByName.set(full, { price: t.price, book: t.book });
-    const last = full.split(/\s+/).pop();
-    if (last && !liveByName.has(last)) liveByName.set(last, { price: t.price, book: t.book });
-  }
-  const priceFor = (name: string): number | null => {
-    const k = name.toLowerCase().trim();
-    if (liveByName.has(k)) return liveByName.get(k)!.price;
-    const last = k.split(/\s+/).pop();
-    if (last && liveByName.has(last)) return liveByName.get(last)!.price;
-    return null;
-  };
-
-  const firstTry: string = tryscorers?.first?.[0]?.player ?? insights?.firstTryscorer?.pick ?? insights?.scriptAnalyst?.predictions?.firstTryscorer?.name ?? "Awaiting team list";
   const firstTryPrice = tryscorers?.first?.[0]?.price ?? null;
-
-  // Top 3 anytime — prefer ranked simulation, fall back to AI list, dedupe
-  type AnytimeRow = { name: string; price: number | null; reasoning: string };
-  const ranked: AnytimeRow[] = [];
-  const seen = new Set<string>();
-  const pushRow = (name: string, reasoning: string, price?: number | null) => {
-    const k = name.toLowerCase().trim();
-    if (!k || seen.has(k)) return;
-    seen.add(k);
-    ranked.push({ name, reasoning, price: price ?? priceFor(name) });
-  };
-  for (const r of (insights?.simulation?.rankedTryscorers ?? []) as { name: string; market: string; rationale: string; decimalOdds: number | null }[]) {
-    if (r.market !== "first") pushRow(r.name, r.rationale, r.decimalOdds);
-    if (ranked.length >= 6) break;
-  }
-  for (const r of (insights?.anytimeTryscorers ?? []) as { pick: string; reasoning: string }[]) {
-    pushRow(r.pick, r.reasoning);
-    if (ranked.length >= 6) break;
-  }
-  const topAnytime = ranked.slice(0, 3);
-
-  // Channel-based opportunities — pull KeyMatchups that mention edges/channels
-  const keyMatchups: { area: string; homeSide: string; awaySide: string; edge: string; why: string }[] = (insights?.intelligence?.keyMatchups ?? []) as any;
-  const channelMatchups = keyMatchups
-    .filter((m) => /edge|channel|left|right|wide|wing|centre|edge/i.test(m.area || ""))
-    .slice(0, 3);
 
   return (
     <div className="space-y-4">
-      {/* Section 1 — Match Summary */}
-      <Card title="Match summary" icon={Sparkles} className="accent-glow">
-        <p className="text-sm leading-relaxed text-foreground/90">
-          {matchOverview || "Match read pending."}
-        </p>
-      </Card>
-
-      {/* Section 2 — Key Team Edge Analysis */}
-      <Card title="Key team edge analysis" icon={Shield}>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <EdgeColumn title={home.nickName} themeKey={home.themeKey} strengths={homeStrengths} weaknesses={homeWeaknesses} accent />
-          <EdgeColumn title={away.nickName} themeKey={away.themeKey} strengths={awayStrengths} weaknesses={awayWeaknesses} />
+      {/* 1 — Match Winner */}
+      <Card title="Match winner" icon={Trophy} className="accent-glow">
+        <div className="flex items-center gap-3 mb-2">
+          <TeamLogo themeKey={winnerTeam.themeKey} name={winnerNick} size={40} />
+          <div className="flex-1 min-w-0">
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Projected winner</div>
+            <div className="text-lg font-black truncate">{winnerNick}</div>
+          </div>
+          {winnerPrice ? (
+            <span className="text-base font-black tabular-nums px-3 py-1.5 rounded-full bg-accent/15 text-accent border border-accent/30 shrink-0">
+              {winnerPrice.price.toFixed(2)}
+            </span>
+          ) : null}
         </div>
+        <p className="text-sm leading-relaxed text-foreground/90">{det.matchWinner?.reasoning}</p>
       </Card>
 
-      {/* Section 3 — Game Script Breakdown */}
-      <Card title="Game script breakdown" icon={Hourglass}>
-        {scriptPhases.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Phase-by-phase read pending.</p>
-        ) : (
-          <ol className="space-y-3">
-            {scriptPhases.map((p, i) => (
-              <li key={i} className="border-l-2 border-accent/40 pl-3">
-                <div className="text-[10px] uppercase tracking-widest text-accent font-bold mb-0.5">{p.window}</div>
-                <p className="text-sm leading-relaxed text-foreground/90">{p.read}</p>
-              </li>
-            ))}
-          </ol>
-        )}
+      {/* 2 — Winning Margin */}
+      <Card title="Winning margin" icon={Gauge}>
+        <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Projected margin band</div>
+        <div className="text-2xl font-black mb-2 text-accent">{det.margin?.bucket}</div>
+        <p className="text-sm leading-relaxed text-foreground/90">{det.margin?.reasoning}</p>
       </Card>
 
-      {/* Section 4 — Betting Outlook */}
-      <Card title="Betting outlook" icon={Target}>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-          <OutlookCell label="Winner" pick={winnerTeam.nickName} price={winnerPrice ? winnerPrice.price.toFixed(2) : null} accent />
-          <OutlookCell label="Margin" pick={marginBucket} />
-          <OutlookCell label="Total points" pick={`${capitaliseFirst(totalLean)} ${totalLine}`} />
-          <OutlookCell label="HT / FT" pick={htft} />
+      {/* 3 — Predicted Score */}
+      <Card title="Predicted score" icon={BarChart3}>
+        <div className="flex items-center justify-center gap-4 mb-3">
+          <div className="flex flex-col items-center gap-1">
+            <TeamLogo themeKey={home.themeKey} name={home.nickName} size={32} />
+            <div className="text-[11px] font-bold truncate max-w-[100px]">{home.nickName}</div>
+          </div>
+          <div className="kbd flex items-center gap-2 px-4 py-2">
+            <span className="text-3xl font-black tabular-nums">{det.predictedScore?.home}</span>
+            <span className="text-muted-foreground">–</span>
+            <span className="text-3xl font-black tabular-nums">{det.predictedScore?.away}</span>
+          </div>
+          <div className="flex flex-col items-center gap-1">
+            <TeamLogo themeKey={away.themeKey} name={away.nickName} size={32} />
+            <div className="text-[11px] font-bold truncate max-w-[100px]">{away.nickName}</div>
+          </div>
         </div>
+        <p className="text-sm leading-relaxed text-foreground/90">{det.predictedScore?.reasoning}</p>
       </Card>
 
-      {/* Section 5 — Player Try Scoring */}
+      {/* 4 — Total Points (Over/Under) */}
+      <Card title="Points over / under" icon={TrendingUp}>
+        <div className="flex items-baseline gap-3 mb-2">
+          <span className="text-2xl font-black text-accent uppercase">{det.totalPoints?.lean}</span>
+          <span className="text-2xl font-black tabular-nums">{det.totalPoints?.line}</span>
+        </div>
+        <p className="text-sm leading-relaxed text-foreground/90">{det.totalPoints?.reasoning}</p>
+      </Card>
+
+      {/* 5 — HT/FT Double */}
+      <Card title="Halftime / fulltime double" icon={Hourglass}>
+        <div className="text-2xl font-black mb-2 text-accent">{det.htft?.pick}</div>
+        <p className="text-sm leading-relaxed text-foreground/90">{det.htft?.reasoning}</p>
+      </Card>
+
+      {/* 6 — First Tryscorer */}
       <Card title="First tryscorer" icon={Flag} className="accent-glow">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 mb-2">
           <div className="h-12 w-12 rounded-full bg-accent/15 text-accent flex items-center justify-center shrink-0">
             <Crown className="h-6 w-6" />
           </div>
           <div className="min-w-0 flex-1">
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Top pick</div>
-            <div className="text-xl font-black truncate">{firstTry}</div>
-            {insights?.firstTryscorer?.reasoning && (
-              <p className="text-xs text-muted-foreground mt-1 leading-snug">{insights.firstTryscorer.reasoning}</p>
-            )}
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Top opening-set pick</div>
+            <div className="text-xl font-black truncate">{det.firstTryscorer?.name}</div>
+            <div className="text-[11px] text-muted-foreground">{det.firstTryscorer?.team} · {det.firstTryscorer?.position}</div>
           </div>
-          {firstTryPrice ? (
+          {(det.firstTryscorer?.price ?? firstTryPrice) ? (
             <span className="text-lg font-black tabular-nums px-3 py-1.5 rounded-full bg-accent/15 text-accent border border-accent/30 shrink-0">
-              {firstTryPrice.toFixed(2)}
+              {(det.firstTryscorer?.price ?? firstTryPrice).toFixed(2)}
             </span>
           ) : null}
         </div>
+        <p className="text-sm leading-relaxed text-foreground/90">{det.firstTryscorer?.reasoning}</p>
       </Card>
 
-      <Card title="Top 3 anytime tryscorers" icon={Sparkles}>
-        {topAnytime.length === 0 ? (
+      {/* 7 — First / Second / Third Tryscorer */}
+      <Card title="First / second / third tryscorer" icon={Target}>
+        <ul className="space-y-2.5">
+          {[det.rankedTryscorers?.first, det.rankedTryscorers?.second, det.rankedTryscorers?.third].map((p: any, i: number) => (
+            <li key={i} className="flex items-start gap-3 bg-surface-2 rounded-lg p-2.5">
+              <span className="kbd h-6 w-6 rounded-full bg-background text-xs font-black flex items-center justify-center shrink-0 mt-0.5">{i + 1}</span>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-bold truncate">{p?.name ?? "—"}</div>
+                <div className="text-[10px] text-muted-foreground">{p?.team} · {p?.position}</div>
+                {p?.reasoning && <p className="text-[11px] text-muted-foreground leading-snug mt-1">{p.reasoning}</p>}
+              </div>
+              {p?.price ? (
+                <span className="text-xs font-black tabular-nums px-2 py-0.5 rounded-full bg-accent/15 text-accent border border-accent/30 shrink-0">{p.price.toFixed(2)}</span>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      </Card>
+
+      {/* 8 — Top 5 Anytime Tryscorers */}
+      <Card title="Top 5 anytime tryscorers" icon={Sparkles}>
+        {(!det.topAnytime || det.topAnytime.length === 0) ? (
           <p className="text-sm text-muted-foreground">Try-scoring board pending squad release.</p>
         ) : (
           <ul className="space-y-2.5">
-            {topAnytime.map((r, i) => (
+            {det.topAnytime.slice(0, 5).map((r: any, i: number) => (
               <li key={`${r.name}-${i}`} className="flex items-start gap-3 bg-surface-2 rounded-lg p-2.5">
                 <span className="kbd h-6 w-6 rounded-full bg-background text-xs font-black flex items-center justify-center shrink-0 mt-0.5">{i + 1}</span>
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-bold truncate">{r.name}</div>
+                  <div className="text-sm font-bold truncate">{r.name} <span className="text-[10px] text-muted-foreground font-normal">({r.team})</span></div>
                   {r.reasoning && <p className="text-[11px] text-muted-foreground leading-snug mt-1">{r.reasoning}</p>}
                 </div>
                 {r.price != null ? (
@@ -1610,21 +1574,8 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, hom
         )}
       </Card>
 
-      {channelMatchups.length > 0 && (
-        <Card title="Edge-channel try opportunities" icon={Compass}>
-          <ul className="space-y-3">
-            {channelMatchups.map((m, i) => (
-              <li key={i} className="border-l-2 border-accent/40 pl-3">
-                <div className="text-[11px] uppercase tracking-wider text-accent font-bold mb-0.5">{m.area}</div>
-                <p className="text-sm leading-relaxed text-foreground/90">{m.why}</p>
-              </li>
-            ))}
-          </ul>
-        </Card>
-      )}
-
       <p className="text-[10px] text-muted-foreground text-center px-4 leading-relaxed">
-        Insights generated from current form, ladder, head-to-head, named squads, weather, and live AU bookie markets. Bet responsibly · 18+
+        Stats-driven projections from 2026 season-to-date team & player data. Bet responsibly · 18+
       </p>
     </div>
   );

@@ -234,8 +234,11 @@ export const getMatchPage = createServerFn({ method: "GET" })
     };
   });
 
-// Lazily generate AI insights — called by the client AFTER the match page renders.
-// Has its own request budget so it can take 30+ seconds without aborting the page.
+// Lazily generate insights — called by the client AFTER the match page renders.
+// PRIMARY path: deterministic stats engine (fast, no AI). It always runs and is
+// persisted immediately so the Insights tab renders within ~1-2 seconds. AI
+// enrichment for the Script tab is best-effort and runs after — its failure
+// never blocks the deterministic insights from being shown.
 export const getMatchInsights = createServerFn({ method: "GET" })
   .inputValidator((i: { matchId: string; refresh?: boolean }) => {
     if (!i?.matchId) throw new Error("matchId required");
@@ -244,10 +247,12 @@ export const getMatchInsights = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     const season = currentSeason();
     try {
-      // 1) Fast-path: shared DB cache hit. Every visitor reads the same row.
+      // 1) Fast-path: shared DB cache hit with deterministic payload present.
       if (!data.refresh) {
         const stored = await readSharedInsights(data.matchId);
-        if (stored) return { insights: stored.payload, insightsError: null as string | null };
+        if (stored && (stored.payload as unknown as { deterministic?: unknown }).deterministic) {
+          return { insights: stored.payload, insightsError: null as string | null };
+        }
       }
 
       // 2) Single-flight: if another request for the same match is already
@@ -272,42 +277,17 @@ export const getMatchInsights = createServerFn({ method: "GET" })
           return (eh === homeNick && ea === awayNick) || (eh === awayNick && ea === homeNick);
         }) ?? null;
         const weather = await safeWeather(data.matchId, details.venue, details.venueCity, details.kickoffUtc);
-
-        // Real tryscorer odds + structured h2h/totals — passed to AI so it
-        // quotes EXACT bookie prices instead of inventing them.
         let tryscorers: TryscorerMarkets | null = null;
         if (odds) {
           const r = await safeTryscorers(odds.id);
           tryscorers = r.data;
         }
-        const realOdds = odds ? buildRealOdds(odds, homeNick, awayNick, tryscorers) : undefined;
 
-        const generated = await generateInsights({
-          homeName: details.homeTeam.nickName,
-          awayName: details.awayTeam.nickName,
-          venue: details.venue,
-          homeRecentForm: details.homeTeam.recentForm,
-          awayRecentForm: details.awayTeam.recentForm,
-          homePosition: details.homeTeam.position,
-          awayPosition: details.awayTeam.position,
-          homeSquad: details.homeTeam.players,
-          awaySquad: details.awayTeam.players,
-          ladder: ladder.map((r) => ({
-            nickname: r.nickname, played: r.played, wins: r.wins, losses: r.losses,
-            for: r.for, against: r.against, diff: r.diff, points: r.points,
-          })),
-          oddsSummary: odds ? summariseOdds(odds, homeNick, awayNick) : "No live odds available",
-          realOdds,
-          weatherSummary: weather ? `${weather.tempC}°C, ${weather.condition}, ${weather.windKph} km/h wind, ${weather.precipMm}mm rain (${weather.groundCondition} ground)` : "Weather unavailable",
-          homeTeamNews: details.teamNews?.home ?? null,
-          awayTeamNews: details.teamNews?.away ?? null,
-          statGroups: details.statGroups,
-        });
-
-        // Deterministic engine — runs alongside AI and is attached to payload.
+        // ---- PRIMARY: deterministic stats engine. Runs always, no AI. ----
+        let deterministic: DeterministicInsights | null = null;
         try {
           const snap = await getSeasonSnapshot(season);
-          const deterministic = generateDeterministicInsights({
+          deterministic = generateDeterministicInsights({
             homeNickname: details.homeTeam.nickName,
             awayNickname: details.awayTeam.nickName,
             homeThemeKey: details.homeTeam.themeKey,
@@ -320,28 +300,64 @@ export const getMatchInsights = createServerFn({ method: "GET" })
             tryscorers,
             venue: details.venue,
           });
-          (generated as unknown as { deterministic: DeterministicInsights }).deterministic = deterministic;
         } catch (err) {
           console.warn("deterministic engine failed:", err);
         }
 
-        // Persist to the shared DB cache so every visitor gets the same payload.
-        await writeSharedInsights(data.matchId, generated, insightsTtlMs(details.kickoffUtc));
-        return generated;
+        // Persist deterministic-only payload IMMEDIATELY so the Insights tab
+        // becomes available even if AI enrichment below fails or times out.
+        const minimalPayload = { deterministic } as unknown as Insights;
+        if (deterministic) {
+          await writeSharedInsights(data.matchId, minimalPayload, insightsTtlMs(details.kickoffUtc));
+        }
+
+        // ---- SECONDARY: AI enrichment for Script tab. Best-effort. ----
+        const realOdds = odds ? buildRealOdds(odds, homeNick, awayNick, tryscorers) : undefined;
+        try {
+          const generated = await generateInsights({
+            homeName: details.homeTeam.nickName,
+            awayName: details.awayTeam.nickName,
+            venue: details.venue,
+            homeRecentForm: details.homeTeam.recentForm,
+            awayRecentForm: details.awayTeam.recentForm,
+            homePosition: details.homeTeam.position,
+            awayPosition: details.awayTeam.position,
+            homeSquad: details.homeTeam.players,
+            awaySquad: details.awayTeam.players,
+            ladder: ladder.map((r) => ({
+              nickname: r.nickname, played: r.played, wins: r.wins, losses: r.losses,
+              for: r.for, against: r.against, diff: r.diff, points: r.points,
+            })),
+            oddsSummary: odds ? summariseOdds(odds, homeNick, awayNick) : "No live odds available",
+            realOdds,
+            weatherSummary: weather ? `${weather.tempC}°C, ${weather.condition}, ${weather.windKph} km/h wind, ${weather.precipMm}mm rain (${weather.groundCondition} ground)` : "Weather unavailable",
+            homeTeamNews: details.teamNews?.home ?? null,
+            awayTeamNews: details.teamNews?.away ?? null,
+            statGroups: details.statGroups,
+          });
+          if (deterministic) {
+            (generated as unknown as { deterministic: DeterministicInsights }).deterministic = deterministic;
+          }
+          await writeSharedInsights(data.matchId, generated, insightsTtlMs(details.kickoffUtc));
+          return generated;
+        } catch (err) {
+          console.warn("AI insight enrichment failed (deterministic still served):", err);
+          return deterministic ? minimalPayload : null;
+        }
       })();
 
       inFlight.set(lockKey, job);
       try {
         const insights = await job;
-        return { insights, insightsError: null as string | null };
+        if (insights) return { insights, insightsError: null as string | null };
+        return { insights: null, insightsError: "Insights engine produced no output" };
       } finally {
         inFlight.delete(lockKey);
       }
     } catch (e) {
-      // Last-ditch fallback: serve stale DB row if we have one rather than nothing.
       const stale = await readAnySharedInsights(data.matchId);
       if (stale) return { insights: stale.payload, insightsError: null as string | null };
-      return { insights: null, insightsError: e instanceof Error ? e.message : "AI insights unavailable" };
+      return { insights: null, insightsError: e instanceof Error ? e.message : "Insights unavailable" };
     }
   });
 

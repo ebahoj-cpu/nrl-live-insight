@@ -1416,6 +1416,18 @@ function FormPickColumn({ title, picks, accent }:
    Every field is unique-per-fixture (driven by AI payload).
    ============================================================ */
 
+function AnytimeOddsTag({ price }: { price: number | null }) {
+  if (price == null) return null;
+  return (
+    <span
+      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 text-[9px] font-black uppercase tracking-wider tabular-nums"
+      title="Anytime tryscorer odds (best market price)"
+    >
+      Anytime {price.toFixed(2)}
+    </span>
+  );
+}
+
 function InsightsTab({ insights, insightsError, insightsLoading, home, away, tryscorers, odds }:
   { insights: any; insightsError: string | null; insightsLoading?: boolean;
     home: TeamWithPlayers; away: TeamWithPlayers;

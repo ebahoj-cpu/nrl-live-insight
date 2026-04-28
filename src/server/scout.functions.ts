@@ -5,7 +5,7 @@ import { z } from "zod";
 import { cached, TTL } from "./cache";
 import { fetchDraw, fetchLadder } from "./nrl";
 import { fetchNrlOdds } from "./odds";
-import { fetchAllNews } from "./news";
+import { fetchNews, type NewsItem } from "./news";
 import { findTeam } from "@/lib/teams";
 
 const Message = z.object({

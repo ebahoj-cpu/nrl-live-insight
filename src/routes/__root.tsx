@@ -4,7 +4,7 @@ import {
 } from "@tanstack/react-router";
 import { QueryClient, QueryClientProvider, useIsFetching } from "@tanstack/react-query";
 import appCss from "../styles.css?url";
-import { RotateCw, Menu, X, Calendar, BarChart3, Newspaper } from "lucide-react";
+import { RotateCw, Menu, X, Calendar, BarChart3, Newspaper, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 
 interface RouterContext { queryClient: QueryClient }
@@ -13,6 +13,7 @@ const NAV_ITEMS = [
   { to: "/", label: "Fixtures", icon: Calendar, exact: true },
   { to: "/ladder", label: "Ladder", icon: BarChart3, exact: false },
   { to: "/news", label: "News", icon: Newspaper, exact: false },
+  { to: "/scout", label: "Scout", icon: Sparkles, exact: false },
 ] as const;
 
 function NotFoundComponent() {

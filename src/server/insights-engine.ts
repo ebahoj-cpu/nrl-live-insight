@@ -60,6 +60,7 @@ export type DeterministicInsights = {
   topAnytime: EnginePlayerPick[]; // length 5 (legacy: combined)
   topAnytimeHome: EnginePlayerPick[]; // length 3
   topAnytimeAway: EnginePlayerPick[]; // length 3
+  topAnytimeOverall: EnginePlayerPick[]; // length 3 — highest likely across both teams
   // 9 — Player to score 2+ tries (double)
   playerDouble: EnginePlayerPick;
   // 10 — Predicted outcome narrative with 3 anytime tryscorer picks
@@ -213,6 +214,7 @@ export function generateDeterministicInsights(inp: EngineInputs): DeterministicI
     topAnytime: top5.map((r) => stripInternal(r, r.reasoning)),
     topAnytimeHome: homeRanked.map((r) => stripInternal(r, r.reasoning)),
     topAnytimeAway: awayRanked.map((r) => stripInternal(r, r.reasoning)),
+    topAnytimeOverall: ranking.slice(0, 3).map((r) => stripInternal(r, r.reasoning)),
     playerDouble: stripInternal(doublePick, doubleReason),
     predictedOutcome,
   };

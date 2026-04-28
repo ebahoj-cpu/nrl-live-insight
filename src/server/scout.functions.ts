@@ -55,7 +55,7 @@ async function buildScoutContext(): Promise<string> {
     `${r.position}. ${r.nickname} — ${r.played}P ${r.wins}W ${r.losses}L, ${r.points}pts, diff ${r.diff}`
   ).join("\n");
 
-  const newsLines = news.slice(0, 12).map((n) =>
+  const newsLines = (news as NewsItem[]).slice(0, 12).map((n) =>
     `- [${n.source}] ${n.title}${n.summary ? ` — ${n.summary.slice(0, 140)}` : ""}`
   ).join("\n");
 

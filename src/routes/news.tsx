@@ -1,8 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useSuspenseQuery, queryOptions } from "@tanstack/react-query";
-import { Suspense } from "react";
+import { useSuspenseQuery, useQuery, queryOptions } from "@tanstack/react-query";
+import { Suspense, useState } from "react";
 import { getNews } from "@/server/news.functions";
-import { ExternalLink } from "lucide-react";
+import { summariseArticle, type ArticleSummary } from "@/server/news-summary.functions";
+import { ExternalLink, Sparkles, TrendingUp, TrendingDown, Minus, Loader2 } from "lucide-react";
 
 const newsQO = () => queryOptions({
   queryKey: ["news"],
@@ -72,46 +73,158 @@ function NewsFeed() {
       ) : (
         <ul className="space-y-3">
           {items.map((n) => (
-            <li key={n.id}>
-              <a
-                href={n.link}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex gap-3 rounded-2xl border border-border bg-surface hover:bg-surface-2 transition p-3 group"
-              >
-                {n.image ? (
-                  <img
-                    src={n.image}
-                    alt=""
-                    loading="lazy"
-                    className="h-20 w-20 sm:h-24 sm:w-24 shrink-0 rounded-xl object-cover bg-surface-2"
-                    onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-                  />
-                ) : (
-                  <div className="h-20 w-20 sm:h-24 sm:w-24 shrink-0 rounded-xl bg-surface-2 flex items-center justify-center text-accent font-black text-xl">
-                    {n.source.charAt(0)}
-                  </div>
-                )}
-                <div className="flex-1 min-w-0 flex flex-col">
-                  <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider font-bold text-accent">
-                    <span>{n.source}</span>
-                    <span className="text-muted-foreground">· {timeAgo(n.publishedUtc)}</span>
-                  </div>
-                  <h2 className="font-extrabold text-sm sm:text-base mt-1 leading-snug line-clamp-3 group-hover:text-accent transition">
-                    {n.title}
-                  </h2>
-                  {n.summary && (
-                    <p className="text-xs text-muted-foreground mt-1 line-clamp-2 hidden sm:block">{n.summary}</p>
-                  )}
-                  <div className="mt-auto pt-1 inline-flex items-center gap-1 text-[10px] text-muted-foreground">
-                    <ExternalLink className="h-3 w-3" /> Open article
-                  </div>
-                </div>
-              </a>
-            </li>
+            <NewsCard key={n.id} item={n} />
           ))}
         </ul>
       )}
+    </div>
+  );
+}
+
+type NewsItemProps = {
+  item: {
+    id: string;
+    title: string;
+    link: string;
+    source: string;
+    publishedUtc: string;
+    image?: string;
+    summary?: string;
+  };
+};
+
+function NewsCard({ item: n }: NewsItemProps) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <li>
+      <div className="flex gap-3 rounded-2xl border border-border bg-surface hover:bg-surface-2 transition p-3 group">
+        {n.image ? (
+          <img
+            src={n.image}
+            alt=""
+            loading="lazy"
+            className="h-20 w-20 sm:h-24 sm:w-24 shrink-0 rounded-xl object-cover bg-surface-2"
+            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+          />
+        ) : (
+          <div className="h-20 w-20 sm:h-24 sm:w-24 shrink-0 rounded-xl bg-surface-2 flex items-center justify-center text-accent font-black text-xl">
+            {n.source.charAt(0)}
+          </div>
+        )}
+        <div className="flex-1 min-w-0 flex flex-col">
+          <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider font-bold text-accent">
+            <span>{n.source}</span>
+            <span className="text-muted-foreground">· {timeAgo(n.publishedUtc)}</span>
+          </div>
+          <a
+            href={n.link}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block"
+          >
+            <h2 className="font-extrabold text-sm sm:text-base mt-1 leading-snug line-clamp-3 group-hover:text-accent transition">
+              {n.title}
+            </h2>
+          </a>
+          {n.summary && (
+            <p className="text-xs text-muted-foreground mt-1 line-clamp-2 hidden sm:block">{n.summary}</p>
+          )}
+          <div className="mt-auto pt-2 flex items-center gap-3 flex-wrap">
+            <a
+              href={n.link}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-accent transition"
+            >
+              <ExternalLink className="h-3 w-3" /> Open article
+            </a>
+            <button
+              type="button"
+              onClick={() => setOpen((v) => !v)}
+              className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full bg-accent/15 text-accent border border-accent/30 hover:bg-accent/25 transition"
+            >
+              <Sparkles className="h-3 w-3" /> {open ? "Hide" : "Article"} Summary
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {open && (
+        <ArticleSummaryPanel url={n.link} title={n.title} source={n.source} />
+      )}
+    </li>
+  );
+}
+
+function ArticleSummaryPanel({ url, title, source }: { url: string; title: string; source: string }) {
+  const q = useQuery({
+    queryKey: ["article-summary", url],
+    queryFn: () => summariseArticle({ data: { url, title, source } }),
+    staleTime: 24 * 60 * 60_000,
+    retry: 1,
+  });
+
+  return (
+    <div className="mt-2 ml-3 rounded-2xl border border-accent/30 bg-accent/5 p-4 animate-in fade-in slide-in-from-top-1">
+      <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] font-bold text-accent mb-3">
+        <Sparkles className="h-3.5 w-3.5" />
+        Article Summary
+      </div>
+
+      {q.isLoading && (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          Reading the article…
+        </div>
+      )}
+
+      {q.isError && (
+        <p className="text-xs text-danger">
+          {(q.error as Error)?.message ?? "Couldn't summarise this article."}
+        </p>
+      )}
+
+      {q.data && <SummaryBody data={q.data} />}
+    </div>
+  );
+}
+
+function SummaryBody({ data }: { data: ArticleSummary }) {
+  const dir = data.bettingImpact.direction;
+  const tone =
+    dir === "positive"
+      ? { Icon: TrendingUp, label: "Positive impact", className: "text-accent border-accent/40 bg-accent/15" }
+      : dir === "negative"
+        ? { Icon: TrendingDown, label: "Negative impact", className: "text-danger border-danger/40 bg-danger/10" }
+        : { Icon: Minus, label: "Neutral impact", className: "text-muted-foreground border-border bg-surface-2" };
+  const Icon = tone.Icon;
+
+  return (
+    <div className="space-y-3">
+      <p className="text-sm leading-relaxed text-foreground/90">{data.summary}</p>
+
+      {data.keyPoints.length > 0 && (
+        <div>
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold mb-1.5">Key points</div>
+          <ul className="space-y-1">
+            {data.keyPoints.map((p, i) => (
+              <li key={i} className="text-xs text-foreground/85 flex gap-2">
+                <span className="text-accent font-black mt-0.5">·</span>
+                <span className="flex-1">{p}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <div className={`rounded-xl border p-3 ${tone.className}`}>
+        <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-black mb-1">
+          <Icon className="h-3.5 w-3.5" />
+          {tone.label} on Insights bets
+        </div>
+        <p className="text-xs leading-relaxed text-foreground/90">{data.bettingImpact.note}</p>
+      </div>
     </div>
   );
 }

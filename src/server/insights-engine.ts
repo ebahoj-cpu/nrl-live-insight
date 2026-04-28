@@ -521,3 +521,37 @@ function buildOutcomePickReason(r: RankedRow, isWinnerTeam: boolean, _isHomeTeam
   return `${last} (${role.toLowerCase()}) lines up ${sideTag}${blowoutTag}.${formTag}`;
 }
 
+
+// Forward Picks: 2 per team, prioritising forwards (or anyone outside the
+// per-team top 3) with the highest score — these are the next-best scorers
+// behind the headline anytime board.
+function pickForwardPicks(
+  ranking: RankedRow[],
+  homeTop: RankedRow[],
+  awayTop: RankedRow[],
+  inp: EngineInputs,
+): RankedRow[] {
+  const topNames = new Set([...homeTop, ...awayTop].map((r) => r.name));
+  const isForward = (pos: string) => /prop|hook|lock|second\s*row|back\s*row/i.test(pos || "");
+
+  const pickForTeam = (teamNick: string): RankedRow[] => {
+    const teamRows = ranking.filter((r) => r.team.toLowerCase() === teamNick.toLowerCase());
+    // Tier 1: forwards not already in the top board
+    const forwardsOutside = teamRows.filter((r) => isForward(r.position) && !topNames.has(r.name));
+    // Tier 2: any non-top players (in case there aren't enough forward candidates)
+    const anyOutside = teamRows.filter((r) => !topNames.has(r.name) && !forwardsOutside.find((x) => x.name === r.name));
+    return [...forwardsOutside, ...anyOutside].slice(0, 2);
+  };
+
+  return [...pickForTeam(inp.homeNickname), ...pickForTeam(inp.awayNickname)];
+}
+
+function buildForwardPickReason(r: RankedRow): string {
+  const last = r.name.split(/\s+/).pop() || r.name;
+  const role = positionRole(r.position);
+  const isFwd = /prop|hook|lock|second\s*row|back\s*row/i.test(r.position || "");
+  if (isFwd) {
+    return `${last} brings the ${role.toLowerCase()} forward threat for ${r.team} — short-range carries and goal-line involvements make them the next try-scoring lane if the headline outside backs are shut down.`;
+  }
+  return `${last} rates as ${r.team}'s next-best scoring option behind the headline anytime board — secondary attacking touches keep them live if the top picks don't convert.`;
+}

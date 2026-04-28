@@ -99,6 +99,9 @@ export function MatchCard({ fixture, odds }: { fixture: NrlFixture & { weather?:
         <div className="flex flex-col items-center text-center">
           <TeamLogo themeKey={fixture.homeTeam.themeKey} name={fixture.homeTeam.nickName} size={56} />
           <div className="mt-2 text-sm font-semibold leading-tight">{fixture.homeTeam.nickName}</div>
+          {!(isFinished || isLive) && (
+            <OddsPill odds={homeOdds} isFav={fav === "home"} />
+          )}
         </div>
 
         <div className="flex flex-col items-center justify-center">
@@ -118,24 +121,16 @@ export function MatchCard({ fixture, odds }: { fixture: NrlFixture & { weather?:
               </div>
             </>
           ) : (
-            <>
-              <div className="text-[10px] uppercase tracking-widest text-muted-foreground">H2H</div>
-              <div className="flex items-center gap-1.5 mt-1.5 kbd">
-                <span className={`px-2 py-1 rounded-md text-sm font-semibold ${fav === "home" ? "bg-accent text-accent-foreground" : "bg-surface-2"}`}>
-                  {homeOdds ? homeOdds.price.toFixed(2) : "—"}
-                </span>
-                <span className="text-muted-foreground text-xs">v</span>
-                <span className={`px-2 py-1 rounded-md text-sm font-semibold ${fav === "away" ? "bg-accent text-accent-foreground" : "bg-surface-2"}`}>
-                  {awayOdds ? awayOdds.price.toFixed(2) : "—"}
-                </span>
-              </div>
-            </>
+            <span className="text-[11px] font-black uppercase tracking-[0.2em] text-muted-foreground/70">vs</span>
           )}
         </div>
 
         <div className="flex flex-col items-center text-center">
           <TeamLogo themeKey={fixture.awayTeam.themeKey} name={fixture.awayTeam.nickName} size={56} />
           <div className="mt-2 text-sm font-semibold leading-tight">{fixture.awayTeam.nickName}</div>
+          {!(isFinished || isLive) && (
+            <OddsPill odds={awayOdds} isFav={fav === "away"} />
+          )}
         </div>
       </div>
 

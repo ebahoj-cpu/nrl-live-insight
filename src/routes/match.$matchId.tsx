@@ -11,6 +11,9 @@ import {
   ThumbsUp, ThumbsDown, Activity, Shield, Compass, Gauge, Check,
   Receipt, X,
 } from "lucide-react";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 
 const matchQO = (matchId: string) => queryOptions({
   queryKey: ["match", matchId],
@@ -1885,12 +1888,17 @@ function BetTab({ insights, insightsError, insightsLoading, home, away, tryscore
     return anytimePriceByName.get(name.trim().toLowerCase()) ?? null;
   };
 
-  // Match Winner odds
+  // Match Winner odds (selectable both sides)
   const winnerSide: "home" | "away" = det.matchWinner?.team ?? "home";
   const winnerNick: string = det.matchWinner?.nickname ?? home.nickName;
   const bestOdds = odds ? bestH2H(odds) : { home: null, away: null };
-  const winnerPriceObj = winnerSide === "home" ? bestOdds.home : bestOdds.away;
-  const winnerPrice = winnerPriceObj?.price ?? 1.85;
+  const homeWinPrice = bestOdds.home?.price ?? (winnerSide === "home" ? 1.85 : 2.10);
+  const awayWinPrice = bestOdds.away?.price ?? (winnerSide === "away" ? 1.85 : 2.10);
+  const winnerOptions = [
+    { label: home.nickName, price: Number(homeWinPrice.toFixed(2)) },
+    { label: away.nickName, price: Number(awayWinPrice.toFixed(2)) },
+  ];
+  const initialWinner = winnerOptions.find((o) => o.label === winnerNick) ?? winnerOptions[0];
 
   // Winning margin — selectable across both sides & buckets
   const marginBuckets = ["1-2", "3-12", "13-24", "25+"];
@@ -1934,9 +1942,9 @@ function BetTab({ insights, insightsError, insightsLoading, home, away, tryscore
     {
       id: "winner",
       market: "Match Winner",
-      selection: winnerNick,
-      detail: `${home.nickName} vs ${away.nickName}`,
-      price: Number(winnerPrice.toFixed(2)),
+      selection: initialWinner.label,
+      price: initialWinner.price,
+      options: winnerOptions,
     },
     {
       id: "margin",
@@ -2050,18 +2058,28 @@ function BetTab({ insights, insightsError, insightsLoading, home, away, tryscore
                     {leg.market}
                   </div>
                   {leg.options ? (
-                    <select
-                      value={leg.selection}
-                      onChange={(e) => updateLegSelection(leg.id, e.target.value)}
-                      className="mt-0.5 w-full bg-transparent text-sm font-bold outline-none border-0 cursor-pointer hover:text-accent transition focus:text-accent appearance-none pr-4"
-                      style={{ backgroundImage: "none" }}
-                    >
-                      {leg.options.map((o) => (
-                        <option key={o.label} value={o.label} className="bg-surface-2 text-foreground">
-                          {o.label} · {o.price.toFixed(2)}
-                        </option>
-                      ))}
-                    </select>
+                    <Select value={leg.selection} onValueChange={(v) => updateLegSelection(leg.id, v)}>
+                      <SelectTrigger className="mt-0.5 h-auto px-2 py-1 -ml-2 bg-transparent border border-transparent hover:border-accent/40 hover:bg-accent/5 focus:ring-0 focus:border-accent/60 rounded-md text-sm font-bold text-foreground shadow-none transition w-full justify-between gap-2">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent
+                        className="bg-surface-2 border-accent/30 text-foreground shadow-xl rounded-lg backdrop-blur"
+                        position="popper"
+                      >
+                        {leg.options.map((o) => (
+                          <SelectItem
+                            key={o.label}
+                            value={o.label}
+                            className="text-sm font-semibold focus:bg-accent/20 focus:text-foreground data-[state=checked]:text-accent rounded-md"
+                          >
+                            <span className="flex items-center justify-between gap-4 w-full">
+                              <span className="truncate">{o.label}</span>
+                              <span className="tabular-nums text-[11px] font-black text-accent">{o.price.toFixed(2)}</span>
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   ) : (
                     <div className="text-sm font-bold mt-0.5 truncate">{leg.selection}</div>
                   )}
@@ -2089,24 +2107,36 @@ function BetTab({ insights, insightsError, insightsLoading, home, away, tryscore
         {/* Add tryscorer */}
         <div className="mt-3">
           {addingTry ? (
-            <div className="bg-surface-2 rounded-lg p-3 border border-accent/40 flex items-center gap-2">
-              <select
-                autoFocus
-                defaultValue=""
-                onChange={(e) => e.target.value && addTryscorer(e.target.value)}
-                className="flex-1 bg-transparent text-sm font-bold outline-none cursor-pointer"
-              >
-                <option value="" disabled className="bg-surface-2">Select a player…</option>
-                {availableTryscorers.map((t) => {
-                  const aff = affiliatePlayer(t.player, home, away);
-                  const team = aff === "home" ? home.nickName : aff === "away" ? away.nickName : "";
-                  return (
-                    <option key={t.player} value={t.player} className="bg-surface-2 text-foreground">
-                      {t.player}{team ? ` (${team})` : ""} · {t.price.toFixed(2)}
-                    </option>
-                  );
-                })}
-              </select>
+            <div className="bg-surface-2 rounded-lg p-2 border border-accent/40 flex items-center gap-2">
+              <Select onValueChange={(v) => v && addTryscorer(v)}>
+                <SelectTrigger className="flex-1 h-9 bg-transparent border-0 focus:ring-0 text-sm font-bold text-foreground shadow-none">
+                  <SelectValue placeholder="Select a player…" />
+                </SelectTrigger>
+                <SelectContent
+                  className="bg-surface-2 border-accent/30 text-foreground shadow-xl rounded-lg max-h-72"
+                  position="popper"
+                >
+                  {availableTryscorers.map((t) => {
+                    const aff = affiliatePlayer(t.player, home, away);
+                    const team = aff === "home" ? home.nickName : aff === "away" ? away.nickName : "";
+                    return (
+                      <SelectItem
+                        key={t.player}
+                        value={t.player}
+                        className="text-sm font-semibold focus:bg-accent/20 focus:text-foreground rounded-md"
+                      >
+                        <span className="flex items-center justify-between gap-4 w-full">
+                          <span className="truncate">
+                            {t.player}
+                            {team ? <span className="text-muted-foreground font-normal"> · {team}</span> : null}
+                          </span>
+                          <span className="tabular-nums text-[11px] font-black text-accent">{t.price.toFixed(2)}</span>
+                        </span>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
               <button
                 onClick={() => setAddingTry(false)}
                 className="h-7 w-7 rounded-full bg-surface hover:bg-danger/15 hover:text-danger text-muted-foreground flex items-center justify-center transition"

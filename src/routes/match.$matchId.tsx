@@ -1416,6 +1416,18 @@ function FormPickColumn({ title, picks, accent }:
    Every field is unique-per-fixture (driven by AI payload).
    ============================================================ */
 
+function AnytimeOddsTag({ price }: { price: number | null }) {
+  if (price == null) return null;
+  return (
+    <span
+      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 text-[9px] font-black uppercase tracking-wider tabular-nums"
+      title="Anytime tryscorer odds (best market price)"
+    >
+      Anytime {price.toFixed(2)}
+    </span>
+  );
+}
+
 function InsightsTab({ insights, insightsError, insightsLoading, home, away, tryscorers, odds }:
   { insights: any; insightsError: string | null; insightsLoading?: boolean;
     home: TeamWithPlayers; away: TeamWithPlayers;
@@ -1436,6 +1448,18 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
   const winnerPrice = winnerSide === "home" ? bestOdds.home : bestOdds.away;
 
   const firstTryPrice = tryscorers?.first?.[0]?.price ?? null;
+
+  // Map player name -> best anytime tryscorer price (sourced from The Odds API).
+  const anytimePriceByName = new Map<string, number>();
+  for (const t of tryscorers?.anytime ?? []) {
+    const key = t.player.trim().toLowerCase();
+    const existing = anytimePriceByName.get(key);
+    if (existing == null || t.price < existing) anytimePriceByName.set(key, t.price);
+  }
+  const getAnytime = (name?: string | null): number | null => {
+    if (!name) return null;
+    return anytimePriceByName.get(name.trim().toLowerCase()) ?? null;
+  };
 
   return (
     <div className="space-y-4">
@@ -1508,6 +1532,7 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Top opening-set pick</div>
             <div className="text-xl font-black truncate">{det.firstTryscorer?.name}</div>
             <div className="text-[11px] text-muted-foreground">{det.firstTryscorer?.team} · {det.firstTryscorer?.position}</div>
+            <div className="mt-1.5"><AnytimeOddsTag price={getAnytime(det.firstTryscorer?.name)} /></div>
           </div>
           {(det.firstTryscorer?.price ?? firstTryPrice) ? (
             <span className="text-lg font-black tabular-nums px-3 py-1.5 rounded-full bg-accent/15 text-accent border border-accent/30 shrink-0">
@@ -1527,6 +1552,7 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-bold truncate">{p?.name ?? "—"}</div>
                 <div className="text-[10px] text-muted-foreground">{p?.team} · {p?.position}</div>
+                <div className="mt-1"><AnytimeOddsTag price={getAnytime(p?.name)} /></div>
                 {p?.reasoning && <p className="text-[11px] text-muted-foreground leading-snug mt-1">{p.reasoning}</p>}
               </div>
               {p?.price ? (
@@ -1550,6 +1576,7 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
               <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Double-try ceiling</div>
               <div className="text-xl font-black truncate">{det.playerDouble.name}</div>
               <div className="text-[11px] text-muted-foreground">{det.playerDouble.team} · {det.playerDouble.position}</div>
+              <div className="mt-1.5"><AnytimeOddsTag price={getAnytime(det.playerDouble.name)} /></div>
               {det.playerDouble.reasoning && (
                 <p className="text-sm leading-relaxed text-foreground/90 mt-2">{det.playerDouble.reasoning}</p>
               )}
@@ -1588,6 +1615,7 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
                         <div className="flex-1 min-w-0">
                           <div className="text-sm font-bold truncate">{r.name}</div>
                           <div className="text-[10px] text-muted-foreground">{r.position}</div>
+                          <div className="mt-1"><AnytimeOddsTag price={getAnytime(r.name)} /></div>
                           {r.reasoning && <p className="text-[11px] text-muted-foreground leading-snug mt-1">{r.reasoning}</p>}
                         </div>
                         {r.price != null ? (
@@ -1617,6 +1645,7 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-bold truncate">{r.name}</div>
                     <div className="text-[10px] text-muted-foreground">{r.team} · {r.position}</div>
+                    <div className="mt-1"><AnytimeOddsTag price={getAnytime(r.name)} /></div>
                     {r.reasoning && <p className="text-[11px] text-muted-foreground leading-snug mt-1">{r.reasoning}</p>}
                   </div>
                   {r.price != null ? (
@@ -1641,6 +1670,7 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-bold truncate">{p?.name ?? "—"}</div>
                   <div className="text-[10px] text-muted-foreground">{p?.team} · {p?.position}</div>
+                  <div className="mt-1"><AnytimeOddsTag price={getAnytime(p?.name)} /></div>
                   {p?.reasoning && <p className="text-[11px] text-muted-foreground leading-snug mt-1">{p.reasoning}</p>}
                 </div>
                 {p?.price != null ? (

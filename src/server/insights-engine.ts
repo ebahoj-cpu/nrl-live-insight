@@ -60,6 +60,7 @@ export type DeterministicInsights = {
   topAnytime: EnginePlayerPick[]; // length 5 (legacy: combined)
   topAnytimeHome: EnginePlayerPick[]; // length 3
   topAnytimeAway: EnginePlayerPick[]; // length 3
+  topAnytimeOverall: EnginePlayerPick[]; // length 3 — highest likely across both teams
   // 9 — Player to score 2+ tries (double)
   playerDouble: EnginePlayerPick;
   // 10 — Predicted outcome narrative with 3 anytime tryscorer picks

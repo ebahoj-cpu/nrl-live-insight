@@ -486,7 +486,7 @@ function SquadPanel({ team }: { team: { nickName: string; themeKey: string; play
       <span className="hidden sm:inline text-[10px] uppercase tracking-wider text-muted-foreground shrink-0">
         {p.position}
       </span>
-      <PlayerHeadshot src={p.headImage} firstName={p.firstName} lastName={p.lastName} />
+      
     </li>
   );
 

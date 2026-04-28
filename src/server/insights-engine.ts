@@ -62,6 +62,11 @@ export type DeterministicInsights = {
   topAnytimeAway: EnginePlayerPick[]; // length 3
   // 9 — Player to score 2+ tries (double)
   playerDouble: EnginePlayerPick;
+  // 10 — Predicted outcome narrative with 3 anytime tryscorer picks
+  predictedOutcome: {
+    summary: string;
+    picks: EnginePlayerPick[]; // 3 anytime tryscorers with bespoke reasoning
+  };
 };
 
 // ---------- Public API ----------
@@ -166,6 +171,32 @@ export function generateDeterministicInsights(inp: EngineInputs): DeterministicI
     ? `${(doublePick.name.split(/\s+/).pop() || doublePick.name)} carries the highest multi-try ceiling on the card — ${doublePick.team}'s scoring shape and matchup volume project them through the line more than once.`
     : "Awaiting team list for double-try profiling.";
 
+  // ---- 10. Predicted Outcome ----
+  // Pick 3 anytime tryscorers — prioritise 2 from the projected winner, 1 from
+  // the loser (the most likely opposition scorer). Falls back to the top of
+  // the combined ranking when one side has no candidates.
+  const winnerHome = winnerSide === "home";
+  const winnerList = winnerHome ? homeRanked : awayRanked;
+  const loserList = winnerHome ? awayRanked : homeRanked;
+  const outcomePicksRows: RankedRow[] = [];
+  if (winnerList[0]) outcomePicksRows.push(winnerList[0]);
+  if (winnerList[1]) outcomePicksRows.push(winnerList[1]);
+  if (loserList[0]) outcomePicksRows.push(loserList[0]);
+  // Top up from overall ranking if we still need more
+  for (const r of ranking) {
+    if (outcomePicksRows.length >= 3) break;
+    if (!outcomePicksRows.find((x) => x.name === r.name)) outcomePicksRows.push(r);
+  }
+  const outcomePicks = outcomePicksRows.slice(0, 3).map((r) => {
+    const isWinnerTeam = r.team.toLowerCase() === winnerNick.toLowerCase();
+    const reason = buildOutcomePickReason(r, isWinnerTeam, winnerHome ? (r.team.toLowerCase() === inp.homeNickname.toLowerCase()) : (r.team.toLowerCase() === inp.awayNickname.toLowerCase()), inp, winnerNick, projectedMargin);
+    return stripInternal(r, reason);
+  });
+  const predictedOutcome = {
+    summary: buildOutcomeSummary(inp, winnerNick, loserNick, predHome, predAway, projectedMargin, winnerStats, loserStats, winnerHome),
+    picks: outcomePicks,
+  };
+
   return {
     generatedAt: new Date().toISOString(),
     matchWinner,
@@ -183,6 +214,7 @@ export function generateDeterministicInsights(inp: EngineInputs): DeterministicI
     topAnytimeHome: homeRanked.map((r) => stripInternal(r, r.reasoning)),
     topAnytimeAway: awayRanked.map((r) => stripInternal(r, r.reasoning)),
     playerDouble: stripInternal(doublePick, doubleReason),
+    predictedOutcome,
   };
 }
 
@@ -463,3 +495,25 @@ function positionRole(position: string): string {
   if (/prop/.test(p)) return "Middle carry";
   return "Attacking option";
 }
+
+function buildOutcomeSummary(inp: EngineInputs, winnerNick: string, loserNick: string, predHome: number, predAway: number, margin: number, ws: TeamSeasonStats, ls: TeamSeasonStats, winnerHome: boolean): string {
+  const venue = winnerHome ? `at home` : `on the road`;
+  const formW = ws.last5.length ? ws.last5.map((r) => r.result).join("") : "limited form sample";
+  const formL = ls.last5.length ? ls.last5.map((r) => r.result).join("") : "limited form sample";
+  const shape = margin >= 14 ? `pulling clear in the back half` : margin >= 8 ? `controlling the contest after the break` : `edging it in a tight finish`;
+  return `${winnerNick} project to win ${predHome}–${predAway} ${venue}, ${shape}. Form line ${formW} versus ${loserNick}'s ${formL} reinforces the lean — ${winnerNick} score ${ws.ppgFor.toFixed(1)} per game and concede ${ws.ppgAgainst.toFixed(1)}, against ${loserNick}'s ${ls.ppgFor.toFixed(1)} for / ${ls.ppgAgainst.toFixed(1)} against. The three try-scoring picks below back that script.`;
+}
+
+function buildOutcomePickReason(r: RankedRow, isWinnerTeam: boolean, _isHomeTeam: boolean, inp: EngineInputs, winnerNick: string, margin: number): string {
+  const last = r.name.split(/\s+/).pop() || r.name;
+  const team = getTeam(inp.snapshot, r.team);
+  const role = positionRole(r.position);
+  const formStr = team?.last5?.length ? team.last5.map((x) => x.result).join("") : "";
+  const sideTag = isWinnerTeam
+    ? `on the ${winnerNick} attacking side projected to dominate field position`
+    : `as ${r.team}'s most likely answer when they get into ${winnerNick}'s 20`;
+  const blowoutTag = margin >= 14 && isWinnerTeam ? ` and a projected blowout multiplies their late-set looks` : "";
+  const formTag = formStr ? ` ${r.team}'s ${formStr} form line ${formStr.includes("W") ? "supports" : "still leaves"} the matchup volume` : "";
+  return `${last} (${role.toLowerCase()}) lines up ${sideTag}${blowoutTag}.${formTag}`;
+}
+

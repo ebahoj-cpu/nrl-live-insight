@@ -1437,6 +1437,18 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
 
   const firstTryPrice = tryscorers?.first?.[0]?.price ?? null;
 
+  // Map player name -> best anytime tryscorer price (sourced from The Odds API).
+  const anytimePriceByName = new Map<string, number>();
+  for (const t of tryscorers?.anytime ?? []) {
+    const key = t.player.trim().toLowerCase();
+    const existing = anytimePriceByName.get(key);
+    if (existing == null || t.price < existing) anytimePriceByName.set(key, t.price);
+  }
+  const getAnytime = (name?: string | null): number | null => {
+    if (!name) return null;
+    return anytimePriceByName.get(name.trim().toLowerCase()) ?? null;
+  };
+
   return (
     <div className="space-y-4">
       {/* 1 — Match Winner */}

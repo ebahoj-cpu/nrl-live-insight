@@ -62,6 +62,11 @@ export type DeterministicInsights = {
   topAnytimeAway: EnginePlayerPick[]; // length 3
   // 9 — Player to score 2+ tries (double)
   playerDouble: EnginePlayerPick;
+  // 10 — Predicted outcome narrative with 3 anytime tryscorer picks
+  predictedOutcome: {
+    summary: string;
+    picks: EnginePlayerPick[]; // 3 anytime tryscorers with bespoke reasoning
+  };
 };
 
 // ---------- Public API ----------

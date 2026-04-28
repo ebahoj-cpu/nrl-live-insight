@@ -1552,17 +1552,20 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
 
       {/* 6 — First Tryscorer */}
       <Card title="First tryscorer" icon={Flag} className="accent-glow">
-        <div className="flex items-center gap-3 mb-2">
+        <div className="flex items-start gap-3">
           <div className="h-12 w-12 rounded-full bg-accent/15 text-accent flex items-center justify-center shrink-0">
             <Crown className="h-6 w-6" />
           </div>
           <div className="min-w-0 flex-1">
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Top opening-set pick</div>
-            <div className="flex items-center gap-2 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
               <div className="text-xl font-black truncate">{det.firstTryscorer?.name}</div>
               <AnytimeOddsTag price={getAnytime(det.firstTryscorer?.name)} />
             </div>
             <div className="text-[11px] text-muted-foreground">{det.firstTryscorer?.team} · {det.firstTryscorer?.position}</div>
+            {det.firstTryscorer?.reasoning && (
+              <p className="text-sm leading-relaxed text-foreground/90 mt-2">{det.firstTryscorer.reasoning}</p>
+            )}
           </div>
           {(det.firstTryscorer?.price ?? firstTryPrice) ? (
             <span className="text-lg font-black tabular-nums px-3 py-1.5 rounded-full bg-accent !text-white border border-accent shadow-[0_2px_8px_-2px_color-mix(in_oklab,var(--accent)_60%,transparent)] shrink-0">
@@ -1570,7 +1573,6 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
             </span>
           ) : null}
         </div>
-        <p className="text-sm leading-relaxed text-foreground/90">{det.firstTryscorer?.reasoning}</p>
       </Card>
 
       {/* 8 — Player Double (2+ tries) — moved to sit below First tryscorer */}

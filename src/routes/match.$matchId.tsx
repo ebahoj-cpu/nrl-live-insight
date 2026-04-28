@@ -2048,7 +2048,14 @@ function BetTab({ insights, insightsError, insightsLoading, home, away, tryscore
     setAddingTry(false);
   };
 
-  const totalOdds = legs.reduce((acc, l) => acc * l.price, 1);
+  // Mutual exclusion: if a Winning Margin is selected (not "No margin"), exclude Match Winner from calc.
+  const marginLeg = legs.find((l) => l.id === "margin");
+  const marginActive = !!marginLeg && marginLeg.selection !== NO_MARGIN_LABEL;
+  const totalOdds = legs.reduce((acc, l) => {
+    if (marginActive && l.id === "winner") return acc;
+    if (!marginActive && l.id === "margin") return acc;
+    return acc * l.price;
+  }, 1);
   const stakeNum = Math.max(0, Number(stake) || 0);
   const payout = stakeNum * totalOdds;
   const profit = payout - stakeNum;

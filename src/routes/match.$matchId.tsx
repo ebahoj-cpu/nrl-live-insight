@@ -9,6 +9,7 @@ import {
   ArrowLeft, Clock, MapPin, Users, BarChart3, Sparkles,
   Trophy, Target, Flag, Crown, TrendingUp, AlertCircle, CloudSun, Calendar, Zap, Hourglass,
   ThumbsUp, ThumbsDown, Activity, Shield, Compass, Gauge, Check,
+  Receipt, X,
 } from "lucide-react";
 
 const matchQO = (matchId: string) => queryOptions({
@@ -47,7 +48,7 @@ export const Route = createFileRoute("/match/$matchId")({
   },
 });
 
-type TabKey = "lineup" | "stats" | "insights" | "script";
+type TabKey = "lineup" | "stats" | "insights" | "bet" | "script";
 
 function MatchPage() {
   return (
@@ -145,10 +146,11 @@ function MatchInner() {
       </section>
 
       {/* Tabs — icon-only on mobile, icon+label on sm+ */}
-      <nav className="mt-6 grid grid-cols-3 gap-1 p-1 glass" role="tablist">
+      <nav className="mt-6 grid grid-cols-4 gap-1 p-1 glass" role="tablist">
         <TabButton active={tab === "lineup"} onClick={() => setTab("lineup")} icon={Users} label="Lineup" />
         <TabButton active={tab === "stats"} onClick={() => setTab("stats")} icon={BarChart3} label="Stats" />
         <TabButton active={tab === "insights"} onClick={() => setTab("insights")} icon={Target} label="Insights" />
+        <TabButton active={tab === "bet"} onClick={() => setTab("bet")} icon={Receipt} label="Bet" />
       </nav>
 
       <div className="mt-6">
@@ -165,6 +167,17 @@ function MatchInner() {
             awayRow={awayRow}
             tryscorers={tryscorers}
             tryscorersError={tryscorersError}
+            odds={odds}
+          />
+        )}
+        {tab === "bet" && (
+          <BetTab
+            insights={insights}
+            insightsError={insightsLoading ? null : insightsError}
+            insightsLoading={insightsLoading}
+            home={details.homeTeam}
+            away={details.awayTeam}
+            tryscorers={tryscorers}
             odds={odds}
           />
         )}
@@ -1809,4 +1822,206 @@ const formatTime = (utc: string): string => {
     hour: "numeric", minute: "2-digit", hour12: true,
   }).format(d).toLowerCase();
 };
+
+/* ================= BET TAB — PROFESSIONAL BETSLIP ================= */
+
+type BetLeg = {
+  id: string;
+  market: string;
+  selection: string;
+  detail?: string;
+  price: number;
+};
+
+function BetTab({ insights, insightsError, insightsLoading, home, away, tryscorers, odds }:
+  { insights: any; insightsError: string | null; insightsLoading?: boolean;
+    home: TeamWithPlayers; away: TeamWithPlayers;
+    tryscorers: TryscorerMarkets | null; odds?: OddsEvent | null }) {
+
+  if (insightsLoading) return <InsightsLoading />;
+  if (insightsError && !insights) return <Empty msg={insightsError} />;
+  if (!insights) return <Empty msg="Insights unavailable." />;
+  const det = insights?.deterministic;
+  if (!det) return <Empty msg="Stats engine output not yet computed for this fixture." />;
+
+  // Best anytime price lookup
+  const anytimePriceByName = new Map<string, number>();
+  for (const t of tryscorers?.anytime ?? []) {
+    const key = t.player.trim().toLowerCase();
+    const existing = anytimePriceByName.get(key);
+    if (existing == null || t.price < existing) anytimePriceByName.set(key, t.price);
+  }
+  const getAnytime = (name?: string | null): number | null => {
+    if (!name) return null;
+    return anytimePriceByName.get(name.trim().toLowerCase()) ?? null;
+  };
+
+  // Estimate odds when bookmaker odds aren't available
+  const winnerSide: "home" | "away" = det.matchWinner?.team ?? "home";
+  const winnerNick: string = det.matchWinner?.nickname ?? home.nickName;
+  const bestOdds = odds ? bestH2H(odds) : { home: null, away: null };
+  const winnerPriceObj = winnerSide === "home" ? bestOdds.home : bestOdds.away;
+  const winnerPrice = winnerPriceObj?.price ?? 1.85;
+
+  const marginBucket = det.margin?.bucket ?? "1–12";
+  const marginPrice = marginBucket === "13+" ? 2.40 : 1.65;
+
+  const totalLean = (det.totalPoints?.lean ?? "Over") as "Over" | "Under";
+  const totalLine = det.totalPoints?.line ?? 41.5;
+  const totalPrice = 1.92;
+
+  const htftPick = det.htft?.pick ?? "—";
+  const htftPrice = 3.50;
+
+  // 3 anytime tryscorers from insights' predicted outcome (or fallback to topAnytimeHome top picks)
+  const outcomePicks: any[] = det.predictedOutcome?.picks ?? [];
+  const fallbackPicks: any[] = [
+    ...(det.topAnytimeHome ?? []).slice(0, 2),
+    ...(det.topAnytimeAway ?? []).slice(0, 1),
+  ];
+  const tryscorerPicks: any[] = (outcomePicks.length >= 3 ? outcomePicks : fallbackPicks).slice(0, 3);
+
+  const initialLegs: BetLeg[] = [
+    {
+      id: "winner",
+      market: "Match Winner",
+      selection: winnerNick,
+      detail: `${home.nickName} vs ${away.nickName}`,
+      price: Number(winnerPrice.toFixed(2)),
+    },
+    {
+      id: "margin",
+      market: "Winning Margin",
+      selection: `${winnerNick} by ${marginBucket}`,
+      price: marginPrice,
+    },
+    {
+      id: "total",
+      market: "Total Points",
+      selection: `${totalLean} ${totalLine}`,
+      price: totalPrice,
+    },
+    {
+      id: "htft",
+      market: "Halftime / Fulltime Double",
+      selection: htftPick,
+      price: htftPrice,
+    },
+    ...tryscorerPicks.map((p, i) => {
+      const livePrice = getAnytime(p?.name);
+      return {
+        id: `tryscorer-${i}`,
+        market: `Anytime Tryscorer ${i + 1}`,
+        selection: p?.name ?? "—",
+        detail: p?.team ? `${p.team}${p.position ? ` · ${p.position}` : ""}` : (p?.position ?? ""),
+        price: livePrice ?? (typeof p?.price === "number" ? p.price : 4.50),
+      };
+    }),
+  ];
+
+  const [legs, setLegs] = useState<BetLeg[]>(initialLegs);
+  const [stake, setStake] = useState<string>("10");
+
+  const removeLeg = (id: string) => setLegs((prev) => prev.filter((l) => l.id !== id));
+
+  const totalOdds = legs.reduce((acc, l) => acc * l.price, 1);
+  const stakeNum = Math.max(0, Number(stake) || 0);
+  const payout = stakeNum * totalOdds;
+  const profit = payout - stakeNum;
+
+  return (
+    <div className="space-y-4 max-w-2xl mx-auto">
+      <Card title="Betslip" icon={Receipt} className="accent-glow">
+        <div className="flex items-center justify-between mb-4 -mt-2">
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
+            {legs.length} {legs.length === 1 ? "leg" : "legs"} · Multi
+          </div>
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+            {home.nickName} v {away.nickName}
+          </div>
+        </div>
+
+        {legs.length === 0 ? (
+          <div className="text-center py-8 text-sm text-muted-foreground">
+            No selections. Switch to Insights to rebuild your slip.
+          </div>
+        ) : (
+          <ul className="space-y-2">
+            {legs.map((leg) => (
+              <li
+                key={leg.id}
+                className="bg-surface-2 rounded-lg p-3 flex items-start gap-3 border border-border/40"
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="text-[9px] uppercase tracking-wider text-muted-foreground font-bold">
+                    {leg.market}
+                  </div>
+                  <div className="text-sm font-bold mt-0.5 truncate">{leg.selection}</div>
+                  {leg.detail ? (
+                    <div className="text-[11px] text-muted-foreground truncate mt-0.5">{leg.detail}</div>
+                  ) : null}
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-sm font-black tabular-nums px-2.5 py-1 rounded-full bg-accent !text-white border border-accent shadow-[0_2px_8px_-2px_color-mix(in_oklab,var(--accent)_60%,transparent)]">
+                    {leg.price.toFixed(2)}
+                  </span>
+                  <button
+                    onClick={() => removeLeg(leg.id)}
+                    aria-label={`Remove ${leg.market}`}
+                    className="h-6 w-6 rounded-full bg-surface hover:bg-danger/15 hover:text-danger text-muted-foreground flex items-center justify-center transition"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {/* Calculator */}
+        <div className="mt-5 pt-4 border-t border-border space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <label htmlFor="bet-stake" className="text-[11px] uppercase tracking-wider font-bold text-muted-foreground">
+              Stake
+            </label>
+            <div className="flex items-center gap-1 bg-surface-2 rounded-lg px-2 py-1.5 border border-border/40 focus-within:border-accent/60">
+              <span className="text-sm font-bold text-muted-foreground">$</span>
+              <input
+                id="bet-stake"
+                inputMode="decimal"
+                value={stake}
+                onChange={(e) => setStake(e.target.value.replace(/[^0-9.]/g, ""))}
+                className="w-24 bg-transparent outline-none text-right text-base font-black tabular-nums"
+                placeholder="0"
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">Total odds</span>
+            <span className="font-black tabular-nums kbd">{totalOdds.toFixed(2)}</span>
+          </div>
+
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">Potential profit</span>
+            <span className="font-black tabular-nums text-success">
+              ${profit.toFixed(2)}
+            </span>
+          </div>
+
+          <div className="rounded-lg bg-accent/10 border border-accent/30 px-4 py-3 flex items-center justify-between">
+            <span className="text-[11px] uppercase tracking-wider font-bold text-accent">Potential payout</span>
+            <span className="text-2xl font-black tabular-nums text-accent">
+              ${payout.toFixed(2)}
+            </span>
+          </div>
+
+          <p className="text-[10px] text-muted-foreground text-center pt-1">
+            Odds shown are best available or model-estimated. Confirm with your bookie before placing. 18+ · Bet responsibly.
+          </p>
+        </div>
+      </Card>
+    </div>
+  );
+}
 

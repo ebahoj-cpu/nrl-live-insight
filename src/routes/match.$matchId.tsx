@@ -2072,10 +2072,7 @@ function BetTab({ insights, insightsError, insightsLoading, home, away, tryscore
                             value={o.label}
                             className="text-sm font-semibold focus:bg-accent/20 focus:text-foreground data-[state=checked]:text-accent rounded-md"
                           >
-                            <span className="flex items-center justify-between gap-4 w-full">
-                              <span className="truncate">{o.label}</span>
-                              <span className="tabular-nums text-[11px] font-black text-accent">{o.price.toFixed(2)}</span>
-                            </span>
+                            {o.label}
                           </SelectItem>
                         ))}
                       </SelectContent>

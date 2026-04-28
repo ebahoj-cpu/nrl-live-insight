@@ -161,3 +161,21 @@ function shortCondition(c: string): string {
   if (words.length <= 2) return c;
   return words.slice(0, 2).join(" ");
 }
+
+function OddsPill({ odds, isFav }: { odds: { price: number; book: string } | null; isFav: boolean }) {
+  if (!odds) {
+    return (
+      <span className="mt-2 inline-flex items-center px-2.5 py-1 rounded-full bg-surface-2 text-[11px] font-bold tabular-nums text-muted-foreground border border-border">
+        —
+      </span>
+    );
+  }
+  const base = "mt-2 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[12px] font-black tabular-nums tracking-tight transition-all";
+  const fav = "bg-accent !text-white shadow-[0_4px_14px_-4px_color-mix(in_oklab,var(--accent)_60%,transparent)]";
+  const dog = "bg-accent/10 text-accent border border-accent/30";
+  return (
+    <span className={`${base} ${isFav ? fav : dog}`} title={`Best price: ${odds.book}`}>
+      {odds.price.toFixed(2)}
+    </span>
+  );
+}

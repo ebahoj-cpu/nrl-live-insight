@@ -48,7 +48,7 @@ export const Route = createFileRoute("/match/$matchId")({
   },
 });
 
-type TabKey = "lineup" | "stats" | "insights" | "script";
+type TabKey = "lineup" | "stats" | "insights" | "bet" | "script";
 
 function MatchPage() {
   return (

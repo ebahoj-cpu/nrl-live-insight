@@ -2077,8 +2077,8 @@ function BetTab({ insights, insightsError, insightsLoading, home, away, tryscore
                   </div>
                   {leg.options ? (
                     <Select value={leg.selection} onValueChange={(v) => updateLegSelection(leg.id, v)}>
-                      <SelectTrigger className="mt-0.5 h-auto px-2 py-1 -ml-2 bg-transparent border border-transparent hover:border-accent/40 hover:bg-accent/5 focus:ring-0 focus:border-accent/60 rounded-md text-sm font-bold text-foreground shadow-none transition w-full justify-between gap-2">
-                        <SelectValue />
+                      <SelectTrigger className="mt-1 h-auto min-h-[2rem] px-2 py-1 -ml-2 bg-transparent border border-transparent hover:border-accent/40 hover:bg-accent/5 focus:ring-0 focus:border-accent/60 rounded-md text-base font-bold text-foreground shadow-none transition w-full justify-between gap-2 [&>span]:line-clamp-none [&>span]:text-left [&>span]:whitespace-normal [&>span]:break-words [&>span]:flex-1">
+                        <SelectValue placeholder="Select…" />
                       </SelectTrigger>
                       <SelectContent
                         className="bg-surface-2 border-accent/30 text-foreground shadow-xl rounded-lg backdrop-blur"
@@ -2096,7 +2096,7 @@ function BetTab({ insights, insightsError, insightsLoading, home, away, tryscore
                       </SelectContent>
                     </Select>
                   ) : (
-                    <div className="text-sm font-bold mt-0.5 truncate">{leg.selection}</div>
+                    <div className="text-base font-bold mt-1 break-words">{leg.selection}</div>
                   )}
                   {leg.detail ? (
                     <div className="text-[11px] text-muted-foreground truncate mt-0.5">{leg.detail}</div>

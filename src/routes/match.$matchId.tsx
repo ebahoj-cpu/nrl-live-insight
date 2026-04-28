@@ -1552,17 +1552,20 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
 
       {/* 6 — First Tryscorer */}
       <Card title="First tryscorer" icon={Flag} className="accent-glow">
-        <div className="flex items-center gap-3 mb-2">
+        <div className="flex items-start gap-3">
           <div className="h-12 w-12 rounded-full bg-accent/15 text-accent flex items-center justify-center shrink-0">
             <Crown className="h-6 w-6" />
           </div>
           <div className="min-w-0 flex-1">
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Top opening-set pick</div>
-            <div className="flex items-center gap-2 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
               <div className="text-xl font-black truncate">{det.firstTryscorer?.name}</div>
               <AnytimeOddsTag price={getAnytime(det.firstTryscorer?.name)} />
             </div>
             <div className="text-[11px] text-muted-foreground">{det.firstTryscorer?.team} · {det.firstTryscorer?.position}</div>
+            {det.firstTryscorer?.reasoning && (
+              <p className="text-sm leading-relaxed text-foreground/90 mt-2">{det.firstTryscorer.reasoning}</p>
+            )}
           </div>
           {(det.firstTryscorer?.price ?? firstTryPrice) ? (
             <span className="text-lg font-black tabular-nums px-3 py-1.5 rounded-full bg-accent !text-white border border-accent shadow-[0_2px_8px_-2px_color-mix(in_oklab,var(--accent)_60%,transparent)] shrink-0">
@@ -1570,7 +1573,6 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
             </span>
           ) : null}
         </div>
-        <p className="text-sm leading-relaxed text-foreground/90">{det.firstTryscorer?.reasoning}</p>
       </Card>
 
       {/* 8 — Player Double (2+ tries) — moved to sit below First tryscorer */}
@@ -1917,10 +1919,13 @@ function BetTab({ insights, insightsError, insightsLoading, home, away, tryscore
   ];
   const initialWinner = winnerOptions.find((o) => o.label === winnerNick) ?? winnerOptions[0];
 
-  // Winning margin — only 1-12 or 13+ per team. Single fixed price for betslip calc.
+  // Winning margin — only 1-12 or 13+ per team. Mutually exclusive with Match Winner.
+  // "No margin" leaves only the Match Winner price in the calc.
   const marginBuckets = ["1-12", "13+"];
   const MARGIN_PRICE = 2.00;
+  const NO_MARGIN_LABEL = "No margin (use match winner)";
   const marginOptions: { label: string; price: number }[] = [
+    { label: NO_MARGIN_LABEL, price: 1 },
     ...marginBuckets.map((b) => ({ label: `${home.nickName} ${b}`, price: MARGIN_PRICE })),
     ...marginBuckets.map((b) => ({ label: `${away.nickName} ${b}`, price: MARGIN_PRICE })),
   ];
@@ -2043,7 +2048,14 @@ function BetTab({ insights, insightsError, insightsLoading, home, away, tryscore
     setAddingTry(false);
   };
 
-  const totalOdds = legs.reduce((acc, l) => acc * l.price, 1);
+  // Mutual exclusion: if a Winning Margin is selected (not "No margin"), exclude Match Winner from calc.
+  const marginLeg = legs.find((l) => l.id === "margin");
+  const marginActive = !!marginLeg && marginLeg.selection !== NO_MARGIN_LABEL;
+  const totalOdds = legs.reduce((acc, l) => {
+    if (marginActive && l.id === "winner") return acc;
+    if (!marginActive && l.id === "margin") return acc;
+    return acc * l.price;
+  }, 1);
   const stakeNum = Math.max(0, Number(stake) || 0);
   const payout = stakeNum * totalOdds;
   const profit = payout - stakeNum;
@@ -2053,7 +2065,10 @@ function BetTab({ insights, insightsError, insightsLoading, home, away, tryscore
       <Card title="Betslip" icon={Receipt} className="accent-glow">
         <div className="flex items-center justify-between mb-4 -mt-2">
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
-            {legs.length} {legs.length === 1 ? "leg" : "legs"} · Multi
+            {(() => {
+              const counted = legs.filter((l) => !((marginActive && l.id === "winner") || (!marginActive && l.id === "margin"))).length;
+              return `${counted} ${counted === 1 ? "leg" : "legs"} · Multi`;
+            })()}
           </div>
           <div className="flex items-center gap-1.5">
             <TeamLogo themeKey={home.themeKey} name={home.nickName} size={22} />
@@ -2068,14 +2083,21 @@ function BetTab({ insights, insightsError, insightsLoading, home, away, tryscore
           </div>
         ) : (
           <ul className="space-y-2">
-            {legs.map((leg) => (
+            {legs.map((leg) => {
+              const excluded = (marginActive && leg.id === "winner") || (!marginActive && leg.id === "margin");
+              return (
               <li
                 key={leg.id}
-                className="bg-surface-2 rounded-lg p-3 flex items-start gap-3 border border-border/40"
+                className={`bg-surface-2 rounded-lg p-3 flex items-start gap-3 border border-border/40 transition ${excluded ? "opacity-50" : ""}`}
               >
                 <div className="flex-1 min-w-0">
-                  <div className="text-[9px] uppercase tracking-wider text-muted-foreground font-bold">
-                    {leg.market}
+                  <div className="text-[9px] uppercase tracking-wider text-muted-foreground font-bold flex items-center gap-2">
+                    <span>{leg.market}</span>
+                    {excluded && (
+                      <span className="text-[8px] font-bold text-muted-foreground/80 bg-surface px-1.5 py-0.5 rounded normal-case tracking-normal">
+                        not counted
+                      </span>
+                    )}
                   </div>
                   {leg.options ? (
                     <Select value={leg.selection} onValueChange={(v) => updateLegSelection(leg.id, v)}>
@@ -2105,7 +2127,7 @@ function BetTab({ insights, insightsError, insightsLoading, home, away, tryscore
                   ) : null}
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  <span className="text-sm font-black tabular-nums px-2.5 py-1 rounded-full bg-accent !text-white border border-accent shadow-[0_2px_8px_-2px_color-mix(in_oklab,var(--accent)_60%,transparent)]">
+                  <span className={`text-sm font-black tabular-nums px-2.5 py-1 rounded-full border ${excluded ? "bg-surface text-muted-foreground border-border" : "bg-accent !text-white border-accent shadow-[0_2px_8px_-2px_color-mix(in_oklab,var(--accent)_60%,transparent)]"}`}>
                     {leg.price.toFixed(2)}
                   </span>
                   <button
@@ -2117,7 +2139,8 @@ function BetTab({ insights, insightsError, insightsLoading, home, away, tryscore
                   </button>
                 </div>
               </li>
-            ))}
+              );
+            })}
           </ul>
         )}
 

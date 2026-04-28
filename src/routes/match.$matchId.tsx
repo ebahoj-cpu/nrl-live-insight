@@ -270,18 +270,42 @@ const POSITION_ORDER = [
 type TeamNews = { ins: string[]; outs: string[]; blurb: string; sourceUrl: string } | null;
 
 function LineupTab({ home, away, officials, teamNews }: { home: any; away: any; officials: { position: string; firstName: string; lastName: string; headImage?: string }[]; teamNews?: { home: TeamNews; away: TeamNews } }) {
+  const [side, setSide] = useState<"home" | "away">("home");
+  const team = side === "home" ? home : away;
+  const news = side === "home" ? (teamNews?.home ?? null) : (teamNews?.away ?? null);
+
+  const TeamTab = ({ value, t, label }: { value: "home" | "away"; t: any; label: string }) => {
+    const active = side === value;
+    return (
+      <button
+        type="button"
+        onClick={() => setSide(value)}
+        aria-pressed={active}
+        className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-md transition-all ${
+          active
+            ? "bg-accent/15 ring-1 ring-accent/40 text-foreground"
+            : "bg-surface-2/50 text-muted-foreground hover:text-foreground"
+        }`}
+      >
+        <TeamLogo themeKey={t.themeKey} name={t.nickName} size={28} />
+        <div className="flex flex-col items-start leading-tight min-w-0">
+          <span className="text-[9px] uppercase tracking-wider opacity-70">{label}</span>
+          <span className="text-sm font-extrabold uppercase truncate">{t.nickName}</span>
+        </div>
+      </button>
+    );
+  };
+
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="space-y-4">
-          <SquadPanel team={home} />
-          <InjuryCard team={home} news={teamNews?.home ?? null} />
+      <section className="card-surface p-2">
+        <div className="flex items-stretch gap-2">
+          <TeamTab value="home" t={home} label="Home" />
+          <TeamTab value="away" t={away} label="Away" />
         </div>
-        <div className="space-y-4">
-          <SquadPanel team={away} />
-          <InjuryCard team={away} news={teamNews?.away ?? null} />
-        </div>
-      </div>
+      </section>
+      <SquadPanel team={team} />
+      <InjuryCard team={team} news={news} />
       <OfficialsCard officials={officials} />
     </div>
   );

@@ -1477,6 +1477,18 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
     return anytimePriceByName.get(name.trim().toLowerCase()) ?? null;
   };
 
+  // Map player name -> best 2+ tryscorer price.
+  const multiPriceByName = new Map<string, number>();
+  for (const t of tryscorers?.multi ?? []) {
+    const key = t.player.trim().toLowerCase();
+    const existing = multiPriceByName.get(key);
+    if (existing == null || t.price < existing) multiPriceByName.set(key, t.price);
+  }
+  const getMulti = (name?: string | null): number | null => {
+    if (!name) return null;
+    return multiPriceByName.get(name.trim().toLowerCase()) ?? null;
+  };
+
   return (
     <div className="space-y-4">
       {/* 1 — Match Winner */}

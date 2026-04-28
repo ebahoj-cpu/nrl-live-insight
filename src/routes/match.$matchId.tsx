@@ -1057,7 +1057,7 @@ function TotalPointsCard({ model, bookieTotal }:
       <div className="text-center">
         <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Projected total</div>
         <div className="text-3xl font-black kbd mt-1">{projected}</div>
-        <div className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider px-2 py-1 rounded-md bg-accent/15 text-accent border border-accent/30">
+        <div className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider px-2 py-1 rounded-md bg-accent !text-white border border-accent shadow-[0_2px_8px_-2px_color-mix(in_oklab,var(--accent)_60%,transparent)]">
           {lean === "Over" ? <TrendingUp className="h-3 w-3" /> : <TrendingUp className="h-3 w-3 rotate-180" />}
           {lean} {line}
         </div>
@@ -1277,7 +1277,7 @@ function AnytimeTryscorersCard({ tryscorers, home, away, model }:
     <Card title="Anytime tryscorers" icon={Sparkles}>
       {board.hasLive ? (
         <div className="flex items-center gap-2 mb-3 text-[10px] uppercase tracking-wider">
-          <span className="px-2 py-0.5 rounded-md bg-accent/15 text-accent border border-accent/30 font-bold">Live odds{board.book ? ` · ${board.book}` : ""}</span>
+          <span className="px-2 py-0.5 rounded-md bg-accent !text-white border border-accent shadow-[0_2px_8px_-2px_color-mix(in_oklab,var(--accent)_60%,transparent)] font-bold">Live odds{board.book ? ` · ${board.book}` : ""}</span>
         </div>
       ) : null}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1300,7 +1300,7 @@ function TryscorerTeamColumn({ title, picks, accent }: { title: string; picks: A
             <li key={`${p.name}-${i}`} className="flex items-center gap-2">
               <span className="kbd h-5 w-5 rounded-full bg-surface-2 text-[10px] font-bold flex items-center justify-center shrink-0">{i + 1}</span>
               <span className="text-sm font-semibold truncate flex-1">{p.name}</span>
-              <span className="text-xs font-black tabular-nums px-2 py-0.5 rounded-full bg-accent/15 text-accent border border-accent/30">{p.price.toFixed(2)}</span>
+              <span className="text-xs font-black tabular-nums px-2 py-0.5 rounded-full bg-accent !text-white border border-accent shadow-[0_2px_8px_-2px_color-mix(in_oklab,var(--accent)_60%,transparent)]">{p.price.toFixed(2)}</span>
             </li>
           ))}
         </ul>
@@ -1320,7 +1320,7 @@ function MultiTryscorerCard({ insights, tryscorers }: { insights: any; tryscorer
             <li key={i} className="flex items-center gap-3 text-sm">
               <span className="kbd w-5 text-center text-[11px] font-bold text-muted-foreground">{i + 1}</span>
               <span className="flex-1 font-medium truncate">{p.player}</span>
-              <span className="text-xs font-black tabular-nums px-2 py-0.5 rounded-full bg-accent/15 text-accent border border-accent/30">{p.price.toFixed(2)}</span>
+              <span className="text-xs font-black tabular-nums px-2 py-0.5 rounded-full bg-accent !text-white border border-accent shadow-[0_2px_8px_-2px_color-mix(in_oklab,var(--accent)_60%,transparent)]">{p.price.toFixed(2)}</span>
             </li>
           ))}
         </ul>
@@ -1472,7 +1472,7 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
             <div className="text-lg font-black truncate">{winnerNick}</div>
           </div>
           {winnerPrice ? (
-            <span className="text-base font-black tabular-nums px-3 py-1.5 rounded-full bg-accent/15 text-accent border border-accent/30 shrink-0">
+            <span className="text-base font-black tabular-nums px-3 py-1.5 rounded-full bg-accent !text-white border border-accent shadow-[0_2px_8px_-2px_color-mix(in_oklab,var(--accent)_60%,transparent)] shrink-0">
               {winnerPrice.price.toFixed(2)}
             </span>
           ) : null}
@@ -1535,7 +1535,7 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
             <div className="mt-1.5"><AnytimeOddsTag price={getAnytime(det.firstTryscorer?.name)} /></div>
           </div>
           {(det.firstTryscorer?.price ?? firstTryPrice) ? (
-            <span className="text-lg font-black tabular-nums px-3 py-1.5 rounded-full bg-accent/15 text-accent border border-accent/30 shrink-0">
+            <span className="text-lg font-black tabular-nums px-3 py-1.5 rounded-full bg-accent !text-white border border-accent shadow-[0_2px_8px_-2px_color-mix(in_oklab,var(--accent)_60%,transparent)] shrink-0">
               {(det.firstTryscorer?.price ?? firstTryPrice).toFixed(2)}
             </span>
           ) : null}
@@ -1556,7 +1556,7 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
                 {p?.reasoning && <p className="text-[11px] text-muted-foreground leading-snug mt-1">{p.reasoning}</p>}
               </div>
               {p?.price ? (
-                <span className="text-xs font-black tabular-nums px-2 py-0.5 rounded-full bg-accent/15 text-accent border border-accent/30 shrink-0">{p.price.toFixed(2)}</span>
+                <span className="text-xs font-black tabular-nums px-2 py-0.5 rounded-full bg-accent !text-white border border-accent shadow-[0_2px_8px_-2px_color-mix(in_oklab,var(--accent)_60%,transparent)] shrink-0">{p.price.toFixed(2)}</span>
               ) : null}
             </li>
           ))}
@@ -1582,7 +1582,7 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
               )}
             </div>
             {det.playerDouble.price != null ? (
-              <span className="text-lg font-black tabular-nums px-3 py-1.5 rounded-full bg-accent/15 text-accent border border-accent/30 shrink-0">
+              <span className="text-lg font-black tabular-nums px-3 py-1.5 rounded-full bg-accent !text-white border border-accent shadow-[0_2px_8px_-2px_color-mix(in_oklab,var(--accent)_60%,transparent)] shrink-0">
                 {det.playerDouble.price.toFixed(2)}
               </span>
             ) : null}
@@ -1619,7 +1619,7 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
                           {r.reasoning && <p className="text-[11px] text-muted-foreground leading-snug mt-1">{r.reasoning}</p>}
                         </div>
                         {r.price != null ? (
-                          <span className="text-xs font-black tabular-nums px-2 py-0.5 rounded-full bg-accent/15 text-accent border border-accent/30 shrink-0">{r.price.toFixed(2)}</span>
+                          <span className="text-xs font-black tabular-nums px-2 py-0.5 rounded-full bg-accent !text-white border border-accent shadow-[0_2px_8px_-2px_color-mix(in_oklab,var(--accent)_60%,transparent)] shrink-0">{r.price.toFixed(2)}</span>
                         ) : null}
                       </li>
                     ))}
@@ -1649,7 +1649,7 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
                     {r.reasoning && <p className="text-[11px] text-muted-foreground leading-snug mt-1">{r.reasoning}</p>}
                   </div>
                   {r.price != null ? (
-                    <span className="text-xs font-black tabular-nums px-2 py-0.5 rounded-full bg-accent/15 text-accent border border-accent/30 shrink-0">{r.price.toFixed(2)}</span>
+                    <span className="text-xs font-black tabular-nums px-2 py-0.5 rounded-full bg-accent !text-white border border-accent shadow-[0_2px_8px_-2px_color-mix(in_oklab,var(--accent)_60%,transparent)] shrink-0">{r.price.toFixed(2)}</span>
                   ) : null}
                 </li>
               ))}
@@ -1674,7 +1674,7 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
                   {p?.reasoning && <p className="text-[11px] text-muted-foreground leading-snug mt-1">{p.reasoning}</p>}
                 </div>
                 {p?.price != null ? (
-                  <span className="text-xs font-black tabular-nums px-2 py-0.5 rounded-full bg-accent/15 text-accent border border-accent/30 shrink-0">{p.price.toFixed(2)}</span>
+                  <span className="text-xs font-black tabular-nums px-2 py-0.5 rounded-full bg-accent !text-white border border-accent shadow-[0_2px_8px_-2px_color-mix(in_oklab,var(--accent)_60%,transparent)] shrink-0">{p.price.toFixed(2)}</span>
                 ) : null}
               </li>
             ))}
@@ -1732,7 +1732,7 @@ function OutlookCell({ label, pick, price, accent }: { label: string; pick: stri
       <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">{label}</div>
       <div className={`text-sm font-black mt-1 leading-tight ${accent ? "text-accent" : "text-foreground"}`}>{pick}</div>
       {price ? (
-        <div className="mt-1.5 text-[11px] font-black tabular-nums inline-block px-1.5 py-0.5 rounded-full bg-accent/15 text-accent border border-accent/30">{price}</div>
+        <div className="mt-1.5 text-[11px] font-black tabular-nums inline-block px-1.5 py-0.5 rounded-full bg-accent !text-white border border-accent shadow-[0_2px_8px_-2px_color-mix(in_oklab,var(--accent)_60%,transparent)]">{price}</div>
       ) : null}
     </div>
   );

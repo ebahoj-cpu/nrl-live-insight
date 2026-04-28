@@ -27,7 +27,7 @@ async function buildScoutContext(): Promise<string> {
     cached(`fixtures:${season}:current`, TTL.fixtures, () => fetchDraw(season)).catch(() => []),
     cached(`ladder:${season}`, TTL.ladder, () => fetchLadder(season)).catch(() => []),
     cached(`odds:nrl`, TTL.odds, () => fetchNrlOdds()).catch(() => []),
-    cached(`news:all`, 15 * 60_000, () => fetchAllNews()).catch(() => []),
+    cached("news:all", 15 * 60_000, () => fetchNews()).catch(() => [] as NewsItem[]),
   ]);
 
   const fxLines = fixtures.slice(0, 12).map((f) => {

@@ -1831,7 +1831,36 @@ type BetLeg = {
   selection: string;
   detail?: string;
   price: number;
+  // Optional selectable options { label, price }
+  options?: { label: string; price: number }[];
 };
+
+// Margin price by bucket (rough but consistent across both sides)
+function marginPriceFor(bucket: string): number {
+  switch (bucket) {
+    case "1-12": return 1.65;
+    case "13+":  return 2.40;
+    case "1-2":  return 6.50;
+    case "3-12": return 1.95;
+    case "13-24": return 3.10;
+    case "25+":  return 4.50;
+    default: return 2.00;
+  }
+}
+
+function htftPriceFor(label: string, favouriteLabel: string): number {
+  // Cheaper for favourite/favourite, expensive for underdog double or comebacks
+  if (label === favouriteLabel) return 2.40;
+  if (label.includes("Draw")) return 21.0;
+  const [ht, ft] = label.split(" / ");
+  if (ht === ft) return 4.50; // led wire-to-wire by underdog
+  return 6.50; // mixed comeback
+}
+
+function totalPriceFor(side: "Over" | "Under", line: number, lean: "Over" | "Under"): number {
+  // Slight juice toward the leaning side
+  return side === lean ? 1.85 : 1.95;
+}
 
 function BetTab({ insights, insightsError, insightsLoading, home, away, tryscorers, odds }:
   { insights: any; insightsError: string | null; insightsLoading?: boolean;
@@ -1856,24 +1885,44 @@ function BetTab({ insights, insightsError, insightsLoading, home, away, tryscore
     return anytimePriceByName.get(name.trim().toLowerCase()) ?? null;
   };
 
-  // Estimate odds when bookmaker odds aren't available
+  // Match Winner odds
   const winnerSide: "home" | "away" = det.matchWinner?.team ?? "home";
   const winnerNick: string = det.matchWinner?.nickname ?? home.nickName;
   const bestOdds = odds ? bestH2H(odds) : { home: null, away: null };
   const winnerPriceObj = winnerSide === "home" ? bestOdds.home : bestOdds.away;
   const winnerPrice = winnerPriceObj?.price ?? 1.85;
 
-  const marginBucket = det.margin?.bucket ?? "1–12";
-  const marginPrice = marginBucket === "13+" ? 2.40 : 1.65;
+  // Winning margin — selectable across both sides & buckets
+  const marginBuckets = ["1-2", "3-12", "13-24", "25+"];
+  const marginOptions: { label: string; price: number }[] = [
+    ...marginBuckets.map((b) => ({ label: `${home.nickName} ${b}`, price: marginPriceFor(b) })),
+    ...marginBuckets.map((b) => ({ label: `${away.nickName} ${b}`, price: marginPriceFor(b) })),
+  ];
+  const detMarginBucket = det.margin?.bucket ?? "1-12";
+  const initialMarginLabel = `${winnerNick} ${detMarginBucket === "1–12" ? "3-12" : detMarginBucket === "13+" ? "13-24" : detMarginBucket}`;
+  const initialMargin = marginOptions.find((o) => o.label === initialMarginLabel) ?? marginOptions[0];
 
+  // Total points — Over/Under selectable
   const totalLean = (det.totalPoints?.lean ?? "Over") as "Over" | "Under";
   const totalLine = det.totalPoints?.line ?? 41.5;
-  const totalPrice = 1.92;
+  const totalOptions = [
+    { label: `Over ${totalLine}`, price: totalPriceFor("Over", totalLine, totalLean) },
+    { label: `Under ${totalLine}`, price: totalPriceFor("Under", totalLine, totalLean) },
+  ];
 
-  const htftPick = det.htft?.pick ?? "—";
-  const htftPrice = 3.50;
+  // HT/FT — all 9 combos
+  const sides = [home.nickName, "Draw", away.nickName];
+  const favouriteLabel = `${winnerNick} / ${winnerNick}`;
+  const htftOptions = sides.flatMap((ht) =>
+    sides.map((ft) => {
+      const label = `${ht} / ${ft}`;
+      return { label, price: htftPriceFor(label, favouriteLabel) };
+    })
+  );
+  const detHtftPick = det.htft?.pick ?? favouriteLabel;
+  const initialHtft = htftOptions.find((o) => o.label === detHtftPick) ?? htftOptions.find((o) => o.label === favouriteLabel)!;
 
-  // 3 anytime tryscorers from insights' predicted outcome (or fallback to topAnytimeHome top picks)
+  // 3 anytime tryscorers from insights
   const outcomePicks: any[] = det.predictedOutcome?.picks ?? [];
   const fallbackPicks: any[] = [
     ...(det.topAnytimeHome ?? []).slice(0, 2),
@@ -1892,20 +1941,23 @@ function BetTab({ insights, insightsError, insightsLoading, home, away, tryscore
     {
       id: "margin",
       market: "Winning Margin",
-      selection: `${winnerNick} by ${marginBucket}`,
-      price: marginPrice,
+      selection: initialMargin.label,
+      price: initialMargin.price,
+      options: marginOptions,
     },
     {
       id: "total",
       market: "Total Points",
       selection: `${totalLean} ${totalLine}`,
-      price: totalPrice,
+      price: totalPriceFor(totalLean, totalLine, totalLean),
+      options: totalOptions,
     },
     {
       id: "htft",
       market: "Halftime / Fulltime Double",
-      selection: htftPick,
-      price: htftPrice,
+      selection: initialHtft.label,
+      price: initialHtft.price,
+      options: htftOptions,
     },
     ...tryscorerPicks.map((p, i) => {
       const livePrice = getAnytime(p?.name);
@@ -1921,8 +1973,47 @@ function BetTab({ insights, insightsError, insightsLoading, home, away, tryscore
 
   const [legs, setLegs] = useState<BetLeg[]>(initialLegs);
   const [stake, setStake] = useState<string>("10");
+  const [addingTry, setAddingTry] = useState<boolean>(false);
 
   const removeLeg = (id: string) => setLegs((prev) => prev.filter((l) => l.id !== id));
+
+  const updateLegSelection = (id: string, label: string) => {
+    setLegs((prev) => prev.map((l) => {
+      if (l.id !== id || !l.options) return l;
+      const opt = l.options.find((o) => o.label === label);
+      if (!opt) return l;
+      return { ...l, selection: opt.label, price: opt.price };
+    }));
+  };
+
+  // Players already on the slip (anytime legs) — exclude from add list
+  const usedTryscorerNames = new Set(
+    legs.filter((l) => l.market.startsWith("Anytime Tryscorer")).map((l) => l.selection.trim().toLowerCase())
+  );
+  const availableTryscorers = (tryscorers?.anytime ?? [])
+    .filter((t) => !usedTryscorerNames.has(t.player.trim().toLowerCase()))
+    .slice(0, 60);
+
+  const addTryscorer = (name: string) => {
+    const t = (tryscorers?.anytime ?? []).find((x) => x.player === name);
+    if (!t) return;
+    const aff = affiliatePlayer(t.player, home, away);
+    const teamLabel = aff === "home" ? home.nickName : aff === "away" ? away.nickName : "";
+    setLegs((prev) => {
+      const idx = prev.filter((l) => l.market.startsWith("Anytime Tryscorer")).length + 1;
+      return [
+        ...prev,
+        {
+          id: `tryscorer-extra-${Date.now()}`,
+          market: `Anytime Tryscorer ${idx}`,
+          selection: t.player,
+          detail: teamLabel,
+          price: t.price,
+        },
+      ];
+    });
+    setAddingTry(false);
+  };
 
   const totalOdds = legs.reduce((acc, l) => acc * l.price, 1);
   const stakeNum = Math.max(0, Number(stake) || 0);
@@ -1936,8 +2027,10 @@ function BetTab({ insights, insightsError, insightsLoading, home, away, tryscore
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
             {legs.length} {legs.length === 1 ? "leg" : "legs"} · Multi
           </div>
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-            {home.nickName} v {away.nickName}
+          <div className="flex items-center gap-1.5">
+            <TeamLogo themeKey={home.themeKey} name={home.nickName} size={22} />
+            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">v</span>
+            <TeamLogo themeKey={away.themeKey} name={away.nickName} size={22} />
           </div>
         </div>
 
@@ -1956,7 +2049,22 @@ function BetTab({ insights, insightsError, insightsLoading, home, away, tryscore
                   <div className="text-[9px] uppercase tracking-wider text-muted-foreground font-bold">
                     {leg.market}
                   </div>
-                  <div className="text-sm font-bold mt-0.5 truncate">{leg.selection}</div>
+                  {leg.options ? (
+                    <select
+                      value={leg.selection}
+                      onChange={(e) => updateLegSelection(leg.id, e.target.value)}
+                      className="mt-0.5 w-full bg-transparent text-sm font-bold outline-none border-0 cursor-pointer hover:text-accent transition focus:text-accent appearance-none pr-4"
+                      style={{ backgroundImage: "none" }}
+                    >
+                      {leg.options.map((o) => (
+                        <option key={o.label} value={o.label} className="bg-surface-2 text-foreground">
+                          {o.label} · {o.price.toFixed(2)}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <div className="text-sm font-bold mt-0.5 truncate">{leg.selection}</div>
+                  )}
                   {leg.detail ? (
                     <div className="text-[11px] text-muted-foreground truncate mt-0.5">{leg.detail}</div>
                   ) : null}
@@ -1977,6 +2085,46 @@ function BetTab({ insights, insightsError, insightsLoading, home, away, tryscore
             ))}
           </ul>
         )}
+
+        {/* Add tryscorer */}
+        <div className="mt-3">
+          {addingTry ? (
+            <div className="bg-surface-2 rounded-lg p-3 border border-accent/40 flex items-center gap-2">
+              <select
+                autoFocus
+                defaultValue=""
+                onChange={(e) => e.target.value && addTryscorer(e.target.value)}
+                className="flex-1 bg-transparent text-sm font-bold outline-none cursor-pointer"
+              >
+                <option value="" disabled className="bg-surface-2">Select a player…</option>
+                {availableTryscorers.map((t) => {
+                  const aff = affiliatePlayer(t.player, home, away);
+                  const team = aff === "home" ? home.nickName : aff === "away" ? away.nickName : "";
+                  return (
+                    <option key={t.player} value={t.player} className="bg-surface-2 text-foreground">
+                      {t.player}{team ? ` (${team})` : ""} · {t.price.toFixed(2)}
+                    </option>
+                  );
+                })}
+              </select>
+              <button
+                onClick={() => setAddingTry(false)}
+                className="h-7 w-7 rounded-full bg-surface hover:bg-danger/15 hover:text-danger text-muted-foreground flex items-center justify-center transition"
+                aria-label="Cancel add tryscorer"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setAddingTry(true)}
+              disabled={availableTryscorers.length === 0}
+              className="w-full text-[11px] uppercase tracking-wider font-bold py-2.5 rounded-lg border border-dashed border-accent/40 text-accent hover:bg-accent/10 transition disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {availableTryscorers.length === 0 ? "No more tryscorer markets" : "+ Add another anytime tryscorer"}
+            </button>
+          )}
+        </div>
 
         {/* Calculator */}
         <div className="mt-5 pt-4 border-t border-border space-y-3">

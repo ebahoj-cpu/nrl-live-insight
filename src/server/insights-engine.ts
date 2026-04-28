@@ -171,6 +171,32 @@ export function generateDeterministicInsights(inp: EngineInputs): DeterministicI
     ? `${(doublePick.name.split(/\s+/).pop() || doublePick.name)} carries the highest multi-try ceiling on the card — ${doublePick.team}'s scoring shape and matchup volume project them through the line more than once.`
     : "Awaiting team list for double-try profiling.";
 
+  // ---- 10. Predicted Outcome ----
+  // Pick 3 anytime tryscorers — prioritise 2 from the projected winner, 1 from
+  // the loser (the most likely opposition scorer). Falls back to the top of
+  // the combined ranking when one side has no candidates.
+  const winnerHome = winnerSide === "home";
+  const winnerList = winnerHome ? homeRanked : awayRanked;
+  const loserList = winnerHome ? awayRanked : homeRanked;
+  const outcomePicksRows: RankedRow[] = [];
+  if (winnerList[0]) outcomePicksRows.push(winnerList[0]);
+  if (winnerList[1]) outcomePicksRows.push(winnerList[1]);
+  if (loserList[0]) outcomePicksRows.push(loserList[0]);
+  // Top up from overall ranking if we still need more
+  for (const r of ranking) {
+    if (outcomePicksRows.length >= 3) break;
+    if (!outcomePicksRows.find((x) => x.name === r.name)) outcomePicksRows.push(r);
+  }
+  const outcomePicks = outcomePicksRows.slice(0, 3).map((r) => {
+    const isWinnerTeam = r.team.toLowerCase() === winnerNick.toLowerCase();
+    const reason = buildOutcomePickReason(r, isWinnerTeam, winnerHome ? (r.team.toLowerCase() === inp.homeNickname.toLowerCase()) : (r.team.toLowerCase() === inp.awayNickname.toLowerCase()), inp, winnerNick, projectedMargin);
+    return stripInternal(r, reason);
+  });
+  const predictedOutcome = {
+    summary: buildOutcomeSummary(inp, winnerNick, loserNick, predHome, predAway, projectedMargin, winnerStats, loserStats, winnerHome),
+    picks: outcomePicks,
+  };
+
   return {
     generatedAt: new Date().toISOString(),
     matchWinner,
@@ -188,6 +214,7 @@ export function generateDeterministicInsights(inp: EngineInputs): DeterministicI
     topAnytimeHome: homeRanked.map((r) => stripInternal(r, r.reasoning)),
     topAnytimeAway: awayRanked.map((r) => stripInternal(r, r.reasoning)),
     playerDouble: stripInternal(doublePick, doubleReason),
+    predictedOutcome,
   };
 }
 

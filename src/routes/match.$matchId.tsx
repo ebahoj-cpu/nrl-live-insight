@@ -1942,9 +1942,9 @@ function BetTab({ insights, insightsError, insightsLoading, home, away, tryscore
     {
       id: "winner",
       market: "Match Winner",
-      selection: winnerNick,
-      detail: `${home.nickName} vs ${away.nickName}`,
-      price: Number(winnerPrice.toFixed(2)),
+      selection: initialWinner.label,
+      price: initialWinner.price,
+      options: winnerOptions,
     },
     {
       id: "margin",

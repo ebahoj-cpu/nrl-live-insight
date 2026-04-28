@@ -220,6 +220,8 @@ export function generateDeterministicInsights(inp: EngineInputs): DeterministicI
     topAnytimeAway: awayRanked.map((r) => stripInternal(r, r.reasoning)),
     topAnytimeOverall: ranking.slice(0, 3).map((r) => stripInternal(r, r.reasoning)),
     forwardPicks: pickForwardPicks(ranking, homeRanked, awayRanked, inp).map((r) => stripInternal(r, buildForwardPickReason(r))),
+    tryAssistsHome: pickTryAssists(inp, "home").map((r) => stripInternal(r, r.reasoning)),
+    tryAssistsAway: pickTryAssists(inp, "away").map((r) => stripInternal(r, r.reasoning)),
     playerDouble: stripInternal(doublePick, doubleReason),
     predictedOutcome,
   };

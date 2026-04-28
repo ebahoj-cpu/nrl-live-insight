@@ -1775,16 +1775,11 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
                 <li key={`${r.name}-${i}`} className="flex items-start gap-3 bg-surface-2 rounded-lg p-2.5">
                   <span className="kbd h-6 w-6 rounded-full bg-background text-xs font-black flex items-center justify-center shrink-0 mt-0.5">{i + 1}</span>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <div className="text-sm font-bold truncate">{r.name}</div>
-                      <AnytimeOddsTag price={getAnytime(r.name)} />
-                    </div>
+                    <div className="text-sm font-bold truncate">{r.name}</div>
                     <div className="text-[10px] text-muted-foreground">{r.team} · {r.position}</div>
                     {r.reasoning && <p className="text-[11px] text-muted-foreground leading-snug mt-1">{r.reasoning}</p>}
                   </div>
-                  {r.price != null ? (
-                    <span className="text-xs font-black tabular-nums px-2 py-0.5 rounded-full bg-accent !text-white border border-accent shadow-[0_2px_8px_-2px_color-mix(in_oklab,var(--accent)_60%,transparent)] shrink-0">{r.price.toFixed(2)}</span>
-                  ) : null}
+                  <AnytimeOddsTag price={getAnytime(r.name) ?? r.price ?? null} />
                 </li>
               ))}
             </ul>

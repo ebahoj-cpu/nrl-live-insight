@@ -2107,24 +2107,36 @@ function BetTab({ insights, insightsError, insightsLoading, home, away, tryscore
         {/* Add tryscorer */}
         <div className="mt-3">
           {addingTry ? (
-            <div className="bg-surface-2 rounded-lg p-3 border border-accent/40 flex items-center gap-2">
-              <select
-                autoFocus
-                defaultValue=""
-                onChange={(e) => e.target.value && addTryscorer(e.target.value)}
-                className="flex-1 bg-transparent text-sm font-bold outline-none cursor-pointer"
-              >
-                <option value="" disabled className="bg-surface-2">Select a player…</option>
-                {availableTryscorers.map((t) => {
-                  const aff = affiliatePlayer(t.player, home, away);
-                  const team = aff === "home" ? home.nickName : aff === "away" ? away.nickName : "";
-                  return (
-                    <option key={t.player} value={t.player} className="bg-surface-2 text-foreground">
-                      {t.player}{team ? ` (${team})` : ""} · {t.price.toFixed(2)}
-                    </option>
-                  );
-                })}
-              </select>
+            <div className="bg-surface-2 rounded-lg p-2 border border-accent/40 flex items-center gap-2">
+              <Select onValueChange={(v) => v && addTryscorer(v)}>
+                <SelectTrigger className="flex-1 h-9 bg-transparent border-0 focus:ring-0 text-sm font-bold text-foreground shadow-none">
+                  <SelectValue placeholder="Select a player…" />
+                </SelectTrigger>
+                <SelectContent
+                  className="bg-surface-2 border-accent/30 text-foreground shadow-xl rounded-lg max-h-72"
+                  position="popper"
+                >
+                  {availableTryscorers.map((t) => {
+                    const aff = affiliatePlayer(t.player, home, away);
+                    const team = aff === "home" ? home.nickName : aff === "away" ? away.nickName : "";
+                    return (
+                      <SelectItem
+                        key={t.player}
+                        value={t.player}
+                        className="text-sm font-semibold focus:bg-accent/20 focus:text-foreground rounded-md"
+                      >
+                        <span className="flex items-center justify-between gap-4 w-full">
+                          <span className="truncate">
+                            {t.player}
+                            {team ? <span className="text-muted-foreground font-normal"> · {team}</span> : null}
+                          </span>
+                          <span className="tabular-nums text-[11px] font-black text-accent">{t.price.toFixed(2)}</span>
+                        </span>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
               <button
                 onClick={() => setAddingTry(false)}
                 className="h-7 w-7 rounded-full bg-surface hover:bg-danger/15 hover:text-danger text-muted-foreground flex items-center justify-center transition"

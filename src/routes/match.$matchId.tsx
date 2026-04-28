@@ -168,20 +168,7 @@ function MatchInner() {
             odds={odds}
           />
         )}
-        {tab === "script" && (
-          <ScriptTab
-            insights={insights}
-            insightsError={insightsLoading ? null : insightsError}
-            insightsLoading={insightsLoading}
-            home={details.homeTeam}
-            away={details.awayTeam}
-            homeRow={homeRow}
-            awayRow={awayRow}
-            tryscorers={tryscorers}
-            tryscorersError={tryscorersError}
-            odds={odds}
-          />
-        )}
+      </div>
       </div>
 
       <p className="text-[11px] text-muted-foreground text-center mt-10">

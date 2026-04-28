@@ -1570,8 +1570,8 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {[
-              { label: home?.nickName ?? "Home", themeKey: home?.theme?.key ?? "", list: det.topAnytimeHome ?? [] },
-              { label: away?.nickName ?? "Away", themeKey: away?.theme?.key ?? "", list: det.topAnytimeAway ?? [] },
+              { label: home?.nickName ?? "Home", themeKey: home?.themeKey ?? "", list: det.topAnytimeHome ?? [] },
+              { label: away?.nickName ?? "Away", themeKey: away?.themeKey ?? "", list: det.topAnytimeAway ?? [] },
             ].map((col) => (
               <div key={col.label}>
                 <div className="flex items-center gap-2 mb-2">

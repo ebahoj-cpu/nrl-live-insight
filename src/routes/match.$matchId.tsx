@@ -448,7 +448,28 @@ function OfficialAvatar({ src, firstName, lastName, size }: { src?: string; firs
   );
 }
 
-function SquadPanel({ team }: { team: { nickName: string; themeKey: string; players: { firstName: string; lastName: string; position: string; jerseyNumber?: number; isCaptain?: boolean }[] } }) {
+function PlayerHeadshot({ src, firstName, lastName }: { src?: string; firstName: string; lastName: string }) {
+  const [failed, setFailed] = useState(false);
+  const initials = `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
+  if (!src || failed) {
+    return (
+      <span className="hidden xs:flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-background text-[10px] font-extrabold text-muted-foreground ring-1 ring-accent/25">
+        {initials}
+      </span>
+    );
+  }
+  return (
+    <img
+      src={src}
+      alt={`${firstName} ${lastName}`}
+      onError={() => setFailed(true)}
+      loading="lazy"
+      className="h-8 w-8 shrink-0 rounded-full object-cover bg-background ring-1 ring-accent/25"
+    />
+  );
+}
+
+function SquadPanel({ team }: { team: { nickName: string; themeKey: string; players: { firstName: string; lastName: string; position: string; jerseyNumber?: number; isCaptain?: boolean; headImage?: string }[] } }) {
   const sorted = [...team.players].sort((a, b) => {
     const ai = a.jerseyNumber ?? 999;
     const bi = b.jerseyNumber ?? 999;
@@ -486,6 +507,7 @@ function SquadPanel({ team }: { team: { nickName: string; themeKey: string; play
       <span className="hidden sm:inline text-[10px] uppercase tracking-wider text-muted-foreground shrink-0">
         {p.position}
       </span>
+      <PlayerHeadshot src={p.headImage} firstName={p.firstName} lastName={p.lastName} />
     </li>
   );
 

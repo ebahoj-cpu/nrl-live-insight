@@ -416,6 +416,52 @@ function SquadPanel({ team }: { team: { nickName: string; themeKey: string; play
     const pj = POSITION_ORDER.indexOf(b.position);
     return (pi === -1 ? 99 : pi) - (pj === -1 ? 99 : pj);
   });
+
+  type P = (typeof sorted)[number];
+  const starters: P[] = [];
+  const interchange: P[] = [];
+  const reserves: P[] = [];
+  const unnumbered: P[] = [];
+  for (const p of sorted) {
+    const n = p.jerseyNumber;
+    if (n == null) unnumbered.push(p);
+    else if (n <= 13) starters.push(p);
+    else if (n <= 20) interchange.push(p);
+    else reserves.push(p);
+  }
+
+  const renderRow = (p: P, i: number) => (
+    <li
+      key={i}
+      className="flex items-center gap-3 rounded-md bg-accent/15 ring-1 ring-accent/25 px-2 py-1.5"
+    >
+      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-background text-accent font-extrabold text-sm tabular-nums">
+        {p.jerseyNumber ?? "—"}
+      </span>
+      <span className="flex-1 min-w-0 font-extrabold uppercase tracking-wide text-sm truncate">
+        {p.firstName} {p.lastName}
+        {p.isCaptain && <Crown className="inline h-3 w-3 ml-1.5 text-accent align-[-1px]" />}
+      </span>
+      <span className="hidden sm:inline text-[10px] uppercase tracking-wider text-muted-foreground shrink-0">
+        {p.position}
+      </span>
+    </li>
+  );
+
+  const Group = ({ label, items }: { label?: string; items: P[] }) => {
+    if (items.length === 0) return null;
+    return (
+      <div className="space-y-1.5">
+        {label && (
+          <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-accent/80 pt-1">
+            {label}
+          </div>
+        )}
+        <ul className="space-y-1.5">{items.map(renderRow)}</ul>
+      </div>
+    );
+  };
+
   return (
     <section className="card-surface p-5">
       <div className="flex items-center justify-between gap-2 mb-4">
@@ -428,20 +474,12 @@ function SquadPanel({ team }: { team: { nickName: string; themeKey: string; play
       {sorted.length === 0 ? (
         <div className="text-xs text-muted-foreground">Squad not yet named.</div>
       ) : (
-        <ul className="space-y-2">
-          {sorted.map((p, i) => (
-            <li key={i} className="flex items-center gap-3 text-sm">
-              {p.jerseyNumber != null && (
-                <span className="kbd w-6 text-center text-xs font-bold text-muted-foreground">{p.jerseyNumber}</span>
-              )}
-              <span className="flex-1">
-                <span className="font-medium">{p.firstName} {p.lastName}</span>
-                {p.isCaptain && <Crown className="inline h-3 w-3 ml-1.5 text-accent" />}
-              </span>
-              <span className="text-[11px] uppercase tracking-wider text-muted-foreground">{p.position}</span>
-            </li>
-          ))}
-        </ul>
+        <div className="space-y-3">
+          <Group items={starters} />
+          <Group label="Interchange" items={interchange} />
+          <Group label="Reserves" items={reserves} />
+          {unnumbered.length > 0 && <Group label="Unnamed" items={unnumbered} />}
+        </div>
       )}
     </section>
   );

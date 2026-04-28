@@ -176,7 +176,7 @@ function BottomNav() {
         aria-label="Primary"
         className="pointer-events-auto bg-surface/95 backdrop-blur-xl border-t-2 border-accent/40 shadow-[0_-12px_32px_-8px_rgba(0,0,0,0.6)]"
       >
-        <ul className="mx-auto max-w-6xl grid grid-cols-3 px-2">
+        <ul className="mx-auto max-w-6xl grid grid-cols-4 px-2">
           {NAV_ITEMS.map(({ to, label, icon: Icon, exact }) => (
             <li key={to}>
               <Link

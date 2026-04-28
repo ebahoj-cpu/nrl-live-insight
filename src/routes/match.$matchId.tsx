@@ -1593,11 +1593,14 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
                 <p className="text-sm leading-relaxed text-foreground/90 mt-2">{det.playerDouble.reasoning}</p>
               )}
             </div>
-            {det.playerDouble.price != null ? (
-              <span className="text-lg font-black tabular-nums px-3 py-1.5 rounded-full bg-accent !text-white border border-accent shadow-[0_2px_8px_-2px_color-mix(in_oklab,var(--accent)_60%,transparent)] shrink-0">
-                {det.playerDouble.price.toFixed(2)}
-              </span>
-            ) : null}
+            {(() => {
+              const doublePrice = det.playerDouble.price ?? getMulti(det.playerDouble.name);
+              return doublePrice != null ? (
+                <span className="text-lg font-black tabular-nums px-3 py-1.5 rounded-full bg-accent !text-white border border-accent shadow-[0_2px_8px_-2px_color-mix(in_oklab,var(--accent)_60%,transparent)] shrink-0">
+                  {doublePrice.toFixed(2)}
+                </span>
+              ) : null;
+            })()}
           </div>
         )}
       </Card>

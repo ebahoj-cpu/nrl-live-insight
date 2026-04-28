@@ -9,11 +9,17 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as NewsRouteImport } from './routes/news'
 import { Route as LadderRouteImport } from './routes/ladder'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as MatchMatchIdRouteImport } from './routes/match.$matchId'
 import { Route as ApiPublicHooksPrecomputeInsightsRouteImport } from './routes/api/public/hooks/precompute-insights'
 
+const NewsRoute = NewsRouteImport.update({
+  id: '/news',
+  path: '/news',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LadderRoute = LadderRouteImport.update({
   id: '/ladder',
   path: '/ladder',
@@ -39,12 +45,14 @@ const ApiPublicHooksPrecomputeInsightsRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/ladder': typeof LadderRoute
+  '/news': typeof NewsRoute
   '/match/$matchId': typeof MatchMatchIdRoute
   '/api/public/hooks/precompute-insights': typeof ApiPublicHooksPrecomputeInsightsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/ladder': typeof LadderRoute
+  '/news': typeof NewsRoute
   '/match/$matchId': typeof MatchMatchIdRoute
   '/api/public/hooks/precompute-insights': typeof ApiPublicHooksPrecomputeInsightsRoute
 }
@@ -52,6 +60,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/ladder': typeof LadderRoute
+  '/news': typeof NewsRoute
   '/match/$matchId': typeof MatchMatchIdRoute
   '/api/public/hooks/precompute-insights': typeof ApiPublicHooksPrecomputeInsightsRoute
 }
@@ -60,18 +69,21 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/ladder'
+    | '/news'
     | '/match/$matchId'
     | '/api/public/hooks/precompute-insights'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/ladder'
+    | '/news'
     | '/match/$matchId'
     | '/api/public/hooks/precompute-insights'
   id:
     | '__root__'
     | '/'
     | '/ladder'
+    | '/news'
     | '/match/$matchId'
     | '/api/public/hooks/precompute-insights'
   fileRoutesById: FileRoutesById
@@ -79,12 +91,20 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   LadderRoute: typeof LadderRoute
+  NewsRoute: typeof NewsRoute
   MatchMatchIdRoute: typeof MatchMatchIdRoute
   ApiPublicHooksPrecomputeInsightsRoute: typeof ApiPublicHooksPrecomputeInsightsRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/news': {
+      id: '/news'
+      path: '/news'
+      fullPath: '/news'
+      preLoaderRoute: typeof NewsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/ladder': {
       id: '/ladder'
       path: '/ladder'
@@ -119,6 +139,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   LadderRoute: LadderRoute,
+  NewsRoute: NewsRoute,
   MatchMatchIdRoute: MatchMatchIdRoute,
   ApiPublicHooksPrecomputeInsightsRoute: ApiPublicHooksPrecomputeInsightsRoute,
 }

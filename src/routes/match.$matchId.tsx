@@ -1420,7 +1420,7 @@ function AnytimeOddsTag({ price }: { price: number | null }) {
   if (price == null) return null;
   return (
     <span
-      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 text-[9px] font-black uppercase tracking-wider tabular-nums"
+      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-accent/15 text-accent border border-accent/30 text-[9px] font-black uppercase tracking-wider tabular-nums whitespace-nowrap"
       title="Anytime tryscorer odds (best market price)"
     >
       Anytime {price.toFixed(2)}
@@ -1543,27 +1543,7 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
         <p className="text-sm leading-relaxed text-foreground/90">{det.firstTryscorer?.reasoning}</p>
       </Card>
 
-      {/* 7 — First / Second / Third Tryscorer */}
-      <Card title="First / second / third tryscorer" icon={Target}>
-        <ul className="space-y-2.5">
-          {[det.rankedTryscorers?.first, det.rankedTryscorers?.second, det.rankedTryscorers?.third].map((p: any, i: number) => (
-            <li key={i} className="flex items-start gap-3 bg-surface-2 rounded-lg p-2.5">
-              <span className="kbd h-6 w-6 rounded-full bg-background text-xs font-black flex items-center justify-center shrink-0 mt-0.5">{i + 1}</span>
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-bold truncate">{p?.name ?? "—"}</div>
-                <div className="text-[10px] text-muted-foreground">{p?.team} · {p?.position}</div>
-                <div className="mt-1"><AnytimeOddsTag price={getAnytime(p?.name)} /></div>
-                {p?.reasoning && <p className="text-[11px] text-muted-foreground leading-snug mt-1">{p.reasoning}</p>}
-              </div>
-              {p?.price ? (
-                <span className="text-xs font-black tabular-nums px-2 py-0.5 rounded-full bg-accent !text-white border border-accent shadow-[0_2px_8px_-2px_color-mix(in_oklab,var(--accent)_60%,transparent)] shrink-0">{p.price.toFixed(2)}</span>
-              ) : null}
-            </li>
-          ))}
-        </ul>
-      </Card>
-
-      {/* 8 — Player Double (2+ tries) */}
+      {/* 8 — Player Double (2+ tries) — moved to sit below First tryscorer */}
       <Card title="Player to score 2+ tries" icon={Crown}>
         {!det.playerDouble?.name || det.playerDouble.name === "Awaiting team list" ? (
           <p className="text-sm text-muted-foreground">{det.playerDouble?.reasoning ?? "Awaiting team list."}</p>
@@ -1574,9 +1554,11 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
             </div>
             <div className="min-w-0 flex-1">
               <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Double-try ceiling</div>
-              <div className="text-xl font-black truncate">{det.playerDouble.name}</div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="text-xl font-black truncate">{det.playerDouble.name}</div>
+                <AnytimeOddsTag price={getAnytime(det.playerDouble.name)} />
+              </div>
               <div className="text-[11px] text-muted-foreground">{det.playerDouble.team} · {det.playerDouble.position}</div>
-              <div className="mt-1.5"><AnytimeOddsTag price={getAnytime(det.playerDouble.name)} /></div>
               {det.playerDouble.reasoning && (
                 <p className="text-sm leading-relaxed text-foreground/90 mt-2">{det.playerDouble.reasoning}</p>
               )}
@@ -1588,6 +1570,28 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
             ) : null}
           </div>
         )}
+      </Card>
+
+      {/* 7 — First / Second / Third Tryscorer */}
+      <Card title="First / second / third tryscorer" icon={Target}>
+        <ul className="space-y-2.5">
+          {[det.rankedTryscorers?.first, det.rankedTryscorers?.second, det.rankedTryscorers?.third].map((p: any, i: number) => (
+            <li key={i} className="flex items-start gap-3 bg-surface-2 rounded-lg p-2.5">
+              <span className="kbd h-6 w-6 rounded-full bg-background text-xs font-black flex items-center justify-center shrink-0 mt-0.5">{i + 1}</span>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div className="text-sm font-bold truncate">{p?.name ?? "—"}</div>
+                  <AnytimeOddsTag price={getAnytime(p?.name)} />
+                </div>
+                <div className="text-[10px] text-muted-foreground">{p?.team} · {p?.position}</div>
+                {p?.reasoning && <p className="text-[11px] text-muted-foreground leading-snug mt-1">{p.reasoning}</p>}
+              </div>
+              {p?.price ? (
+                <span className="text-xs font-black tabular-nums px-2 py-0.5 rounded-full bg-accent !text-white border border-accent shadow-[0_2px_8px_-2px_color-mix(in_oklab,var(--accent)_60%,transparent)] shrink-0">{p.price.toFixed(2)}</span>
+              ) : null}
+            </li>
+          ))}
+        </ul>
       </Card>
 
       {/* 9 — Top 3 anytime tryscorers per team */}
@@ -1613,9 +1617,11 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
                       <li key={`${r.name}-${i}`} className="flex items-start gap-3 bg-surface-2 rounded-lg p-2.5">
                         <span className="kbd h-6 w-6 rounded-full bg-background text-xs font-black flex items-center justify-center shrink-0 mt-0.5">{i + 1}</span>
                         <div className="flex-1 min-w-0">
-                          <div className="text-sm font-bold truncate">{r.name}</div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <div className="text-sm font-bold truncate">{r.name}</div>
+                            <AnytimeOddsTag price={getAnytime(r.name)} />
+                          </div>
                           <div className="text-[10px] text-muted-foreground">{r.position}</div>
-                          <div className="mt-1"><AnytimeOddsTag price={getAnytime(r.name)} /></div>
                           {r.reasoning && <p className="text-[11px] text-muted-foreground leading-snug mt-1">{r.reasoning}</p>}
                         </div>
                         {r.price != null ? (
@@ -1631,10 +1637,10 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
         )}
       </Card>
 
-      {/* 9b — Forward Picks (2 per team, forwards/outside top 6) */}
-      <Card title="Forward Picks" icon={Sparkles}>
+      {/* 9b — Secondary Tier Picks (2 per team, forwards/outside top 6) */}
+      <Card title="Secondary Tier Picks" icon={Sparkles}>
         {(!det.forwardPicks || det.forwardPicks.length === 0) ? (
-          <p className="text-sm text-muted-foreground">Forward picks pending squad release.</p>
+          <p className="text-sm text-muted-foreground">Secondary tier picks pending squad release.</p>
         ) : (
           <>
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Two per team — forwards / next-best scorers if the top 6 anytimes don't convert</div>
@@ -1643,9 +1649,11 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
                 <li key={`${r.name}-${i}`} className="flex items-start gap-3 bg-surface-2 rounded-lg p-2.5">
                   <span className="kbd h-6 w-6 rounded-full bg-background text-xs font-black flex items-center justify-center shrink-0 mt-0.5">{i + 1}</span>
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-bold truncate">{r.name}</div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <div className="text-sm font-bold truncate">{r.name}</div>
+                      <AnytimeOddsTag price={getAnytime(r.name)} />
+                    </div>
                     <div className="text-[10px] text-muted-foreground">{r.team} · {r.position}</div>
-                    <div className="mt-1"><AnytimeOddsTag price={getAnytime(r.name)} /></div>
                     {r.reasoning && <p className="text-[11px] text-muted-foreground leading-snug mt-1">{r.reasoning}</p>}
                   </div>
                   {r.price != null ? (
@@ -1668,9 +1676,11 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
               <li key={`${p.name}-${i}`} className="flex items-start gap-3 bg-surface-2 rounded-lg p-2.5">
                 <span className="kbd h-6 w-6 rounded-full bg-background text-xs font-black flex items-center justify-center shrink-0 mt-0.5">{i + 1}</span>
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-bold truncate">{p?.name ?? "—"}</div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <div className="text-sm font-bold truncate">{p?.name ?? "—"}</div>
+                    <AnytimeOddsTag price={getAnytime(p?.name)} />
+                  </div>
                   <div className="text-[10px] text-muted-foreground">{p?.team} · {p?.position}</div>
-                  <div className="mt-1"><AnytimeOddsTag price={getAnytime(p?.name)} /></div>
                   {p?.reasoning && <p className="text-[11px] text-muted-foreground leading-snug mt-1">{p.reasoning}</p>}
                 </div>
                 {p?.price != null ? (

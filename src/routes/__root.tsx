@@ -168,33 +168,40 @@ function NavMenu({ onClose }: { onClose: () => void }) {
 
 function BottomNav() {
   return (
-    <nav
-      aria-label="Primary"
-      className="fixed bottom-0 inset-x-0 z-30 backdrop-blur-xl bg-background/85 border-t border-border pb-[env(safe-area-inset-bottom)]"
-    >
-      <ul className="mx-auto max-w-6xl grid grid-cols-3">
-        {NAV_ITEMS.map(({ to, label, icon: Icon, exact }) => (
-          <li key={to}>
-            <Link
-              to={to}
-              activeOptions={{ exact }}
-              activeProps={{ className: "text-accent" }}
-              inactiveProps={{ className: "text-muted-foreground hover:text-foreground" }}
-              className="group flex flex-col items-center justify-center gap-1 py-2.5 transition"
-            >
-              {({ isActive }) => (
-                <>
-                  <span className={`inline-flex h-8 w-12 items-center justify-center rounded-full transition ${isActive ? "bg-accent/15" : ""}`}>
-                    <Icon className="h-5 w-5" />
-                  </span>
-                  <span className="text-[10px] font-bold uppercase tracking-wider">{label}</span>
-                </>
-              )}
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </nav>
+    <div className="fixed bottom-0 inset-x-0 z-40 pointer-events-none pb-[env(safe-area-inset-bottom)]">
+      {/* fade behind the bar to lift it off page content */}
+      <div className="h-6 bg-gradient-to-t from-background to-transparent" />
+      <nav
+        aria-label="Primary"
+        className="pointer-events-auto bg-surface/95 backdrop-blur-xl border-t-2 border-accent/40 shadow-[0_-12px_32px_-8px_rgba(0,0,0,0.6)]"
+      >
+        <ul className="mx-auto max-w-6xl grid grid-cols-3 px-2">
+          {NAV_ITEMS.map(({ to, label, icon: Icon, exact }) => (
+            <li key={to}>
+              <Link
+                to={to}
+                activeOptions={{ exact }}
+                className="group flex flex-col items-center justify-center gap-1 py-3 transition relative"
+              >
+                {({ isActive }) => (
+                  <>
+                    {isActive && (
+                      <span className="absolute top-0 left-1/2 -translate-x-1/2 h-1 w-12 rounded-b-full bg-accent" />
+                    )}
+                    <span className={`inline-flex h-9 w-14 items-center justify-center rounded-full transition ${isActive ? "bg-accent text-accent-foreground shadow-lg shadow-accent/30 scale-105" : "text-muted-foreground group-hover:text-foreground group-hover:bg-surface-2"}`}>
+                      <Icon className="h-5 w-5" strokeWidth={isActive ? 2.5 : 2} />
+                    </span>
+                    <span className={`text-[10px] font-extrabold uppercase tracking-wider transition ${isActive ? "text-accent" : "text-muted-foreground group-hover:text-foreground"}`}>
+                      {label}
+                    </span>
+                  </>
+                )}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </nav>
+    </div>
   );
 }
 

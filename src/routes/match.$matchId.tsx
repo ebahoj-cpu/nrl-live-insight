@@ -1594,6 +1594,32 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
         </ul>
       </Card>
 
+      {/* 10 — Predicted Outcome (moved above Top 3 anytime) */}
+      {det.predictedOutcome && (
+        <Card title="Predicted outcome" icon={Trophy} className="accent-glow">
+          <p className="text-sm leading-relaxed text-foreground/90 mb-3">{det.predictedOutcome.summary}</p>
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Three anytime tryscorers backing this script</div>
+          <ul className="space-y-2.5">
+            {(det.predictedOutcome.picks ?? []).map((p: any, i: number) => (
+              <li key={`${p.name}-${i}`} className="flex items-start gap-3 bg-surface-2 rounded-lg p-2.5">
+                <span className="kbd h-6 w-6 rounded-full bg-background text-xs font-black flex items-center justify-center shrink-0 mt-0.5">{i + 1}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <div className="text-sm font-bold truncate">{p?.name ?? "—"}</div>
+                    <AnytimeOddsTag price={getAnytime(p?.name)} />
+                  </div>
+                  <div className="text-[10px] text-muted-foreground">{p?.team} · {p?.position}</div>
+                  {p?.reasoning && <p className="text-[11px] text-muted-foreground leading-snug mt-1">{p.reasoning}</p>}
+                </div>
+                {p?.price != null ? (
+                  <span className="text-xs font-black tabular-nums px-2 py-0.5 rounded-full bg-accent !text-white border border-accent shadow-[0_2px_8px_-2px_color-mix(in_oklab,var(--accent)_60%,transparent)] shrink-0">{p.price.toFixed(2)}</span>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
+
       {/* 9 — Top 3 anytime tryscorers per team */}
       <Card title="Top 3 anytime tryscorers — each team" icon={Sparkles}>
         {((!det.topAnytimeHome || det.topAnytimeHome.length === 0) && (!det.topAnytimeAway || det.topAnytimeAway.length === 0)) ? (
@@ -1666,31 +1692,43 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
         )}
       </Card>
 
-      {/* 10 — Predicted Outcome */}
-      {det.predictedOutcome && (
-        <Card title="Predicted outcome" icon={Trophy} className="accent-glow">
-          <p className="text-sm leading-relaxed text-foreground/90 mb-3">{det.predictedOutcome.summary}</p>
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Three anytime tryscorers backing this script</div>
-          <ul className="space-y-2.5">
-            {(det.predictedOutcome.picks ?? []).map((p: any, i: number) => (
-              <li key={`${p.name}-${i}`} className="flex items-start gap-3 bg-surface-2 rounded-lg p-2.5">
-                <span className="kbd h-6 w-6 rounded-full bg-background text-xs font-black flex items-center justify-center shrink-0 mt-0.5">{i + 1}</span>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <div className="text-sm font-bold truncate">{p?.name ?? "—"}</div>
-                    <AnytimeOddsTag price={getAnytime(p?.name)} />
-                  </div>
-                  <div className="text-[10px] text-muted-foreground">{p?.team} · {p?.position}</div>
-                  {p?.reasoning && <p className="text-[11px] text-muted-foreground leading-snug mt-1">{p.reasoning}</p>}
+      {/* 9c — Top 3 try assists per team */}
+      <Card title="Top 3 try assists — each team" icon={Compass}>
+        {((!det.tryAssistsHome || det.tryAssistsHome.length === 0) && (!det.tryAssistsAway || det.tryAssistsAway.length === 0)) ? (
+          <p className="text-sm text-muted-foreground">Try-assist board pending squad release.</p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {[
+              { label: home?.nickName ?? "Home", themeKey: home?.themeKey ?? "", list: det.tryAssistsHome ?? [] },
+              { label: away?.nickName ?? "Away", themeKey: away?.themeKey ?? "", list: det.tryAssistsAway ?? [] },
+            ].map((col) => (
+              <div key={col.label}>
+                <div className="flex items-center gap-2 mb-2">
+                  <TeamLogo themeKey={col.themeKey} name={col.label} size={22} />
+                  <div className="text-sm font-black truncate">{col.label}</div>
                 </div>
-                {p?.price != null ? (
-                  <span className="text-xs font-black tabular-nums px-2 py-0.5 rounded-full bg-accent !text-white border border-accent shadow-[0_2px_8px_-2px_color-mix(in_oklab,var(--accent)_60%,transparent)] shrink-0">{p.price.toFixed(2)}</span>
-                ) : null}
-              </li>
+                {col.list.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">Pending squad.</p>
+                ) : (
+                  <ul className="space-y-2.5">
+                    {col.list.slice(0, 3).map((r: any, i: number) => (
+                      <li key={`${r.name}-${i}`} className="flex items-start gap-3 bg-surface-2 rounded-lg p-2.5">
+                        <span className="kbd h-6 w-6 rounded-full bg-background text-xs font-black flex items-center justify-center shrink-0 mt-0.5">{i + 1}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-bold truncate">{r.name}</div>
+                          <div className="text-[10px] text-muted-foreground">{r.position}</div>
+                          {r.reasoning && <p className="text-[11px] text-muted-foreground leading-snug mt-1">{r.reasoning}</p>}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             ))}
-          </ul>
-        </Card>
-      )}
+          </div>
+        )}
+      </Card>
+
       <p className="text-[10px] text-muted-foreground text-center px-4 leading-relaxed">
         Stats-driven projections from 2026 season-to-date team & player data. Bet responsibly · 18+
       </p>

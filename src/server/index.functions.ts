@@ -166,7 +166,8 @@ export const getOdds = createServerFn({ method: "GET" })
   .inputValidator((i: { refresh?: boolean } | undefined) => i ?? {})
   .handler(async ({ data }) => {
     const result = await safeOdds(data.refresh);
-    return result.data; // empty array if unavailable; UI handles gracefully
+    if (result.error) console.warn(`[getOdds] ${result.error}${result.stale ? " (serving stale)" : ""}`);
+    return result.data;
   });
 
 // ---------- Match details + odds + ladder + AI ----------

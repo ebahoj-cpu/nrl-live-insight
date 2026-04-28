@@ -2083,14 +2083,21 @@ function BetTab({ insights, insightsError, insightsLoading, home, away, tryscore
           </div>
         ) : (
           <ul className="space-y-2">
-            {legs.map((leg) => (
+            {legs.map((leg) => {
+              const excluded = (marginActive && leg.id === "winner") || (!marginActive && leg.id === "margin");
+              return (
               <li
                 key={leg.id}
-                className="bg-surface-2 rounded-lg p-3 flex items-start gap-3 border border-border/40"
+                className={`bg-surface-2 rounded-lg p-3 flex items-start gap-3 border border-border/40 transition ${excluded ? "opacity-50" : ""}`}
               >
                 <div className="flex-1 min-w-0">
-                  <div className="text-[9px] uppercase tracking-wider text-muted-foreground font-bold">
-                    {leg.market}
+                  <div className="text-[9px] uppercase tracking-wider text-muted-foreground font-bold flex items-center gap-2">
+                    <span>{leg.market}</span>
+                    {excluded && (
+                      <span className="text-[8px] font-bold text-muted-foreground/80 bg-surface px-1.5 py-0.5 rounded normal-case tracking-normal">
+                        not counted
+                      </span>
+                    )}
                   </div>
                   {leg.options ? (
                     <Select value={leg.selection} onValueChange={(v) => updateLegSelection(leg.id, v)}>
@@ -2120,7 +2127,7 @@ function BetTab({ insights, insightsError, insightsLoading, home, away, tryscore
                   ) : null}
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  <span className="text-sm font-black tabular-nums px-2.5 py-1 rounded-full bg-accent !text-white border border-accent shadow-[0_2px_8px_-2px_color-mix(in_oklab,var(--accent)_60%,transparent)]">
+                  <span className={`text-sm font-black tabular-nums px-2.5 py-1 rounded-full border ${excluded ? "bg-surface text-muted-foreground border-border" : "bg-accent !text-white border-accent shadow-[0_2px_8px_-2px_color-mix(in_oklab,var(--accent)_60%,transparent)]"}`}>
                     {leg.price.toFixed(2)}
                   </span>
                   <button
@@ -2132,7 +2139,8 @@ function BetTab({ insights, insightsError, insightsLoading, home, away, tryscore
                   </button>
                 </div>
               </li>
-            ))}
+              );
+            })}
           </ul>
         )}
 

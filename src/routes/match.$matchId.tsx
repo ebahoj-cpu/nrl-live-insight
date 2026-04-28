@@ -2065,7 +2065,10 @@ function BetTab({ insights, insightsError, insightsLoading, home, away, tryscore
       <Card title="Betslip" icon={Receipt} className="accent-glow">
         <div className="flex items-center justify-between mb-4 -mt-2">
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
-            {legs.length} {legs.length === 1 ? "leg" : "legs"} · Multi
+            {(() => {
+              const counted = legs.filter((l) => !((marginActive && l.id === "winner") || (!marginActive && l.id === "margin"))).length;
+              return `${counted} ${counted === 1 ? "leg" : "legs"} · Multi`;
+            })()}
           </div>
           <div className="flex items-center gap-1.5">
             <TeamLogo themeKey={home.themeKey} name={home.nickName} size={22} />

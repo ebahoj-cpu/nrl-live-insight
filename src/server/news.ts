@@ -13,6 +13,9 @@ export type NewsItem = {
 
 const FEEDS: { source: string; url: string }[] = [
   { source: "NRL.com", url: "https://www.nrl.com/news/rss/" },
+  { source: "NRL.com", url: "https://www.nrl.com/news/feed/" },
+  { source: "Zero Tackle", url: "https://www.zerotackle.com/feed/" },
+  { source: "Zero Tackle", url: "https://www.zerotackle.com/nrl/feed/" },
   { source: "ABC Sport", url: "https://www.abc.net.au/news/feed/45924/rss.xml" },
   { source: "The Roar", url: "https://www.theroar.com.au/nrl/feed/" },
 ];

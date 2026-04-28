@@ -1546,9 +1546,11 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
           </div>
           <div className="min-w-0 flex-1">
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Top opening-set pick</div>
-            <div className="text-xl font-black truncate">{det.firstTryscorer?.name}</div>
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="text-xl font-black truncate">{det.firstTryscorer?.name}</div>
+              <AnytimeOddsTag price={getAnytime(det.firstTryscorer?.name)} />
+            </div>
             <div className="text-[11px] text-muted-foreground">{det.firstTryscorer?.team} · {det.firstTryscorer?.position}</div>
-            <div className="mt-1.5"><AnytimeOddsTag price={getAnytime(det.firstTryscorer?.name)} /></div>
           </div>
           {(det.firstTryscorer?.price ?? firstTryPrice) ? (
             <span className="text-lg font-black tabular-nums px-3 py-1.5 rounded-full bg-accent !text-white border border-accent shadow-[0_2px_8px_-2px_color-mix(in_oklab,var(--accent)_60%,transparent)] shrink-0">

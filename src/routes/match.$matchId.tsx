@@ -1917,14 +1917,16 @@ function BetTab({ insights, insightsError, insightsLoading, home, away, tryscore
   ];
   const initialWinner = winnerOptions.find((o) => o.label === winnerNick) ?? winnerOptions[0];
 
-  // Winning margin — selectable across both sides & buckets
-  const marginBuckets = ["1-2", "3-12", "13-24", "25+"];
+  // Winning margin — only 1-12 or 13+ per team. Single fixed price for betslip calc.
+  const marginBuckets = ["1-12", "13+"];
+  const MARGIN_PRICE = 2.00;
   const marginOptions: { label: string; price: number }[] = [
-    ...marginBuckets.map((b) => ({ label: `${home.nickName} ${b}`, price: marginPriceFor(b) })),
-    ...marginBuckets.map((b) => ({ label: `${away.nickName} ${b}`, price: marginPriceFor(b) })),
+    ...marginBuckets.map((b) => ({ label: `${home.nickName} ${b}`, price: MARGIN_PRICE })),
+    ...marginBuckets.map((b) => ({ label: `${away.nickName} ${b}`, price: MARGIN_PRICE })),
   ];
-  const detMarginBucket = det.margin?.bucket ?? "1-12";
-  const initialMarginLabel = `${winnerNick} ${detMarginBucket === "1–12" ? "3-12" : detMarginBucket === "13+" ? "13-24" : detMarginBucket}`;
+  const rawDetBucket = String(det.margin?.bucket ?? "1-12").replace("–", "-");
+  const detMarginBucket = rawDetBucket === "13+" ? "13+" : "1-12";
+  const initialMarginLabel = `${winnerNick} ${detMarginBucket}`;
   const initialMargin = marginOptions.find((o) => o.label === initialMarginLabel) ?? marginOptions[0];
 
   // Total points — Over/Under selectable

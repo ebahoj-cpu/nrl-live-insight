@@ -165,14 +165,9 @@ export const getLadder = createServerFn({ method: "GET" })
 export const getOdds = createServerFn({ method: "GET" })
   .inputValidator((i: { refresh?: boolean } | undefined) => i ?? {})
   .handler(async ({ data }) => {
-    try {
-      const result = await safeOdds(data.refresh);
-      console.log(`[getOdds] events=${result.data.length} error=${result.error ?? "none"} stale=${result.stale}`);
-      return result.data; // empty array if unavailable; UI handles gracefully
-    } catch (e) {
-      console.error("[getOdds] unexpected throw:", e);
-      return [];
-    }
+    const result = await safeOdds(data.refresh);
+    if (result.error) console.warn(`[getOdds] ${result.error}${result.stale ? " (serving stale)" : ""}`);
+    return result.data;
   });
 
 // ---------- Match details + odds + ladder + AI ----------

@@ -1919,10 +1919,13 @@ function BetTab({ insights, insightsError, insightsLoading, home, away, tryscore
   ];
   const initialWinner = winnerOptions.find((o) => o.label === winnerNick) ?? winnerOptions[0];
 
-  // Winning margin — only 1-12 or 13+ per team. Single fixed price for betslip calc.
+  // Winning margin — only 1-12 or 13+ per team. Mutually exclusive with Match Winner.
+  // "No margin" leaves only the Match Winner price in the calc.
   const marginBuckets = ["1-12", "13+"];
   const MARGIN_PRICE = 2.00;
+  const NO_MARGIN_LABEL = "No margin (use match winner)";
   const marginOptions: { label: string; price: number }[] = [
+    { label: NO_MARGIN_LABEL, price: 1 },
     ...marginBuckets.map((b) => ({ label: `${home.nickName} ${b}`, price: MARGIN_PRICE })),
     ...marginBuckets.map((b) => ({ label: `${away.nickName} ${b}`, price: MARGIN_PRICE })),
   ];

@@ -4,7 +4,7 @@ import {
 } from "@tanstack/react-router";
 import { QueryClient, QueryClientProvider, useIsFetching } from "@tanstack/react-query";
 import appCss from "../styles.css?url";
-import { RotateCw, Menu, X, Calendar, BarChart3, Newspaper } from "lucide-react";
+import { RotateCw, Menu, X, Calendar, BarChart3, Newspaper, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 
 interface RouterContext { queryClient: QueryClient }
@@ -13,6 +13,7 @@ const NAV_ITEMS = [
   { to: "/", label: "Fixtures", icon: Calendar, exact: true },
   { to: "/ladder", label: "Ladder", icon: BarChart3, exact: false },
   { to: "/news", label: "News", icon: Newspaper, exact: false },
+  { to: "/scout", label: "Scout", icon: Sparkles, exact: false },
 ] as const;
 
 function NotFoundComponent() {
@@ -175,7 +176,7 @@ function BottomNav() {
         aria-label="Primary"
         className="pointer-events-auto bg-surface/95 backdrop-blur-xl border-t-2 border-accent/40 shadow-[0_-12px_32px_-8px_rgba(0,0,0,0.6)]"
       >
-        <ul className="mx-auto max-w-6xl grid grid-cols-3 px-2">
+        <ul className="mx-auto max-w-6xl grid grid-cols-4 px-2">
           {NAV_ITEMS.map(({ to, label, icon: Icon, exact }) => (
             <li key={to}>
               <Link

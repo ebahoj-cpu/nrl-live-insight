@@ -9,12 +9,18 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as ScoutRouteImport } from './routes/scout'
 import { Route as NewsRouteImport } from './routes/news'
 import { Route as LadderRouteImport } from './routes/ladder'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as MatchMatchIdRouteImport } from './routes/match.$matchId'
 import { Route as ApiPublicHooksPrecomputeInsightsRouteImport } from './routes/api/public/hooks/precompute-insights'
 
+const ScoutRoute = ScoutRouteImport.update({
+  id: '/scout',
+  path: '/scout',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const NewsRoute = NewsRouteImport.update({
   id: '/news',
   path: '/news',
@@ -46,6 +52,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/ladder': typeof LadderRoute
   '/news': typeof NewsRoute
+  '/scout': typeof ScoutRoute
   '/match/$matchId': typeof MatchMatchIdRoute
   '/api/public/hooks/precompute-insights': typeof ApiPublicHooksPrecomputeInsightsRoute
 }
@@ -53,6 +60,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/ladder': typeof LadderRoute
   '/news': typeof NewsRoute
+  '/scout': typeof ScoutRoute
   '/match/$matchId': typeof MatchMatchIdRoute
   '/api/public/hooks/precompute-insights': typeof ApiPublicHooksPrecomputeInsightsRoute
 }
@@ -61,6 +69,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/ladder': typeof LadderRoute
   '/news': typeof NewsRoute
+  '/scout': typeof ScoutRoute
   '/match/$matchId': typeof MatchMatchIdRoute
   '/api/public/hooks/precompute-insights': typeof ApiPublicHooksPrecomputeInsightsRoute
 }
@@ -70,6 +79,7 @@ export interface FileRouteTypes {
     | '/'
     | '/ladder'
     | '/news'
+    | '/scout'
     | '/match/$matchId'
     | '/api/public/hooks/precompute-insights'
   fileRoutesByTo: FileRoutesByTo
@@ -77,6 +87,7 @@ export interface FileRouteTypes {
     | '/'
     | '/ladder'
     | '/news'
+    | '/scout'
     | '/match/$matchId'
     | '/api/public/hooks/precompute-insights'
   id:
@@ -84,6 +95,7 @@ export interface FileRouteTypes {
     | '/'
     | '/ladder'
     | '/news'
+    | '/scout'
     | '/match/$matchId'
     | '/api/public/hooks/precompute-insights'
   fileRoutesById: FileRoutesById
@@ -92,12 +104,20 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   LadderRoute: typeof LadderRoute
   NewsRoute: typeof NewsRoute
+  ScoutRoute: typeof ScoutRoute
   MatchMatchIdRoute: typeof MatchMatchIdRoute
   ApiPublicHooksPrecomputeInsightsRoute: typeof ApiPublicHooksPrecomputeInsightsRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/scout': {
+      id: '/scout'
+      path: '/scout'
+      fullPath: '/scout'
+      preLoaderRoute: typeof ScoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/news': {
       id: '/news'
       path: '/news'
@@ -140,18 +160,10 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   LadderRoute: LadderRoute,
   NewsRoute: NewsRoute,
+  ScoutRoute: ScoutRoute,
   MatchMatchIdRoute: MatchMatchIdRoute,
   ApiPublicHooksPrecomputeInsightsRoute: ApiPublicHooksPrecomputeInsightsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}

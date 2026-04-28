@@ -1552,6 +1552,7 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-bold truncate">{p?.name ?? "—"}</div>
                 <div className="text-[10px] text-muted-foreground">{p?.team} · {p?.position}</div>
+                <div className="mt-1"><AnytimeOddsTag price={getAnytime(p?.name)} /></div>
                 {p?.reasoning && <p className="text-[11px] text-muted-foreground leading-snug mt-1">{p.reasoning}</p>}
               </div>
               {p?.price ? (
@@ -1575,6 +1576,7 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
               <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Double-try ceiling</div>
               <div className="text-xl font-black truncate">{det.playerDouble.name}</div>
               <div className="text-[11px] text-muted-foreground">{det.playerDouble.team} · {det.playerDouble.position}</div>
+              <div className="mt-1.5"><AnytimeOddsTag price={getAnytime(det.playerDouble.name)} /></div>
               {det.playerDouble.reasoning && (
                 <p className="text-sm leading-relaxed text-foreground/90 mt-2">{det.playerDouble.reasoning}</p>
               )}
@@ -1613,6 +1615,7 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
                         <div className="flex-1 min-w-0">
                           <div className="text-sm font-bold truncate">{r.name}</div>
                           <div className="text-[10px] text-muted-foreground">{r.position}</div>
+                          <div className="mt-1"><AnytimeOddsTag price={getAnytime(r.name)} /></div>
                           {r.reasoning && <p className="text-[11px] text-muted-foreground leading-snug mt-1">{r.reasoning}</p>}
                         </div>
                         {r.price != null ? (
@@ -1642,6 +1645,7 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-bold truncate">{r.name}</div>
                     <div className="text-[10px] text-muted-foreground">{r.team} · {r.position}</div>
+                    <div className="mt-1"><AnytimeOddsTag price={getAnytime(r.name)} /></div>
                     {r.reasoning && <p className="text-[11px] text-muted-foreground leading-snug mt-1">{r.reasoning}</p>}
                   </div>
                   {r.price != null ? (
@@ -1666,6 +1670,7 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-bold truncate">{p?.name ?? "—"}</div>
                   <div className="text-[10px] text-muted-foreground">{p?.team} · {p?.position}</div>
+                  <div className="mt-1"><AnytimeOddsTag price={getAnytime(p?.name)} /></div>
                   {p?.reasoning && <p className="text-[11px] text-muted-foreground leading-snug mt-1">{p.reasoning}</p>}
                 </div>
                 {p?.price != null ? (

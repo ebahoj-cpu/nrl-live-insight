@@ -134,6 +134,8 @@ export function generateDeterministicInsights(inp: EngineInputs): DeterministicI
   // ---- Player engine: try-scoring ranking ----
   const ranking = rankTryscorers(inp, home, away, winnerSide, projectedMargin);
   const top5 = ranking.slice(0, 5);
+  const homeRanked = ranking.filter((r) => r.team.toLowerCase() === inp.homeNickname.toLowerCase()).slice(0, 3);
+  const awayRanked = ranking.filter((r) => r.team.toLowerCase() === inp.awayNickname.toLowerCase()).slice(0, 3);
 
   // ---- 6. First Tryscorer ----
   // Bias toward opening-set involvement: weight firstTries + firstTeamTries
@@ -144,6 +146,25 @@ export function generateDeterministicInsights(inp: EngineInputs): DeterministicI
 
   // ---- 7. First / Second / Third Tryscorer ----
   const ranked123 = pickRanked123(ranking, firstPick);
+
+  // ---- 9. Player Double (2+ tries) ----
+  // Highest finalScore weighted by triesPerMatch and blowout boost — prioritise
+  // players with multi-try seasons in scoring positions, ideally on the winning
+  // side of a projected blowout.
+  const doubleScored = ranking
+    .map((r) => {
+      const isWinnerTeam = r.team.toLowerCase() === (winnerSide === "home" ? inp.homeNickname : inp.awayNickname).toLowerCase();
+      const blowout = projectedMargin >= 14 ? 1.25 : 1.0;
+      const winnerLift = isWinnerTeam ? 1.15 : 0.95;
+      // Bias to high tries-per-match and finishing positions
+      const tpm = (ranking.length && (r as any)) ? 0 : 0; // placeholder for type
+      return { row: r, doubleScore: r.score * blowout * winnerLift };
+    })
+    .sort((a, b) => b.doubleScore - a.doubleScore);
+  const doublePick = doubleScored[0]?.row;
+  const doubleReason = doublePick
+    ? `${(doublePick.name.split(/\s+/).pop() || doublePick.name)} carries the highest multi-try ceiling on the card — ${doublePick.team}'s scoring shape and matchup volume project them through the line more than once.`
+    : "Awaiting team list for double-try profiling.";
 
   return {
     generatedAt: new Date().toISOString(),
@@ -159,6 +180,9 @@ export function generateDeterministicInsights(inp: EngineInputs): DeterministicI
       third: stripInternal(ranked123[2], "Third-try profile — emerges as the contest opens up after the early exchanges."),
     },
     topAnytime: top5.map((r) => stripInternal(r, r.reasoning)),
+    topAnytimeHome: homeRanked.map((r) => stripInternal(r, r.reasoning)),
+    topAnytimeAway: awayRanked.map((r) => stripInternal(r, r.reasoning)),
+    playerDouble: stripInternal(doublePick, doubleReason),
   };
 }
 

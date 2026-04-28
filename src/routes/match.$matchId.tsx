@@ -1537,25 +1537,69 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
         </ul>
       </Card>
 
-      {/* 8 — Top 5 Anytime Tryscorers */}
-      <Card title="Top 5 anytime tryscorers" icon={Sparkles}>
-        {(!det.topAnytime || det.topAnytime.length === 0) ? (
+      {/* 8 — Player Double (2+ tries) */}
+      <Card title="Player to score 2+ tries" icon={Crown}>
+        {!det.playerDouble?.name || det.playerDouble.name === "Awaiting team list" ? (
+          <p className="text-sm text-muted-foreground">{det.playerDouble?.reasoning ?? "Awaiting team list."}</p>
+        ) : (
+          <div className="flex items-start gap-3">
+            <div className="h-12 w-12 rounded-full bg-accent/15 text-accent flex items-center justify-center shrink-0">
+              <Crown className="h-6 w-6" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Double-try ceiling</div>
+              <div className="text-xl font-black truncate">{det.playerDouble.name}</div>
+              <div className="text-[11px] text-muted-foreground">{det.playerDouble.team} · {det.playerDouble.position}</div>
+              {det.playerDouble.reasoning && (
+                <p className="text-sm leading-relaxed text-foreground/90 mt-2">{det.playerDouble.reasoning}</p>
+              )}
+            </div>
+            {det.playerDouble.price != null ? (
+              <span className="text-lg font-black tabular-nums px-3 py-1.5 rounded-full bg-accent/15 text-accent border border-accent/30 shrink-0">
+                {det.playerDouble.price.toFixed(2)}
+              </span>
+            ) : null}
+          </div>
+        )}
+      </Card>
+
+      {/* 9 — Top 3 anytime tryscorers per team */}
+      <Card title="Top 3 anytime tryscorers — each team" icon={Sparkles}>
+        {((!det.topAnytimeHome || det.topAnytimeHome.length === 0) && (!det.topAnytimeAway || det.topAnytimeAway.length === 0)) ? (
           <p className="text-sm text-muted-foreground">Try-scoring board pending squad release.</p>
         ) : (
-          <ul className="space-y-2.5">
-            {det.topAnytime.slice(0, 5).map((r: any, i: number) => (
-              <li key={`${r.name}-${i}`} className="flex items-start gap-3 bg-surface-2 rounded-lg p-2.5">
-                <span className="kbd h-6 w-6 rounded-full bg-background text-xs font-black flex items-center justify-center shrink-0 mt-0.5">{i + 1}</span>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-bold truncate">{r.name} <span className="text-[10px] text-muted-foreground font-normal">({r.team})</span></div>
-                  {r.reasoning && <p className="text-[11px] text-muted-foreground leading-snug mt-1">{r.reasoning}</p>}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {[
+              { label: home?.nickName ?? "Home", themeKey: home?.themeKey ?? "", list: det.topAnytimeHome ?? [] },
+              { label: away?.nickName ?? "Away", themeKey: away?.themeKey ?? "", list: det.topAnytimeAway ?? [] },
+            ].map((col) => (
+              <div key={col.label}>
+                <div className="flex items-center gap-2 mb-2">
+                  <TeamLogo themeKey={col.themeKey} name={col.label} size={22} />
+                  <div className="text-sm font-black truncate">{col.label}</div>
                 </div>
-                {r.price != null ? (
-                  <span className="text-xs font-black tabular-nums px-2 py-0.5 rounded-full bg-accent/15 text-accent border border-accent/30 shrink-0">{r.price.toFixed(2)}</span>
-                ) : null}
-              </li>
+                {col.list.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">Pending squad.</p>
+                ) : (
+                  <ul className="space-y-2.5">
+                    {col.list.slice(0, 3).map((r: any, i: number) => (
+                      <li key={`${r.name}-${i}`} className="flex items-start gap-3 bg-surface-2 rounded-lg p-2.5">
+                        <span className="kbd h-6 w-6 rounded-full bg-background text-xs font-black flex items-center justify-center shrink-0 mt-0.5">{i + 1}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-bold truncate">{r.name}</div>
+                          <div className="text-[10px] text-muted-foreground">{r.position}</div>
+                          {r.reasoning && <p className="text-[11px] text-muted-foreground leading-snug mt-1">{r.reasoning}</p>}
+                        </div>
+                        {r.price != null ? (
+                          <span className="text-xs font-black tabular-nums px-2 py-0.5 rounded-full bg-accent/15 text-accent border border-accent/30 shrink-0">{r.price.toFixed(2)}</span>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             ))}
-          </ul>
+          </div>
         )}
       </Card>
 

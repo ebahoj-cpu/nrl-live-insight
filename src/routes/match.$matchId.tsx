@@ -448,7 +448,7 @@ function OfficialAvatar({ src, firstName, lastName, size }: { src?: string; firs
   );
 }
 
-function SquadPanel({ team }: { team: { nickName: string; themeKey: string; players: { firstName: string; lastName: string; position: string; jerseyNumber?: number; isCaptain?: boolean }[] } }) {
+function SquadPanel({ team }: { team: { nickName: string; themeKey: string; players: { firstName: string; lastName: string; position: string; jerseyNumber?: number; isCaptain?: boolean; headImage?: string }[] } }) {
   const sorted = [...team.players].sort((a, b) => {
     const ai = a.jerseyNumber ?? 999;
     const bi = b.jerseyNumber ?? 999;
@@ -486,6 +486,7 @@ function SquadPanel({ team }: { team: { nickName: string; themeKey: string; play
       <span className="hidden sm:inline text-[10px] uppercase tracking-wider text-muted-foreground shrink-0">
         {p.position}
       </span>
+      <PlayerHeadshot src={p.headImage} firstName={p.firstName} lastName={p.lastName} />
     </li>
   );
 

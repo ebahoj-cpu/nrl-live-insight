@@ -57,7 +57,11 @@ export type DeterministicInsights = {
   // 7
   rankedTryscorers: { first: EnginePlayerPick; second: EnginePlayerPick; third: EnginePlayerPick };
   // 8
-  topAnytime: EnginePlayerPick[]; // length 5
+  topAnytime: EnginePlayerPick[]; // length 5 (legacy: combined)
+  topAnytimeHome: EnginePlayerPick[]; // length 3
+  topAnytimeAway: EnginePlayerPick[]; // length 3
+  // 9 — Player to score 2+ tries (double)
+  playerDouble: EnginePlayerPick;
 };
 
 // ---------- Public API ----------

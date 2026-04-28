@@ -495,3 +495,25 @@ function positionRole(position: string): string {
   if (/prop/.test(p)) return "Middle carry";
   return "Attacking option";
 }
+
+function buildOutcomeSummary(inp: EngineInputs, winnerNick: string, loserNick: string, predHome: number, predAway: number, margin: number, ws: TeamSeasonStats, ls: TeamSeasonStats, winnerHome: boolean): string {
+  const venue = winnerHome ? `at home` : `on the road`;
+  const formW = ws.last5.length ? ws.last5.map((r) => r.result).join("") : "limited form sample";
+  const formL = ls.last5.length ? ls.last5.map((r) => r.result).join("") : "limited form sample";
+  const shape = margin >= 14 ? `pulling clear in the back half` : margin >= 8 ? `controlling the contest after the break` : `edging it in a tight finish`;
+  return `${winnerNick} project to win ${predHome}–${predAway} ${venue}, ${shape}. Form line ${formW} versus ${loserNick}'s ${formL} reinforces the lean — ${winnerNick} score ${ws.ppgFor.toFixed(1)} per game and concede ${ws.ppgAgainst.toFixed(1)}, against ${loserNick}'s ${ls.ppgFor.toFixed(1)} for / ${ls.ppgAgainst.toFixed(1)} against. The three try-scoring picks below back that script.`;
+}
+
+function buildOutcomePickReason(r: RankedRow, isWinnerTeam: boolean, _isHomeTeam: boolean, inp: EngineInputs, winnerNick: string, margin: number): string {
+  const last = r.name.split(/\s+/).pop() || r.name;
+  const team = getTeam(inp.snapshot, r.team);
+  const role = positionRole(r.position);
+  const formStr = team?.last5?.length ? team.last5.map((x) => x.result).join("") : "";
+  const sideTag = isWinnerTeam
+    ? `on the ${winnerNick} attacking side projected to dominate field position`
+    : `as ${r.team}'s most likely answer when they get into ${winnerNick}'s 20`;
+  const blowoutTag = margin >= 14 && isWinnerTeam ? ` and a projected blowout multiplies their late-set looks` : "";
+  const formTag = formStr ? ` ${r.team}'s ${formStr} form line ${formStr.includes("W") ? "supports" : "still leaves"} the matchup volume` : "";
+  return `${last} (${role.toLowerCase()}) lines up ${sideTag}${blowoutTag}.${formTag}`;
+}
+

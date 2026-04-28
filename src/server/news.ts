@@ -90,10 +90,14 @@ export async function fetchNews(): Promise<NewsItem[]> {
     return t.includes("nrl") || t.includes("rugby league") || t.includes("origin");
   });
 
+  // Keep only this week's news (last 7 days)
+  const weekAgo = Date.now() - 7 * 24 * 60 * 60_000;
+  const recent = filtered.filter((n) => new Date(n.publishedUtc).getTime() >= weekAgo);
+
   // Dedupe by normalized title
   const seen = new Set<string>();
   const deduped: NewsItem[] = [];
-  for (const n of filtered) {
+  for (const n of recent) {
     const key = n.title.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().slice(0, 80);
     if (seen.has(key)) continue;
     seen.add(key);
@@ -101,5 +105,5 @@ export async function fetchNews(): Promise<NewsItem[]> {
   }
 
   deduped.sort((a, b) => new Date(b.publishedUtc).getTime() - new Date(a.publishedUtc).getTime());
-  return deduped.slice(0, 60);
+  return deduped.slice(0, 100);
 }

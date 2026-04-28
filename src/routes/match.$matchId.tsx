@@ -1603,26 +1603,29 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
         )}
       </Card>
 
-      {/* 9b — Top 3 anytime tryscorers overall (across both teams) */}
-      <Card title="Top 3 anytime tryscorers — overall" icon={Sparkles}>
-        {(!det.topAnytimeOverall || det.topAnytimeOverall.length === 0) ? (
-          <p className="text-sm text-muted-foreground">Try-scoring board pending squad release.</p>
+      {/* 9b — Forward Picks (2 per team, forwards/outside top 6) */}
+      <Card title="Forward Picks" icon={Sparkles}>
+        {(!det.forwardPicks || det.forwardPicks.length === 0) ? (
+          <p className="text-sm text-muted-foreground">Forward picks pending squad release.</p>
         ) : (
-          <ul className="space-y-2.5">
-            {det.topAnytimeOverall.slice(0, 3).map((r: any, i: number) => (
-              <li key={`${r.name}-${i}`} className="flex items-start gap-3 bg-surface-2 rounded-lg p-2.5">
-                <span className="kbd h-6 w-6 rounded-full bg-background text-xs font-black flex items-center justify-center shrink-0 mt-0.5">{i + 1}</span>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-bold truncate">{r.name}</div>
-                  <div className="text-[10px] text-muted-foreground">{r.team} · {r.position}</div>
-                  {r.reasoning && <p className="text-[11px] text-muted-foreground leading-snug mt-1">{r.reasoning}</p>}
-                </div>
-                {r.price != null ? (
-                  <span className="text-xs font-black tabular-nums px-2 py-0.5 rounded-full bg-accent/15 text-accent border border-accent/30 shrink-0">{r.price.toFixed(2)}</span>
-                ) : null}
-              </li>
-            ))}
-          </ul>
+          <>
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Two per team — forwards / next-best scorers if the top 6 anytimes don't convert</div>
+            <ul className="space-y-2.5">
+              {det.forwardPicks.map((r: any, i: number) => (
+                <li key={`${r.name}-${i}`} className="flex items-start gap-3 bg-surface-2 rounded-lg p-2.5">
+                  <span className="kbd h-6 w-6 rounded-full bg-background text-xs font-black flex items-center justify-center shrink-0 mt-0.5">{i + 1}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-bold truncate">{r.name}</div>
+                    <div className="text-[10px] text-muted-foreground">{r.team} · {r.position}</div>
+                    {r.reasoning && <p className="text-[11px] text-muted-foreground leading-snug mt-1">{r.reasoning}</p>}
+                  </div>
+                  {r.price != null ? (
+                    <span className="text-xs font-black tabular-nums px-2 py-0.5 rounded-full bg-accent/15 text-accent border border-accent/30 shrink-0">{r.price.toFixed(2)}</span>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          </>
         )}
       </Card>
 

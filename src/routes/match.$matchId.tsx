@@ -1666,23 +1666,23 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
             </div>
             <div className="min-w-0 flex-1">
               <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Double-try ceiling</div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <div className="text-xl font-black truncate">{det.playerDouble.name}</div>
-                <AnytimeOddsTag price={getAnytime(det.playerDouble.name)} />
-              </div>
+              <div className="text-xl font-black truncate">{det.playerDouble.name}</div>
               <div className="text-[11px] text-muted-foreground">{det.playerDouble.team} · {det.playerDouble.position}</div>
               {det.playerDouble.reasoning && (
                 <p className="text-sm leading-relaxed text-foreground/90 mt-2">{det.playerDouble.reasoning}</p>
               )}
             </div>
-            {(() => {
-              const doublePrice = det.playerDouble.price ?? getMulti(det.playerDouble.name);
-              return doublePrice != null ? (
-                <span className="text-lg font-black tabular-nums px-3 py-1.5 rounded-full bg-accent !text-white border border-accent shadow-[0_2px_8px_-2px_color-mix(in_oklab,var(--accent)_60%,transparent)] shrink-0">
-                  {doublePrice.toFixed(2)}
-                </span>
-              ) : null;
-            })()}
+            <div className="flex flex-col items-end gap-1.5 shrink-0">
+              {(() => {
+                const doublePrice = getMulti(det.playerDouble.name) ?? det.playerDouble.price ?? null;
+                return doublePrice != null ? (
+                  <span className="text-lg font-black tabular-nums px-3 py-1.5 rounded-full bg-accent !text-white border border-accent shadow-[0_2px_8px_-2px_color-mix(in_oklab,var(--accent)_60%,transparent)]">
+                    {doublePrice.toFixed(2)}
+                  </span>
+                ) : null;
+              })()}
+              <AnytimeOddsTag price={getAnytime(det.playerDouble.name)} />
+            </div>
           </div>
         )}
       </Card>

@@ -1928,7 +1928,8 @@ function BetTab({ insights, insightsError, insightsLoading, home, away, tryscore
   const initialMargin = marginOptions.find((o) => o.label === initialMarginLabel) ?? marginOptions[0];
 
   // Total points — Over/Under selectable
-  const totalLean = (det.totalPoints?.lean ?? "Over") as "Over" | "Under";
+  const rawLean = String(det.totalPoints?.lean ?? "Over").toLowerCase();
+  const totalLean: "Over" | "Under" = rawLean.startsWith("u") ? "Under" : "Over";
   const totalLine = det.totalPoints?.line ?? 41.5;
   const totalOptions = [
     { label: `Over ${totalLine}`, price: totalPriceFor("Over", totalLine, totalLean) },

@@ -1516,7 +1516,7 @@ function AnytimeOddsTag({ price }: { price: number | null }) {
   if (price == null) return null;
   return (
     <span
-      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-accent/15 text-accent border border-accent/30 text-[9px] font-black uppercase tracking-wider tabular-nums whitespace-nowrap"
+      className="shrink-0 inline-flex items-center gap-1 px-2 py-1 rounded-full bg-accent/15 text-accent border border-accent/30 text-[10px] font-black uppercase tracking-wider tabular-nums whitespace-nowrap"
       title="Anytime tryscorer odds (best market price)"
     >
       Anytime {price.toFixed(2)}

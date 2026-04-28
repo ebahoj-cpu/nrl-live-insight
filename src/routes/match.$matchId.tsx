@@ -1888,12 +1888,17 @@ function BetTab({ insights, insightsError, insightsLoading, home, away, tryscore
     return anytimePriceByName.get(name.trim().toLowerCase()) ?? null;
   };
 
-  // Match Winner odds
+  // Match Winner odds (selectable both sides)
   const winnerSide: "home" | "away" = det.matchWinner?.team ?? "home";
   const winnerNick: string = det.matchWinner?.nickname ?? home.nickName;
   const bestOdds = odds ? bestH2H(odds) : { home: null, away: null };
-  const winnerPriceObj = winnerSide === "home" ? bestOdds.home : bestOdds.away;
-  const winnerPrice = winnerPriceObj?.price ?? 1.85;
+  const homeWinPrice = bestOdds.home?.price ?? (winnerSide === "home" ? 1.85 : 2.10);
+  const awayWinPrice = bestOdds.away?.price ?? (winnerSide === "away" ? 1.85 : 2.10);
+  const winnerOptions = [
+    { label: home.nickName, price: Number(homeWinPrice.toFixed(2)) },
+    { label: away.nickName, price: Number(awayWinPrice.toFixed(2)) },
+  ];
+  const initialWinner = winnerOptions.find((o) => o.label === winnerNick) ?? winnerOptions[0];
 
   // Winning margin — selectable across both sides & buckets
   const marginBuckets = ["1-2", "3-12", "13-24", "25+"];

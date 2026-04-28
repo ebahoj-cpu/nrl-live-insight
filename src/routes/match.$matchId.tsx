@@ -270,26 +270,66 @@ const POSITION_ORDER = [
 type TeamNews = { ins: string[]; outs: string[]; blurb: string; sourceUrl: string } | null;
 
 function LineupTab({ home, away, officials, teamNews }: { home: any; away: any; officials: { position: string; firstName: string; lastName: string; headImage?: string }[]; teamNews?: { home: TeamNews; away: TeamNews } }) {
+  const [side, setSide] = useState<"home" | "away">("home");
+  const team = side === "home" ? home : away;
+  const news = side === "home" ? (teamNews?.home ?? null) : (teamNews?.away ?? null);
+
+  const TeamTab = ({ value, t, label }: { value: "home" | "away"; t: any; label: string }) => {
+    const active = side === value;
+    return (
+      <button
+        type="button"
+        onClick={() => setSide(value)}
+        aria-pressed={active}
+        className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-md transition-all ${
+          active
+            ? "bg-accent/15 ring-1 ring-accent/40 text-foreground"
+            : "bg-surface-2/50 text-muted-foreground hover:text-foreground"
+        }`}
+      >
+        <TeamLogo themeKey={t.themeKey} name={t.nickName} size={28} />
+        <div className="flex flex-col items-start leading-tight min-w-0">
+          <span className="text-[9px] uppercase tracking-wider opacity-70">{label}</span>
+          <span className="text-sm font-extrabold uppercase truncate">{t.nickName}</span>
+        </div>
+      </button>
+    );
+  };
+
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="space-y-4">
-          <SquadPanel team={home} />
-          <InjuryCard team={home} news={teamNews?.home ?? null} />
+      <section className="card-surface p-2">
+        <div className="flex items-stretch gap-2">
+          <TeamTab value="home" t={home} label="Home" />
+          <TeamTab value="away" t={away} label="Away" />
         </div>
-        <div className="space-y-4">
-          <SquadPanel team={away} />
-          <InjuryCard team={away} news={teamNews?.away ?? null} />
-        </div>
-      </div>
+      </section>
+      <SquadPanel team={team} />
+      <InjuryCard team={team} news={news} />
       <OfficialsCard officials={officials} />
     </div>
   );
 }
 
 function InjuryCard({ team, news }: { team: { nickName: string }; news: TeamNews }) {
+  const renderName = (n: string, tone: "in" | "out") => (
+    <li
+      key={`${tone}-${n}`}
+      className="flex items-center gap-2 rounded-md bg-accent/15 ring-1 ring-accent/25 px-2 py-1"
+    >
+      <span
+        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded ${
+          tone === "in" ? "bg-background text-success" : "bg-background text-danger"
+        }`}
+      >
+        {tone === "in" ? <ThumbsUp className="h-3 w-3" /> : <ThumbsDown className="h-3 w-3" />}
+      </span>
+      <span className="flex-1 min-w-0 font-extrabold uppercase tracking-wide text-xs truncate">{n}</span>
+    </li>
+  );
+
   return (
-    <section className="card-surface p-5">
+    <section className="card-surface p-4">
       <div className="flex items-center gap-2 mb-3">
         <AlertCircle className="h-4 w-4 text-accent shrink-0" />
         <h3 className="font-bold text-sm uppercase tracking-wider truncate">{team.nickName} · Ins & Outs</h3>
@@ -298,33 +338,21 @@ function InjuryCard({ team, news }: { team: { nickName: string }; news: TeamNews
         <p className="text-xs text-muted-foreground">Late mail not yet published. Updates land Tuesday/Thursday on NRL.com.</p>
       ) : (
         <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <div className="text-[10px] uppercase tracking-wider font-bold text-success mb-1.5 flex items-center gap-1">
-                <ThumbsUp className="h-3 w-3" /> Ins
-              </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1.5">
+              <div className="text-[10px] uppercase tracking-[0.2em] font-bold text-accent/80">Ins</div>
               {news.ins.length === 0 ? (
                 <div className="text-xs text-muted-foreground">—</div>
               ) : (
-                <ul className="space-y-1">
-                  {news.ins.map((n, i) => (
-                    <li key={i} className="text-xs font-medium">{n}</li>
-                  ))}
-                </ul>
+                <ul className="space-y-1">{news.ins.map((n) => renderName(n, "in"))}</ul>
               )}
             </div>
-            <div>
-              <div className="text-[10px] uppercase tracking-wider font-bold text-danger mb-1.5 flex items-center gap-1">
-                <ThumbsDown className="h-3 w-3" /> Outs
-              </div>
+            <div className="space-y-1.5">
+              <div className="text-[10px] uppercase tracking-[0.2em] font-bold text-accent/80">Outs</div>
               {news.outs.length === 0 ? (
                 <div className="text-xs text-muted-foreground">—</div>
               ) : (
-                <ul className="space-y-1">
-                  {news.outs.map((n, i) => (
-                    <li key={i} className="text-xs font-medium">{n}</li>
-                  ))}
-                </ul>
+                <ul className="space-y-1">{news.outs.map((n) => renderName(n, "out"))}</ul>
               )}
             </div>
           </div>
@@ -345,13 +373,16 @@ function InjuryCard({ team, news }: { team: { nickName: string }; news: TeamNews
 }
 
 function OfficialsCard({ officials }: { officials: { position: string; firstName: string; lastName: string; headImage?: string }[] }) {
-  // We only display the on-field Referee and the Senior Review / Bunker Official.
   const filtered = (officials ?? []).filter((o) => /^Referee$/i.test(o.position) || /Senior Review|Bunker/i.test(o.position));
   if (filtered.length === 0) {
     return (
-      <Card title="Match officials" icon={Shield}>
+      <section className="card-surface p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <Shield className="h-4 w-4 text-accent shrink-0" />
+          <h3 className="font-bold text-sm uppercase tracking-wider truncate">Match Officials</h3>
+        </div>
         <p className="text-xs text-muted-foreground">Officials not yet announced.</p>
-      </Card>
+      </section>
     );
   }
   const order = ["Referee", "Senior Review Official", "Bunker Official"];
@@ -361,25 +392,35 @@ function OfficialsCard({ officials }: { officials: { position: string; firstName
     return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
   });
   return (
-    <Card title="Match officials" icon={Shield}>
-      <div className="grid grid-cols-2 gap-3">
+    <section className="card-surface p-4">
+      <div className="flex items-center gap-2 mb-3">
+        <Shield className="h-4 w-4 text-accent shrink-0" />
+        <h3 className="font-bold text-sm uppercase tracking-wider truncate">Match Officials</h3>
+      </div>
+      <ul className="space-y-1.5">
         {sorted.map((o, i) => {
           const isTMO = /Senior Review|Bunker/i.test(o.position);
-          const isRef = /^Referee$/i.test(o.position);
+          const code = isTMO ? "TMO" : "REF";
+          const label = isTMO ? "TMO / Bunker" : "Referee";
           return (
-            <div key={i} className={`bg-surface-2 rounded-lg p-3 flex items-center gap-3 ${isRef ? "ring-1 ring-accent/40" : ""}`}>
-              <OfficialAvatar src={o.headImage} firstName={o.firstName} lastName={o.lastName} size={isRef ? 56 : 44} />
-              <div className="min-w-0 flex-1">
-                <div className="text-sm font-semibold truncate">{o.firstName} {o.lastName}</div>
-                <div className={`text-[10px] uppercase tracking-wider truncate ${isTMO ? "text-accent font-bold" : isRef ? "text-foreground font-bold" : "text-muted-foreground"}`}>
-                  {isTMO ? "TMO / Bunker" : o.position}
-                </div>
-              </div>
-            </div>
+            <li
+              key={i}
+              className="flex items-center gap-3 rounded-md bg-accent/15 ring-1 ring-accent/25 px-2 py-1.5"
+            >
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-background text-accent font-extrabold text-[10px] tabular-nums">
+                {code}
+              </span>
+              <span className="flex-1 min-w-0 font-extrabold uppercase tracking-wide text-sm truncate">
+                {o.firstName} {o.lastName}
+              </span>
+              <span className="text-[10px] uppercase tracking-wider text-accent/80 font-bold shrink-0">
+                {label}
+              </span>
+            </li>
           );
         })}
-      </div>
-    </Card>
+      </ul>
+    </section>
   );
 }
 

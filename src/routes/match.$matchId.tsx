@@ -2058,18 +2058,28 @@ function BetTab({ insights, insightsError, insightsLoading, home, away, tryscore
                     {leg.market}
                   </div>
                   {leg.options ? (
-                    <select
-                      value={leg.selection}
-                      onChange={(e) => updateLegSelection(leg.id, e.target.value)}
-                      className="mt-0.5 w-full bg-transparent text-sm font-bold outline-none border-0 cursor-pointer hover:text-accent transition focus:text-accent appearance-none pr-4"
-                      style={{ backgroundImage: "none" }}
-                    >
-                      {leg.options.map((o) => (
-                        <option key={o.label} value={o.label} className="bg-surface-2 text-foreground">
-                          {o.label} · {o.price.toFixed(2)}
-                        </option>
-                      ))}
-                    </select>
+                    <Select value={leg.selection} onValueChange={(v) => updateLegSelection(leg.id, v)}>
+                      <SelectTrigger className="mt-0.5 h-auto px-2 py-1 -ml-2 bg-transparent border border-transparent hover:border-accent/40 hover:bg-accent/5 focus:ring-0 focus:border-accent/60 rounded-md text-sm font-bold text-foreground shadow-none transition w-full justify-between gap-2">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent
+                        className="bg-surface-2 border-accent/30 text-foreground shadow-xl rounded-lg backdrop-blur"
+                        position="popper"
+                      >
+                        {leg.options.map((o) => (
+                          <SelectItem
+                            key={o.label}
+                            value={o.label}
+                            className="text-sm font-semibold focus:bg-accent/20 focus:text-foreground data-[state=checked]:text-accent rounded-md"
+                          >
+                            <span className="flex items-center justify-between gap-4 w-full">
+                              <span className="truncate">{o.label}</span>
+                              <span className="tabular-nums text-[11px] font-black text-accent">{o.price.toFixed(2)}</span>
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   ) : (
                     <div className="text-sm font-bold mt-0.5 truncate">{leg.selection}</div>
                   )}

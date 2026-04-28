@@ -214,6 +214,7 @@ export function generateDeterministicInsights(inp: EngineInputs): DeterministicI
     topAnytime: top5.map((r) => stripInternal(r, r.reasoning)),
     topAnytimeHome: homeRanked.map((r) => stripInternal(r, r.reasoning)),
     topAnytimeAway: awayRanked.map((r) => stripInternal(r, r.reasoning)),
+    topAnytimeOverall: ranking.slice(0, 3).map((r) => stripInternal(r, r.reasoning)),
     playerDouble: stripInternal(doublePick, doubleReason),
     predictedOutcome,
   };

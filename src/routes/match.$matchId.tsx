@@ -1632,7 +1632,7 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
       </Card>
 
       {/* 9b — Forward Picks (2 per team, forwards/outside top 6) */}
-      <Card title="Forward Picks" icon={Sparkles}>
+      <Card title="Secondary Tier Picks" icon={Sparkles}>
         {(!det.forwardPicks || det.forwardPicks.length === 0) ? (
           <p className="text-sm text-muted-foreground">Forward picks pending squad release.</p>
         ) : (

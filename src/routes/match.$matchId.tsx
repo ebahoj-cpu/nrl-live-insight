@@ -1625,7 +1625,7 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
           </ul>
         </Card>
       )}
-
+      <p className="text-[10px] text-muted-foreground text-center px-4 leading-relaxed">
         Stats-driven projections from 2026 season-to-date team & player data. Bet responsibly · 18+
       </p>
     </div>

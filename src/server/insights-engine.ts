@@ -62,6 +62,9 @@ export type DeterministicInsights = {
   topAnytimeAway: EnginePlayerPick[]; // length 3
   topAnytimeOverall: EnginePlayerPick[]; // length 3 — highest likely across both teams (legacy)
   forwardPicks: EnginePlayerPick[]; // length 4 — 2 per team, forwards / outside top 6 anytime
+  // Try-assist boards (3 per team) — playmakers most likely to provide try assists
+  tryAssistsHome: EnginePlayerPick[]; // length 3
+  tryAssistsAway: EnginePlayerPick[]; // length 3
   // 9 — Player to score 2+ tries (double)
   playerDouble: EnginePlayerPick;
   // 10 — Predicted outcome narrative with 3 anytime tryscorer picks

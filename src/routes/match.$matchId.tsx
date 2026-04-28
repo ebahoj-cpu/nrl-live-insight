@@ -1603,7 +1603,29 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
         )}
       </Card>
 
-      <p className="text-[10px] text-muted-foreground text-center px-4 leading-relaxed">
+      {/* 10 — Predicted Outcome */}
+      {det.predictedOutcome && (
+        <Card title="Predicted outcome" icon={Trophy} className="accent-glow">
+          <p className="text-sm leading-relaxed text-foreground/90 mb-3">{det.predictedOutcome.summary}</p>
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Three anytime tryscorers backing this script</div>
+          <ul className="space-y-2.5">
+            {(det.predictedOutcome.picks ?? []).map((p: any, i: number) => (
+              <li key={`${p.name}-${i}`} className="flex items-start gap-3 bg-surface-2 rounded-lg p-2.5">
+                <span className="kbd h-6 w-6 rounded-full bg-background text-xs font-black flex items-center justify-center shrink-0 mt-0.5">{i + 1}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-bold truncate">{p?.name ?? "—"}</div>
+                  <div className="text-[10px] text-muted-foreground">{p?.team} · {p?.position}</div>
+                  {p?.reasoning && <p className="text-[11px] text-muted-foreground leading-snug mt-1">{p.reasoning}</p>}
+                </div>
+                {p?.price != null ? (
+                  <span className="text-xs font-black tabular-nums px-2 py-0.5 rounded-full bg-accent/15 text-accent border border-accent/30 shrink-0">{p.price.toFixed(2)}</span>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
+
         Stats-driven projections from 2026 season-to-date team & player data. Bet responsibly · 18+
       </p>
     </div>

@@ -560,3 +560,68 @@ function buildForwardPickReason(r: RankedRow): string {
   }
   return `${last} rates as ${r.team}'s next-best scoring option behind the headline anytime board — secondary attacking touches keep them live if the top picks don't convert.`;
 }
+
+// Try-assist picks: 3 per team. There's no direct try-assist stat in the
+// snapshot, so we rank named-squad playmakers by positional priority
+// (Halfback > Hooker > Five-Eighth > Fullback > Lock), then break ties by
+// captaincy and lower jersey number (seniority). Falls back to season tries
+// for the same player as a secondary signal of attacking involvement.
+function pickTryAssists(inp: EngineInputs, side: "home" | "away"): RankedRow[] {
+  const teamNick = side === "home" ? inp.homeNickname : inp.awayNickname;
+  const squad = side === "home" ? inp.homeSquad : inp.awaySquad;
+  const players = getTeamPlayers(inp.snapshot, teamNick);
+  const byName = new Map(players.map((p) => [normName(p.name), p]));
+
+  const POSITION_RANK: Record<string, number> = {
+    halfback: 100,
+    hooker: 88,
+    "five-eighth": 86,
+    fiveeighth: 86,
+    "stand off": 86,
+    standoff: 86,
+    fullback: 78,
+    lock: 60,
+  };
+  const posScore = (pos: string): number => {
+    const p = (pos || "").toLowerCase().replace(/\s+/g, " ").trim();
+    for (const key of Object.keys(POSITION_RANK)) {
+      if (p.includes(key)) return POSITION_RANK[key];
+    }
+    return 0;
+  };
+
+  const candidates = squad
+    .map((sp) => {
+      const fullName = `${sp.firstName} ${sp.lastName}`.trim();
+      const stats = byName.get(normName(fullName));
+      const ps = posScore(sp.position);
+      if (ps === 0) return null;
+      // Higher score = better playmaker pick. Add captain bonus + jersey
+      // seniority + a small lift for season tries (proxy for attacking touches).
+      const score =
+        ps +
+        (sp.isCaptain ? 6 : 0) +
+        (sp.jerseyNumber ? Math.max(0, 18 - sp.jerseyNumber) * 0.4 : 0) +
+        Math.min(8, (stats?.tries ?? 0) * 0.5);
+      const role = positionRole(sp.position);
+      const last = sp.lastName || fullName;
+      const triesNote = stats && stats.tries > 0
+        ? ` Has ${stats.tries} tr${stats.tries === 1 ? "y" : "ies"} of own this season — stays involved at the line.`
+        : "";
+      const reasoning = `${last} (${role.toLowerCase()}) drives ${teamNick}'s shape — ball-playing role and goal-line involvements make them the lead try-assist option in their zone.${triesNote}`;
+      const row: RankedRow = {
+        name: fullName,
+        team: teamNick,
+        position: sp.position,
+        reasoning,
+        price: null,
+        score,
+        _openingBoost: 0,
+      };
+      return row;
+    })
+    .filter((r): r is RankedRow => r !== null)
+    .sort((a, b) => b.score - a.score);
+
+  return candidates.slice(0, 3);
+}

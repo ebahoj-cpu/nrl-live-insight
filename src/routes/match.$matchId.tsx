@@ -639,43 +639,55 @@ function SquadPanel({ team }: { team: { nickName: string; themeKey: string; play
   const renderRow = (p: P, i: number) => (
     <li
       key={i}
-      className="flex items-center gap-3 rounded-md bg-accent/15 ring-1 ring-accent/25 px-2 py-1.5"
+      // Same fixed-height card as the H2H view so the lineup pages feel uniform.
+      className="relative flex items-stretch h-24 sm:h-28 rounded-lg bg-accent/15 ring-1 ring-accent/25 overflow-hidden"
     >
-      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-background text-accent font-extrabold text-sm tabular-nums">
-        {p.jerseyNumber ?? "—"}
-      </span>
-      <div className="relative shrink-0 h-12 w-12 overflow-hidden">
+      {/* Headshot pinned to the left edge, bottom-aligned to the card */}
+      <div className="relative shrink-0 self-stretch w-24 sm:w-28">
         {p.headImage ? (
           <img
             src={p.headImage}
             alt=""
             loading="lazy"
-            className="absolute inset-0 h-full w-full object-contain object-bottom"
+            className="pointer-events-none absolute bottom-0 left-0 h-[110%] w-auto max-w-none object-contain object-bottom"
             onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
           />
         ) : null}
       </div>
-      <span className="flex-1 min-w-0 font-extrabold uppercase tracking-wide text-sm truncate">
-        {p.firstName} {p.lastName}
-        {p.isCaptain && <Crown className="inline h-3 w-3 ml-1.5 text-accent align-[-1px]" />}
-      </span>
-      <span className="hidden sm:inline text-[10px] uppercase tracking-wider text-muted-foreground shrink-0">
-        {p.position}
-      </span>
 
+      {/* Jersey number badge */}
+      <div className="shrink-0 flex flex-col items-center justify-center w-14 sm:w-16">
+        <span className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-md bg-accent text-accent-foreground font-black text-base sm:text-lg tabular-nums">
+          {p.jerseyNumber ?? "—"}
+        </span>
+      </div>
+
+      {/* Name + position */}
+      <div className="flex-1 min-w-0 flex flex-col justify-center px-2 sm:px-3 leading-tight">
+        <div className="text-[10px] sm:text-[11px] uppercase tracking-wider text-muted-foreground truncate">
+          {p.firstName}
+        </div>
+        <div className="text-sm sm:text-lg font-black uppercase truncate">
+          {p.lastName}
+          {p.isCaptain && <Crown className="inline h-3 w-3 sm:h-3.5 sm:w-3.5 mx-1 text-accent align-[-1px]" />}
+        </div>
+        <div className="text-[9px] sm:text-[10px] uppercase tracking-wider text-accent/70 font-bold mt-0.5 truncate">
+          {p.position}
+        </div>
+      </div>
     </li>
   );
 
   const Group = ({ label, items }: { label?: string; items: P[] }) => {
     if (items.length === 0) return null;
     return (
-      <div className="space-y-1.5">
+      <div className="space-y-3">
         {label && (
           <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-accent/80 pt-1">
             {label}
           </div>
         )}
-        <ul className="space-y-1.5">{items.map(renderRow)}</ul>
+        <ul className="space-y-3">{items.map(renderRow)}</ul>
       </div>
     );
   };

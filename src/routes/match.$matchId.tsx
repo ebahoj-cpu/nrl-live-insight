@@ -388,49 +388,63 @@ function H2HPanel({ home, away }: { home: any; away: any }) {
   // card edge so the head/hair is never clipped. Row uses overflow-visible
   // and groups have extra vertical spacing so the overflow doesn't collide
   // with the row above.
-  const Headshot = ({ p, side }: { p?: P; themeKey: string; side: "left" | "right" }) => (
-    <div className={`relative shrink-0 self-stretch w-24 sm:w-28`}>
-      {p?.headImage ? (
-        <img
-          src={p.headImage}
-          alt=""
-          loading="lazy"
-          className={`pointer-events-none absolute bottom-0 h-[150%] w-auto max-w-none object-contain object-bottom drop-shadow-[0_4px_10px_rgba(0,0,0,0.5)] ${
-            side === "left" ? "left-0" : "right-0"
-          }`}
-          onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-        />
-      ) : null}
-    </div>
-  );
-
-  const NameBlock = ({ p }: { p?: P; align: "left" | "right" }) => {
-    if (!p) {
-      return (
-        <div className="flex-1 min-w-0 px-2 sm:px-3 text-center">
-          <div className="text-[10px] sm:text-xs uppercase tracking-wider text-muted-foreground/60 italic">— TBC —</div>
-        </div>
-      );
-    }
+  // Mobile: smaller (~25% reduction from w-24 → w-[72px]) headshots pushed to
+  // the outer edges. The player's name sits as a gradient overlay across the
+  // bottom of the headshot (where the jersey is, so the face is still visible)
+  // AND repeats as a clean caption directly underneath the headshot.
+  const HeadshotWithName = ({ p, side }: { p?: P; side: "left" | "right" }) => {
+    const longName = (p?.lastName ?? "").length >= 9;
     return (
-      <div className="flex-1 min-w-0 px-2 sm:px-3 leading-tight text-center">
-        <div className="text-[10px] sm:text-[11px] uppercase tracking-wider text-muted-foreground truncate">
-          {p.firstName}
+      <div className={`shrink-0 flex flex-col items-${side === "left" ? "start" : "end"}`}>
+        <div className="relative w-[72px] h-20 sm:w-28 sm:h-28 overflow-visible">
+          {p?.headImage ? (
+            <>
+              <img
+                src={p.headImage}
+                alt=""
+                loading="lazy"
+                className={`pointer-events-none absolute bottom-0 h-[150%] w-auto max-w-none object-contain object-bottom drop-shadow-[0_4px_10px_rgba(0,0,0,0.5)] ${
+                  side === "left" ? "left-0" : "right-0"
+                }`}
+                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+              />
+              {/* Gradient overlay at the bottom of the headshot frame with the surname */}
+              {p?.lastName && (
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-8 sm:h-9 rounded-b-md bg-gradient-to-t from-background/85 via-background/55 to-transparent flex items-end justify-center px-1 pb-1">
+                  <span className={`uppercase font-black tracking-wide truncate text-foreground ${longName ? "text-[9px] sm:text-[11px]" : "text-[11px] sm:text-sm"}`}>
+                    {p.lastName}
+                  </span>
+                </div>
+              )}
+            </>
+          ) : null}
         </div>
-        <div className="text-sm sm:text-lg font-black uppercase truncate">
-          {p.lastName}
-          {p.isCaptain && <Crown className="inline h-3 w-3 sm:h-3.5 sm:w-3.5 mx-1 text-accent align-[-1px]" />}
+        {/* Caption under the headshot: first name + surname */}
+        <div className={`mt-1.5 w-[72px] sm:w-28 leading-tight text-center`}>
+          {p ? (
+            <>
+              <div className="text-[9px] sm:text-[10px] uppercase tracking-wider text-muted-foreground truncate">
+                {p.firstName}
+              </div>
+              <div className={`font-black uppercase truncate ${longName ? "text-[10px] sm:text-sm" : "text-xs sm:text-base"}`}>
+                {p.lastName}
+                {p.isCaptain && <Crown className="inline h-3 w-3 mx-0.5 text-accent align-[-1px]" />}
+              </div>
+            </>
+          ) : (
+            <div className="text-[9px] sm:text-[10px] uppercase tracking-wider text-muted-foreground/60 italic">— TBC —</div>
+          )}
         </div>
       </div>
     );
   };
 
   const CenterBadge = ({ n, label }: { n: number; label?: string }) => (
-    <div className="shrink-0 flex flex-col items-center justify-center w-20 sm:w-24">
+    <div className="shrink-0 flex flex-col items-center justify-center px-2">
       <span className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-md bg-accent text-accent-foreground font-black text-base sm:text-lg tabular-nums">
         {n}
       </span>
-      <span className="text-[8px] sm:text-[9px] uppercase tracking-wider text-muted-foreground mt-1 whitespace-nowrap">
+      <span className="text-[8px] sm:text-[9px] uppercase tracking-wider text-muted-foreground mt-1 whitespace-nowrap text-center">
         {label ?? positionFor(n)}
       </span>
     </div>
@@ -440,19 +454,12 @@ function H2HPanel({ home, away }: { home: any; away: any }) {
     const h = homeMap.get(n);
     const a = awayMap.get(n);
     return (
-      // overflow-visible so the headshots can extend above the card without
-      // being clipped. Names are absolutely centered to the full card width
-      // (independent of the headshot columns) so they don't drift off-center.
-      <li className="relative flex items-stretch rounded-lg bg-accent/10 ring-1 ring-accent/25 hover:ring-accent/50 transition h-24 sm:h-28 overflow-visible">
-        <Headshot p={h} themeKey={home.themeKey} side="left" />
-        <div className="flex-1" />
-        <Headshot p={a} themeKey={away.themeKey} side="right" />
-        {/* Absolute overlay row: home name | center badge | away name, perfectly centered */}
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center px-24 sm:px-28">
-          <div className="flex-1 min-w-0 flex justify-center"><NameBlock p={h} align="left" /></div>
+      <li className="relative flex items-start justify-between gap-2 sm:gap-4 rounded-lg bg-accent/10 ring-1 ring-accent/25 hover:ring-accent/50 transition px-2 sm:px-4 py-2 overflow-visible">
+        <HeadshotWithName p={h} side="left" />
+        <div className="flex-1 flex items-center justify-center pt-4 sm:pt-6">
           <CenterBadge n={n} label={label} />
-          <div className="flex-1 min-w-0 flex justify-center"><NameBlock p={a} align="right" /></div>
         </div>
+        <HeadshotWithName p={a} side="right" />
       </li>
     );
   };

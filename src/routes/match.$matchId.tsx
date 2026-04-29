@@ -2330,24 +2330,59 @@ function BetTab({ insights, insightsError, insightsLoading, home, away, tryscore
   const usedTryscorerNames = new Set(
     legs.filter((l) => l.market.startsWith("Anytime Tryscorer")).map((l) => l.selection.trim().toLowerCase())
   );
-  const availableTryscorers = (tryscorers?.anytime ?? [])
-    .filter((t) => !usedTryscorerNames.has(t.player.trim().toLowerCase()))
-    .slice(0, 60);
 
-  const addTryscorer = (name: string) => {
-    const t = (tryscorers?.anytime ?? []).find((x) => x.player === name);
-    if (!t) return;
+  // Build candidate tryscorer list. Prefer live bookie prices when available;
+  // otherwise fall back to the squad lists with an estimated price so users
+  // can still build their slip before player markets are released (~24h pre-game).
+  type TryCandidate = { player: string; price: number; team: string; isEstimate: boolean };
+  const liveCandidates: TryCandidate[] = (tryscorers?.anytime ?? []).map((t) => {
     const aff = affiliatePlayer(t.player, home, away);
     const teamLabel = aff === "home" ? home.nickName : aff === "away" ? away.nickName : "";
+    return { player: t.player, price: t.price, team: teamLabel, isEstimate: false };
+  });
+
+  const tryProneSet = new Set(["FB", "W", "WG", "C", "CE", "FE", "HB", "L", "LK", "FR", "PR", "HK", "SR"]);
+  const estimatePrice = (pos: string): number => {
+    const p = (pos || "").toUpperCase();
+    if (p.includes("W") || p === "FB") return 3.50;
+    if (p.includes("C")) return 4.50;
+    if (p === "FE" || p === "HB" || p === "L" || p === "LK") return 5.50;
+    return 8.00; // forwards
+  };
+  const buildEstimateCandidates = (squad: TeamWithPlayers): TryCandidate[] => {
+    const players = squad.players ?? [];
+    return players
+      .filter((p) => tryProneSet.has((p.position || "").toUpperCase().replace(/[^A-Z]/g, "")))
+      .map((p) => ({
+        player: `${p.firstName} ${p.lastName}`.trim(),
+        price: estimatePrice(p.position),
+        team: squad.nickName,
+        isEstimate: true,
+      }));
+  };
+  const fallbackCandidates: TryCandidate[] = liveCandidates.length === 0
+    ? [...buildEstimateCandidates(home), ...buildEstimateCandidates(away)]
+    : [];
+
+  const allCandidates = liveCandidates.length > 0 ? liveCandidates : fallbackCandidates;
+  const availableTryscorers = allCandidates
+    .filter((t) => !usedTryscorerNames.has(t.player.trim().toLowerCase()))
+    .sort((a, b) => a.price - b.price)
+    .slice(0, 60);
+  const usingEstimates = liveCandidates.length === 0 && fallbackCandidates.length > 0;
+
+  const addTryscorer = (name: string) => {
+    const t = allCandidates.find((x) => x.player === name);
+    if (!t) return;
     setLegs((prev) => {
       const idx = prev.filter((l) => l.market.startsWith("Anytime Tryscorer")).length + 1;
       return [
         ...prev,
         {
           id: `tryscorer-extra-${Date.now()}`,
-          market: `Anytime Tryscorer ${idx}`,
+          market: `Anytime Tryscorer ${idx}${t.isEstimate ? " (est.)" : ""}`,
           selection: t.player,
-          detail: teamLabel,
+          detail: t.team,
           price: t.price,
         },
       ];
@@ -2408,7 +2443,7 @@ function BetTab({ insights, insightsError, insightsLoading, home, away, tryscore
                   </div>
                   {leg.options ? (
                     <Select value={leg.selection} onValueChange={(v) => updateLegSelection(leg.id, v)}>
-                      <SelectTrigger className="mt-1 h-auto min-h-[2rem] px-2 py-1 -ml-2 bg-transparent border border-transparent hover:border-accent/40 hover:bg-accent/5 focus:ring-0 focus:border-accent/60 rounded-md text-base font-bold text-foreground shadow-none transition w-full justify-between gap-2 [&>span]:line-clamp-none [&>span]:text-left [&>span]:whitespace-normal [&>span]:break-words [&>span]:flex-1">
+                      <SelectTrigger className="mt-1 h-auto min-h-[2rem] px-2 py-1 -ml-2 bg-transparent border border-transparent hover:border-accent/40 hover:bg-accent/5 focus:ring-0 focus:border-accent/60 rounded-md text-base font-bold text-foreground shadow-none transition w-fit max-w-full justify-start gap-1.5 [&>span]:line-clamp-none [&>span]:text-left [&>span]:whitespace-normal [&>span]:break-words [&>svg]:opacity-60 [&>svg]:shrink-0">
                         <SelectValue placeholder="Select…" />
                       </SelectTrigger>
                       <SelectContent
@@ -2464,8 +2499,6 @@ function BetTab({ insights, insightsError, insightsLoading, home, away, tryscore
                   position="popper"
                 >
                   {availableTryscorers.map((t) => {
-                    const aff = affiliatePlayer(t.player, home, away);
-                    const team = aff === "home" ? home.nickName : aff === "away" ? away.nickName : "";
                     return (
                       <SelectItem
                         key={t.player}
@@ -2475,9 +2508,9 @@ function BetTab({ insights, insightsError, insightsLoading, home, away, tryscore
                         <span className="flex items-center justify-between gap-4 w-full">
                           <span className="truncate">
                             {t.player}
-                            {team ? <span className="text-muted-foreground font-normal"> · {team}</span> : null}
+                            {t.team ? <span className="text-muted-foreground font-normal"> · {t.team}</span> : null}
                           </span>
-                          <span className="tabular-nums text-[11px] font-black text-accent">{t.price.toFixed(2)}</span>
+                          <span className="tabular-nums text-[11px] font-black text-accent">{t.price.toFixed(2)}{t.isEstimate ? "*" : ""}</span>
                         </span>
                       </SelectItem>
                     );
@@ -2498,7 +2531,11 @@ function BetTab({ insights, insightsError, insightsLoading, home, away, tryscore
               disabled={availableTryscorers.length === 0}
               className="w-full text-[11px] uppercase tracking-wider font-bold py-2.5 rounded-lg border border-dashed border-accent/40 text-accent hover:bg-accent/10 transition disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              {availableTryscorers.length === 0 ? "No more tryscorer markets" : "+ Add another anytime tryscorer"}
+              {availableTryscorers.length === 0
+                ? "No more tryscorer markets"
+                : usingEstimates
+                  ? "+ Add tryscorer (estimated odds — markets open ~24h pre-game)"
+                  : "+ Add another anytime tryscorer"}
             </button>
           )}
         </div>

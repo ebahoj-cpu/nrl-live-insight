@@ -2359,7 +2359,7 @@ function BetTab({ insights, insightsError, insightsLoading, home, away, tryscore
   const profit = payout - stakeNum;
 
   return (
-    <div className="space-y-4 max-w-2xl mx-auto">
+    <div className="space-y-4 pt-4">
       <Card title="Betslip" icon={Receipt} className="accent-glow">
         <div className="flex items-center justify-between mb-4 -mt-2">
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">

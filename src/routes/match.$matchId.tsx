@@ -644,6 +644,17 @@ function SquadPanel({ team }: { team: { nickName: string; themeKey: string; play
       <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-background text-accent font-extrabold text-sm tabular-nums">
         {p.jerseyNumber ?? "—"}
       </span>
+      <div className="relative shrink-0 h-12 w-12 overflow-hidden">
+        {p.headImage ? (
+          <img
+            src={p.headImage}
+            alt=""
+            loading="lazy"
+            className="absolute inset-0 h-full w-full object-contain object-bottom"
+            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+          />
+        ) : null}
+      </div>
       <span className="flex-1 min-w-0 font-extrabold uppercase tracking-wide text-sm truncate">
         {p.firstName} {p.lastName}
         {p.isCaptain && <Crown className="inline h-3 w-3 ml-1.5 text-accent align-[-1px]" />}
@@ -651,7 +662,7 @@ function SquadPanel({ team }: { team: { nickName: string; themeKey: string; play
       <span className="hidden sm:inline text-[10px] uppercase tracking-wider text-muted-foreground shrink-0">
         {p.position}
       </span>
-      
+
     </li>
   );
 

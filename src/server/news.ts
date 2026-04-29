@@ -101,7 +101,7 @@ function findImage(itemXml: string): string | undefined {
   return imgMatch?.[1];
 }
 
-async function parseFeed(source: string, url: string): Promise<NewsItem[]> {
+async function parseFeed(source: string, url: string, team?: string): Promise<NewsItem[]> {
   try {
     const res = await fetch(url, {
       headers: { "User-Agent": UA, Accept: "application/rss+xml,application/xml,text/xml,*/*" },
@@ -111,19 +111,35 @@ async function parseFeed(source: string, url: string): Promise<NewsItem[]> {
     const items: NewsItem[] = [];
     const itemBlocks = xml.match(/<item[\s\S]*?<\/item>/gi) ?? [];
     for (const block of itemBlocks) {
-      const title = pick(block, "title");
+      const rawTitle = pick(block, "title");
       const link = pick(block, "link") || pickAttr(block, "link", "href");
       const pubDate = pick(block, "pubDate") || pick(block, "published") || pick(block, "dc:date");
-      if (!title || !link) continue;
+      if (!rawTitle || !link) continue;
       const dateIso = pubDate ? new Date(pubDate).toISOString() : new Date().toISOString();
+
+      // Google News items embed the real publisher in <source> and append
+      // " - Publisher" to the title. Prefer <source> when present so each
+      // article is attributed to its underlying outlet rather than "Google News".
+      const publisher = pick(block, "source");
+      const cleanTitle = stripHtml(rawTitle).replace(/\s+-\s+[^-]+$/, "").trim();
+      const effectiveSource = publisher ? stripHtml(publisher) : source;
+
+      // For per-team feeds, summary becomes the publisher attribution so the
+      // card shows "{Team} · {Publisher}" semantics without losing the brand.
+      const rawDescription = pick(block, "description") ?? "";
+      const summary = team
+        ? (publisher ? `via ${stripHtml(publisher)}` : undefined)
+        : (stripHtml(rawDescription).slice(0, 220) || undefined);
+
       items.push({
         id: link,
-        title: stripHtml(title),
+        title: cleanTitle || stripHtml(rawTitle),
         link: link.trim(),
-        source,
+        source: team ?? effectiveSource,
+        team,
         publishedUtc: dateIso,
         image: findImage(block),
-        summary: stripHtml(pick(block, "description") ?? "").slice(0, 220) || undefined,
+        summary,
       });
     }
     return items;
@@ -133,7 +149,7 @@ async function parseFeed(source: string, url: string): Promise<NewsItem[]> {
 }
 
 export async function fetchNews(): Promise<NewsItem[]> {
-  const all = (await Promise.all(FEEDS.map((f) => parseFeed(f.source, f.url)))).flat();
+  const all = (await Promise.all(FEEDS.map((f) => parseFeed(f.source, f.url, f.team)))).flat();
 
   // Filter ABC to NRL/rugby league only (it's a general sport feed)
   const filtered = all.filter((n) => {
@@ -146,16 +162,21 @@ export async function fetchNews(): Promise<NewsItem[]> {
   const weekAgo = Date.now() - 7 * 24 * 60 * 60_000;
   const recent = filtered.filter((n) => new Date(n.publishedUtc).getTime() >= weekAgo);
 
-  // Dedupe by normalized title
-  const seen = new Set<string>();
-  const deduped: NewsItem[] = [];
+  // Dedupe by normalized title (cross-feed: same story surfaced from team feed
+  // + general feed should collapse, preferring the team-tagged version).
+  const seen = new Map<string, NewsItem>();
   for (const n of recent) {
     const key = n.title.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().slice(0, 80);
-    if (seen.has(key)) continue;
-    seen.add(key);
-    deduped.push(n);
+    const existing = seen.get(key);
+    if (!existing) {
+      seen.set(key, n);
+    } else if (!existing.team && n.team) {
+      // Prefer the team-tagged variant for richer attribution.
+      seen.set(key, n);
+    }
   }
+  const deduped = Array.from(seen.values());
 
   deduped.sort((a, b) => new Date(b.publishedUtc).getTime() - new Date(a.publishedUtc).getTime());
-  return deduped.slice(0, 100);
+  return deduped.slice(0, 200);
 }

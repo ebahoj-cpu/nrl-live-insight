@@ -339,7 +339,7 @@ function LineupTab({ home, away, officials, teamNews }: { home: any; away: any; 
 }
 
 function H2HPanel({ home, away }: { home: any; away: any }) {
-  type P = { firstName: string; lastName: string; position: string; jerseyNumber?: number; isCaptain?: boolean };
+  type P = { firstName: string; lastName: string; position: string; jerseyNumber?: number; isCaptain?: boolean; headImage?: string };
   const byNumber = (players: P[]) => {
     const m = new Map<number, P>();
     for (const p of players ?? []) if (p.jerseyNumber != null) m.set(p.jerseyNumber, p);
@@ -358,48 +358,77 @@ function H2HPanel({ home, away }: { home: any; away: any }) {
   for (let i = 1; i <= 17; i++) {
     if (homeMap.has(i) || awayMap.has(i)) numbers.push(i);
   }
-  // Trailing reserves (>17) — pair by number if either side has them
   const extraSet = new Set<number>();
   for (const n of homeMap.keys()) if (n > 17) extraSet.add(n);
   for (const n of awayMap.keys()) if (n > 17) extraSet.add(n);
   const extras = [...extraSet].sort((a, b) => a - b);
 
-  const PlayerCell = ({ p, align }: { p?: P; align: "left" | "right" }) => (
-    <div className={`flex-1 min-w-0 flex items-center gap-2 ${align === "right" ? "flex-row-reverse text-right" : ""}`}>
-      <span className="text-[10px] uppercase tracking-wider text-muted-foreground hidden sm:inline shrink-0">
-        {p?.position ?? ""}
-      </span>
-      <span className="flex-1 min-w-0 font-extrabold uppercase tracking-wide text-xs sm:text-sm truncate">
-        {p ? (
-          <>
-            {p.firstName} {p.lastName}
-            {p.isCaptain && <Crown className="inline h-3 w-3 mx-1 text-accent align-[-1px]" />}
-          </>
+  const Headshot = ({ p, themeKey, side }: { p?: P; themeKey: string; side: "left" | "right" }) => {
+    const ringSide = side === "left" ? "border-r-2" : "border-l-2";
+    return (
+      <div className={`relative shrink-0 h-16 w-16 sm:h-20 sm:w-20 overflow-hidden bg-gradient-to-b from-accent/10 to-transparent ${ringSide} border-accent/30 rounded-md`}>
+        {p?.headImage ? (
+          <img
+            src={p.headImage}
+            alt=""
+            loading="lazy"
+            className="absolute inset-0 h-full w-full object-cover object-top"
+            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+          />
         ) : (
-          <span className="text-muted-foreground/60 normal-case font-normal italic">— TBC —</span>
+          <div className="absolute inset-0 flex items-center justify-center opacity-40">
+            <TeamLogo themeKey={themeKey} name="" size={36} />
+          </div>
         )}
-      </span>
-    </div>
-  );
-
-  const Row = ({ n, label }: { n: number; label?: string }) => (
-    <li className="flex items-center gap-2 rounded-md bg-accent/10 ring-1 ring-accent/20 px-2 py-2">
-      <PlayerCell p={homeMap.get(n)} align="left" />
-      <div className="shrink-0 flex flex-col items-center justify-center px-1">
-        <span className="flex h-6 min-w-6 px-1.5 items-center justify-center rounded bg-accent text-accent-foreground font-black text-xs tabular-nums">
-          {n}
-        </span>
-        <span className="text-[8px] uppercase tracking-wider text-muted-foreground mt-0.5 hidden sm:block">
-          {label ?? positionFor(n)}
-        </span>
       </div>
-      <PlayerCell p={awayMap.get(n)} align="right" />
-    </li>
-  );
+    );
+  };
+
+  const NameBlock = ({ p, align }: { p?: P; align: "left" | "right" }) => {
+    if (!p) {
+      return (
+        <div className={`flex-1 min-w-0 px-2 sm:px-3 ${align === "right" ? "text-right" : "text-left"}`}>
+          <div className="text-[10px] sm:text-xs uppercase tracking-wider text-muted-foreground/60 italic">— TBC —</div>
+        </div>
+      );
+    }
+    return (
+      <div className={`flex-1 min-w-0 px-2 sm:px-3 leading-tight ${align === "right" ? "text-right" : "text-left"}`}>
+        <div className="text-[10px] sm:text-[11px] uppercase tracking-wider text-muted-foreground truncate">
+          {p.firstName}
+        </div>
+        <div className="text-sm sm:text-lg font-black uppercase truncate">
+          {p.lastName}
+          {p.isCaptain && <Crown className="inline h-3 w-3 sm:h-3.5 sm:w-3.5 mx-1 text-accent align-[-1px]" />}
+        </div>
+      </div>
+    );
+  };
+
+  const Row = ({ n, label }: { n: number; label?: string }) => {
+    const h = homeMap.get(n);
+    const a = awayMap.get(n);
+    return (
+      <li className="flex items-stretch overflow-hidden rounded-lg bg-accent/10 ring-1 ring-accent/25 hover:ring-accent/50 transition">
+        <Headshot p={h} themeKey={home.themeKey} side="left" />
+        <NameBlock p={h} align="left" />
+        <div className="shrink-0 flex flex-col items-center justify-center px-2 sm:px-4 border-x border-accent/20 bg-accent/5">
+          <span className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-md bg-accent text-accent-foreground font-black text-sm sm:text-base tabular-nums">
+            {n}
+          </span>
+          <span className="text-[8px] sm:text-[9px] uppercase tracking-wider text-muted-foreground mt-1 whitespace-nowrap">
+            {label ?? positionFor(n)}
+          </span>
+        </div>
+        <NameBlock p={a} align="right" />
+        <Headshot p={a} themeKey={away.themeKey} side="right" />
+      </li>
+    );
+  };
 
   return (
     <section className="card-surface p-4 sm:p-5">
-      <div className="flex items-center justify-between gap-3 mb-4">
+      <div className="flex items-center justify-between gap-3 mb-5">
         <div className="flex items-center gap-2 min-w-0 flex-1 justify-start">
           <TeamLogo themeKey={home.themeKey} name={home.nickName} size={32} />
           <span className="font-extrabold uppercase text-xs sm:text-sm truncate">{home.nickName}</span>
@@ -414,25 +443,25 @@ function H2HPanel({ home, away }: { home: any; away: any }) {
       {numbers.length === 0 && extras.length === 0 ? (
         <div className="text-xs text-muted-foreground text-center py-6">Squads not yet named.</div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-5">
           <div>
-            <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-accent/80 mb-2">Starters</div>
-            <ul className="space-y-1.5">
+            <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-accent/80 mb-2">Starters</div>
+            <ul className="space-y-2">
               {numbers.filter((n) => n <= 13).map((n) => <Row key={n} n={n} />)}
             </ul>
           </div>
           {numbers.some((n) => n > 13 && n <= 17) && (
             <div>
-              <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-accent/80 mb-2">Interchange</div>
-              <ul className="space-y-1.5">
+              <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-accent/80 mb-2">Interchange</div>
+              <ul className="space-y-2">
                 {numbers.filter((n) => n > 13 && n <= 17).map((n) => <Row key={n} n={n} label="Bench" />)}
               </ul>
             </div>
           )}
           {extras.length > 0 && (
             <div>
-              <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-accent/80 mb-2">Reserves</div>
-              <ul className="space-y-1.5">
+              <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-accent/80 mb-2">Reserves</div>
+              <ul className="space-y-2">
                 {extras.map((n) => <Row key={n} n={n} label="Reserve" />)}
               </ul>
             </div>

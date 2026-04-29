@@ -376,6 +376,34 @@ function currentSeason(): number {
   return new Date().getUTCFullYear();
 }
 
+function fixtureFromDetails(details: Awaited<ReturnType<typeof fetchMatchDetails>>): NrlFixture {
+  return {
+    matchId: details.matchId,
+    matchCentrePath: "",
+    roundNumber: details.roundNumber,
+    roundTitle: `Round ${details.roundNumber}`,
+    isCurrentRound: false,
+    matchState: details.matchState,
+    venue: details.venue,
+    venueCity: details.venueCity,
+    kickoffUtc: details.kickoffUtc,
+    homeTeam: {
+      teamId: details.homeTeam.teamId,
+      nickName: details.homeTeam.nickName,
+      themeKey: details.homeTeam.themeKey,
+      teamPosition: details.homeTeam.position,
+      score: details.homeTeam.score,
+    },
+    awayTeam: {
+      teamId: details.awayTeam.teamId,
+      nickName: details.awayTeam.nickName,
+      themeKey: details.awayTeam.themeKey,
+      teamPosition: details.awayTeam.position,
+      score: details.awayTeam.score,
+    },
+  };
+}
+
 function summariseOdds(ev: OddsEvent, home: string, away: string): string {
   const lines: string[] = [];
   for (const b of ev.bookmakers.slice(0, 5)) {

@@ -363,17 +363,17 @@ function H2HPanel({ home, away }: { home: any; away: any }) {
   for (const n of awayMap.keys()) if (n > 17) extraSet.add(n);
   const extras = [...extraSet].sort((a, b) => a - b);
 
+  // Headshot fits cleanly inside the row, anchored to the bottom edge of the
+  // card (so the chest line meets the card edge — like nrl.com's lineup view).
+  // Card sizes itself to the headshot height; no overflow.
   const Headshot = ({ p, side }: { p?: P; themeKey: string; side: "left" | "right" }) => (
-    <div className="relative shrink-0 w-20 sm:w-24 self-stretch">
+    <div className={`relative shrink-0 self-stretch w-24 sm:w-28 ${side === "left" ? "" : ""}`}>
       {p?.headImage ? (
         <img
           src={p.headImage}
           alt=""
           loading="lazy"
-          // Doubled in size; absolutely positioned so it can overflow the row
-          // top/bottom without affecting row height. object-bottom keeps the
-          // face anchored at the row baseline like a sportsbook card.
-          className={`pointer-events-none absolute bottom-0 h-40 sm:h-48 w-40 sm:w-48 object-contain object-bottom drop-shadow-[0_4px_12px_rgba(0,0,0,0.5)] ${
+          className={`pointer-events-none absolute bottom-0 h-[110%] w-auto max-w-none object-contain object-bottom ${
             side === "left" ? "left-0" : "right-0"
           }`}
           onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
@@ -418,9 +418,9 @@ function H2HPanel({ home, away }: { home: any; away: any }) {
     const h = homeMap.get(n);
     const a = awayMap.get(n);
     return (
-      // overflow-visible + min-height lets the oversized headshots spill above
-      // and below the card while keeping the row layout tidy.
-      <li className="relative flex items-center rounded-lg bg-accent/10 ring-1 ring-accent/25 hover:ring-accent/50 transition min-h-[88px] sm:min-h-[96px] overflow-visible">
+      // Fixed row height; headshots sit fully inside, anchored bottom-aligned
+      // to the card edge so all rows look uniform and the player stands out.
+      <li className="relative flex items-stretch rounded-lg bg-accent/10 ring-1 ring-accent/25 hover:ring-accent/50 transition h-24 sm:h-28 overflow-hidden">
         <Headshot p={h} themeKey={home.themeKey} side="left" />
         <NameBlock p={h} align="left" />
         <CenterBadge n={n} label={label} />
@@ -431,7 +431,7 @@ function H2HPanel({ home, away }: { home: any; away: any }) {
   };
 
   return (
-    <section className="card-surface p-4 sm:p-5 pt-10 sm:pt-12 overflow-visible">
+    <section className="card-surface p-4 sm:p-5">
       <div className="flex items-center justify-between gap-3 mb-5">
         <div className="flex items-center gap-2 min-w-0 flex-1 justify-start">
           <TeamLogo themeKey={home.themeKey} name={home.nickName} size={32} />
@@ -450,14 +450,14 @@ function H2HPanel({ home, away }: { home: any; away: any }) {
         <div className="space-y-8">
           <div>
             <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-accent/80 mb-3">Starters</div>
-            <ul className="space-y-6 sm:space-y-7">
+            <ul className="space-y-3">
               {numbers.filter((n) => n <= 13).map((n) => <Row key={n} n={n} />)}
             </ul>
           </div>
           {numbers.some((n) => n > 13 && n <= 17) && (
             <div>
               <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-accent/80 mb-3">Interchange</div>
-              <ul className="space-y-6 sm:space-y-7">
+              <ul className="space-y-3">
                 {numbers.filter((n) => n > 13 && n <= 17).map((n) => <Row key={n} n={n} label="Bench" />)}
               </ul>
             </div>
@@ -465,7 +465,7 @@ function H2HPanel({ home, away }: { home: any; away: any }) {
           {extras.length > 0 && (
             <div>
               <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-accent/80 mb-3">Reserves</div>
-              <ul className="space-y-6 sm:space-y-7">
+              <ul className="space-y-3">
                 {extras.map((n) => <Row key={n} n={n} label="Reserve" />)}
               </ul>
             </div>
@@ -639,43 +639,55 @@ function SquadPanel({ team }: { team: { nickName: string; themeKey: string; play
   const renderRow = (p: P, i: number) => (
     <li
       key={i}
-      className="flex items-center gap-3 rounded-md bg-accent/15 ring-1 ring-accent/25 px-2 py-1.5"
+      // Same fixed-height card as the H2H view so the lineup pages feel uniform.
+      className="relative flex items-stretch h-24 sm:h-28 rounded-lg bg-accent/15 ring-1 ring-accent/25 overflow-hidden"
     >
-      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-background text-accent font-extrabold text-sm tabular-nums">
-        {p.jerseyNumber ?? "—"}
-      </span>
-      <div className="relative shrink-0 h-12 w-12 overflow-hidden">
+      {/* Headshot pinned to the left edge, bottom-aligned to the card */}
+      <div className="relative shrink-0 self-stretch w-24 sm:w-28">
         {p.headImage ? (
           <img
             src={p.headImage}
             alt=""
             loading="lazy"
-            className="absolute inset-0 h-full w-full object-contain object-bottom"
+            className="pointer-events-none absolute bottom-0 left-0 h-[110%] w-auto max-w-none object-contain object-bottom"
             onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
           />
         ) : null}
       </div>
-      <span className="flex-1 min-w-0 font-extrabold uppercase tracking-wide text-sm truncate">
-        {p.firstName} {p.lastName}
-        {p.isCaptain && <Crown className="inline h-3 w-3 ml-1.5 text-accent align-[-1px]" />}
-      </span>
-      <span className="hidden sm:inline text-[10px] uppercase tracking-wider text-muted-foreground shrink-0">
-        {p.position}
-      </span>
 
+      {/* Jersey number badge */}
+      <div className="shrink-0 flex flex-col items-center justify-center w-14 sm:w-16">
+        <span className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-md bg-accent text-accent-foreground font-black text-base sm:text-lg tabular-nums">
+          {p.jerseyNumber ?? "—"}
+        </span>
+      </div>
+
+      {/* Name + position */}
+      <div className="flex-1 min-w-0 flex flex-col justify-center px-2 sm:px-3 leading-tight">
+        <div className="text-[10px] sm:text-[11px] uppercase tracking-wider text-muted-foreground truncate">
+          {p.firstName}
+        </div>
+        <div className="text-sm sm:text-lg font-black uppercase truncate">
+          {p.lastName}
+          {p.isCaptain && <Crown className="inline h-3 w-3 sm:h-3.5 sm:w-3.5 mx-1 text-accent align-[-1px]" />}
+        </div>
+        <div className="text-[9px] sm:text-[10px] uppercase tracking-wider text-accent/70 font-bold mt-0.5 truncate">
+          {p.position}
+        </div>
+      </div>
     </li>
   );
 
   const Group = ({ label, items }: { label?: string; items: P[] }) => {
     if (items.length === 0) return null;
     return (
-      <div className="space-y-1.5">
+      <div className="space-y-3">
         {label && (
           <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-accent/80 pt-1">
             {label}
           </div>
         )}
-        <ul className="space-y-1.5">{items.map(renderRow)}</ul>
+        <ul className="space-y-3">{items.map(renderRow)}</ul>
       </div>
     );
   };

@@ -689,8 +689,8 @@ function SquadPanel({ team }: { team: { nickName: string; themeKey: string; play
           ) : null}
         </div>
 
-        {/* Jersey number badge — pushed right so the headshot doesn't cover it */}
-        <div className="shrink-0 flex flex-col items-center justify-center w-14 sm:w-16 ml-8 sm:ml-12">
+        {/* Jersey number badge — pushed well clear of the overlapping headshot */}
+        <div className="shrink-0 flex flex-col items-center justify-center w-14 sm:w-16 ml-20 sm:ml-28">
           <span className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-md bg-accent text-accent-foreground font-black text-base sm:text-lg tabular-nums">
             {p.jerseyNumber ?? "—"}
           </span>

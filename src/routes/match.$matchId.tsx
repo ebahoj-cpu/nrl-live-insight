@@ -440,9 +440,9 @@ function H2HPanel({ home, away }: { home: any; away: any }) {
     const h = homeMap.get(n);
     const a = awayMap.get(n);
     return (
-      // Fixed row height; headshots sit fully inside, anchored bottom-aligned
-      // to the card edge so all rows look uniform and the player stands out.
-      <li className="relative flex items-stretch rounded-lg bg-accent/10 ring-1 ring-accent/25 hover:ring-accent/50 transition h-24 sm:h-28 overflow-hidden">
+      // overflow-visible so the headshots can extend above the card without
+      // being clipped. Row spacing is increased on the parent <ul>.
+      <li className="relative flex items-stretch rounded-lg bg-accent/10 ring-1 ring-accent/25 hover:ring-accent/50 transition h-24 sm:h-28 overflow-visible">
         <Headshot p={h} themeKey={home.themeKey} side="left" />
         <NameBlock p={h} align="left" />
         <CenterBadge n={n} label={label} />

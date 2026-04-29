@@ -384,17 +384,18 @@ function H2HPanel({ home, away }: { home: any; away: any }) {
   for (const n of awayMap.keys()) if (n > 20) extraSet.add(n);
   const extras = [...extraSet].sort((a, b) => a - b);
 
-  // Headshot fits cleanly inside the row, anchored to the bottom edge of the
-  // card (so the chest line meets the card edge — like nrl.com's lineup view).
-  // Card sizes itself to the headshot height; no overflow.
+  // Headshot anchored to bottom of the row but allowed to overflow ABOVE the
+  // card edge so the head/hair is never clipped. Row uses overflow-visible
+  // and groups have extra vertical spacing so the overflow doesn't collide
+  // with the row above.
   const Headshot = ({ p, side }: { p?: P; themeKey: string; side: "left" | "right" }) => (
-    <div className={`relative shrink-0 self-stretch w-24 sm:w-28 ${side === "left" ? "" : ""}`}>
+    <div className={`relative shrink-0 self-stretch w-24 sm:w-28`}>
       {p?.headImage ? (
         <img
           src={p.headImage}
           alt=""
           loading="lazy"
-          className={`pointer-events-none absolute bottom-0 h-[110%] w-auto max-w-none object-contain object-bottom ${
+          className={`pointer-events-none absolute bottom-0 h-[150%] w-auto max-w-none object-contain object-bottom drop-shadow-[0_4px_10px_rgba(0,0,0,0.5)] ${
             side === "left" ? "left-0" : "right-0"
           }`}
           onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}

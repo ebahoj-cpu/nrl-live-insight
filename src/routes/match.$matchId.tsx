@@ -393,7 +393,15 @@ function H2HPanel({ home, away }: { home: any; away: any }) {
   // bottom of the headshot (where the jersey is, so the face is still visible)
   // AND repeats as a clean caption directly underneath the headshot.
   const HeadshotWithName = ({ p, side }: { p?: P; side: "left" | "right" }) => {
-    const longName = (p?.lastName ?? "").length >= 10;
+    const len = p?.lastName?.length ?? 0;
+    // Aggressive scale-down so the surname always fits without truncation
+    const lastSize =
+      len >= 13 ? "text-[9px] sm:text-base"
+      : len >= 11 ? "text-[10px] sm:text-lg"
+      : len >= 9 ? "text-xs sm:text-lg"
+      : "text-sm sm:text-xl";
+    const firstLen = p?.firstName?.length ?? 0;
+    const firstSize = firstLen >= 12 ? "text-[8px] sm:text-[11px]" : "text-[10px] sm:text-[12px]";
     return (
       <div className={`shrink-0 flex flex-col ${side === "left" ? "items-start" : "items-end"}`}>
         <div className="relative w-[72px] h-20 sm:w-28 sm:h-28 overflow-visible">
@@ -409,14 +417,18 @@ function H2HPanel({ home, away }: { home: any; away: any }) {
             />
           ) : null}
         </div>
-        {/* Caption under the headshot: first name + surname, centered under the player */}
-        <div className="mt-3 w-[88px] sm:w-32 -mx-2 sm:-mx-2 leading-tight text-center">
+        {/* Caption centered directly under the player's face (face sits at the outer edge of the 72px container, ~36px in). */}
+        <div
+          className={`mt-3 w-[96px] sm:w-32 leading-tight text-center ${
+            side === "left" ? "-ml-3 sm:ml-0" : "-mr-3 sm:mr-0"
+          }`}
+        >
           {p ? (
             <>
-              <div className="text-[10px] sm:text-[12px] uppercase tracking-wider text-muted-foreground truncate">
+              <div className={`${firstSize} uppercase tracking-wider text-muted-foreground whitespace-nowrap overflow-visible`}>
                 {p.firstName}
               </div>
-              <div className={`font-black uppercase truncate ${longName ? "text-sm sm:text-lg" : "text-base sm:text-xl"}`}>
+              <div className={`font-black uppercase whitespace-nowrap overflow-visible ${lastSize}`}>
                 {p.lastName}
                 {p.isCaptain && <Crown className="inline h-3 w-3 mx-0.5 text-accent align-[-1px]" />}
               </div>

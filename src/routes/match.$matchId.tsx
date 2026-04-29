@@ -370,18 +370,18 @@ function H2HPanel({ home, away }: { home: any; away: any }) {
   const awayMap = byNumber(away.players);
 
   const positionFor = (n: number): string => {
-    if (n >= 1 && n <= 13) return POSITION_ORDER[Math.min(n - 1, POSITION_ORDER.length - 1)];
-    if (n <= 17) return "Interchange";
+    if (n >= 1 && n <= 13) return JERSEY_POSITION[n] ?? "";
+    if (n <= 20) return "Interchange";
     return "Reserve";
   };
 
   const numbers: number[] = [];
-  for (let i = 1; i <= 17; i++) {
+  for (let i = 1; i <= 20; i++) {
     if (homeMap.has(i) || awayMap.has(i)) numbers.push(i);
   }
   const extraSet = new Set<number>();
-  for (const n of homeMap.keys()) if (n > 17) extraSet.add(n);
-  for (const n of awayMap.keys()) if (n > 17) extraSet.add(n);
+  for (const n of homeMap.keys()) if (n > 20) extraSet.add(n);
+  for (const n of awayMap.keys()) if (n > 20) extraSet.add(n);
   const extras = [...extraSet].sort((a, b) => a - b);
 
   // Headshot fits cleanly inside the row, anchored to the bottom edge of the

@@ -450,14 +450,14 @@ function H2HPanel({ home, away }: { home: any; away: any }) {
         <div className="space-y-8">
           <div>
             <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-accent/80 mb-3">Starters</div>
-            <ul className="space-y-6 sm:space-y-7">
+            <ul className="space-y-3">
               {numbers.filter((n) => n <= 13).map((n) => <Row key={n} n={n} />)}
             </ul>
           </div>
           {numbers.some((n) => n > 13 && n <= 17) && (
             <div>
               <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-accent/80 mb-3">Interchange</div>
-              <ul className="space-y-6 sm:space-y-7">
+              <ul className="space-y-3">
                 {numbers.filter((n) => n > 13 && n <= 17).map((n) => <Row key={n} n={n} label="Bench" />)}
               </ul>
             </div>
@@ -465,7 +465,7 @@ function H2HPanel({ home, away }: { home: any; away: any }) {
           {extras.length > 0 && (
             <div>
               <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-accent/80 mb-3">Reserves</div>
-              <ul className="space-y-6 sm:space-y-7">
+              <ul className="space-y-3">
                 {extras.map((n) => <Row key={n} n={n} label="Reserve" />)}
               </ul>
             </div>

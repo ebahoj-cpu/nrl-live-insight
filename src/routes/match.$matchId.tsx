@@ -417,18 +417,14 @@ function H2HPanel({ home, away }: { home: any; away: any }) {
             />
           ) : null}
         </div>
-        {/* Caption centered directly under the player's face (face sits at the outer edge of the 72px container, ~36px in). */}
-        <div
-          className={`mt-3 w-[96px] sm:w-32 leading-tight text-center ${
-            side === "left" ? "-ml-3 sm:ml-0" : "-mr-3 sm:mr-0"
-          }`}
-        >
+        {/* Caption centered under the player's face. Stays within the player's half so it never collides with the centre badge. */}
+        <div className="mt-3 w-[88px] sm:w-32 leading-tight text-center">
           {p ? (
             <>
-              <div className={`${firstSize} uppercase tracking-wider text-muted-foreground whitespace-nowrap overflow-visible`}>
+              <div className={`${firstSize} uppercase tracking-wider text-muted-foreground whitespace-nowrap`}>
                 {p.firstName}
               </div>
-              <div className={`font-black uppercase whitespace-nowrap overflow-visible ${lastSize}`}>
+              <div className={`font-black uppercase whitespace-nowrap ${lastSize}`}>
                 {p.lastName}
                 {p.isCaptain && <Crown className="inline h-3 w-3 mx-0.5 text-accent align-[-1px]" />}
               </div>

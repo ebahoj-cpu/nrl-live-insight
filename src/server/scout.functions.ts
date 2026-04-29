@@ -244,7 +244,7 @@ export const scoutChat = createServerFn({ method: "POST" })
     const key = process.env.LOVABLE_API_KEY;
     if (!key) throw new Error("LOVABLE_API_KEY not configured");
 
-    const context = await cached("scout:context:v2", CTX_TTL, buildScoutContext);
+    const context = await cached("scout:context:v3", CTX_TTL, buildScoutContext);
 
     const system = [
       "You are SCOUT — the in-house NRL betting analyst inside the LINEBREAK app.",

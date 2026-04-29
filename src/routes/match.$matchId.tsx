@@ -363,37 +363,30 @@ function H2HPanel({ home, away }: { home: any; away: any }) {
   for (const n of awayMap.keys()) if (n > 17) extraSet.add(n);
   const extras = [...extraSet].sort((a, b) => a - b);
 
-  const Headshot = ({ p, themeKey, side }: { p?: P; themeKey: string; side: "left" | "right" }) => {
-    const ringSide = side === "left" ? "border-r-2" : "border-l-2";
-    return (
-      <div className={`relative shrink-0 h-16 w-16 sm:h-20 sm:w-20 overflow-hidden bg-gradient-to-b from-accent/10 to-transparent ${ringSide} border-accent/30 rounded-md`}>
-        {p?.headImage ? (
-          <img
-            src={p.headImage}
-            alt=""
-            loading="lazy"
-            className="absolute inset-0 h-full w-full object-cover object-top"
-            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-          />
-        ) : (
-          <div className="absolute inset-0 flex items-center justify-center opacity-40">
-            <TeamLogo themeKey={themeKey} name="" size={36} />
-          </div>
-        )}
-      </div>
-    );
-  };
+  const Headshot = ({ p }: { p?: P; themeKey: string; side: "left" | "right" }) => (
+    <div className="relative shrink-0 h-20 w-20 sm:h-24 sm:w-24">
+      {p?.headImage ? (
+        <img
+          src={p.headImage}
+          alt=""
+          loading="lazy"
+          className="absolute inset-0 h-full w-full object-contain object-center"
+          onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+        />
+      ) : null}
+    </div>
+  );
 
-  const NameBlock = ({ p, align }: { p?: P; align: "left" | "right" }) => {
+  const NameBlock = ({ p }: { p?: P; align: "left" | "right" }) => {
     if (!p) {
       return (
-        <div className={`flex-1 min-w-0 px-2 sm:px-3 ${align === "right" ? "text-right" : "text-left"}`}>
+        <div className="flex-1 min-w-0 px-2 sm:px-3 text-center">
           <div className="text-[10px] sm:text-xs uppercase tracking-wider text-muted-foreground/60 italic">— TBC —</div>
         </div>
       );
     }
     return (
-      <div className={`flex-1 min-w-0 px-2 sm:px-3 leading-tight ${align === "right" ? "text-right" : "text-left"}`}>
+      <div className="flex-1 min-w-0 px-2 sm:px-3 leading-tight text-center">
         <div className="text-[10px] sm:text-[11px] uppercase tracking-wider text-muted-foreground truncate">
           {p.firstName}
         </div>
@@ -405,21 +398,25 @@ function H2HPanel({ home, away }: { home: any; away: any }) {
     );
   };
 
+  const CenterBadge = ({ n, label }: { n: number; label?: string }) => (
+    <div className="shrink-0 flex flex-col items-center justify-center w-20 sm:w-24">
+      <span className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-md bg-accent text-accent-foreground font-black text-base sm:text-lg tabular-nums">
+        {n}
+      </span>
+      <span className="text-[8px] sm:text-[9px] uppercase tracking-wider text-muted-foreground mt-1 whitespace-nowrap">
+        {label ?? positionFor(n)}
+      </span>
+    </div>
+  );
+
   const Row = ({ n, label }: { n: number; label?: string }) => {
     const h = homeMap.get(n);
     const a = awayMap.get(n);
     return (
-      <li className="flex items-stretch overflow-hidden rounded-lg bg-accent/10 ring-1 ring-accent/25 hover:ring-accent/50 transition">
+      <li className="flex items-center rounded-lg bg-accent/10 ring-1 ring-accent/25 hover:ring-accent/50 transition py-1.5 sm:py-2">
         <Headshot p={h} themeKey={home.themeKey} side="left" />
         <NameBlock p={h} align="left" />
-        <div className="shrink-0 flex flex-col items-center justify-center px-2 sm:px-4 border-x border-accent/20 bg-accent/5">
-          <span className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-md bg-accent text-accent-foreground font-black text-sm sm:text-base tabular-nums">
-            {n}
-          </span>
-          <span className="text-[8px] sm:text-[9px] uppercase tracking-wider text-muted-foreground mt-1 whitespace-nowrap">
-            {label ?? positionFor(n)}
-          </span>
-        </div>
+        <CenterBadge n={n} label={label} />
         <NameBlock p={a} align="right" />
         <Headshot p={a} themeKey={away.themeKey} side="right" />
       </li>

@@ -5,19 +5,48 @@ export type NewsItem = {
   id: string;
   title: string;
   link: string;
-  source: string;
+  source: string;       // attributable publisher (e.g. "Fox Sports") or aggregator label
+  team?: string;        // NRL club label when sourced from a per-team feed
   publishedUtc: string;
   image?: string;
   summary?: string;
 };
 
-const FEEDS: { source: string; url: string }[] = [
-  { source: "NRL.com", url: "https://www.nrl.com/news/rss/" },
-  { source: "NRL.com", url: "https://www.nrl.com/news/feed/" },
+// Per-club Google News RSS queries. The NRL clubs do not publish RSS feeds, so
+// Google News is the most reliable per-team aggregator: each item carries the
+// real publisher in <source>, which we extract for proper attribution.
+const TEAM_QUERIES: { team: string; query: string }[] = [
+  { team: "Broncos",        query: '"Brisbane Broncos" NRL' },
+  { team: "Raiders",        query: '"Canberra Raiders" NRL' },
+  { team: "Bulldogs",       query: '"Canterbury Bulldogs" NRL' },
+  { team: "Sharks",         query: '"Cronulla Sharks" NRL' },
+  { team: "Dolphins",       query: '"Dolphins" NRL rugby league' },
+  { team: "Titans",         query: '"Gold Coast Titans" NRL' },
+  { team: "Sea Eagles",     query: '"Manly Sea Eagles" NRL' },
+  { team: "Storm",          query: '"Melbourne Storm" NRL' },
+  { team: "Knights",        query: '"Newcastle Knights" NRL' },
+  { team: "Cowboys",        query: '"North Queensland Cowboys" NRL' },
+  { team: "Eels",           query: '"Parramatta Eels" NRL' },
+  { team: "Panthers",       query: '"Penrith Panthers" NRL' },
+  { team: "Rabbitohs",      query: '"South Sydney Rabbitohs" NRL' },
+  { team: "Dragons",        query: '"St George Illawarra Dragons" NRL' },
+  { team: "Roosters",       query: '"Sydney Roosters" NRL' },
+  { team: "Warriors",       query: '"New Zealand Warriors" NRL' },
+  { team: "Wests Tigers",   query: '"Wests Tigers" NRL' },
+];
+
+function googleNewsUrl(query: string): string {
+  return `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-AU&gl=AU&ceid=AU:en`;
+}
+
+const FEEDS: { source: string; url: string; team?: string }[] = [
+  // General / league-wide aggregators
   { source: "Zero Tackle", url: "https://www.zerotackle.com/feed/" },
   { source: "Zero Tackle", url: "https://www.zerotackle.com/nrl/feed/" },
-  { source: "ABC Sport", url: "https://www.abc.net.au/news/feed/45924/rss.xml" },
-  { source: "The Roar", url: "https://www.theroar.com.au/nrl/feed/" },
+  { source: "ABC Sport",   url: "https://www.abc.net.au/news/feed/45924/rss.xml" },
+  { source: "Google News", url: googleNewsUrl("NRL rugby league") },
+  // Per-club feeds (Google News, attributed to the underlying publisher per item)
+  ...TEAM_QUERIES.map((t) => ({ source: t.team, team: t.team, url: googleNewsUrl(t.query) })),
 ];
 
 const UA = "Mozilla/5.0 (compatible; LineBreak/1.0)";

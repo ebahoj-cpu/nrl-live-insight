@@ -174,7 +174,13 @@ export const getOdds = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     const result = await safeOdds(data.refresh);
     if (result.error) console.warn(`[getOdds] ${result.error}${result.stale ? " (serving stale)" : ""}`);
-    return result.data;
+    if (result.data.length > 0) return result.data;
+    const season = currentSeason();
+    const [fixtures, ladder] = await Promise.all([
+      cached(`fixtures:${season}:current`, TTL.fixtures, () => fetchDraw(season), { bypass: data.refresh }).catch(() => []),
+      cached(`ladder:${season}`, TTL.ladder, () => fetchLadder(season), { bypass: data.refresh }).catch(() => []),
+    ]);
+    return buildEstimatedOdds(fixtures, ladder);
   });
 
 // ---------- Match details + odds + ladder + AI ----------

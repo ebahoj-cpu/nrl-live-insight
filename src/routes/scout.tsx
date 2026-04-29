@@ -175,19 +175,19 @@ function Bubble({ msg }: { msg: Msg }) {
   if (isUser) {
     return (
       <div className="flex justify-end">
-        <div className="max-w-[85%] rounded-2xl rounded-br-sm bg-accent text-accent-foreground px-3.5 py-2 text-sm font-medium shadow-md shadow-accent/20 whitespace-pre-wrap">
+        <div className="max-w-[80%] rounded-2xl bg-white text-neutral-900 px-3.5 py-2 text-sm shadow-sm whitespace-pre-wrap border border-neutral-200">
           {msg.content}
         </div>
       </div>
     );
   }
   return (
-    <div className="flex gap-2.5 items-start">
-      <span className="shrink-0 inline-flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-accent to-accent/60 text-accent-foreground shadow-md shadow-accent/30 mt-0.5">
+    <div className="flex gap-2 items-start">
+      <span className="shrink-0 inline-flex h-8 w-8 items-center justify-center rounded-full bg-accent text-accent-foreground shadow-md mt-0.5">
         <Sparkles className="h-4 w-4" strokeWidth={2.5} />
       </span>
-      <div className="max-w-[85%] rounded-2xl rounded-tl-sm bg-surface-2 border border-border px-3.5 py-2.5 text-sm">
-        <div className="prose prose-sm prose-invert max-w-none prose-p:my-1.5 prose-ul:my-1.5 prose-ol:my-1.5 prose-li:my-0.5 prose-headings:mt-2 prose-headings:mb-1 prose-strong:text-accent">
+      <div className="max-w-[80%] rounded-2xl bg-accent text-accent-foreground px-3.5 py-2.5 text-sm shadow-sm">
+        <div className="prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5 prose-headings:mt-1.5 prose-headings:mb-1 text-accent-foreground prose-strong:text-accent-foreground prose-li:marker:text-accent-foreground/70">
           <ReactMarkdown>{msg.content}</ReactMarkdown>
         </div>
       </div>

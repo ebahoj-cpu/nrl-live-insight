@@ -431,7 +431,7 @@ function H2HPanel({ home, away }: { home: any; away: any }) {
   };
 
   return (
-    <section className="card-surface p-4 sm:p-5">
+    <section className="card-surface p-4 sm:p-5 pt-10 sm:pt-12 overflow-visible">
       <div className="flex items-center justify-between gap-3 mb-5">
         <div className="flex items-center gap-2 min-w-0 flex-1 justify-start">
           <TeamLogo themeKey={home.themeKey} name={home.nickName} size={32} />

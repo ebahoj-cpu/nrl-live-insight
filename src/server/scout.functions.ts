@@ -9,7 +9,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { cached, TTL } from "./cache";
 import { fetchDraw, fetchLadder, fetchMatchDetails, type NrlMatchDetails } from "./nrl";
-import { fetchNrlOdds, fetchTryscorerOdds, bestH2H, type OddsEvent } from "./odds";
+import { buildEstimatedOdds, fetchNrlOdds, fetchTryscorerOdds, bestH2H, type OddsEvent } from "./odds";
 import { fetchNews, type NewsItem } from "./news";
 import { getSeasonSnapshot, getTeam, type TeamSeasonStats } from "./season-stats";
 import { findTeam } from "@/lib/teams";
@@ -178,13 +178,14 @@ async function buildFixtureBrief(
 
 async function buildScoutContext(): Promise<string> {
   const season = NOW_SEASON();
-  const [fixtures, ladder, odds, news, snap] = await Promise.all([
+  const [fixtures, ladder, liveOdds, news, snap] = await Promise.all([
     cached(`fixtures:${season}:current`, TTL.fixtures, () => fetchDraw(season)).catch(() => []),
     cached(`ladder:${season}`, TTL.ladder, () => fetchLadder(season)).catch(() => []),
     cached(`odds:nrl`, TTL.odds, () => fetchNrlOdds()).catch(() => []),
     cached("news:all", 15 * 60_000, () => fetchNews()).catch(() => [] as NewsItem[]),
     getSeasonSnapshot(season).catch(() => null),
   ]);
+  const odds = liveOdds.length ? liveOdds : buildEstimatedOdds(fixtures, ladder);
 
   // Pick the next chronological 8 fixtures that haven't finished yet.
   const nowMs = Date.now();
@@ -244,7 +245,7 @@ export const scoutChat = createServerFn({ method: "POST" })
     const key = process.env.LOVABLE_API_KEY;
     if (!key) throw new Error("LOVABLE_API_KEY not configured");
 
-    const context = await cached("scout:context:v3", CTX_TTL, buildScoutContext);
+    const context = await cached("scout:context:v4", CTX_TTL, buildScoutContext);
 
     const system = [
       "You are SCOUT — the in-house NRL betting analyst inside the LINEBREAK app.",
@@ -253,6 +254,7 @@ export const scoutChat = createServerFn({ method: "POST" })
       "• Sharp. Concise. Punter-grade. NEVER blabber or pad answers.",
       "• Lead with the call, then 1–2 short reasons. Use bullets, not paragraphs.",
       "• Quote exact prices, lines and bookmakers from the SNAPSHOT.",
+      "• If bookmaker is 'Model estimate', label it as an estimated fallback, not a live bookmaker price.",
       "• Always name the market explicitly (H2H / Line / Total / Anytime Tryscorer / First Tryscorer).",
       "• If a fact (injury, line, tryscorer price) is NOT in the SNAPSHOT, say 'no data' — never invent.",
       "• MARKET AVAILABILITY: H2H/Line/Total prices in the SNAPSHOT are LIVE. Use them. Do NOT claim markets haven't dropped if 'H2H best:' or 'Line:' is present for that fixture.",

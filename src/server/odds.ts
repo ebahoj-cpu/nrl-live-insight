@@ -5,6 +5,7 @@
 //   player_try_scorer_first, player_try_scorer_anytime, player_try_scorer_over
 
 import { findTeam } from "@/lib/teams";
+import type { NrlFixture, NrlLadderRow } from "./nrl";
 
 const BASE = "https://api.the-odds-api.com/v4";
 const SPORT = "rugbyleague_nrl";
@@ -41,6 +42,71 @@ export async function fetchNrlOdds(): Promise<OddsEvent[]> {
   if (!res.ok) throw new Error(`Odds API HTTP ${res.status}`);
   const data = await res.json() as any[];
   return data.map(mapEvent);
+}
+
+function clamp(n: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, n));
+}
+
+function fairPrice(probability: number): number {
+  return Number((1 / clamp(probability, 0.05, 0.95)).toFixed(2));
+}
+
+function teamStrength(row?: NrlLadderRow): number {
+  if (!row || row.played === 0) return 0;
+  const winRate = (row.wins + row.drawn * 0.5) / row.played;
+  const differential = row.diff / Math.max(1, row.played);
+  return (winRate - 0.5) * 18 + differential * 0.35;
+}
+
+function avgPoints(home?: NrlLadderRow, away?: NrlLadderRow): number {
+  const rows = [home, away].filter((r): r is NrlLadderRow => !!r && r.played > 0);
+  if (rows.length === 0) return 43.5;
+  const total = rows.reduce((sum, r) => sum + (r.for + r.against) / r.played, 0);
+  return total / rows.length;
+}
+
+export function buildEstimatedOdds(fixtures: NrlFixture[], ladder: NrlLadderRow[]): OddsEvent[] {
+  const ladderByNick = new Map(ladder.map((r) => [findTeam(r.nickname)?.nickname ?? r.nickname, r]));
+  return fixtures
+    .filter((f) => !/full\s*time|fulltime|final|completed/i.test(f.matchState))
+    .map((f) => {
+      const home = findTeam(f.homeTeam.nickName)?.nickname ?? f.homeTeam.nickName;
+      const away = findTeam(f.awayTeam.nickName)?.nickname ?? f.awayTeam.nickName;
+      const homeRow = ladderByNick.get(home);
+      const awayRow = ladderByNick.get(away);
+      const homeStrength = teamStrength(homeRow) + 1.5;
+      const awayStrength = teamStrength(awayRow);
+      const diff = homeStrength - awayStrength;
+      const homeProb = clamp(0.5 + diff * 0.018, 0.25, 0.75);
+      const awayProb = 1 - homeProb;
+      const homePrice = fairPrice(homeProb);
+      const awayPrice = fairPrice(awayProb);
+      const spread = Math.round(Math.abs(diff) * 1.35 * 2) / 2;
+      const total = Math.round(clamp(avgPoints(homeRow, awayRow), 36, 52) * 2) / 2;
+      const homePoint = diff >= 0 ? -spread : spread;
+      const awayPoint = -homePoint;
+      const book = "Model estimate";
+
+      return {
+        id: `estimate:${f.matchId}`,
+        commenceUtc: f.kickoffUtc,
+        homeTeam: f.homeTeam.nickName,
+        awayTeam: f.awayTeam.nickName,
+        homeNickname: home,
+        awayNickname: away,
+        bookmakers: [{
+          key: "model_estimate",
+          title: book,
+          lastUpdate: new Date().toISOString(),
+          markets: [
+            { key: "h2h", outcomes: [{ name: home, price: homePrice }, { name: away, price: awayPrice }] },
+            { key: "spreads", outcomes: [{ name: home, price: 1.91, point: homePoint }, { name: away, price: 1.91, point: awayPoint }] },
+            { key: "totals", outcomes: [{ name: "Over", price: 1.91, point: total }, { name: "Under", price: 1.91, point: total }] },
+          ],
+        }],
+      } satisfies OddsEvent;
+    });
 }
 
 export async function fetchEventOdds(eventId: string): Promise<OddsEvent | null> {

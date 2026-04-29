@@ -10,8 +10,8 @@
 
 import { createServerFn } from "@tanstack/react-start";
 import { cached, TTL, insightsTtlMs } from "./cache";
-import { fetchDraw, fetchLadder, fetchMatchDetails, fetchMatchRecap, type NrlMatchRecap } from "./nrl";
-import { fetchNrlOdds, fetchEventOdds, fetchTryscorerOdds, type OddsEvent, type TryscorerMarkets } from "./odds";
+import { fetchDraw, fetchLadder, fetchMatchDetails, fetchMatchRecap, type NrlFixture, type NrlMatchRecap } from "./nrl";
+import { buildEstimatedOdds, fetchNrlOdds, fetchEventOdds, fetchTryscorerOdds, type OddsEvent, type TryscorerMarkets } from "./odds";
 import { generateInsights, type RealOdds, type Insights } from "./ai-insights";
 import { fetchVenueWeather, type WeatherSnapshot } from "./weather";
 import { findTeam } from "@/lib/teams";
@@ -167,7 +167,13 @@ export const getOdds = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     const result = await safeOdds(data.refresh);
     if (result.error) console.warn(`[getOdds] ${result.error}${result.stale ? " (serving stale)" : ""}`);
-    return result.data;
+    if (result.data.length > 0) return result.data;
+    const season = currentSeason();
+    const [fixtures, ladder] = await Promise.all([
+      cached(`fixtures:${season}:current`, TTL.fixtures, () => fetchDraw(season), { bypass: data.refresh }).catch(() => []),
+      cached(`ladder:${season}`, TTL.ladder, () => fetchLadder(season), { bypass: data.refresh }).catch(() => []),
+    ]);
+    return buildEstimatedOdds(fixtures, ladder);
   });
 
 // ---------- Match details + odds + ladder + AI ----------
@@ -198,10 +204,13 @@ export const getMatchPage = createServerFn({ method: "GET" })
       safeRecaps(details.awayTeam.recentForm, data.refresh),
     ]);
 
-    const odds: OddsEvent | null = oddsResult.data.find((e) => {
+    let odds: OddsEvent | null = oddsResult.data.find((e) => {
       const eh = e.homeNickname; const ea = e.awayNickname;
       return (eh === homeNick && ea === awayNick) || (eh === awayNick && ea === homeNick);
     }) ?? null;
+    if (!odds && oddsResult.data.length === 0) {
+      odds = buildEstimatedOdds([fixtureFromDetails(details)], ladder)[0] ?? null;
+    }
     const oddsError = oddsResult.error;
     const oddsStale = oddsResult.stale;
 
@@ -365,6 +374,34 @@ export const getMatchInsights = createServerFn({ method: "GET" })
 function currentSeason(): number {
   // NRL season runs Mar–Oct. Use current calendar year.
   return new Date().getUTCFullYear();
+}
+
+function fixtureFromDetails(details: Awaited<ReturnType<typeof fetchMatchDetails>>): NrlFixture {
+  return {
+    matchId: details.matchId,
+    matchCentrePath: "",
+    roundNumber: details.roundNumber,
+    roundTitle: `Round ${details.roundNumber}`,
+    isCurrentRound: false,
+    matchState: details.matchState,
+    venue: details.venue,
+    venueCity: details.venueCity,
+    kickoffUtc: details.kickoffUtc,
+    homeTeam: {
+      teamId: details.homeTeam.teamId,
+      nickName: details.homeTeam.nickName,
+      themeKey: details.homeTeam.themeKey,
+      teamPosition: details.homeTeam.position,
+      score: details.homeTeam.score,
+    },
+    awayTeam: {
+      teamId: details.awayTeam.teamId,
+      nickName: details.awayTeam.nickName,
+      themeKey: details.awayTeam.themeKey,
+      teamPosition: details.awayTeam.position,
+      score: details.awayTeam.score,
+    },
+  };
 }
 
 function summariseOdds(ev: OddsEvent, home: string, away: string): string {

@@ -9,6 +9,19 @@ import { fetchMatchTeamNews, type TeamNews } from "./team-news";
 const UA = "Mozilla/5.0 (compatible; LineBreak/1.0)";
 const COMP = 111; // Telstra Premiership
 
+// NRL.com serves headshots via a /remote.axd?<actual-url> proxy that returns 404
+// to non-nrl.com origins. The wrapped statsperform.com URL works directly, so
+// strip the proxy prefix and force https for browser loading.
+function extractHeadshotUrl(raw: unknown): string | undefined {
+  if (typeof raw !== "string" || !raw) return undefined;
+  // Pattern: "/remote.axd?http://..." or "/remote.axd?https://..."
+  const m = raw.match(/^\/remote\.axd\?(https?:\/\/.+)$/i);
+  if (m) return m[1].replace(/^http:\/\//i, "https://");
+  if (/^https?:\/\//i.test(raw)) return raw.replace(/^http:\/\//i, "https://");
+  if (raw.startsWith("/")) return `https://www.nrl.com${raw}`;
+  return undefined;
+}
+
 export type NrlFixture = {
   matchId: string;            // derived from matchCentreUrl
   matchCentrePath: string;    // e.g. /draw/nrl-premiership/2026/round-8/wests-tigers-v-raiders/

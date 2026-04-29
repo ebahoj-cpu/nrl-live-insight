@@ -203,7 +203,7 @@ export async function fetchMatchDetails(matchId: string): Promise<NrlMatchDetail
       lastName: p.lastName ?? "",
       position: p.position ?? "",
       jerseyNumber: p.number ?? p.jerseyNumber,
-      headImage: p.headImage ? (p.headImage.startsWith("http") ? p.headImage : `https://www.nrl.com${p.headImage}`) : undefined,
+      headImage: extractHeadshotUrl(p.headImage),
       isCaptain: p.isCaptain === true || (captainId != null && p.playerId === captainId),
     }));
     return {

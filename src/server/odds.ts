@@ -44,6 +44,28 @@ export async function fetchNrlOdds(): Promise<OddsEvent[]> {
   return data.map(mapEvent);
 }
 
+function clamp(n: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, n));
+}
+
+function fairPrice(probability: number): number {
+  return Number((1 / clamp(probability, 0.05, 0.95)).toFixed(2));
+}
+
+function teamStrength(row?: NrlLadderRow): number {
+  if (!row || row.played === 0) return 0;
+  const winRate = (row.wins + row.drawn * 0.5) / row.played;
+  const differential = row.diff / Math.max(1, row.played);
+  return (winRate - 0.5) * 18 + differential * 0.35;
+}
+
+function avgPoints(home?: NrlLadderRow, away?: NrlLadderRow): number {
+  const rows = [home, away].filter((r): r is NrlLadderRow => !!r && r.played > 0);
+  if (rows.length === 0) return 43.5;
+  const total = rows.reduce((sum, r) => sum + (r.for + r.against) / r.played, 0);
+  return total / rows.length;
+}
+
 export function buildEstimatedOdds(fixtures: NrlFixture[], ladder: NrlLadderRow[]): OddsEvent[] {
   const ladderByNick = new Map(ladder.map((r) => [findTeam(r.nickname)?.nickname ?? r.nickname, r]));
   return fixtures

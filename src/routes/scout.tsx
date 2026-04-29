@@ -175,7 +175,10 @@ function Bubble({ msg }: { msg: Msg }) {
   if (isUser) {
     return (
       <div className="flex justify-end">
-        <div className="max-w-[80%] rounded-2xl bg-white text-neutral-900 px-3.5 py-2 text-sm shadow-sm whitespace-pre-wrap border border-neutral-200">
+        <div
+          className="max-w-[80%] rounded-2xl bg-white text-neutral-900 px-4 py-2.5 text-[13.5px] leading-snug font-medium shadow-sm whitespace-pre-wrap border border-neutral-200 tracking-tight"
+          style={{ fontFeatureSettings: '"tnum" 1, "ss01" 1' }}
+        >
           {msg.content}
         </div>
       </div>
@@ -183,13 +186,45 @@ function Bubble({ msg }: { msg: Msg }) {
   }
   return (
     <div className="flex gap-2 items-start">
-      <span className="shrink-0 inline-flex h-8 w-8 items-center justify-center rounded-full bg-accent text-accent-foreground shadow-md mt-0.5">
+      <span className="shrink-0 inline-flex h-8 w-8 items-center justify-center rounded-full bg-accent text-accent-foreground shadow-md mt-0.5 ring-2 ring-accent/30">
         <Sparkles className="h-4 w-4" strokeWidth={2.5} />
       </span>
-      <div className="max-w-[80%] rounded-2xl bg-accent text-accent-foreground px-3.5 py-2.5 text-sm shadow-sm">
-        <div className="prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5 prose-headings:mt-1.5 prose-headings:mb-1 text-accent-foreground prose-strong:text-accent-foreground prose-li:marker:text-accent-foreground/70">
-          <ReactMarkdown>{msg.content}</ReactMarkdown>
-        </div>
+      <div
+        className="scout-bubble max-w-[88%] sm:max-w-[80%] rounded-2xl bg-neutral-950/80 border border-accent/40 text-neutral-100 px-4 py-3 text-[13.5px] shadow-lg shadow-accent/10"
+        style={{ fontFeatureSettings: '"tnum" 1, "ss01" 1, "cv11" 1' }}
+      >
+        <ReactMarkdown
+          components={{
+            ul: ({ node, ...props }) => (
+              <ul {...props} className="list-none space-y-2 m-0 p-0" />
+            ),
+            li: ({ node, children, ...props }) => (
+              <li
+                {...props}
+                className="relative pl-4 leading-[1.45] tracking-tight before:content-[''] before:absolute before:left-0 before:top-[0.6em] before:h-1.5 before:w-1.5 before:rounded-sm before:bg-accent before:shadow-[0_0_8px] before:shadow-accent/60"
+              >
+                {children}
+              </li>
+            ),
+            strong: ({ node, ...props }) => (
+              <strong
+                {...props}
+                className="font-display font-bold uppercase tracking-wider text-[12.5px] text-white"
+              />
+            ),
+            code: ({ node, ...props }) => (
+              <code
+                {...props}
+                className="font-mono text-[12.5px] font-semibold text-accent bg-accent/10 border border-accent/30 rounded px-1.5 py-0.5 mx-0.5 tabular-nums"
+              />
+            ),
+            p: ({ node, ...props }) => (
+              <p {...props} className="m-0 leading-snug" />
+            ),
+          }}
+        >
+          {msg.content}
+        </ReactMarkdown>
       </div>
     </div>
   );

@@ -2219,13 +2219,22 @@ function BetTab({ insights, insightsError, insightsLoading, home, away, tryscore
 
   // Winning margin — only 1-12 or 13+ per team. Mutually exclusive with Match Winner.
   // "No margin" leaves only the Match Winner price in the calc.
+  // Prices vary by team (favourite vs underdog) and bucket so the calculator
+  // recalculates the payout when the user picks a different outcome.
   const marginBuckets = ["1-12", "13+"];
-  const MARGIN_PRICE = 2.00;
   const NO_MARGIN_LABEL = "No margin (use match winner)";
+  // Derive favourite from match-winner prices (lower price = favourite).
+  const homeIsFav = homeWinPrice <= awayWinPrice;
+  const marginPriceForTeam = (team: "home" | "away", bucket: string): number => {
+    const isFav = team === "home" ? homeIsFav : !homeIsFav;
+    if (bucket === "1-12") return Number((isFav ? 2.40 : 4.20).toFixed(2));
+    // 13+
+    return Number((isFav ? 3.50 : 8.00).toFixed(2));
+  };
   const marginOptions: { label: string; price: number }[] = [
     { label: NO_MARGIN_LABEL, price: 1 },
-    ...marginBuckets.map((b) => ({ label: `${home.nickName} ${b}`, price: MARGIN_PRICE })),
-    ...marginBuckets.map((b) => ({ label: `${away.nickName} ${b}`, price: MARGIN_PRICE })),
+    ...marginBuckets.map((b) => ({ label: `${home.nickName} ${b}`, price: marginPriceForTeam("home", b) })),
+    ...marginBuckets.map((b) => ({ label: `${away.nickName} ${b}`, price: marginPriceForTeam("away", b) })),
   ];
   const rawDetBucket = String(det.margin?.bucket ?? "1-12").replace("–", "-");
   const detMarginBucket = rawDetBucket === "13+" ? "13+" : "1-12";

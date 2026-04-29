@@ -262,9 +262,30 @@ function InsightsLoading() {
 
 /* ================= LINEUP TAB ================= */
 
+// Strict NRL jersey-to-position map (1-13 starters).
+// Numbers repeat (e.g. two Wingers, two Centres, two Props, two 2nd Rowers),
+// so we map by jersey number rather than indexing a flat array.
+const JERSEY_POSITION: Record<number, string> = {
+  1: "Fullback",
+  2: "Right Wing",
+  3: "Right Centre",
+  4: "Left Centre",
+  5: "Left Wing",
+  6: "Five-Eighth",
+  7: "Halfback",
+  8: "Prop",
+  9: "Hooker",
+  10: "Prop",
+  11: "2nd Row",
+  12: "2nd Row",
+  13: "Lock",
+};
+
+// Used for stable secondary-sort of squad lists when jersey numbers tie.
 const POSITION_ORDER = [
-  "Fullback","Winger","Centre","Five-Eighth","Halfback",
-  "Prop","Hooker","2nd Row","Lock","Interchange","Reserve",
+  "Fullback","Right Wing","Right Centre","Left Centre","Left Wing",
+  "Five-Eighth","Halfback","Prop","Hooker","2nd Row","Lock",
+  "Interchange","Reserve",
 ];
 
 type TeamNews = { ins: string[]; outs: string[]; blurb: string; sourceUrl: string } | null;

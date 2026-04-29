@@ -2443,7 +2443,7 @@ function BetTab({ insights, insightsError, insightsLoading, home, away, tryscore
                   </div>
                   {leg.options ? (
                     <Select value={leg.selection} onValueChange={(v) => updateLegSelection(leg.id, v)}>
-                      <SelectTrigger className="mt-1 h-auto min-h-[2rem] px-2 py-1 -ml-2 bg-transparent border border-transparent hover:border-accent/40 hover:bg-accent/5 focus:ring-0 focus:border-accent/60 rounded-md text-base font-bold text-foreground shadow-none transition w-full justify-between gap-2 [&>span]:line-clamp-none [&>span]:text-left [&>span]:whitespace-normal [&>span]:break-words [&>span]:flex-1">
+                      <SelectTrigger className="mt-1 h-auto min-h-[2rem] px-2 py-1 -ml-2 bg-transparent border border-transparent hover:border-accent/40 hover:bg-accent/5 focus:ring-0 focus:border-accent/60 rounded-md text-base font-bold text-foreground shadow-none transition w-fit max-w-full justify-start gap-1.5 [&>span]:line-clamp-none [&>span]:text-left [&>span]:whitespace-normal [&>span]:break-words [&>svg]:opacity-60 [&>svg]:shrink-0">
                         <SelectValue placeholder="Select…" />
                       </SelectTrigger>
                       <SelectContent

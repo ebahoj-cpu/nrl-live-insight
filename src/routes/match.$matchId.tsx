@@ -703,12 +703,18 @@ function SquadPanel({ team }: { team: { nickName: string; themeKey: string; play
           </span>
         </div>
 
-        {/* Name + position — also offset so it clears the overlapping headshot */}
+        {/* Name + position — also offset so it clears the overlapping headshot. Long surnames shrink to fit. */}
         <div className="flex-1 min-w-0 flex flex-col justify-center px-2 sm:px-3 leading-tight">
           <div className="text-[10px] sm:text-[11px] uppercase tracking-wider text-muted-foreground truncate">
             {p.firstName}
           </div>
-          <div className="text-sm sm:text-lg font-black uppercase truncate">
+          <div className={`font-black uppercase truncate ${
+            (p.lastName?.length ?? 0) >= 11
+              ? "text-[11px] sm:text-base"
+              : (p.lastName?.length ?? 0) >= 9
+                ? "text-xs sm:text-lg"
+                : "text-sm sm:text-lg"
+          }`}>
             {p.lastName}
             {p.isCaptain && <Crown className="inline h-3 w-3 sm:h-3.5 sm:w-3.5 mx-1 text-accent align-[-1px]" />}
           </div>

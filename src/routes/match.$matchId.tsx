@@ -409,20 +409,20 @@ function H2HPanel({ home, away }: { home: any; away: any }) {
             />
           ) : null}
         </div>
-        {/* Caption under the headshot: first name + surname, centered with breathing room */}
-        <div className="mt-3 w-[72px] sm:w-28 leading-tight text-center">
+        {/* Caption under the headshot: first name + surname, centered under the player */}
+        <div className="mt-3 w-[88px] sm:w-32 -mx-2 sm:-mx-2 leading-tight text-center">
           {p ? (
             <>
-              <div className="text-[10px] sm:text-[11px] uppercase tracking-wider text-muted-foreground truncate">
+              <div className="text-[10px] sm:text-[12px] uppercase tracking-wider text-muted-foreground truncate">
                 {p.firstName}
               </div>
-              <div className={`font-black uppercase truncate ${longName ? "text-xs sm:text-base" : "text-sm sm:text-lg"}`}>
+              <div className={`font-black uppercase truncate ${longName ? "text-sm sm:text-lg" : "text-base sm:text-xl"}`}>
                 {p.lastName}
                 {p.isCaptain && <Crown className="inline h-3 w-3 mx-0.5 text-accent align-[-1px]" />}
               </div>
             </>
           ) : (
-            <div className="text-[10px] sm:text-[11px] uppercase tracking-wider text-muted-foreground/60 italic">— TBC —</div>
+            <div className="text-[10px] sm:text-[12px] uppercase tracking-wider text-muted-foreground/60 italic">— TBC —</div>
           )}
         </div>
       </div>
@@ -430,12 +430,12 @@ function H2HPanel({ home, away }: { home: any; away: any }) {
   };
 
   const CenterBadge = ({ n, label }: { n: number; label?: string }) => (
-    <div className="shrink-0 flex flex-col items-center justify-center px-2">
+    <div className="relative z-20 shrink-0 flex flex-col items-center justify-center px-2">
       <span className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-md bg-accent text-accent-foreground font-black text-base sm:text-lg tabular-nums shadow-md">
         {n}
       </span>
       {/* Position pill — solid background so the label reads clearly even when it sits over a headshot */}
-      <span className="mt-1.5 px-1.5 py-0.5 rounded-md bg-background/90 ring-1 ring-accent/40 text-[8px] sm:text-[9px] uppercase tracking-wider text-foreground font-bold whitespace-nowrap text-center shadow-sm">
+      <span className="mt-1.5 px-2 py-1 rounded-md bg-background/95 ring-1 ring-accent/50 text-[9px] sm:text-[10px] uppercase tracking-wider text-foreground font-bold whitespace-nowrap text-center shadow-md">
         {label ?? positionFor(n)}
       </span>
     </div>

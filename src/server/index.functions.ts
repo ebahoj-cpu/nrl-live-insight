@@ -11,7 +11,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { cached, TTL, insightsTtlMs } from "./cache";
 import { fetchDraw, fetchLadder, fetchMatchDetails, fetchMatchRecap, type NrlMatchRecap } from "./nrl";
-import { fetchNrlOdds, fetchEventOdds, fetchTryscorerOdds, type OddsEvent, type TryscorerMarkets } from "./odds";
+import { buildEstimatedOdds, fetchNrlOdds, fetchEventOdds, fetchTryscorerOdds, type OddsEvent, type TryscorerMarkets } from "./odds";
 import { generateInsights, type RealOdds, type Insights } from "./ai-insights";
 import { fetchVenueWeather, type WeatherSnapshot } from "./weather";
 import { findTeam } from "@/lib/teams";
@@ -39,6 +39,13 @@ async function safeOdds(refresh?: boolean): Promise<{ data: OddsEvent[]; error: 
     if (lastGoodOdds) return { data: lastGoodOdds.data, error: msg, stale: true };
     return { data: [], error: msg, stale: false };
   }
+}
+
+async function safeOddsForFixtures(fixtures: Awaited<ReturnType<typeof fetchDraw>>, ladder: Awaited<ReturnType<typeof fetchLadder>>, refresh?: boolean) {
+  const result = await safeOdds(refresh);
+  if (result.data.length > 0) return result;
+  const estimated = buildEstimatedOdds(fixtures, ladder);
+  return { data: estimated, error: result.error ? `${result.error}; using model estimates` : "Using model estimates", stale: true };
 }
 
 async function safeTryscorers(eventId: string, refresh?: boolean): Promise<{ data: TryscorerMarkets | null; error: string | null }> {

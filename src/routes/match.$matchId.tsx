@@ -2395,9 +2395,9 @@ function BetTab({ insights, insightsError, insightsLoading, home, away, tryscore
               return (
               <li
                 key={leg.id}
-                className={`bg-surface-2 rounded-lg p-3 flex items-start gap-3 border border-border/40 transition ${excluded ? "opacity-50" : ""}`}
+                className={`bg-surface-2 rounded-lg px-3 py-3 sm:px-4 sm:py-3.5 grid grid-cols-[1fr_auto] items-center gap-3 sm:gap-4 border border-border/40 transition ${excluded ? "opacity-50" : ""}`}
               >
-                <div className="flex-1 min-w-0">
+                <div className="min-w-0">
                   <div className="text-[9px] uppercase tracking-wider text-muted-foreground font-bold flex items-center gap-2">
                     <span>{leg.market}</span>
                     {excluded && (
@@ -2433,8 +2433,8 @@ function BetTab({ insights, insightsError, insightsLoading, home, away, tryscore
                     <div className="text-[11px] text-muted-foreground truncate mt-0.5">{leg.detail}</div>
                   ) : null}
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <span className={`text-sm font-black tabular-nums px-2.5 py-1 rounded-full border ${excluded ? "bg-surface text-muted-foreground border-border" : "bg-accent !text-white border-accent shadow-[0_2px_8px_-2px_color-mix(in_oklab,var(--accent)_60%,transparent)]"}`}>
+                <div className="flex items-center gap-2 shrink-0 self-center">
+                  <span className={`text-sm font-black tabular-nums px-3 py-1 rounded-full border min-w-[3.25rem] text-center ${excluded ? "bg-surface text-muted-foreground border-border" : "bg-accent !text-white border-accent shadow-[0_2px_8px_-2px_color-mix(in_oklab,var(--accent)_60%,transparent)]"}`}>
                     {leg.price.toFixed(2)}
                   </span>
                   <button

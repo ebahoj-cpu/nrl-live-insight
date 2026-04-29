@@ -2506,10 +2506,10 @@ function BetTab({ insights, insightsError, insightsLoading, home, away, tryscore
               className="w-full text-[11px] uppercase tracking-wider font-bold py-2.5 rounded-lg border border-dashed border-accent/40 text-accent hover:bg-accent/10 transition disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {availableTryscorers.length === 0
-                ? "No more tryscorer markets"
-                : usingEstimates
-                  ? "+ Add tryscorer (estimated odds — markets open ~24h pre-game)"
-                  : "+ Add another anytime tryscorer"}
+                ? marketsLive
+                  ? "No more tryscorer markets"
+                  : "Tryscorer odds open ~24h pre-game"
+                : "+ Add another anytime tryscorer"}
             </button>
           )}
         </div>

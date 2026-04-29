@@ -2553,7 +2553,7 @@ function BetTab({ insights, insightsError, insightsLoading, home, away, tryscore
           </div>
 
           <p className="text-[10px] text-muted-foreground text-center pt-1">
-            Odds shown are best available or model-estimated. Confirm with your bookie before placing. 18+ · Bet responsibly.
+            Odds shown are the best live market price from The Odds API. Confirm with your bookie before placing. 18+ · Bet responsibly.
           </p>
         </div>
       </Card>

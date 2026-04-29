@@ -676,8 +676,8 @@ function SquadPanel({ team }: { team: { nickName: string; themeKey: string; play
         // overflow-visible so the headshot can extend above the card edge.
         className="relative flex items-stretch h-24 sm:h-28 rounded-lg bg-accent/15 ring-1 ring-accent/25 overflow-visible"
       >
-        {/* Headshot pinned to the left edge, bottom-aligned, overflows above */}
-        <div className="relative shrink-0 self-stretch w-24 sm:w-28">
+        {/* Headshot pinned to the left edge, bottom-aligned, overflows above and to the right */}
+        <div className="relative shrink-0 self-stretch w-28 sm:w-32">
           {p.headImage ? (
             <img
               src={p.headImage}
@@ -689,14 +689,14 @@ function SquadPanel({ team }: { team: { nickName: string; themeKey: string; play
           ) : null}
         </div>
 
-        {/* Jersey number badge */}
-        <div className="shrink-0 flex flex-col items-center justify-center w-14 sm:w-16">
+        {/* Jersey number badge — pushed right so the headshot doesn't cover it */}
+        <div className="shrink-0 flex flex-col items-center justify-center w-14 sm:w-16 ml-8 sm:ml-12">
           <span className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-md bg-accent text-accent-foreground font-black text-base sm:text-lg tabular-nums">
             {p.jerseyNumber ?? "—"}
           </span>
         </div>
 
-        {/* Name + position */}
+        {/* Name + position — also offset so it clears the overlapping headshot */}
         <div className="flex-1 min-w-0 flex flex-col justify-center px-2 sm:px-3 leading-tight">
           <div className="text-[10px] sm:text-[11px] uppercase tracking-wider text-muted-foreground truncate">
             {p.firstName}

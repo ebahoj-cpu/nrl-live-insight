@@ -363,17 +363,17 @@ function H2HPanel({ home, away }: { home: any; away: any }) {
   for (const n of awayMap.keys()) if (n > 17) extraSet.add(n);
   const extras = [...extraSet].sort((a, b) => a - b);
 
+  // Headshot fits cleanly inside the row, anchored to the bottom edge of the
+  // card (so the chest line meets the card edge — like nrl.com's lineup view).
+  // Card sizes itself to the headshot height; no overflow.
   const Headshot = ({ p, side }: { p?: P; themeKey: string; side: "left" | "right" }) => (
-    <div className="relative shrink-0 w-20 sm:w-24 self-stretch">
+    <div className={`relative shrink-0 self-stretch w-24 sm:w-28 ${side === "left" ? "" : ""}`}>
       {p?.headImage ? (
         <img
           src={p.headImage}
           alt=""
           loading="lazy"
-          // Doubled in size; absolutely positioned so it can overflow the row
-          // top/bottom without affecting row height. object-bottom keeps the
-          // face anchored at the row baseline like a sportsbook card.
-          className={`pointer-events-none absolute bottom-0 h-40 sm:h-48 w-40 sm:w-48 object-contain object-bottom drop-shadow-[0_4px_12px_rgba(0,0,0,0.5)] ${
+          className={`pointer-events-none absolute bottom-0 h-[110%] w-auto max-w-none object-contain object-bottom ${
             side === "left" ? "left-0" : "right-0"
           }`}
           onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
@@ -418,9 +418,9 @@ function H2HPanel({ home, away }: { home: any; away: any }) {
     const h = homeMap.get(n);
     const a = awayMap.get(n);
     return (
-      // overflow-visible + min-height lets the oversized headshots spill above
-      // and below the card while keeping the row layout tidy.
-      <li className="relative flex items-center rounded-lg bg-accent/10 ring-1 ring-accent/25 hover:ring-accent/50 transition min-h-[88px] sm:min-h-[96px] overflow-visible">
+      // Fixed row height; headshots sit fully inside, anchored bottom-aligned
+      // to the card edge so all rows look uniform and the player stands out.
+      <li className="relative flex items-stretch rounded-lg bg-accent/10 ring-1 ring-accent/25 hover:ring-accent/50 transition h-24 sm:h-28 overflow-hidden">
         <Headshot p={h} themeKey={home.themeKey} side="left" />
         <NameBlock p={h} align="left" />
         <CenterBadge n={n} label={label} />
@@ -431,7 +431,7 @@ function H2HPanel({ home, away }: { home: any; away: any }) {
   };
 
   return (
-    <section className="card-surface p-4 sm:p-5 pt-10 sm:pt-12 overflow-visible">
+    <section className="card-surface p-4 sm:p-5">
       <div className="flex items-center justify-between gap-3 mb-5">
         <div className="flex items-center gap-2 min-w-0 flex-1 justify-start">
           <TeamLogo themeKey={home.themeKey} name={home.nickName} size={32} />

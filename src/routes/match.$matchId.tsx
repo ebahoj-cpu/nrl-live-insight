@@ -659,47 +659,54 @@ function SquadPanel({ team }: { team: { nickName: string; themeKey: string; play
     else reserves.push(p);
   }
 
-  const renderRow = (p: P, i: number) => (
-    <li
-      key={i}
-      // Same fixed-height card as the H2H view so the lineup pages feel uniform.
-      className="relative flex items-stretch h-24 sm:h-28 rounded-lg bg-accent/15 ring-1 ring-accent/25 overflow-hidden"
-    >
-      {/* Headshot pinned to the left edge, bottom-aligned to the card */}
-      <div className="relative shrink-0 self-stretch w-24 sm:w-28">
-        {p.headImage ? (
-          <img
-            src={p.headImage}
-            alt=""
-            loading="lazy"
-            className="pointer-events-none absolute bottom-0 left-0 h-[110%] w-auto max-w-none object-contain object-bottom"
-            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-          />
-        ) : null}
-      </div>
+  const renderRow = (p: P, i: number) => {
+    // Prefer the canonical NRL position name from the jersey number, falling
+    // back to whatever the feed reports (covers interchange/reserves).
+    const positionLabel = p.jerseyNumber != null && JERSEY_POSITION[p.jerseyNumber]
+      ? JERSEY_POSITION[p.jerseyNumber]
+      : p.position;
+    return (
+      <li
+        key={i}
+        // overflow-visible so the headshot can extend above the card edge.
+        className="relative flex items-stretch h-24 sm:h-28 rounded-lg bg-accent/15 ring-1 ring-accent/25 overflow-visible"
+      >
+        {/* Headshot pinned to the left edge, bottom-aligned, overflows above */}
+        <div className="relative shrink-0 self-stretch w-24 sm:w-28">
+          {p.headImage ? (
+            <img
+              src={p.headImage}
+              alt=""
+              loading="lazy"
+              className="pointer-events-none absolute bottom-0 left-0 h-[150%] w-auto max-w-none object-contain object-bottom drop-shadow-[0_4px_10px_rgba(0,0,0,0.5)]"
+              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+            />
+          ) : null}
+        </div>
 
-      {/* Jersey number badge */}
-      <div className="shrink-0 flex flex-col items-center justify-center w-14 sm:w-16">
-        <span className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-md bg-accent text-accent-foreground font-black text-base sm:text-lg tabular-nums">
-          {p.jerseyNumber ?? "—"}
-        </span>
-      </div>
+        {/* Jersey number badge */}
+        <div className="shrink-0 flex flex-col items-center justify-center w-14 sm:w-16">
+          <span className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-md bg-accent text-accent-foreground font-black text-base sm:text-lg tabular-nums">
+            {p.jerseyNumber ?? "—"}
+          </span>
+        </div>
 
-      {/* Name + position */}
-      <div className="flex-1 min-w-0 flex flex-col justify-center px-2 sm:px-3 leading-tight">
-        <div className="text-[10px] sm:text-[11px] uppercase tracking-wider text-muted-foreground truncate">
-          {p.firstName}
+        {/* Name + position */}
+        <div className="flex-1 min-w-0 flex flex-col justify-center px-2 sm:px-3 leading-tight">
+          <div className="text-[10px] sm:text-[11px] uppercase tracking-wider text-muted-foreground truncate">
+            {p.firstName}
+          </div>
+          <div className="text-sm sm:text-lg font-black uppercase truncate">
+            {p.lastName}
+            {p.isCaptain && <Crown className="inline h-3 w-3 sm:h-3.5 sm:w-3.5 mx-1 text-accent align-[-1px]" />}
+          </div>
+          <div className="text-[9px] sm:text-[10px] uppercase tracking-wider text-accent/70 font-bold mt-0.5 truncate">
+            {positionLabel}
+          </div>
         </div>
-        <div className="text-sm sm:text-lg font-black uppercase truncate">
-          {p.lastName}
-          {p.isCaptain && <Crown className="inline h-3 w-3 sm:h-3.5 sm:w-3.5 mx-1 text-accent align-[-1px]" />}
-        </div>
-        <div className="text-[9px] sm:text-[10px] uppercase tracking-wider text-accent/70 font-bold mt-0.5 truncate">
-          {p.position}
-        </div>
-      </div>
-    </li>
-  );
+      </li>
+    );
+  };
 
   const Group = ({ label, items }: { label?: string; items: P[] }) => {
     if (items.length === 0) return null;
@@ -710,7 +717,8 @@ function SquadPanel({ team }: { team: { nickName: string; themeKey: string; play
             {label}
           </div>
         )}
-        <ul className="space-y-3">{items.map(renderRow)}</ul>
+        {/* generous spacing so headshot overflow doesn't collide with the row above */}
+        <ul className="space-y-14 sm:space-y-16 pt-12">{items.map(renderRow)}</ul>
       </div>
     );
   };

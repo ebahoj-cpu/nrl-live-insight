@@ -417,18 +417,14 @@ function H2HPanel({ home, away }: { home: any; away: any }) {
             />
           ) : null}
         </div>
-        {/* Caption centered directly under the player's face (face sits at the outer edge of the 72px container, ~36px in). */}
-        <div
-          className={`mt-3 w-[96px] sm:w-32 leading-tight text-center ${
-            side === "left" ? "-ml-3 sm:ml-0" : "-mr-3 sm:mr-0"
-          }`}
-        >
+        {/* Caption centered under the player's face. Stays within the player's half so it never collides with the centre badge. */}
+        <div className="mt-3 w-[88px] sm:w-32 leading-tight text-center">
           {p ? (
             <>
-              <div className={`${firstSize} uppercase tracking-wider text-muted-foreground whitespace-nowrap overflow-visible`}>
+              <div className={`${firstSize} uppercase tracking-wider text-muted-foreground whitespace-nowrap`}>
                 {p.firstName}
               </div>
-              <div className={`font-black uppercase whitespace-nowrap overflow-visible ${lastSize}`}>
+              <div className={`font-black uppercase whitespace-nowrap ${lastSize}`}>
                 {p.lastName}
                 {p.isCaptain && <Crown className="inline h-3 w-3 mx-0.5 text-accent align-[-1px]" />}
               </div>
@@ -706,22 +702,24 @@ function SquadPanel({ team }: { team: { nickName: string; themeKey: string; play
           </span>
         </div>
 
-        {/* Name + position — also offset so it clears the overlapping headshot. Long surnames shrink to fit. */}
+        {/* Name + position — offset so it clears the overlapping headshot. Long surnames shrink to fit, never truncate. */}
         <div className="flex-1 min-w-0 flex flex-col justify-center px-2 sm:px-3 leading-tight">
-          <div className="text-[10px] sm:text-[11px] uppercase tracking-wider text-muted-foreground truncate">
+          <div className="text-[10px] sm:text-[11px] uppercase tracking-wider text-muted-foreground whitespace-nowrap overflow-hidden">
             {p.firstName}
           </div>
-          <div className={`font-black uppercase truncate ${
-            (p.lastName?.length ?? 0) >= 11
-              ? "text-[11px] sm:text-base"
-              : (p.lastName?.length ?? 0) >= 9
-                ? "text-xs sm:text-lg"
-                : "text-sm sm:text-lg"
+          <div className={`font-black uppercase whitespace-nowrap ${
+            (p.lastName?.length ?? 0) >= 13
+              ? "text-[10px] sm:text-sm"
+              : (p.lastName?.length ?? 0) >= 11
+                ? "text-[11px] sm:text-base"
+                : (p.lastName?.length ?? 0) >= 9
+                  ? "text-xs sm:text-lg"
+                  : "text-sm sm:text-lg"
           }`}>
             {p.lastName}
             {p.isCaptain && <Crown className="inline h-3 w-3 sm:h-3.5 sm:w-3.5 mx-1 text-accent align-[-1px]" />}
           </div>
-          <div className="text-[9px] sm:text-[10px] uppercase tracking-wider text-accent/70 font-bold mt-0.5 truncate">
+          <div className="text-[9px] sm:text-[10px] uppercase tracking-wider text-accent/70 font-bold mt-0.5 whitespace-nowrap">
             {positionLabel}
           </div>
         </div>

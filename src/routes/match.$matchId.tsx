@@ -2331,45 +2331,19 @@ function BetTab({ insights, insightsError, insightsLoading, home, away, tryscore
     legs.filter((l) => l.market.startsWith("Anytime Tryscorer")).map((l) => l.selection.trim().toLowerCase())
   );
 
-  // Build candidate tryscorer list. Prefer live bookie prices when available;
-  // otherwise fall back to the squad lists with an estimated price so users
-  // can still build their slip before player markets are released (~24h pre-game).
-  type TryCandidate = { player: string; price: number; team: string; isEstimate: boolean };
-  const liveCandidates: TryCandidate[] = (tryscorers?.anytime ?? []).map((t) => {
+  // Live tryscorer markets sourced exclusively from The Odds API. No estimates —
+  // if bookies haven't released player markets yet (~24h pre-game), the add
+  // button is disabled with a clear message.
+  type TryCandidate = { player: string; price: number; team: string; isEstimate: false };
+  const allCandidates: TryCandidate[] = (tryscorers?.anytime ?? []).map((t) => {
     const aff = affiliatePlayer(t.player, home, away);
     const teamLabel = aff === "home" ? home.nickName : aff === "away" ? away.nickName : "";
     return { player: t.player, price: t.price, team: teamLabel, isEstimate: false };
   });
-
-  const tryProneSet = new Set(["FB", "W", "WG", "C", "CE", "FE", "HB", "L", "LK", "FR", "PR", "HK", "SR"]);
-  const estimatePrice = (pos: string): number => {
-    const p = (pos || "").toUpperCase();
-    if (p.includes("W") || p === "FB") return 3.50;
-    if (p.includes("C")) return 4.50;
-    if (p === "FE" || p === "HB" || p === "L" || p === "LK") return 5.50;
-    return 8.00; // forwards
-  };
-  const buildEstimateCandidates = (squad: TeamWithPlayers): TryCandidate[] => {
-    const players = squad.players ?? [];
-    return players
-      .filter((p) => tryProneSet.has((p.position || "").toUpperCase().replace(/[^A-Z]/g, "")))
-      .map((p) => ({
-        player: `${p.firstName} ${p.lastName}`.trim(),
-        price: estimatePrice(p.position),
-        team: squad.nickName,
-        isEstimate: true,
-      }));
-  };
-  const fallbackCandidates: TryCandidate[] = liveCandidates.length === 0
-    ? [...buildEstimateCandidates(home), ...buildEstimateCandidates(away)]
-    : [];
-
-  const allCandidates = liveCandidates.length > 0 ? liveCandidates : fallbackCandidates;
   const availableTryscorers = allCandidates
     .filter((t) => !usedTryscorerNames.has(t.player.trim().toLowerCase()))
-    .sort((a, b) => a.price - b.price)
-    .slice(0, 60);
-  const usingEstimates = liveCandidates.length === 0 && fallbackCandidates.length > 0;
+    .sort((a, b) => a.price - b.price);
+  const marketsLive = (tryscorers?.anytime?.length ?? 0) > 0;
 
   const addTryscorer = (name: string) => {
     const t = allCandidates.find((x) => x.player === name);
@@ -2532,10 +2506,10 @@ function BetTab({ insights, insightsError, insightsLoading, home, away, tryscore
               className="w-full text-[11px] uppercase tracking-wider font-bold py-2.5 rounded-lg border border-dashed border-accent/40 text-accent hover:bg-accent/10 transition disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {availableTryscorers.length === 0
-                ? "No more tryscorer markets"
-                : usingEstimates
-                  ? "+ Add tryscorer (estimated odds — markets open ~24h pre-game)"
-                  : "+ Add another anytime tryscorer"}
+                ? marketsLive
+                  ? "No more tryscorer markets"
+                  : "Tryscorer odds open ~24h pre-game"
+                : "+ Add another anytime tryscorer"}
             </button>
           )}
         </div>
@@ -2579,7 +2553,7 @@ function BetTab({ insights, insightsError, insightsLoading, home, away, tryscore
           </div>
 
           <p className="text-[10px] text-muted-foreground text-center pt-1">
-            Odds shown are best available or model-estimated. Confirm with your bookie before placing. 18+ · Bet responsibly.
+            Odds shown are the best live market price from The Odds API. Confirm with your bookie before placing. 18+ · Bet responsibly.
           </p>
         </div>
       </Card>

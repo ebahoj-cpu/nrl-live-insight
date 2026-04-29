@@ -481,18 +481,18 @@ function H2HPanel({ home, away }: { home: any; away: any }) {
       {numbers.length === 0 && extras.length === 0 ? (
         <div className="text-xs text-muted-foreground text-center py-6">Squads not yet named.</div>
       ) : (
-        // pt-16 keeps first-row headshot overflow from clipping against the section header.
-        <div className="space-y-10 pt-16">
+        // pt-12 keeps first-row headshot overflow from clipping against the section header.
+        <div className="space-y-10 pt-12">
           <div>
             <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-accent/80 mb-3">Starters</div>
-            <ul className="space-y-14 sm:space-y-16">
+            <ul className="space-y-10 sm:space-y-14">
               {numbers.filter((n) => n <= 13).map((n) => <Row key={n} n={n} />)}
             </ul>
           </div>
           {numbers.some((n) => n > 13 && n <= 20) && (
             <div>
               <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-accent/80 mb-3">Interchange</div>
-              <ul className="space-y-14 sm:space-y-16">
+              <ul className="space-y-10 sm:space-y-14">
                 {numbers.filter((n) => n > 13 && n <= 20).map((n) => <Row key={n} n={n} label="Bench" />)}
               </ul>
             </div>
@@ -500,7 +500,7 @@ function H2HPanel({ home, away }: { home: any; away: any }) {
           {extras.length > 0 && (
             <div>
               <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-accent/80 mb-3">Reserves</div>
-              <ul className="space-y-14 sm:space-y-16">
+              <ul className="space-y-10 sm:space-y-14">
                 {extras.map((n) => <Row key={n} n={n} label="Reserve" />)}
               </ul>
             </div>

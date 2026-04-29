@@ -2499,8 +2499,6 @@ function BetTab({ insights, insightsError, insightsLoading, home, away, tryscore
                   position="popper"
                 >
                   {availableTryscorers.map((t) => {
-                    const aff = affiliatePlayer(t.player, home, away);
-                    const team = aff === "home" ? home.nickName : aff === "away" ? away.nickName : "";
                     return (
                       <SelectItem
                         key={t.player}
@@ -2510,9 +2508,9 @@ function BetTab({ insights, insightsError, insightsLoading, home, away, tryscore
                         <span className="flex items-center justify-between gap-4 w-full">
                           <span className="truncate">
                             {t.player}
-                            {team ? <span className="text-muted-foreground font-normal"> · {team}</span> : null}
+                            {t.team ? <span className="text-muted-foreground font-normal"> · {t.team}</span> : null}
                           </span>
-                          <span className="tabular-nums text-[11px] font-black text-accent">{t.price.toFixed(2)}</span>
+                          <span className="tabular-nums text-[11px] font-black text-accent">{t.price.toFixed(2)}{t.isEstimate ? "*" : ""}</span>
                         </span>
                       </SelectItem>
                     );

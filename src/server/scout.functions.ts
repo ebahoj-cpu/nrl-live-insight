@@ -186,9 +186,20 @@ async function buildScoutContext(): Promise<string> {
     getSeasonSnapshot(season).catch(() => null),
   ]);
 
-  // Pick the upcoming/current round's fixtures (or next 8 if state is mixed).
+  // Pick the next chronological 8 fixtures that haven't finished yet.
+  const nowMs = Date.now();
   const upcoming = fixtures
     .filter((f) => !/full\s*time|fulltime/i.test(f.matchState))
+    .filter((f) => {
+      const t = f.kickoffUtc ? Date.parse(f.kickoffUtc) : NaN;
+      // keep if kickoff unknown, in the future, or within last 4h (live)
+      return isNaN(t) || t > nowMs - 4 * 3600_000;
+    })
+    .sort((a, b) => {
+      const ta = a.kickoffUtc ? Date.parse(a.kickoffUtc) : Number.MAX_SAFE_INTEGER;
+      const tb = b.kickoffUtc ? Date.parse(b.kickoffUtc) : Number.MAX_SAFE_INTEGER;
+      return ta - tb;
+    })
     .slice(0, 8);
 
   // Build deep briefs in parallel for every upcoming fixture.
@@ -233,7 +244,7 @@ export const scoutChat = createServerFn({ method: "POST" })
     const key = process.env.LOVABLE_API_KEY;
     if (!key) throw new Error("LOVABLE_API_KEY not configured");
 
-    const context = await cached("scout:context:v2", CTX_TTL, buildScoutContext);
+    const context = await cached("scout:context:v3", CTX_TTL, buildScoutContext);
 
     const system = [
       "You are SCOUT — the in-house NRL betting analyst inside the LINEBREAK app.",
@@ -244,7 +255,8 @@ export const scoutChat = createServerFn({ method: "POST" })
       "• Quote exact prices, lines and bookmakers from the SNAPSHOT.",
       "• Always name the market explicitly (H2H / Line / Total / Anytime Tryscorer / First Tryscorer).",
       "• If a fact (injury, line, tryscorer price) is NOT in the SNAPSHOT, say 'no data' — never invent.",
-      "• If markets aren't posted yet, say so and explain when they typically drop (≈24h pre-game once team lists land).",
+      "• MARKET AVAILABILITY: H2H/Line/Total prices in the SNAPSHOT are LIVE. Use them. Do NOT claim markets haven't dropped if 'H2H best:' or 'Line:' is present for that fixture.",
+      "• Tryscorer markets typically only post ~24h before kickoff (once team lists drop). If 'Tryscorer markets: not posted yet' appears, say so for THAT specific fixture only — H2H/Line/Total are still live.",
       "• Close picks with a one-liner responsible-betting reminder ONLY when explicitly suggesting a bet.",
       "",
       "WHAT YOU KNOW (use it ruthlessly):",

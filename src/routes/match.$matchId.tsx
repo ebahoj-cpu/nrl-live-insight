@@ -441,13 +441,18 @@ function H2HPanel({ home, away }: { home: any; away: any }) {
     const a = awayMap.get(n);
     return (
       // overflow-visible so the headshots can extend above the card without
-      // being clipped. Row spacing is increased on the parent <ul>.
+      // being clipped. Names are absolutely centered to the full card width
+      // (independent of the headshot columns) so they don't drift off-center.
       <li className="relative flex items-stretch rounded-lg bg-accent/10 ring-1 ring-accent/25 hover:ring-accent/50 transition h-24 sm:h-28 overflow-visible">
         <Headshot p={h} themeKey={home.themeKey} side="left" />
-        <NameBlock p={h} align="left" />
-        <CenterBadge n={n} label={label} />
-        <NameBlock p={a} align="right" />
+        <div className="flex-1" />
         <Headshot p={a} themeKey={away.themeKey} side="right" />
+        {/* Absolute overlay row: home name | center badge | away name, perfectly centered */}
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center px-24 sm:px-28">
+          <div className="flex-1 min-w-0 flex justify-center"><NameBlock p={h} align="left" /></div>
+          <CenterBadge n={n} label={label} />
+          <div className="flex-1 min-w-0 flex justify-center"><NameBlock p={a} align="right" /></div>
+        </div>
       </li>
     );
   };

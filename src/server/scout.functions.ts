@@ -186,9 +186,20 @@ async function buildScoutContext(): Promise<string> {
     getSeasonSnapshot(season).catch(() => null),
   ]);
 
-  // Pick the upcoming/current round's fixtures (or next 8 if state is mixed).
+  // Pick the next chronological 8 fixtures that haven't finished yet.
+  const nowMs = Date.now();
   const upcoming = fixtures
     .filter((f) => !/full\s*time|fulltime/i.test(f.matchState))
+    .filter((f) => {
+      const t = f.kickoffUtc ? Date.parse(f.kickoffUtc) : NaN;
+      // keep if kickoff unknown, in the future, or within last 4h (live)
+      return isNaN(t) || t > nowMs - 4 * 3600_000;
+    })
+    .sort((a, b) => {
+      const ta = a.kickoffUtc ? Date.parse(a.kickoffUtc) : Number.MAX_SAFE_INTEGER;
+      const tb = b.kickoffUtc ? Date.parse(b.kickoffUtc) : Number.MAX_SAFE_INTEGER;
+      return ta - tb;
+    })
     .slice(0, 8);
 
   // Build deep briefs in parallel for every upcoming fixture.

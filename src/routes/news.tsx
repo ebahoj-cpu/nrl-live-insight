@@ -7,6 +7,16 @@ import { ExternalLink, Sparkles, TrendingUp, TrendingDown, Minus, Loader2 } from
 import { findTeam } from "@/lib/teams";
 import { TeamLogo } from "@/components/TeamLogo";
 
+// Publisher logos for known sources (matched case-insensitively, substring).
+const PUBLISHER_LOGOS: { match: RegExp; src: string; alt: string }[] = [
+  { match: /nrl\.com|^nrl$/i, src: "https://www.nrl.com/.theme/nrl/logo.svg", alt: "NRL" },
+  { match: /sydney morning herald|smh/i, src: "https://www.google.com/s2/favicons?domain=smh.com.au&sz=128", alt: "Sydney Morning Herald" },
+];
+
+function findPublisherLogo(source: string) {
+  return PUBLISHER_LOGOS.find((p) => p.match.test(source)) ?? null;
+}
+
 const newsQO = () => queryOptions({
   queryKey: ["news"],
   queryFn: () => getNews({ data: {} }),
@@ -111,10 +121,13 @@ function NewsCard({ item: n }: NewsItemProps) {
           />
         ) : (() => {
           const team = findTeam(n.source);
+          const pub = !team ? findPublisherLogo(n.source) : null;
           return (
-            <div className="h-20 w-20 sm:h-24 sm:w-24 shrink-0 rounded-xl bg-surface-2 flex items-center justify-center">
+            <div className="h-20 w-20 sm:h-24 sm:w-24 shrink-0 rounded-xl bg-surface-2 flex items-center justify-center p-2">
               {team ? (
                 <TeamLogo themeKey={team.themeKey} name={team.nickname} size={64} />
+              ) : pub ? (
+                <img src={pub.src} alt={pub.alt} className="max-h-full max-w-full object-contain" loading="lazy" />
               ) : (
                 <span className="text-accent font-black text-xl">{n.source.charAt(0)}</span>
               )}

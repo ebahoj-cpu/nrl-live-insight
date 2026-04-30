@@ -4,7 +4,8 @@
 //   https://www.nrl.com/ladder/data?competition=111&season=YYYY
 //   https://www.nrl.com{matchCentreUrl}data
 
-import { fetchMatchTeamNews, type TeamNews } from "./team-news";
+import { fetchMatchTeamNews, type TeamNews, type NewsOut } from "./team-news";
+import { findNewsRulingsForSquads } from "./news-rulings";
 
 const UA = "Mozilla/5.0 (compatible; LineBreak/1.0)";
 const COMP = 111; // Telstra Premiership

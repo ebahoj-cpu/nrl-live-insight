@@ -72,6 +72,14 @@ function ScoutPage() {
     mutation.mutate(forApi);
   };
 
+  // Auto-send the question if arrived via ?q=...  (e.g. "Ask Scout" from the news page)
+  useEffect(() => {
+    if (!initialQuery || autoSentRef.current) return;
+    autoSentRef.current = true;
+    send(initialQuery);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialQuery]);
+
   const reset = () => {
     setMessages([GREETING]);
     mutation.reset();

@@ -99,21 +99,35 @@ function MatchInner() {
             return null;
           })()}
         </div>
-        <div className="grid grid-cols-3 items-center mt-4 gap-4">
-          <TeamColumn name={details.homeTeam.nickName} themeKey={details.homeTeam.themeKey} position={details.homeTeam.position} />
-          <div className="text-center">
-            {(typeof details.homeTeam.score === "number" && typeof details.awayTeam.score === "number") ? (
-              <div className="kbd flex items-center justify-center gap-3">
-                <span className={`text-4xl sm:text-5xl font-black tabular-nums ${details.homeTeam.score > details.awayTeam.score ? "text-accent" : ""}`}>{details.homeTeam.score}</span>
-                <span className="text-muted-foreground text-lg font-bold">–</span>
-                <span className={`text-4xl sm:text-5xl font-black tabular-nums ${details.awayTeam.score > details.homeTeam.score ? "text-accent" : ""}`}>{details.awayTeam.score}</span>
+        {(() => {
+          const hasScore = typeof details.homeTeam.score === "number" && typeof details.awayTeam.score === "number";
+          const isFinishedOrLive = hasScore && /^(FullTime|Final|Completed|InProgress|Live|HalfTime)$/i.test(details.matchState);
+          const h2h = odds ? bestH2H(odds) : null;
+          const fav = h2h?.home && h2h?.away ? (h2h.home.price < h2h.away.price ? "home" : "away") : null;
+          return (
+            <div className="grid grid-cols-[1fr_auto_1fr] items-center mt-4 gap-2 sm:gap-4">
+              <div className="flex items-center justify-end gap-2 sm:gap-3 min-w-0">
+                <TeamColumn name={details.homeTeam.nickName} themeKey={details.homeTeam.themeKey} position={details.homeTeam.position} />
+                {!isFinishedOrLive && <OddsPill odds={h2h?.home ?? null} isFav={fav === "home"} />}
               </div>
-            ) : (
-              <div className="text-2xl sm:text-3xl font-extrabold">vs</div>
-            )}
-          </div>
-          <TeamColumn name={details.awayTeam.nickName} themeKey={details.awayTeam.themeKey} position={details.awayTeam.position} />
-        </div>
+              <div className="text-center px-1">
+                {hasScore ? (
+                  <div className="kbd flex items-center justify-center gap-3">
+                    <span className={`text-4xl sm:text-5xl font-black tabular-nums ${details.homeTeam.score > details.awayTeam.score ? "text-accent" : ""}`}>{details.homeTeam.score}</span>
+                    <span className="text-muted-foreground text-lg font-bold">–</span>
+                    <span className={`text-4xl sm:text-5xl font-black tabular-nums ${details.awayTeam.score > details.homeTeam.score ? "text-accent" : ""}`}>{details.awayTeam.score}</span>
+                  </div>
+                ) : (
+                  <div className="text-2xl sm:text-3xl font-extrabold">vs</div>
+                )}
+              </div>
+              <div className="flex items-center justify-start gap-2 sm:gap-3 min-w-0">
+                {!isFinishedOrLive && <OddsPill odds={h2h?.away ?? null} isFav={fav === "away"} />}
+                <TeamColumn name={details.awayTeam.nickName} themeKey={details.awayTeam.themeKey} position={details.awayTeam.position} />
+              </div>
+            </div>
+          );
+        })()}
 
         <div className="mt-6 pt-5 border-t border-border space-y-2 text-sm text-center sm:text-left sm:grid sm:grid-cols-2 sm:gap-3 sm:space-y-0">
           <div className="inline-flex items-center justify-center sm:justify-start gap-2 flex-wrap">
@@ -218,6 +232,22 @@ function TeamColumn({ name, themeKey }: { name: string; themeKey: string; positi
       <TeamLogo themeKey={themeKey} name={name} size={56} />
       <div className="text-xs sm:text-sm font-bold text-center leading-tight truncate max-w-full">{name}</div>
     </div>
+  );
+}
+
+function OddsPill({ odds, isFav }: { odds: { price: number; book: string } | null; isFav: boolean }) {
+  if (!odds) {
+    return (
+      <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-surface-2 text-[11px] font-bold tabular-nums text-muted-foreground border border-border shrink-0">—</span>
+    );
+  }
+  return (
+    <span
+      className="inline-flex items-center px-3 py-1 rounded-full bg-accent !text-black text-[12px] font-black tabular-nums tracking-tight shadow-[0_4px_14px_-4px_color-mix(in_oklab,var(--accent)_60%,transparent)] shrink-0"
+      title={`Best price: ${odds.book}${isFav ? " · favourite" : ""}`}
+    >
+      {odds.price.toFixed(2)}
+    </span>
   );
 }
 

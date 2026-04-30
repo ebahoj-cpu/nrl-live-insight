@@ -1,9 +1,10 @@
-import { createFileRoute, useRouter } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useMutation } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { Sparkles, Send, Loader2, RotateCw, AlertTriangle } from "lucide-react";
+import { Send, Loader2, RotateCw, AlertTriangle } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { scoutChat } from "@/server/scout.functions";
+import scoutAvatar from "@/assets/scout-avatar.png";
 
 type Msg = { role: "user" | "assistant"; content: string };
 
@@ -33,7 +34,6 @@ export const Route = createFileRoute("/scout")({
 });
 
 function ScoutPage() {
-  const router = useRouter();
   const [messages, setMessages] = useState<Msg[]>([GREETING]);
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -59,7 +59,6 @@ function ScoutPage() {
     const next: Msg[] = [...messages, { role: "user", content: trimmed }];
     setMessages(next);
     setInput("");
-    // Send the conversation excluding the greeting (system handles persona)
     const forApi = next.filter((m, i) => !(i === 0 && m === GREETING));
     mutation.mutate(forApi);
   };
@@ -70,34 +69,41 @@ function ScoutPage() {
     inputRef.current?.focus();
   };
 
+  // Layout math: header is h-16 (64px), bottom nav ~92px (incl. fade + safe area).
+  // We pin the page to the viewport between them; only the messages list scrolls.
   return (
-    <div className="pt-4 sm:pt-6">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <div className="relative">
-            <span className="absolute inset-0 rounded-full bg-accent/30 blur-md animate-pulse" />
-            <span className="relative inline-flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-accent to-accent/60 text-accent-foreground shadow-lg shadow-accent/30">
-              <Sparkles className="h-5 w-5" strokeWidth={2.5} />
-            </span>
+    <div
+      className="fixed left-0 right-0 top-16 flex flex-col"
+      style={{ bottom: "calc(92px + env(safe-area-inset-bottom))" }}
+    >
+      {/* Static header bar */}
+      <div className="shrink-0 border-b border-border bg-background/80 backdrop-blur-xl">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <span className="absolute inset-0 rounded-full bg-accent/30 blur-md animate-pulse" />
+              <span className="relative inline-flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-accent to-accent/60 ring-2 ring-accent/40 overflow-hidden shadow-lg shadow-accent/30">
+                <img src={scoutAvatar} alt="Scout" width={44} height={44} className="h-full w-full object-cover" />
+              </span>
+            </div>
+            <div>
+              <div className="text-[10px] uppercase tracking-[0.2em] text-accent font-bold">AI Assistant</div>
+              <h1 className="text-xl font-display font-extrabold tracking-tight leading-tight">Scout</h1>
+            </div>
           </div>
-          <div>
-            <div className="text-[10px] uppercase tracking-[0.2em] text-accent font-bold">AI Assistant</div>
-            <h1 className="text-2xl font-display font-extrabold tracking-tight">Scout</h1>
-          </div>
+          <button
+            onClick={reset}
+            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold hover:bg-surface-2 transition"
+          >
+            <RotateCw className="h-3.5 w-3.5" />
+            New chat
+          </button>
         </div>
-        <button
-          onClick={reset}
-          className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold hover:bg-surface-2 transition"
-        >
-          <RotateCw className="h-3.5 w-3.5" />
-          New chat
-        </button>
       </div>
 
-      {/* Chat container */}
-      <div className="rounded-3xl border border-border bg-surface/60 backdrop-blur-sm overflow-hidden flex flex-col h-[calc(100vh-260px)] min-h-[480px]">
-        <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 sm:px-5 py-5 space-y-4">
+      {/* Scrollable chat dialogue */}
+      <div ref={scrollRef} className="flex-1 overflow-y-auto">
+        <div className="mx-auto max-w-6xl px-3 sm:px-5 py-5 space-y-3">
           {messages.map((m, i) => (
             <Bubble key={i} msg={m} />
           ))}
@@ -113,27 +119,27 @@ function ScoutPage() {
               <span>{(mutation.error as Error)?.message ?? "Something went wrong."}</span>
             </div>
           )}
+          {messages.length === 1 && !mutation.isPending && (
+            <div className="pt-2 flex flex-wrap gap-2">
+              {STARTER_PROMPTS.map((p) => (
+                <button
+                  key={p}
+                  onClick={() => send(p)}
+                  className="text-xs px-3 py-1.5 rounded-full border border-border bg-surface-2 hover:bg-accent hover:text-accent-foreground hover:border-accent transition font-medium"
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
+      </div>
 
-        {/* Starter chips (only on the greeting) */}
-        {messages.length === 1 && !mutation.isPending && (
-          <div className="px-3 sm:px-5 pb-3 flex flex-wrap gap-2">
-            {STARTER_PROMPTS.map((p) => (
-              <button
-                key={p}
-                onClick={() => send(p)}
-                className="text-xs px-3 py-1.5 rounded-full border border-border bg-surface-2 hover:bg-accent hover:text-accent-foreground hover:border-accent transition font-medium"
-              >
-                {p}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* Composer */}
+      {/* Pinned composer */}
+      <div className="shrink-0 border-t border-border bg-background/90 backdrop-blur-xl">
         <form
           onSubmit={(e) => { e.preventDefault(); send(input); }}
-          className="border-t border-border bg-background/40 p-2 sm:p-3"
+          className="mx-auto max-w-6xl px-3 sm:px-5 py-2.5"
         >
           <div className="flex items-end gap-2 rounded-2xl border border-border bg-surface focus-within:border-accent transition px-3 py-2">
             <textarea
@@ -146,7 +152,7 @@ function ScoutPage() {
                   send(input);
                 }
               }}
-              placeholder="Ask Scout about a team, player, fixture or market…"
+              placeholder="Message Scout…"
               rows={1}
               className="flex-1 resize-none bg-transparent outline-none text-sm placeholder:text-muted-foreground max-h-32 py-1"
             />
@@ -161,9 +167,6 @@ function ScoutPage() {
                 : <Send className="h-4 w-4" />}
             </button>
           </div>
-          <p className="mt-1.5 text-[10px] text-muted-foreground text-center">
-            Scout uses live NRL data. Always bet responsibly · 18+
-          </p>
         </form>
       </div>
     </div>
@@ -176,7 +179,7 @@ function Bubble({ msg }: { msg: Msg }) {
     return (
       <div className="flex justify-end">
         <div
-          className="max-w-[80%] rounded-2xl bg-white text-neutral-900 px-4 py-2.5 text-[13.5px] leading-snug font-medium shadow-sm whitespace-pre-wrap border border-neutral-200 tracking-tight"
+          className="max-w-[80%] rounded-2xl rounded-br-md bg-accent text-accent-foreground px-3.5 py-2 text-[13.5px] leading-snug font-medium shadow-md shadow-accent/20 whitespace-pre-wrap tracking-tight"
           style={{ fontFeatureSettings: '"tnum" 1, "ss01" 1' }}
         >
           {msg.content}
@@ -186,17 +189,17 @@ function Bubble({ msg }: { msg: Msg }) {
   }
   return (
     <div className="flex gap-2 items-start">
-      <span className="shrink-0 inline-flex h-8 w-8 items-center justify-center rounded-full bg-accent text-accent-foreground shadow-md mt-0.5 ring-2 ring-accent/30">
-        <Sparkles className="h-4 w-4" strokeWidth={2.5} />
+      <span className="shrink-0 inline-flex h-8 w-8 items-center justify-center rounded-full bg-surface-2 ring-2 ring-accent/40 overflow-hidden mt-0.5">
+        <img src={scoutAvatar} alt="Scout" width={32} height={32} className="h-full w-full object-cover" />
       </span>
       <div
-        className="scout-bubble max-w-[88%] sm:max-w-[80%] rounded-2xl bg-neutral-950/80 border border-accent/40 text-neutral-100 px-4 py-3 text-[13.5px] shadow-lg shadow-accent/10"
+        className="scout-bubble max-w-[82%] rounded-2xl rounded-bl-md bg-surface border border-border text-foreground px-3.5 py-2.5 text-[13.5px] shadow-sm"
         style={{ fontFeatureSettings: '"tnum" 1, "ss01" 1, "cv11" 1' }}
       >
         <ReactMarkdown
           components={{
             ul: ({ node, ...props }) => (
-              <ul {...props} className="list-none space-y-2 m-0 p-0" />
+              <ul {...props} className="list-none space-y-1.5 m-0 p-0" />
             ),
             li: ({ node, children, ...props }) => (
               <li
@@ -207,10 +210,7 @@ function Bubble({ msg }: { msg: Msg }) {
               </li>
             ),
             strong: ({ node, ...props }) => (
-              <strong
-                {...props}
-                className="font-display font-bold uppercase tracking-wider text-[12.5px] text-white"
-              />
+              <strong {...props} className="font-bold text-foreground" />
             ),
             code: ({ node, ...props }) => (
               <code
@@ -219,7 +219,7 @@ function Bubble({ msg }: { msg: Msg }) {
               />
             ),
             p: ({ node, ...props }) => (
-              <p {...props} className="m-0 leading-snug" />
+              <p {...props} className="m-0 leading-snug [&:not(:first-child)]:mt-2" />
             ),
           }}
         >

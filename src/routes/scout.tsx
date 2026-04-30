@@ -155,7 +155,7 @@ function ScoutPage() {
               }}
               placeholder="Message Scout…"
               rows={1}
-              className="flex-1 resize-none bg-transparent outline-none text-sm placeholder:text-muted-foreground max-h-32 py-1"
+              className="font-chat flex-1 resize-none bg-transparent outline-none text-[15px] font-medium placeholder:text-muted-foreground placeholder:font-normal max-h-32 py-1"
             />
             <button
               type="submit"

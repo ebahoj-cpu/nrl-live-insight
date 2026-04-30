@@ -7,7 +7,7 @@
 // Heavy lifting is cached so chat turns stay snappy.
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { cached, TTL } from "./cache";
+import { cached, staleWhileRevalidate, TTL } from "./cache";
 import { fetchDraw, fetchLadder, fetchMatchDetails, type NrlMatchDetails } from "./nrl";
 import { buildEstimatedOdds, fetchNrlOdds, fetchTryscorerOdds, bestH2H, type OddsEvent } from "./odds";
 import { fetchNews, type NewsItem } from "./news";
@@ -15,6 +15,14 @@ import { getSeasonSnapshot, getTeam, type TeamSeasonStats } from "./season-stats
 import { findTeam } from "@/lib/teams";
 import { readAnySharedInsights } from "./insights-store";
 import type { Insights } from "./ai-insights";
+
+// Race a promise against a timeout, returning a fallback if it doesn't beat the clock.
+function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return new Promise((resolve) => {
+    const t = setTimeout(() => resolve(fallback), ms);
+    p.then((v) => { clearTimeout(t); resolve(v); }).catch(() => { clearTimeout(t); resolve(fallback); });
+  });
+}
 
 const Message = z.object({
   role: z.enum(["user", "assistant"]),

@@ -270,13 +270,13 @@ function BottomNav() {
                       <span className="absolute top-0 left-1/2 -translate-x-1/2 h-1 w-12 rounded-b-full bg-accent" />
                     )}
                     {to === "/scout" ? (
-                      <span className="inline-flex h-11 w-11 items-center justify-center">
+                      <span className="inline-flex h-11 w-14 items-center justify-center">
                         <img
                           src={scoutAvatar}
                           alt=""
-                          width={44}
-                          height={44}
-                          className={`h-11 w-11 object-contain transition ${isActive ? "drop-shadow-[0_0_8px_var(--accent)] scale-110" : "opacity-90 group-hover:opacity-100 group-hover:scale-105"}`}
+                          width={56}
+                          height={56}
+                          className={`h-14 w-14 object-contain transition ${isActive ? "drop-shadow-[0_0_10px_var(--accent)] scale-110" : "opacity-90 group-hover:opacity-100 group-hover:scale-105"}`}
                         />
                       </span>
                     ) : (

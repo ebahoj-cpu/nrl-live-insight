@@ -87,7 +87,9 @@ function decodeEntities(s: string): string {
 }
 
 function stripHtml(s: string): string {
-  return decodeEntities(s.replace(/<[^>]+>/g, "")).replace(/\s+/g, " ").trim();
+  // Decode entities first so encoded tags (&lt;a&gt;) become real tags and get stripped.
+  const decoded = decodeEntities(s);
+  return decodeEntities(decoded.replace(/<[^>]+>/g, "")).replace(/\s+/g, " ").trim();
 }
 
 function findImage(itemXml: string): string | undefined {

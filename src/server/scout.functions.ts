@@ -201,13 +201,37 @@ async function buildScoutContext(): Promise<string> {
       const tb = b.kickoffUtc ? Date.parse(b.kickoffUtc) : Number.MAX_SAFE_INTEGER;
       return ta - tb;
     })
-    .slice(0, 8);
+    .slice(0, 6);
 
-  // Build deep briefs in parallel for every upcoming fixture.
-  const briefs = await Promise.all(upcoming.map((f) =>
-    buildFixtureBrief(f.matchId, f.homeTeam.nickName, f.awayTeam.nickName, odds)
-      .catch(() => `### ${f.homeTeam.nickName} v ${f.awayTeam.nickName}\n(brief unavailable)`),
-  ));
+  // Lightweight briefs: odds + season form only (no per-fixture match-details
+  // or tryscorer fetches in the hot path — those add 8+ network round-trips
+  // and were the main reason Scout responses felt slow). Deep briefs are
+  // built lazily by buildFixtureBrief if a future code path needs them.
+  const briefs = upcoming.map((f) => {
+    const homeNick = f.homeTeam.nickName;
+    const awayNick = f.awayTeam.nickName;
+    const ev = matchOddsEvent(odds, homeNick, awayNick);
+    const lines: string[] = [`### ${homeNick} v ${awayNick}`];
+    if (f.venue) lines.push(`Venue: ${f.venue} · Round ${f.roundNumber ?? "?"}`);
+    if (ev) {
+      const h2h = bestH2H(ev);
+      const homeBest = (ev.homeNickname === homeNick) ? h2h.home : h2h.away;
+      const awayBest = (ev.homeNickname === homeNick) ? h2h.away : h2h.home;
+      if (homeBest && awayBest) {
+        lines.push(`H2H best: ${homeNick} ${homeBest.price} (${homeBest.book}) / ${awayNick} ${awayBest.price} (${awayBest.book})`);
+      }
+      const { line, total } = pickLineTotal(ev, ev.homeNickname, ev.awayNickname);
+      if (line) lines.push(`Line: ${line}`);
+      if (total) lines.push(`Total: ${total}`);
+    }
+    if (snap) {
+      const ht = getTeam(snap, homeNick);
+      const at = getTeam(snap, awayNick);
+      if (ht) lines.push(teamLine(ht, homeNick));
+      if (at) lines.push(teamLine(at, awayNick));
+    }
+    return lines.join("\n");
+  });
 
   // Per-team season profiles (one line each)
   const teamProfiles = snap

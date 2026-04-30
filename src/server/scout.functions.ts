@@ -226,8 +226,13 @@ async function buildFixtureBrief(
   }
 
   // App Insights summary — mirrors what the user sees on the Insights tab so
-  // Scout's chat answers stay consistent with the on-app projections.
-  const insightsSummary = await summarizeStoredInsights(matchId, homeNick, awayNick).catch(() => "");
+  // Scout's chat answers stay consistent with the on-app projections. Capped at
+  // 2s so a slow DB round-trip can't stall the per-fixture brief.
+  const insightsSummary = await withTimeout(
+    summarizeStoredInsights(matchId, homeNick, awayNick).catch(() => ""),
+    2000,
+    "",
+  );
   if (insightsSummary) {
     lines.push(insightsSummary);
   }

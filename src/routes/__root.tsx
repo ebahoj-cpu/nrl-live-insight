@@ -233,7 +233,11 @@ function NavMenu({ onClose }: { onClose: () => void }) {
               inactiveProps={{ className: "text-foreground hover:bg-surface-2" }}
               className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition"
             >
-              <Icon className="h-4 w-4" />
+              {to === "/scout" ? (
+                <img src={scoutAvatar} alt="" width={20} height={20} className="h-5 w-5 object-contain" />
+              ) : (
+                <Icon className="h-4 w-4" />
+              )}
               <span className="font-semibold text-sm">{label}</span>
             </Link>
           ))}

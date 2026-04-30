@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useSuspenseQuery, useQuery, queryOptions } from "@tanstack/react-query";
 import { Suspense, useState } from "react";
 import { getNews } from "@/server/news.functions";
@@ -6,6 +6,7 @@ import { summariseArticle, type ArticleSummary } from "@/server/news-summary.fun
 import { ExternalLink, Sparkles, TrendingUp, TrendingDown, Minus, Loader2 } from "lucide-react";
 import { findTeam } from "@/lib/teams";
 import { TeamLogo } from "@/components/TeamLogo";
+import scoutAvatar from "@/assets/scout-avatar.png";
 
 // Publisher logos for known sources (matched case-insensitively, substring).
 const PUBLISHER_LOGOS: { match: RegExp; src: string; alt: string }[] = [
@@ -200,6 +201,14 @@ function NewsCard({ item: n }: NewsItemProps) {
             >
               <TrendingUp className="h-3 w-3" /> {mode === "impact" ? "Hide" : "Impact on"} Insights
             </button>
+            <Link
+              to="/scout"
+              search={{ q: `Give me your read on this NRL news story and what it means for betting angles. Headline: "${n.title}" (source: ${n.source}). ${n.summary ? `Summary: ${n.summary}` : ""}`.trim() }}
+              className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full bg-accent text-accent-foreground border border-accent hover:brightness-110 transition shadow-sm shadow-accent/30"
+            >
+              <img src={scoutAvatar} alt="" width={14} height={14} className="h-3.5 w-3.5 object-contain" />
+              Ask Scout
+            </Link>
           </div>
         </div>
       </div>

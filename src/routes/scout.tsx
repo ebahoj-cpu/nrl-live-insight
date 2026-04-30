@@ -3,8 +3,13 @@ import { useMutation } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { Send, Loader2, RotateCw, AlertTriangle } from "lucide-react";
 import ReactMarkdown from "react-markdown";
+import { z } from "zod";
 import { scoutChat } from "@/server/scout.functions";
 import scoutAvatar from "@/assets/scout-avatar.png";
+
+const searchSchema = z.object({
+  q: z.string().max(2000).optional(),
+});
 
 type Msg = { role: "user" | "assistant"; content: string };
 
@@ -22,6 +27,7 @@ const GREETING: Msg = {
 };
 
 export const Route = createFileRoute("/scout")({
+  validateSearch: searchSchema,
   head: () => ({
     meta: [
       { title: "Scout — Your NRL Betting AI · LINEBREAK" },
@@ -34,10 +40,12 @@ export const Route = createFileRoute("/scout")({
 });
 
 function ScoutPage() {
+  const { q: initialQuery } = Route.useSearch();
   const [messages, setMessages] = useState<Msg[]>([GREETING]);
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const autoSentRef = useRef(false);
 
   const mutation = useMutation({
     mutationFn: async (msgs: Msg[]) => {
@@ -63,6 +71,14 @@ function ScoutPage() {
     const forApi = next.filter((m, i) => !(i === 0 && m === GREETING));
     mutation.mutate(forApi);
   };
+
+  // Auto-send the question if arrived via ?q=...  (e.g. "Ask Scout" from the news page)
+  useEffect(() => {
+    if (!initialQuery || autoSentRef.current) return;
+    autoSentRef.current = true;
+    send(initialQuery);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialQuery]);
 
   const reset = () => {
     setMessages([GREETING]);

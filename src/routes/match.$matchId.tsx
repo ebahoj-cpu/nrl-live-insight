@@ -318,7 +318,8 @@ const POSITION_ORDER = [
   "Interchange","Reserve",
 ];
 
-type TeamNews = { ins: string[]; outs: string[]; blurb: string; sourceUrl: string } | null;
+type NewsOut = { playerName: string; reason: string; sourceUrl: string; sourceTitle: string; source: string; publishedUtc: string };
+type TeamNews = { ins: string[]; outs: string[]; blurb: string; sourceUrl: string; newsOuts?: NewsOut[] } | null;
 
 function LineupTab({ home, away, officials, teamNews }: { home: any; away: any; officials: { position: string; firstName: string; lastName: string; headImage?: string }[]; teamNews?: { home: TeamNews; away: TeamNews } }) {
   const [side, setSide] = useState<"home" | "away" | "h2h">("home");

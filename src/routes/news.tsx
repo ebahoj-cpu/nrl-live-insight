@@ -121,10 +121,13 @@ function NewsCard({ item: n }: NewsItemProps) {
           />
         ) : (() => {
           const team = findTeam(n.source);
+          const pub = !team ? findPublisherLogo(n.source) : null;
           return (
-            <div className="h-20 w-20 sm:h-24 sm:w-24 shrink-0 rounded-xl bg-surface-2 flex items-center justify-center">
+            <div className="h-20 w-20 sm:h-24 sm:w-24 shrink-0 rounded-xl bg-surface-2 flex items-center justify-center p-2">
               {team ? (
                 <TeamLogo themeKey={team.themeKey} name={team.nickname} size={64} />
+              ) : pub ? (
+                <img src={pub.src} alt={pub.alt} className="max-h-full max-w-full object-contain" loading="lazy" />
               ) : (
                 <span className="text-accent font-black text-xl">{n.source.charAt(0)}</span>
               )}

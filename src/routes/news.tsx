@@ -10,7 +10,7 @@ import { TeamLogo } from "@/components/TeamLogo";
 // Publisher logos for known sources (matched case-insensitively, substring).
 const PUBLISHER_LOGOS: { match: RegExp; src: string; alt: string }[] = [
   { match: /nrl\.com|^nrl$/i, src: "https://www.nrl.com/.theme/nrl/logo.svg", alt: "NRL" },
-  { match: /sydney morning herald|smh/i, src: "https://www.smh.com.au/favicon.ico", alt: "Sydney Morning Herald" },
+  { match: /sydney morning herald|smh/i, src: "https://www.google.com/s2/favicons?domain=smh.com.au&sz=128", alt: "Sydney Morning Herald" },
 ];
 
 function findPublisherLogo(source: string) {

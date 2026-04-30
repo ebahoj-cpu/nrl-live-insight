@@ -14,7 +14,7 @@ const NAV_ITEMS = [
   { to: "/", label: "Fixtures", icon: Swords, exact: true },
   { to: "/ladder", label: "Ladder", icon: ListOrdered, exact: false },
   { to: "/news", label: "News", icon: Newspaper, exact: false },
-  { to: "/scout", label: "Scout", icon: Newspaper /* unused */, exact: false },
+  { to: "/scout", label: "Scout", icon: Swords /* unused — rendered as avatar image */, exact: false },
 ] as const;
 
 function NotFoundComponent() {

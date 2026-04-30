@@ -339,6 +339,9 @@ export const scoutChat = createServerFn({ method: "POST" })
       CTX_TTL,
       buildScoutContext,
     ).catch((e) => { console.error("[scout] context build failed:", e); return "(official NRL snapshot unavailable)"; });
+    if (context.includes("official NRL snapshot unavailable") || !context.includes("## GROUND TRUTH")) {
+      throw new Error("Scout can't verify the latest official fixtures right now — try again shortly.");
+    }
 
     const system = [
       "You are SCOUT — a sharp, friendly NRL betting analyst inside LINEBREAK. Sporty, confident, plain-spoken Aussie tone.",

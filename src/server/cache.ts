@@ -27,6 +27,37 @@ export function peekCache<T>(key: string): T | undefined {
   return undefined;
 }
 
+// Stale-while-revalidate: returns whatever is in the cache (even expired), and
+// kicks off a background refresh if expired. If nothing is cached at all,
+// awaits the fetch. Used for snappy UX where slightly stale > waiting.
+const inflight = new Map<string, Promise<unknown>>();
+export async function staleWhileRevalidate<T>(
+  key: string,
+  ttlMs: number,
+  fn: () => Promise<T>,
+  fallback?: T,
+): Promise<T> {
+  const now = Date.now();
+  const hit = store.get(key) as Entry<T> | undefined;
+  const refresh = () => {
+    if (inflight.has(key)) return inflight.get(key) as Promise<T>;
+    const p = fn()
+      .then((v) => { store.set(key, { v, exp: Date.now() + ttlMs }); return v; })
+      .finally(() => inflight.delete(key));
+    inflight.set(key, p);
+    return p;
+  };
+  if (hit) {
+    if (hit.exp <= now) { refresh().catch(() => {}); }
+    return hit.v;
+  }
+  if (fallback !== undefined) {
+    refresh().catch(() => {});
+    return fallback;
+  }
+  return refresh();
+}
+
 // Insights-specific TTL: long-lived once generated, short refresh window inside
 // the final hour before kickoff so late team / odds / weather changes can land.
 //   - >24h to kickoff:  cache 24h (rare — most viewers hit closer to game day)

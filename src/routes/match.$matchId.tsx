@@ -381,7 +381,7 @@ function LineupTab({ home, away, officials, teamNews }: { home: any; away: any; 
         <H2HPanel home={home} away={away} />
       ) : (
         <>
-          <SquadPanel team={team} />
+          <SquadPanel team={team} news={news} />
           <InjuryCard team={team} news={news} />
         </>
       )}

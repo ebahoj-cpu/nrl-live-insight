@@ -7,7 +7,7 @@
 // Heavy lifting is cached so chat turns stay snappy.
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { cached, TTL } from "./cache";
+import { cached, staleWhileRevalidate, TTL } from "./cache";
 import { fetchDraw, fetchLadder, fetchMatchDetails, type NrlMatchDetails } from "./nrl";
 import { buildEstimatedOdds, fetchNrlOdds, fetchTryscorerOdds, bestH2H, type OddsEvent } from "./odds";
 import { fetchNews, type NewsItem } from "./news";
@@ -15,6 +15,14 @@ import { getSeasonSnapshot, getTeam, type TeamSeasonStats } from "./season-stats
 import { findTeam } from "@/lib/teams";
 import { readAnySharedInsights } from "./insights-store";
 import type { Insights } from "./ai-insights";
+
+// Race a promise against a timeout, returning a fallback if it doesn't beat the clock.
+function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return new Promise((resolve) => {
+    const t = setTimeout(() => resolve(fallback), ms);
+    p.then((v) => { clearTimeout(t); resolve(v); }).catch(() => { clearTimeout(t); resolve(fallback); });
+  });
+}
 
 const Message = z.object({
   role: z.enum(["user", "assistant"]),
@@ -218,8 +226,13 @@ async function buildFixtureBrief(
   }
 
   // App Insights summary — mirrors what the user sees on the Insights tab so
-  // Scout's chat answers stay consistent with the on-app projections.
-  const insightsSummary = await summarizeStoredInsights(matchId, homeNick, awayNick).catch(() => "");
+  // Scout's chat answers stay consistent with the on-app projections. Capped at
+  // 2s so a slow DB round-trip can't stall the per-fixture brief.
+  const insightsSummary = await withTimeout(
+    summarizeStoredInsights(matchId, homeNick, awayNick).catch(() => ""),
+    2000,
+    "",
+  );
   if (insightsSummary) {
     lines.push(insightsSummary);
   }
@@ -227,43 +240,37 @@ async function buildFixtureBrief(
   return lines.join("\n");
 }
 
-async function buildScoutContext(): Promise<string> {
-  const season = NOW_SEASON();
-  const [fixtures, ladder, liveOdds, news, snap] = await Promise.all([
-    cached(`scout:fixtures:${season}:v2-official`, 60_000, () => fetchDraw(season)),
-    cached(`ladder:${season}`, TTL.ladder, () => fetchLadder(season)).catch(() => []),
-    cached(`odds:nrl`, TTL.odds, () => fetchNrlOdds()).catch(() => []),
-    cached("news:all", 15 * 60_000, () => fetchNews()).catch(() => [] as NewsItem[]),
-    getSeasonSnapshot(season).catch(() => null),
-  ]);
-  if (!fixtures.length) throw new Error("Official NRL fixtures unavailable");
-  const odds = liveOdds.length ? liveOdds : buildEstimatedOdds(fixtures, ladder);
-
-  // Lock to the CURRENT round (per NRL.com's isCurrentRound flag) so a live
-  // matchup never gets crowded out by future-round fixtures sneaking in by
-  // kickoff sort. Fall back to "next 8 chronological" only if NRL hasn't
-  // flagged a current round yet.
+// Shared block builder: takes the lightweight inputs (fixtures, ladder, odds,
+// news, season snapshot) and the per-fixture briefs (which may be empty on the
+// fast path) and produces the full SNAPSHOT string. Always includes the
+// authoritative GROUND-TRUTH fixtures + byes block so Scout's grounding rules
+// hold regardless of whether deep briefs are ready yet.
+function assembleSnapshot(args: {
+  season: number;
+  fixtures: Awaited<ReturnType<typeof fetchDraw>>;
+  ladder: Awaited<ReturnType<typeof fetchLadder>>;
+  odds: OddsEvent[];
+  news: NewsItem[];
+  snap: Awaited<ReturnType<typeof getSeasonSnapshot>> | null;
+  briefs: string[];
+  briefsAreDeep: boolean;
+}): string {
+  const { season, fixtures, ladder, odds, news, snap, briefs, briefsAreDeep } = args;
   const nowMs = Date.now();
   const notFinished = fixtures.filter((f) => !/full\s*time|fulltime/i.test(f.matchState));
   const currentRoundFixtures = notFinished.filter((f) => f.isCurrentRound);
   const currentRoundNum = currentRoundFixtures[0]?.roundNumber;
-  // Include all fixtures from the current round (so byes are obvious by absence)
-  // PLUS any from the next round if the current round is mostly done — gives Scout
-  // forward visibility without losing tonight's games.
   const fromCurrent = currentRoundNum != null
-    ? notFinished.filter((f) => f.roundNumber === currentRoundNum)
-    : [];
+    ? notFinished.filter((f) => f.roundNumber === currentRoundNum) : [];
   const fromNext = currentRoundNum != null
-    ? notFinished.filter((f) => f.roundNumber === currentRoundNum + 1)
-    : [];
+    ? notFinished.filter((f) => f.roundNumber === currentRoundNum + 1) : [];
   const pool = (fromCurrent.length ? [...fromCurrent, ...fromNext] : notFinished)
     .filter((f) => {
       const t = f.kickoffUtc ? Date.parse(f.kickoffUtc) : NaN;
       return isNaN(t) || t > nowMs - 4 * 3600_000;
     })
     .sort((a, b) => {
-      const ra = a.roundNumber || 0;
-      const rb = b.roundNumber || 0;
+      const ra = a.roundNumber || 0; const rb = b.roundNumber || 0;
       if (ra !== rb) return ra - rb;
       const ta = a.kickoffUtc ? Date.parse(a.kickoffUtc) : Number.MAX_SAFE_INTEGER;
       const tb = b.kickoffUtc ? Date.parse(b.kickoffUtc) : Number.MAX_SAFE_INTEGER;
@@ -271,56 +278,14 @@ async function buildScoutContext(): Promise<string> {
     });
   const upcoming = pool.slice(0, 10);
 
-  // Compute byes for the current round so Scout can answer "is X playing?" correctly.
   const playingTeamIds = new Set<number>();
   for (const f of fromCurrent) {
     playingTeamIds.add(f.homeTeam.teamId);
     playingTeamIds.add(f.awayTeam.teamId);
   }
   const byeNicknames = currentRoundNum != null
-    ? ladder
-        .filter((r) => !playingTeamIds.has(r.teamId))
-        .map((r) => r.nickname)
-    : [];
+    ? ladder.filter((r) => !playingTeamIds.has(r.teamId)).map((r) => r.nickname) : [];
 
-  // DEEP briefs in parallel — odds + season form + lineups + late mail + tryscorers + H2H.
-  // Each per-fixture deep fetch is cached (FIXTURE_TTL/TRYSCORER_TTL) so steady-state
-  // chat turns hit cache. Run concurrently with a soft cap; on the rare slow upstream,
-  // we still serve the snapshot via the SWR layer.
-  const briefs = await Promise.all(
-    upcoming.map((f) =>
-      buildFixtureBrief(f.matchId, f.homeTeam.nickName, f.awayTeam.nickName, odds)
-        .catch((e) => {
-          console.error(`[scout] brief failed for ${f.homeTeam.nickName} v ${f.awayTeam.nickName}:`, e);
-          const homeNick = f.homeTeam.nickName;
-          const awayNick = f.awayTeam.nickName;
-          const ev = matchOddsEvent(odds, homeNick, awayNick);
-          const lines: string[] = [`### ${homeNick} v ${awayNick}`];
-          if (f.venue) lines.push(`Venue: ${f.venue} · Round ${f.roundNumber ?? "?"}`);
-          if (ev) {
-            const h2h = bestH2H(ev);
-            const homeBest = (ev.homeNickname === homeNick) ? h2h.home : h2h.away;
-            const awayBest = (ev.homeNickname === homeNick) ? h2h.away : h2h.home;
-            if (homeBest && awayBest) {
-              lines.push(`H2H best: ${homeNick} ${homeBest.price} (${homeBest.book}) / ${awayNick} ${awayBest.price} (${awayBest.book})`);
-            }
-            const { line, total } = pickLineTotal(ev, ev.homeNickname, ev.awayNickname);
-            if (line) lines.push(`Line: ${line}`);
-            if (total) lines.push(`Total: ${total}`);
-          }
-          if (snap) {
-            const ht = getTeam(snap, homeNick);
-            const at = getTeam(snap, awayNick);
-            if (ht) lines.push(teamLine(ht, homeNick));
-            if (at) lines.push(teamLine(at, awayNick));
-          }
-          return lines.join("\n");
-        }),
-    ),
-  );
-
-  // GROUND-TRUTH fixtures table — explicit "who plays who" so Scout never
-  // pairs the wrong opponents based on ladder proximity or odds confusion.
   const fmtKickoff = (iso: string | undefined) => {
     if (!iso) return "TBD";
     const d = new Date(iso);
@@ -336,7 +301,6 @@ async function buildScoutContext(): Promise<string> {
       ).join("\n")
     : "(no upcoming fixtures found)";
 
-  // Per-team season profiles (one line each)
   const teamProfiles = snap
     ? ladder.slice(0, 17).map((r) => teamLine(getTeam(snap, r.nickname), r.nickname)).join("\n")
     : "(season stats unavailable)";
@@ -345,17 +309,51 @@ async function buildScoutContext(): Promise<string> {
     `${r.position}. ${r.nickname} — ${r.played}P ${r.wins}W ${r.losses}L, ${r.points}pts, diff ${r.diff}`,
   ).join("\n");
 
-  const newsLines = (news as NewsItem[]).slice(0, 15).map((n) =>
+  const newsLines = news.slice(0, 15).map((n) =>
     `- [${n.source}] ${n.title}${n.summary ? ` — ${n.summary.slice(0, 140)}` : ""}`,
   ).join("\n");
+
+  // If briefs aren't deep yet, render lightweight per-fixture lines from odds/season-form
+  // so Scout still has odds + form per matchup on the fast path.
+  const lightBriefs = upcoming.map((f) => {
+    const homeNick = f.homeTeam.nickName;
+    const awayNick = f.awayTeam.nickName;
+    const ev = matchOddsEvent(odds, homeNick, awayNick);
+    const out: string[] = [`### ${homeNick} v ${awayNick}`];
+    if (f.venue) out.push(`Venue: ${f.venue} · Round ${f.roundNumber ?? "?"}`);
+    if (ev) {
+      const h2h = bestH2H(ev);
+      const homeBest = (ev.homeNickname === homeNick) ? h2h.home : h2h.away;
+      const awayBest = (ev.homeNickname === homeNick) ? h2h.away : h2h.home;
+      if (homeBest && awayBest) {
+        out.push(`H2H best: ${homeNick} ${homeBest.price} (${homeBest.book}) / ${awayNick} ${awayBest.price} (${awayBest.book})`);
+      }
+      const { line, total } = pickLineTotal(ev, ev.homeNickname, ev.awayNickname);
+      if (line) out.push(`Line: ${line}`);
+      if (total) out.push(`Total: ${total}`);
+    }
+    if (snap) {
+      const ht = getTeam(snap, homeNick);
+      const at = getTeam(snap, awayNick);
+      if (ht) out.push(teamLine(ht, homeNick));
+      if (at) out.push(teamLine(at, awayNick));
+    }
+    return out.join("\n");
+  });
+  const briefsBlock = briefsAreDeep && briefs.length
+    ? briefs.join("\n\n")
+    : (lightBriefs.join("\n\n") || "(no upcoming fixtures found)");
 
   const roundLabel = currentRoundNum != null ? `Round ${currentRoundNum}` : "Current round";
   const byesLine = currentRoundNum != null
     ? (byeNicknames.length ? byeNicknames.join(", ") : "(none)")
     : "(round boundary unclear)";
+  const depthNote = briefsAreDeep
+    ? "(deep: lineups, late mail, app-insights, tryscorers)"
+    : "(quick: odds + season form only — deep briefs warming in background)";
 
   return [
-    `# NRL Snapshot · season ${season} · ${roundLabel} · generated ${new Date().toISOString()}`,
+    `# NRL Snapshot · season ${season} · ${roundLabel} · generated ${new Date().toISOString()} ${depthNote}`,
     "",
     `## GROUND TRUTH — ${roundLabel} Fixtures (authoritative who-plays-who)`,
     groundTruthFixtures,
@@ -368,12 +366,91 @@ async function buildScoutContext(): Promise<string> {
     "## Team season profiles",
     teamProfiles,
     "",
-    "## Upcoming fixtures (briefs — odds, season form per matchup)",
-    briefs.join("\n\n") || "(no upcoming fixtures found)",
+    "## Upcoming fixtures (briefs)",
+    briefsBlock,
     "",
     "## Recent news headlines",
     newsLines || "(none)",
   ].join("\n");
+}
+
+// Fast path: only the cheap data sources (fixtures + ladder + cached odds + news + season snapshot).
+// Returns the full SNAPSHOT with lightweight per-fixture lines. Always includes
+// GROUND-TRUTH fixtures + byes so chat answers stay correctly grounded even
+// when deep briefs aren't ready yet.
+async function buildFastContext(): Promise<string> {
+  const season = NOW_SEASON();
+  const [fixtures, ladder, liveOdds, news, snap] = await Promise.all([
+    cached(`scout:fixtures:${season}:v2-official`, 60_000, () => fetchDraw(season)),
+    cached(`ladder:${season}`, TTL.ladder, () => fetchLadder(season)).catch(() => []),
+    cached(`odds:nrl`, TTL.odds, () => fetchNrlOdds()).catch(() => [] as OddsEvent[]),
+    cached("news:all", 15 * 60_000, () => fetchNews()).catch(() => [] as NewsItem[]),
+    getSeasonSnapshot(season).catch(() => null),
+  ]);
+  if (!fixtures.length) throw new Error("Official NRL fixtures unavailable");
+  const odds = liveOdds.length ? liveOdds : buildEstimatedOdds(fixtures, ladder);
+  return assembleSnapshot({ season, fixtures, ladder, odds, news, snap, briefs: [], briefsAreDeep: false });
+}
+
+// Deep path: fast context + per-fixture deep briefs (lineups, late mail,
+// tryscorers, H2H, app-insights). Concurrency-capped + per-fixture timeout so
+// one slow upstream can't stall the whole snapshot.
+async function buildDeepContext(): Promise<string> {
+  const season = NOW_SEASON();
+  const [fixtures, ladder, liveOdds, news, snap] = await Promise.all([
+    cached(`scout:fixtures:${season}:v2-official`, 60_000, () => fetchDraw(season)),
+    cached(`ladder:${season}`, TTL.ladder, () => fetchLadder(season)).catch(() => []),
+    cached(`odds:nrl`, TTL.odds, () => fetchNrlOdds()).catch(() => [] as OddsEvent[]),
+    cached("news:all", 15 * 60_000, () => fetchNews()).catch(() => [] as NewsItem[]),
+    getSeasonSnapshot(season).catch(() => null),
+  ]);
+  if (!fixtures.length) throw new Error("Official NRL fixtures unavailable");
+  const odds = liveOdds.length ? liveOdds : buildEstimatedOdds(fixtures, ladder);
+
+  // Re-derive the same upcoming list assembleSnapshot uses so deep briefs line up.
+  const nowMs = Date.now();
+  const notFinished = fixtures.filter((f) => !/full\s*time|fulltime/i.test(f.matchState));
+  const currentRoundFixtures = notFinished.filter((f) => f.isCurrentRound);
+  const currentRoundNum = currentRoundFixtures[0]?.roundNumber;
+  const fromCurrent = currentRoundNum != null
+    ? notFinished.filter((f) => f.roundNumber === currentRoundNum) : [];
+  const fromNext = currentRoundNum != null
+    ? notFinished.filter((f) => f.roundNumber === currentRoundNum + 1) : [];
+  const pool = (fromCurrent.length ? [...fromCurrent, ...fromNext] : notFinished)
+    .filter((f) => {
+      const t = f.kickoffUtc ? Date.parse(f.kickoffUtc) : NaN;
+      return isNaN(t) || t > nowMs - 4 * 3600_000;
+    })
+    .sort((a, b) => {
+      const ra = a.roundNumber || 0; const rb = b.roundNumber || 0;
+      if (ra !== rb) return ra - rb;
+      const ta = a.kickoffUtc ? Date.parse(a.kickoffUtc) : Number.MAX_SAFE_INTEGER;
+      const tb = b.kickoffUtc ? Date.parse(b.kickoffUtc) : Number.MAX_SAFE_INTEGER;
+      return ta - tb;
+    });
+  const upcoming = pool.slice(0, 10);
+
+  // Concurrency-cap deep briefs — NRL.com rate-limits when hammered with 10 in
+  // parallel and any one slow request stalls the whole Promise.all. 4 in flight
+  // at a time + 8s per-fixture timeout keeps the worst case bounded at ~20s.
+  const CONCURRENCY = 4;
+  const briefs: string[] = new Array(upcoming.length);
+  let cursor = 0;
+  async function worker() {
+    while (true) {
+      const i = cursor++;
+      if (i >= upcoming.length) return;
+      const f = upcoming[i];
+      briefs[i] = await withTimeout(
+        buildFixtureBrief(f.matchId, f.homeTeam.nickName, f.awayTeam.nickName, odds),
+        8000,
+        `### ${f.homeTeam.nickName} v ${f.awayTeam.nickName}\n(deep brief still loading)`,
+      );
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, upcoming.length) }, worker));
+
+  return assembleSnapshot({ season, fixtures, ladder, odds, news, snap, briefs, briefsAreDeep: true });
 }
 
 export const scoutChat = createServerFn({ method: "POST" })
@@ -383,15 +460,28 @@ export const scoutChat = createServerFn({ method: "POST" })
     const key = process.env.LOVABLE_API_KEY;
     if (!key) throw new Error("LOVABLE_API_KEY not configured");
 
-    // Correctness beats speed here: Scout must never answer from a ladder-only
-    // fallback, because that caused false bye / matchup calls. Build the full
-    // official fixture snapshot on cold cache, then reuse it briefly.
-    const context = await cached(
-      "scout:context:v11-lineups-insights",
-      CTX_TTL,
-      buildScoutContext,
-    ).catch((e) => { console.error("[scout] context build failed:", e); return "(official NRL snapshot unavailable)"; });
-    if (context.includes("official NRL snapshot unavailable") || !context.includes("## GROUND TRUTH")) {
+    // Two-tier context for snappy first reply + accurate steady-state:
+    //   • DEEP context (lineups, late mail, app-insights, tryscorers per fixture)
+    //     is built in the background and cached. Once warm, every reply uses it.
+    //   • FAST context (fixtures + ladder + odds + season form) is the fallback
+    //     for the very first cold-cache request so users don't wait 60-120s for
+    //     NRL.com round-trips. It STILL contains the authoritative GROUND TRUTH
+    //     fixtures + byes block, so all grounding rules still hold.
+    const DEEP_KEY = "scout:context:v12-fast-fallback";
+    let context: string;
+    try {
+      const fastFallback = await buildFastContext();
+      context = await staleWhileRevalidate<string>(
+        DEEP_KEY,
+        CTX_TTL,
+        buildDeepContext,
+        fastFallback,
+      );
+    } catch (e) {
+      console.error("[scout] context build failed:", e);
+      throw new Error("Scout can't verify the latest official fixtures right now — try again shortly.");
+    }
+    if (!context.includes("## GROUND TRUTH")) {
       throw new Error("Scout can't verify the latest official fixtures right now — try again shortly.");
     }
 

@@ -105,8 +105,12 @@ type NewsItemProps = {
   };
 };
 
+type PanelMode = "summary" | "impact";
+
 function NewsCard({ item: n }: NewsItemProps) {
-  const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState<PanelMode | null>(null);
+
+  const toggle = (next: PanelMode) => setMode((cur) => (cur === next ? null : next));
 
   return (
     <li>

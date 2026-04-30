@@ -203,35 +203,41 @@ async function buildScoutContext(): Promise<string> {
     })
     .slice(0, 6);
 
-  // Lightweight briefs: odds + season form only (no per-fixture match-details
-  // or tryscorer fetches in the hot path — those add 8+ network round-trips
-  // and were the main reason Scout responses felt slow). Deep briefs are
-  // built lazily by buildFixtureBrief if a future code path needs them.
-  const briefs = upcoming.map((f) => {
-    const homeNick = f.homeTeam.nickName;
-    const awayNick = f.awayTeam.nickName;
-    const ev = matchOddsEvent(odds, homeNick, awayNick);
-    const lines: string[] = [`### ${homeNick} v ${awayNick}`];
-    if (f.venue) lines.push(`Venue: ${f.venue} · Round ${f.roundNumber ?? "?"}`);
-    if (ev) {
-      const h2h = bestH2H(ev);
-      const homeBest = (ev.homeNickname === homeNick) ? h2h.home : h2h.away;
-      const awayBest = (ev.homeNickname === homeNick) ? h2h.away : h2h.home;
-      if (homeBest && awayBest) {
-        lines.push(`H2H best: ${homeNick} ${homeBest.price} (${homeBest.book}) / ${awayNick} ${awayBest.price} (${awayBest.book})`);
-      }
-      const { line, total } = pickLineTotal(ev, ev.homeNickname, ev.awayNickname);
-      if (line) lines.push(`Line: ${line}`);
-      if (total) lines.push(`Total: ${total}`);
-    }
-    if (snap) {
-      const ht = getTeam(snap, homeNick);
-      const at = getTeam(snap, awayNick);
-      if (ht) lines.push(teamLine(ht, homeNick));
-      if (at) lines.push(teamLine(at, awayNick));
-    }
-    return lines.join("\n");
-  });
+  // DEEP briefs in parallel — odds + season form + lineups + late mail + tryscorers + H2H.
+  // Each per-fixture deep fetch is cached (FIXTURE_TTL/TRYSCORER_TTL) so steady-state
+  // chat turns hit cache. Run concurrently with a soft cap; on the rare slow upstream,
+  // we still serve the snapshot via the SWR layer.
+  const briefs = await Promise.all(
+    upcoming.map((f) =>
+      buildFixtureBrief(f.matchId, f.homeTeam.nickName, f.awayTeam.nickName, odds)
+        .catch((e) => {
+          console.error(`[scout] brief failed for ${f.homeTeam.nickName} v ${f.awayTeam.nickName}:`, e);
+          const homeNick = f.homeTeam.nickName;
+          const awayNick = f.awayTeam.nickName;
+          const ev = matchOddsEvent(odds, homeNick, awayNick);
+          const lines: string[] = [`### ${homeNick} v ${awayNick}`];
+          if (f.venue) lines.push(`Venue: ${f.venue} · Round ${f.roundNumber ?? "?"}`);
+          if (ev) {
+            const h2h = bestH2H(ev);
+            const homeBest = (ev.homeNickname === homeNick) ? h2h.home : h2h.away;
+            const awayBest = (ev.homeNickname === homeNick) ? h2h.away : h2h.home;
+            if (homeBest && awayBest) {
+              lines.push(`H2H best: ${homeNick} ${homeBest.price} (${homeBest.book}) / ${awayNick} ${awayBest.price} (${awayBest.book})`);
+            }
+            const { line, total } = pickLineTotal(ev, ev.homeNickname, ev.awayNickname);
+            if (line) lines.push(`Line: ${line}`);
+            if (total) lines.push(`Total: ${total}`);
+          }
+          if (snap) {
+            const ht = getTeam(snap, homeNick);
+            const at = getTeam(snap, awayNick);
+            if (ht) lines.push(teamLine(ht, homeNick));
+            if (at) lines.push(teamLine(at, awayNick));
+          }
+          return lines.join("\n");
+        }),
+    ),
+  );
 
   // GROUND-TRUTH fixtures table — explicit "who plays who" so Scout never
   // pairs the wrong opponents based on ladder proximity or odds confusion.
@@ -306,7 +312,7 @@ export const scoutChat = createServerFn({ method: "POST" })
     // minimal snapshot now (just the ladder) and queue the full one.
     const fallback = await buildMinimalContext().catch(() => "(snapshot unavailable)");
     const context = await staleWhileRevalidate(
-      "scout:context:v7",
+      "scout:context:v8-deep",
       CTX_TTL,
       buildScoutContext,
       fallback,
@@ -324,16 +330,22 @@ export const scoutChat = createServerFn({ method: "POST" })
       "",
       "DATA YOU HAVE in SNAPSHOT below — never ask for it, never claim you lack it:",
       "• Authoritative round fixtures (home v away, venue, kickoff)",
-      "• Live ladder",
-      "• Live odds: H2H best, line/spread, totals across all bookies",
+      "• Live ladder with W-L, points, points-diff",
+      "• Live odds across multiple bookies: H2H best, line/spread, totals (O/U)",
+      "• Tryscorer markets per fixture (anytime + first-tryscorer favs) — if listed under a fixture, USE THEM",
+      "• Lineups / late mail per fixture (ins, outs, blurb) — if listed under a fixture, USE THEM",
       "• Season form per team: W-L-D, PPG for/against, HT-lead %, HT→W conversion %, last-5",
+      "• Per-fixture recent form (last-5 of each side) and head-to-head history",
       "• Recent news headlines",
       "",
+      "DATA RULES for missing fields:",
+      "• If a fixture brief says 'Tryscorer markets: not posted yet' → say markets aren't out yet for that game.",
+      "• If a fixture has no ins/outs lines → say lineups aren't released yet for that game.",
+      "• Otherwise NEVER claim you lack data that IS in SNAPSHOT. Read the relevant fixture block carefully before answering.",
+      "",
       "DATA YOU DO NOT HAVE — never invent:",
-      "• Late mail / ins-outs / tryscorer markets (not in this snapshot — say markets/lineups not yet posted if asked)",
-      "• Multi-season historical logs (current season only)",
+      "• Multi-season historical logs (current season only, plus the H2H history block when shown)",
       "• Play-by-play stats, possession %, completions",
-      "If a question needs missing data, give the sharpest read possible from what IS in SNAPSHOT — do not list what you lack.",
       "",
       "RESPONSE MODE — pick the right format:",
       "1) CONVERSATIONAL — default for chat, opinions, comparisons, who/what/why questions.",

@@ -13,6 +13,8 @@ import { buildEstimatedOdds, fetchNrlOdds, fetchTryscorerOdds, bestH2H, type Odd
 import { fetchNews, type NewsItem } from "./news";
 import { getSeasonSnapshot, getTeam, type TeamSeasonStats } from "./season-stats";
 import { findTeam } from "@/lib/teams";
+import { readAnySharedInsights } from "./insights-store";
+import type { Insights } from "./ai-insights";
 
 const Message = z.object({
   role: z.enum(["user", "assistant"]),

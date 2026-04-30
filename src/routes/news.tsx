@@ -68,14 +68,22 @@ function timeAgo(iso: string): string {
   return new Date(iso).toLocaleDateString();
 }
 
+const PAGE_SIZE = 10;
+
 function NewsFeed() {
   const items = useSuspenseQuery(newsQO()).data;
+  const [visible, setVisible] = useState(PAGE_SIZE);
+  const shown = items.slice(0, visible);
+  const remaining = items.length - visible;
+
   return (
     <div className="pt-8">
       <header className="mb-6">
         <div className="text-[11px] uppercase tracking-[0.25em] text-accent font-bold">Live Feed</div>
         <h1 className="font-display font-extrabold text-lg sm:text-xl tracking-tight mt-1">NRL News</h1>
-        <p className="text-xs text-muted-foreground mt-2">{items.length} stories · auto-refreshed</p>
+        <p className="text-xs text-muted-foreground mt-2">
+          Showing {shown.length} of {items.length} stories · auto-refreshed
+        </p>
       </header>
 
       {items.length === 0 ? (
@@ -83,11 +91,24 @@ function NewsFeed() {
           No news available right now.
         </div>
       ) : (
-        <ul className="space-y-3">
-          {items.map((n) => (
-            <NewsCard key={n.id} item={n} />
-          ))}
-        </ul>
+        <>
+          <ul className="space-y-3">
+            {shown.map((n) => (
+              <NewsCard key={n.id} item={n} />
+            ))}
+          </ul>
+          {remaining > 0 && (
+            <div className="mt-6 flex justify-center">
+              <button
+                type="button"
+                onClick={() => setVisible((v) => v + PAGE_SIZE)}
+                className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider px-4 py-2 rounded-full bg-accent/15 text-accent border border-accent/30 hover:bg-accent/25 transition"
+              >
+                Show {Math.min(PAGE_SIZE, remaining)} more
+              </button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

@@ -558,16 +558,54 @@ function InjuryCard({ team, news }: { team: { nickName: string }; news: TeamNews
     </li>
   );
 
+  const renderNewsOut = (o: NewsOut) => (
+    <li
+      key={`news-${o.playerName}`}
+      className="rounded-md bg-danger/10 ring-1 ring-danger/40 px-2 py-1.5"
+    >
+      <div className="flex items-center gap-2">
+        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-background text-danger">
+          <Newspaper className="h-3 w-3" />
+        </span>
+        <span className="flex-1 min-w-0 font-extrabold uppercase tracking-wide text-xs truncate">{o.playerName}</span>
+      </div>
+      <a
+        href={o.sourceUrl}
+        target="_blank"
+        rel="noreferrer"
+        className="mt-1 block text-[9px] uppercase tracking-wider text-danger/90 hover:text-danger hover:underline truncate"
+        title={o.sourceTitle}
+      >
+        Breaking · {o.source} ↗
+      </a>
+    </li>
+  );
+
+  const newsOuts = news?.newsOuts ?? [];
+  const hasAnyOuts = (news?.outs?.length ?? 0) > 0 || newsOuts.length > 0;
+
   return (
     <section className="card-surface p-4">
       <div className="flex items-center gap-2 mb-3">
         <AlertCircle className="h-4 w-4 text-accent shrink-0" />
         <h3 className="font-bold text-sm uppercase tracking-wider truncate">{team.nickName} · Ins & Outs</h3>
       </div>
-      {!news || (news.ins.length === 0 && news.outs.length === 0 && !news.blurb) ? (
+      {!news || (news.ins.length === 0 && !hasAnyOuts && !news.blurb) ? (
         <p className="text-xs text-muted-foreground">Late mail not yet published. Updates land Tuesday/Thursday on NRL.com.</p>
       ) : (
         <div className="space-y-3">
+          {newsOuts.length > 0 && (
+            <div className="rounded-md bg-danger/5 ring-1 ring-danger/30 p-2.5 space-y-1.5">
+              <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.2em] font-bold text-danger">
+                <Newspaper className="h-3 w-3" />
+                <span>Breaking news · ruled out</span>
+              </div>
+              <ul className="space-y-1">{newsOuts.map(renderNewsOut)}</ul>
+              <p className="text-[10px] text-muted-foreground leading-relaxed">
+                Sourced from headlines in the last 5 days. The official team list may not yet reflect this.
+              </p>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1.5">
               <div className="text-[10px] uppercase tracking-[0.2em] font-bold text-accent/80">Ins</div>
@@ -578,7 +616,7 @@ function InjuryCard({ team, news }: { team: { nickName: string }; news: TeamNews
               )}
             </div>
             <div className="space-y-1.5">
-              <div className="text-[10px] uppercase tracking-[0.2em] font-bold text-accent/80">Outs</div>
+              <div className="text-[10px] uppercase tracking-[0.2em] font-bold text-accent/80">Outs (official)</div>
               {news.outs.length === 0 ? (
                 <div className="text-xs text-muted-foreground">—</div>
               ) : (

@@ -1,6 +1,6 @@
 import {
   Outlet, Link, HeadContent, Scripts,
-  createRootRouteWithContext, useRouter,
+  createRootRouteWithContext,
 } from "@tanstack/react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import appCss from "../styles.css?url";

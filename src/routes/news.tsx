@@ -105,8 +105,12 @@ type NewsItemProps = {
   };
 };
 
+type PanelMode = "summary" | "impact";
+
 function NewsCard({ item: n }: NewsItemProps) {
-  const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState<PanelMode | null>(null);
+
+  const toggle = (next: PanelMode) => setMode((cur) => (cur === next ? null : next));
 
   return (
     <li>
@@ -163,23 +167,30 @@ function NewsCard({ item: n }: NewsItemProps) {
             </a>
             <button
               type="button"
-              onClick={() => setOpen((v) => !v)}
+              onClick={() => toggle("summary")}
               className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full bg-accent/15 text-accent border border-accent/30 hover:bg-accent/25 transition"
             >
-              <Sparkles className="h-3 w-3" /> {open ? "Hide" : "Article"} Summary
+              <Sparkles className="h-3 w-3" /> {mode === "summary" ? "Hide" : "Article"} Summary
+            </button>
+            <button
+              type="button"
+              onClick={() => toggle("impact")}
+              className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full bg-accent/15 text-accent border border-accent/30 hover:bg-accent/25 transition"
+            >
+              <TrendingUp className="h-3 w-3" /> {mode === "impact" ? "Hide" : "Impact on"} Insights
             </button>
           </div>
         </div>
       </div>
 
-      {open && (
-        <ArticleSummaryPanel url={n.link} title={n.title} source={n.source} />
+      {mode && (
+        <ArticleSummaryPanel url={n.link} title={n.title} source={n.source} mode={mode} />
       )}
     </li>
   );
 }
 
-function ArticleSummaryPanel({ url, title, source }: { url: string; title: string; source: string }) {
+function ArticleSummaryPanel({ url, title, source, mode }: { url: string; title: string; source: string; mode: PanelMode }) {
   const q = useQuery({
     queryKey: ["article-summary", url],
     queryFn: () => summariseArticle({ data: { url, title, source } }),
@@ -187,17 +198,21 @@ function ArticleSummaryPanel({ url, title, source }: { url: string; title: strin
     retry: 1,
   });
 
+  const heading = mode === "impact" ? "Impact on Insights" : "Article Summary";
+  const HeadingIcon = mode === "impact" ? TrendingUp : Sparkles;
+  const loadingText = mode === "impact" ? "Assessing betting impact…" : "Reading the article…";
+
   return (
     <div className="mt-2 ml-3 rounded-2xl border border-accent/30 bg-accent/5 p-4 animate-in fade-in slide-in-from-top-1">
       <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] font-bold text-accent mb-3">
-        <Sparkles className="h-3.5 w-3.5" />
-        Article Summary
+        <HeadingIcon className="h-3.5 w-3.5" />
+        {heading}
       </div>
 
       {q.isLoading && (
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          Reading the article…
+          {loadingText}
         </div>
       )}
 
@@ -207,7 +222,27 @@ function ArticleSummaryPanel({ url, title, source }: { url: string; title: strin
         </p>
       )}
 
-      {q.data && <SummaryBody data={q.data} />}
+      {q.data && (mode === "impact" ? <ImpactBody data={q.data} /> : <SummaryBody data={q.data} />)}
+    </div>
+  );
+}
+
+function ImpactBody({ data }: { data: ArticleSummary }) {
+  const dir = data.bettingImpact.direction;
+  const tone =
+    dir === "positive"
+      ? { Icon: TrendingUp, label: "Positive impact", className: "text-accent border-accent/40 bg-accent/15" }
+      : dir === "negative"
+        ? { Icon: TrendingDown, label: "Negative impact", className: "text-danger border-danger/40 bg-danger/10" }
+        : { Icon: Minus, label: "Neutral impact", className: "text-muted-foreground border-border bg-surface-2" };
+  const Icon = tone.Icon;
+  return (
+    <div className={`rounded-xl border p-3 ${tone.className}`}>
+      <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-black mb-1">
+        <Icon className="h-3.5 w-3.5" />
+        {tone.label} on Insights bets
+      </div>
+      <p className="text-xs leading-relaxed text-foreground/90">{data.bettingImpact.note}</p>
     </div>
   );
 }

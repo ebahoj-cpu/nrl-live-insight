@@ -187,21 +187,49 @@ async function buildScoutContext(): Promise<string> {
   ]);
   const odds = liveOdds.length ? liveOdds : buildEstimatedOdds(fixtures, ladder);
 
-  // Pick the next chronological 8 fixtures that haven't finished yet.
+  // Lock to the CURRENT round (per NRL.com's isCurrentRound flag) so a live
+  // matchup never gets crowded out by future-round fixtures sneaking in by
+  // kickoff sort. Fall back to "next 8 chronological" only if NRL hasn't
+  // flagged a current round yet.
   const nowMs = Date.now();
-  const upcoming = fixtures
-    .filter((f) => !/full\s*time|fulltime/i.test(f.matchState))
+  const notFinished = fixtures.filter((f) => !/full\s*time|fulltime/i.test(f.matchState));
+  const currentRoundFixtures = notFinished.filter((f) => f.isCurrentRound);
+  const currentRoundNum = currentRoundFixtures[0]?.roundNumber;
+  // Include all fixtures from the current round (so byes are obvious by absence)
+  // PLUS any from the next round if the current round is mostly done — gives Scout
+  // forward visibility without losing tonight's games.
+  const fromCurrent = currentRoundNum != null
+    ? notFinished.filter((f) => f.roundNumber === currentRoundNum)
+    : [];
+  const fromNext = currentRoundNum != null
+    ? notFinished.filter((f) => f.roundNumber === currentRoundNum + 1)
+    : [];
+  const pool = (fromCurrent.length ? [...fromCurrent, ...fromNext] : notFinished)
     .filter((f) => {
       const t = f.kickoffUtc ? Date.parse(f.kickoffUtc) : NaN;
-      // keep if kickoff unknown, in the future, or within last 4h (live)
       return isNaN(t) || t > nowMs - 4 * 3600_000;
     })
     .sort((a, b) => {
+      const ra = a.roundNumber || 0;
+      const rb = b.roundNumber || 0;
+      if (ra !== rb) return ra - rb;
       const ta = a.kickoffUtc ? Date.parse(a.kickoffUtc) : Number.MAX_SAFE_INTEGER;
       const tb = b.kickoffUtc ? Date.parse(b.kickoffUtc) : Number.MAX_SAFE_INTEGER;
       return ta - tb;
-    })
-    .slice(0, 6);
+    });
+  const upcoming = pool.slice(0, 10);
+
+  // Compute byes for the current round so Scout can answer "is X playing?" correctly.
+  const playingTeamIds = new Set<number>();
+  for (const f of fromCurrent) {
+    playingTeamIds.add(f.homeTeam.teamId);
+    playingTeamIds.add(f.awayTeam.teamId);
+  }
+  const byeNicknames = currentRoundNum != null
+    ? ladder
+        .filter((r) => !playingTeamIds.has(r.teamId))
+        .map((r) => r.nickname)
+    : [];
 
   // DEEP briefs in parallel — odds + season form + lineups + late mail + tryscorers + H2H.
   // Each per-fixture deep fetch is cached (FIXTURE_TTL/TRYSCORER_TTL) so steady-state

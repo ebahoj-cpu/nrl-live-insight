@@ -242,10 +242,12 @@ async function buildScoutContext(): Promise<string> {
 export const scoutChat = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => Input.parse(i))
   .handler(async ({ data }): Promise<{ reply: string }> => {
+    try {
     const key = process.env.LOVABLE_API_KEY;
     if (!key) throw new Error("LOVABLE_API_KEY not configured");
 
-    const context = await cached("scout:context:v5", CTX_TTL, buildScoutContext);
+    const context = await cached("scout:context:v5", CTX_TTL, buildScoutContext)
+      .catch((e) => { console.error("[scout] context build failed:", e); return "(snapshot unavailable)"; });
 
     const system = [
       "You are SCOUT — a sharp, friendly NRL betting analyst inside LINEBREAK. Sporty, confident, plain-spoken Aussie tone.",

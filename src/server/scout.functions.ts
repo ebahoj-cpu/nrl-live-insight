@@ -7,7 +7,7 @@
 // Heavy lifting is cached so chat turns stay snappy.
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { cached, TTL } from "./cache";
+import { cached, staleWhileRevalidate, TTL } from "./cache";
 import { fetchDraw, fetchLadder, fetchMatchDetails, type NrlMatchDetails } from "./nrl";
 import { buildEstimatedOdds, fetchNrlOdds, fetchTryscorerOdds, bestH2H, type OddsEvent } from "./odds";
 import { fetchNews, type NewsItem } from "./news";

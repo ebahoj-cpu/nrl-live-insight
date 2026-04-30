@@ -1377,8 +1377,8 @@ function PredictedScoreCard({ model, home, away }:
           <span className={`text-3xl sm:text-4xl font-black tabular-nums ${model.predictedAway > model.predictedHome ? "text-accent" : ""}`}>{model.predictedAway}</span>
         </div>
         <div className="flex flex-col items-center text-center min-w-0">
-          <TeamLogo themeKey={away.themeKey} name={away.nickName} size={36} />
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground mt-1 truncate w-full">{away.nickName}</div>
+          <TeamLogo themeKey={away.themeKey} name={away.nickName} size={64} />
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground mt-1.5 truncate w-full">{away.nickName}</div>
         </div>
       </div>
     </Card>

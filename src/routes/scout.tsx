@@ -71,9 +71,10 @@ function ScoutPage() {
 
   // Layout math: header is h-16 (64px), bottom nav ~92px (incl. fade + safe area).
   // We pin the page to the viewport between them; only the messages list scrolls.
+  // z-20 sits above root <Footer> / <main> so they don't bleed through.
   return (
     <div
-      className="fixed left-0 right-0 top-16 flex flex-col"
+      className="fixed left-0 right-0 top-16 z-20 flex flex-col bg-background"
       style={{ bottom: "calc(92px + env(safe-area-inset-bottom))" }}
     >
       {/* Static header bar */}

@@ -306,7 +306,7 @@ export const scoutChat = createServerFn({ method: "POST" })
     // minimal snapshot now (just the ladder) and queue the full one.
     const fallback = await buildMinimalContext().catch(() => "(snapshot unavailable)");
     const context = await staleWhileRevalidate(
-      "scout:context:v6",
+      "scout:context:v7",
       CTX_TTL,
       buildScoutContext,
       fallback,

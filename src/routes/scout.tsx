@@ -3,8 +3,13 @@ import { useMutation } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { Send, Loader2, RotateCw, AlertTriangle } from "lucide-react";
 import ReactMarkdown from "react-markdown";
+import { z } from "zod";
 import { scoutChat } from "@/server/scout.functions";
 import scoutAvatar from "@/assets/scout-avatar.png";
+
+const searchSchema = z.object({
+  q: z.string().max(2000).optional(),
+});
 
 type Msg = { role: "user" | "assistant"; content: string };
 

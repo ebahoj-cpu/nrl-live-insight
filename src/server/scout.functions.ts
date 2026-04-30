@@ -314,4 +314,8 @@ export const scoutChat = createServerFn({ method: "POST" })
     const reply = json?.choices?.[0]?.message?.content;
     if (!reply || typeof reply !== "string") throw new Error("Scout returned no reply");
     return { reply };
+    } catch (e) {
+      console.error("[scout] handler error:", e);
+      throw e instanceof Error ? e : new Error(String(e));
+    }
   });

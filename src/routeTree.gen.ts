@@ -15,6 +15,7 @@ import { Route as LadderRouteImport } from './routes/ladder'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as MatchMatchIdRouteImport } from './routes/match.$matchId'
 import { Route as ApiPublicManifestRouteImport } from './routes/api/public/manifest'
+import { Route as ApiPublicAppIconRouteImport } from './routes/api/public/app-icon'
 import { Route as ApiPublicHooksPrecomputeInsightsRouteImport } from './routes/api/public/hooks/precompute-insights'
 
 const ScoutRoute = ScoutRouteImport.update({
@@ -47,6 +48,11 @@ const ApiPublicManifestRoute = ApiPublicManifestRouteImport.update({
   path: '/api/public/manifest',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicAppIconRoute = ApiPublicAppIconRouteImport.update({
+  id: '/api/public/app-icon',
+  path: '/api/public/app-icon',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicHooksPrecomputeInsightsRoute =
   ApiPublicHooksPrecomputeInsightsRouteImport.update({
     id: '/api/public/hooks/precompute-insights',
@@ -60,6 +66,7 @@ export interface FileRoutesByFullPath {
   '/news': typeof NewsRoute
   '/scout': typeof ScoutRoute
   '/match/$matchId': typeof MatchMatchIdRoute
+  '/api/public/app-icon': typeof ApiPublicAppIconRoute
   '/api/public/manifest': typeof ApiPublicManifestRoute
   '/api/public/hooks/precompute-insights': typeof ApiPublicHooksPrecomputeInsightsRoute
 }
@@ -69,6 +76,7 @@ export interface FileRoutesByTo {
   '/news': typeof NewsRoute
   '/scout': typeof ScoutRoute
   '/match/$matchId': typeof MatchMatchIdRoute
+  '/api/public/app-icon': typeof ApiPublicAppIconRoute
   '/api/public/manifest': typeof ApiPublicManifestRoute
   '/api/public/hooks/precompute-insights': typeof ApiPublicHooksPrecomputeInsightsRoute
 }
@@ -79,6 +87,7 @@ export interface FileRoutesById {
   '/news': typeof NewsRoute
   '/scout': typeof ScoutRoute
   '/match/$matchId': typeof MatchMatchIdRoute
+  '/api/public/app-icon': typeof ApiPublicAppIconRoute
   '/api/public/manifest': typeof ApiPublicManifestRoute
   '/api/public/hooks/precompute-insights': typeof ApiPublicHooksPrecomputeInsightsRoute
 }
@@ -90,6 +99,7 @@ export interface FileRouteTypes {
     | '/news'
     | '/scout'
     | '/match/$matchId'
+    | '/api/public/app-icon'
     | '/api/public/manifest'
     | '/api/public/hooks/precompute-insights'
   fileRoutesByTo: FileRoutesByTo
@@ -99,6 +109,7 @@ export interface FileRouteTypes {
     | '/news'
     | '/scout'
     | '/match/$matchId'
+    | '/api/public/app-icon'
     | '/api/public/manifest'
     | '/api/public/hooks/precompute-insights'
   id:
@@ -108,6 +119,7 @@ export interface FileRouteTypes {
     | '/news'
     | '/scout'
     | '/match/$matchId'
+    | '/api/public/app-icon'
     | '/api/public/manifest'
     | '/api/public/hooks/precompute-insights'
   fileRoutesById: FileRoutesById
@@ -118,6 +130,7 @@ export interface RootRouteChildren {
   NewsRoute: typeof NewsRoute
   ScoutRoute: typeof ScoutRoute
   MatchMatchIdRoute: typeof MatchMatchIdRoute
+  ApiPublicAppIconRoute: typeof ApiPublicAppIconRoute
   ApiPublicManifestRoute: typeof ApiPublicManifestRoute
   ApiPublicHooksPrecomputeInsightsRoute: typeof ApiPublicHooksPrecomputeInsightsRoute
 }
@@ -166,6 +179,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicManifestRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/app-icon': {
+      id: '/api/public/app-icon'
+      path: '/api/public/app-icon'
+      fullPath: '/api/public/app-icon'
+      preLoaderRoute: typeof ApiPublicAppIconRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/precompute-insights': {
       id: '/api/public/hooks/precompute-insights'
       path: '/api/public/hooks/precompute-insights'
@@ -182,6 +202,7 @@ const rootRouteChildren: RootRouteChildren = {
   NewsRoute: NewsRoute,
   ScoutRoute: ScoutRoute,
   MatchMatchIdRoute: MatchMatchIdRoute,
+  ApiPublicAppIconRoute: ApiPublicAppIconRoute,
   ApiPublicManifestRoute: ApiPublicManifestRoute,
   ApiPublicHooksPrecomputeInsightsRoute: ApiPublicHooksPrecomputeInsightsRoute,
 }

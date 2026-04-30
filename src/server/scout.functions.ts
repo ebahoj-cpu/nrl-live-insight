@@ -179,12 +179,13 @@ async function buildFixtureBrief(
 async function buildScoutContext(): Promise<string> {
   const season = NOW_SEASON();
   const [fixtures, ladder, liveOdds, news, snap] = await Promise.all([
-    cached(`scout:fixtures:${season}:v2-official`, 60_000, () => fetchDraw(season)).catch(() => []),
+    cached(`scout:fixtures:${season}:v2-official`, 60_000, () => fetchDraw(season)),
     cached(`ladder:${season}`, TTL.ladder, () => fetchLadder(season)).catch(() => []),
     cached(`odds:nrl`, TTL.odds, () => fetchNrlOdds()).catch(() => []),
     cached("news:all", 15 * 60_000, () => fetchNews()).catch(() => [] as NewsItem[]),
     getSeasonSnapshot(season).catch(() => null),
   ]);
+  if (!fixtures.length) throw new Error("Official NRL fixtures unavailable");
   const odds = liveOdds.length ? liveOdds : buildEstimatedOdds(fixtures, ladder);
 
   // Lock to the CURRENT round (per NRL.com's isCurrentRound flag) so a live

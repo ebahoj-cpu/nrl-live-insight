@@ -7,6 +7,16 @@ import { ExternalLink, Sparkles, TrendingUp, TrendingDown, Minus, Loader2 } from
 import { findTeam } from "@/lib/teams";
 import { TeamLogo } from "@/components/TeamLogo";
 
+// Publisher logos for known sources (matched case-insensitively, substring).
+const PUBLISHER_LOGOS: { match: RegExp; src: string; alt: string }[] = [
+  { match: /nrl\.com|^nrl$/i, src: "https://www.nrl.com/.theme/nrl/logo.svg", alt: "NRL" },
+  { match: /sydney morning herald|smh/i, src: "https://www.smh.com.au/favicon.ico", alt: "Sydney Morning Herald" },
+];
+
+function findPublisherLogo(source: string) {
+  return PUBLISHER_LOGOS.find((p) => p.match.test(source)) ?? null;
+}
+
 const newsQO = () => queryOptions({
   queryKey: ["news"],
   queryFn: () => getNews({ data: {} }),

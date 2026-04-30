@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import appCss from "../styles.css?url";
 import { Download, Menu, X, Calendar, BarChart3, Newspaper, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
+import scoutAvatar from "@/assets/scout-avatar.png";
 
 interface RouterContext { queryClient: QueryClient }
 

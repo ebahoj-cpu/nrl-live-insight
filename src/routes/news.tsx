@@ -167,17 +167,24 @@ function NewsCard({ item: n }: NewsItemProps) {
             </a>
             <button
               type="button"
-              onClick={() => setOpen((v) => !v)}
+              onClick={() => toggle("summary")}
               className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full bg-accent/15 text-accent border border-accent/30 hover:bg-accent/25 transition"
             >
-              <Sparkles className="h-3 w-3" /> {open ? "Hide" : "Article"} Summary
+              <Sparkles className="h-3 w-3" /> {mode === "summary" ? "Hide" : "Article"} Summary
+            </button>
+            <button
+              type="button"
+              onClick={() => toggle("impact")}
+              className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full bg-accent/15 text-accent border border-accent/30 hover:bg-accent/25 transition"
+            >
+              <TrendingUp className="h-3 w-3" /> {mode === "impact" ? "Hide" : "Impact on"} Insights
             </button>
           </div>
         </div>
       </div>
 
-      {open && (
-        <ArticleSummaryPanel url={n.link} title={n.title} source={n.source} />
+      {mode && (
+        <ArticleSummaryPanel url={n.link} title={n.title} source={n.source} mode={mode} />
       )}
     </li>
   );

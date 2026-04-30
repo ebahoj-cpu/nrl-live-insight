@@ -280,8 +280,8 @@ function BottomNav() {
                         />
                       </span>
                     ) : (
-                      <span className={`inline-flex h-9 w-14 items-center justify-center rounded-full transition ${isActive ? "bg-accent text-accent-foreground shadow-lg shadow-accent/30 scale-105" : "text-muted-foreground group-hover:text-foreground group-hover:bg-surface-2"}`}>
-                        <Icon className="h-5 w-5" strokeWidth={isActive ? 2.5 : 2} />
+                      <span className={`inline-flex h-11 w-14 items-center justify-center rounded-full transition ${isActive ? "bg-accent text-accent-foreground shadow-lg shadow-accent/30 scale-105" : "text-muted-foreground group-hover:text-foreground group-hover:bg-surface-2"}`}>
+                        <Icon className="h-6 w-6" strokeWidth={isActive ? 2.5 : 2} />
                       </span>
                     )}
                     <span className={`text-[10px] font-extrabold uppercase tracking-wider transition ${isActive ? "text-accent" : "text-muted-foreground group-hover:text-foreground"}`}>

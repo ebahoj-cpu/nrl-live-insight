@@ -155,7 +155,7 @@ function ScoutPage() {
               }}
               placeholder="Message Scout…"
               rows={1}
-              className="flex-1 resize-none bg-transparent outline-none text-sm placeholder:text-muted-foreground max-h-32 py-1"
+              className="font-chat flex-1 resize-none bg-transparent outline-none text-[15px] font-medium placeholder:text-muted-foreground placeholder:font-normal max-h-32 py-1"
             />
             <button
               type="submit"
@@ -180,7 +180,7 @@ function Bubble({ msg }: { msg: Msg }) {
     return (
       <div className="flex justify-end">
         <div
-          className="max-w-[80%] rounded-2xl rounded-br-md bg-white text-neutral-950 px-3.5 py-2 text-[13.5px] leading-snug font-medium shadow-md whitespace-pre-wrap tracking-tight"
+          className="font-chat max-w-[80%] rounded-2xl rounded-br-md bg-white text-neutral-950 px-3.5 py-2 text-[15px] leading-snug font-semibold shadow-md whitespace-pre-wrap tracking-tight"
           style={{ fontFeatureSettings: '"tnum" 1, "ss01" 1' }}
         >
           {msg.content}
@@ -194,7 +194,7 @@ function Bubble({ msg }: { msg: Msg }) {
         <img src={scoutAvatar} alt="Scout" width={32} height={32} className="h-full w-full object-cover" />
       </span>
       <div
-        className="scout-bubble max-w-[82%] rounded-2xl rounded-bl-md bg-accent text-accent-foreground px-3.5 py-2.5 text-[13.5px] shadow-md shadow-accent/30"
+        className="scout-bubble font-chat max-w-[82%] rounded-2xl rounded-bl-md bg-accent text-accent-foreground px-3.5 py-2.5 text-[15px] font-medium shadow-md shadow-accent/30"
         style={{ fontFeatureSettings: '"tnum" 1, "ss01" 1, "cv11" 1' }}
       >
         <ReactMarkdown
@@ -205,18 +205,18 @@ function Bubble({ msg }: { msg: Msg }) {
             li: ({ node, children, ...props }) => (
               <li
                 {...props}
-                className="relative pl-4 leading-[1.45] tracking-tight before:content-[''] before:absolute before:left-0 before:top-[0.6em] before:h-1.5 before:w-1.5 before:rounded-sm before:bg-accent-foreground/80"
+                className="relative pl-4 leading-[1.45] tracking-tight before:content-[''] before:absolute before:left-0 before:top-[0.65em] before:h-1.5 before:w-1.5 before:rounded-sm before:bg-accent-foreground/80"
               >
                 {children}
               </li>
             ),
             strong: ({ node, ...props }) => (
-              <strong {...props} className="font-bold text-accent-foreground" />
+              <strong {...props} className="font-extrabold uppercase tracking-wide text-accent-foreground" style={{ fontFamily: 'var(--font-chat-display)' }} />
             ),
             code: ({ node, ...props }) => (
               <code
                 {...props}
-                className="font-mono text-[12.5px] font-semibold text-accent-foreground bg-accent-foreground/15 border border-accent-foreground/30 rounded px-1.5 py-0.5 mx-0.5 tabular-nums"
+                className="font-mono text-[13px] font-bold text-accent-foreground bg-accent-foreground/15 border border-accent-foreground/30 rounded px-1.5 py-0.5 mx-0.5 tabular-nums"
               />
             ),
             p: ({ node, ...props }) => (

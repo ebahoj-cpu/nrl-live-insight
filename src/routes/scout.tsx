@@ -98,12 +98,13 @@ function ScoutPage() {
       <div className="shrink-0 border-b border-border bg-background/80 backdrop-blur-xl">
         <div className="mx-auto max-w-6xl px-4 sm:px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="relative">
-              <span className="absolute inset-0 rounded-full bg-accent/30 blur-md animate-pulse" />
-              <span className="relative inline-flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-accent to-accent/60 ring-2 ring-accent/40 overflow-hidden shadow-lg shadow-accent/30">
-                <img src={scoutAvatar} alt="Scout" width={44} height={44} className="h-full w-full object-cover" />
-              </span>
-            </div>
+            <img
+              src={scoutAvatar}
+              alt="Scout"
+              width={64}
+              height={64}
+              className="h-16 w-16 object-contain drop-shadow-[0_0_10px_var(--accent)]"
+            />
             <div>
               <div className="text-[10px] uppercase tracking-[0.2em] text-accent font-bold">AI Assistant</div>
               <h1 className="text-xl font-display font-extrabold tracking-tight leading-tight">Scout</h1>

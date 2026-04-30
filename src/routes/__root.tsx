@@ -2,9 +2,9 @@ import {
   Outlet, Link, HeadContent, Scripts,
   createRootRouteWithContext, useRouter,
 } from "@tanstack/react-router";
-import { QueryClient, QueryClientProvider, useIsFetching } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import appCss from "../styles.css?url";
-import { RotateCw, Menu, X, Calendar, BarChart3, Newspaper, Sparkles } from "lucide-react";
+import { Download, Menu, X, Calendar, BarChart3, Newspaper, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 
 interface RouterContext { queryClient: QueryClient }

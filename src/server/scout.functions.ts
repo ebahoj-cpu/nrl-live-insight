@@ -233,6 +233,23 @@ async function buildScoutContext(): Promise<string> {
     return lines.join("\n");
   });
 
+  // GROUND-TRUTH fixtures table — explicit "who plays who" so Scout never
+  // pairs the wrong opponents based on ladder proximity or odds confusion.
+  const fmtKickoff = (iso: string | undefined) => {
+    if (!iso) return "TBD";
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return "TBD";
+    return d.toLocaleString("en-AU", {
+      weekday: "short", day: "2-digit", month: "short",
+      hour: "2-digit", minute: "2-digit", timeZone: "Australia/Sydney",
+    }) + " AEST";
+  };
+  const groundTruthFixtures = upcoming.length
+    ? upcoming.map((f) =>
+        `- Round ${f.roundNumber ?? "?"}: **${f.homeTeam.nickName} v ${f.awayTeam.nickName}** — ${f.venue ?? "venue TBD"} · ${fmtKickoff(f.kickoffUtc)}`,
+      ).join("\n")
+    : "(no upcoming fixtures found)";
+
   // Per-team season profiles (one line each)
   const teamProfiles = snap
     ? ladder.slice(0, 17).map((r) => teamLine(getTeam(snap, r.nickname), r.nickname)).join("\n")
@@ -249,13 +266,16 @@ async function buildScoutContext(): Promise<string> {
   return [
     `# NRL Snapshot · season ${season} · generated ${new Date().toISOString()}`,
     "",
+    "## GROUND TRUTH — Current Round Fixtures (authoritative who-plays-who)",
+    groundTruthFixtures,
+    "",
     "## Ladder",
     ladderLines || "(unavailable)",
     "",
     "## Team season profiles",
     teamProfiles,
     "",
-    "## Upcoming fixtures (deep briefs — odds, lineups, H2H, tryscorer markets)",
+    "## Upcoming fixtures (briefs — odds, season form per matchup)",
     briefs.join("\n\n") || "(no upcoming fixtures found)",
     "",
     "## Recent news headlines",
@@ -286,7 +306,7 @@ export const scoutChat = createServerFn({ method: "POST" })
     // minimal snapshot now (just the ladder) and queue the full one.
     const fallback = await buildMinimalContext().catch(() => "(snapshot unavailable)");
     const context = await staleWhileRevalidate(
-      "scout:context:v6",
+      "scout:context:v7",
       CTX_TTL,
       buildScoutContext,
       fallback,
@@ -295,8 +315,16 @@ export const scoutChat = createServerFn({ method: "POST" })
     const system = [
       "You are SCOUT — a sharp, friendly NRL betting analyst inside LINEBREAK. Sporty, confident, plain-spoken Aussie tone.",
       "",
+      "GROUND TRUTH PROTOCOL — read this BEFORE every reply:",
+      "• The 'GROUND TRUTH — Current Round Fixtures' block is the ONLY authoritative source for who plays who this round.",
+      "• Before naming any matchup, cross-reference it against that fixtures list. Never infer an opponent from ladder proximity, odds order, or memory.",
+      "• If a user mentions a matchup that isn't in the fixtures list (e.g. 'Knights v Dolphins' when it's actually 'Storm v Dolphins'), correct them politely and use the real fixture.",
+      "• When recommending a pick, name BOTH teams in the matchup so it's unambiguous (e.g. 'Broncos H2H @2.15 vs Cowboys' — never just 'Broncos H2H').",
+      "• If a team isn't playing this round per the fixtures list, do NOT include them in picks/recommendations.",
+      "",
       "DATA YOU HAVE in SNAPSHOT below — never ask for it, never claim you lack it:",
-      "• Live ladder, fixtures with venue/round, kickoff times",
+      "• Authoritative round fixtures (home v away, venue, kickoff)",
+      "• Live ladder",
       "• Live odds: H2H best, line/spread, totals across all bookies",
       "• Season form per team: W-L-D, PPG for/against, HT-lead %, HT→W conversion %, last-5",
       "• Recent news headlines",
@@ -311,10 +339,11 @@ export const scoutChat = createServerFn({ method: "POST" })
       "1) CONVERSATIONAL — default for chat, opinions, comparisons, who/what/why questions.",
       "   • Natural prose, 1–4 short paragraphs. No bullets. **Bold** key names sparingly.",
       "2) INSIGHTS — only when user asks for picks, bets, value, edges, tips.",
-      "   • 5–8 markdown bullets, no intro/outro. Format: `- **PICK** \\`@PRICE\\` — sharp reason (≤14 words)`",
+      "   • 5–8 markdown bullets, no intro/outro. Format: `- **TEAM market** \\`@PRICE\\` vs OPPONENT — sharp reason (≤14 words)`",
       "",
       "DATA RULES:",
-      "• Quote exact prices/lines from SNAPSHOT only. Never invent prices or players.",
+      "• Quote exact prices/lines from SNAPSHOT only. Never invent prices, players, or matchups.",
+      "• Every pick must reference a matchup that exists in the GROUND TRUTH fixtures list.",
       "• No disclaimers, no 'bet responsibly' (UI handles that).",
       "",
       "=== SNAPSHOT ===",

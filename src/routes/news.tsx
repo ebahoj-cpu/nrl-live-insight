@@ -4,6 +4,8 @@ import { Suspense, useState } from "react";
 import { getNews } from "@/server/news.functions";
 import { summariseArticle, type ArticleSummary } from "@/server/news-summary.functions";
 import { ExternalLink, Sparkles, TrendingUp, TrendingDown, Minus, Loader2 } from "lucide-react";
+import { findTeam } from "@/lib/teams";
+import { TeamLogo } from "@/components/TeamLogo";
 
 const newsQO = () => queryOptions({
   queryKey: ["news"],
@@ -107,11 +109,18 @@ function NewsCard({ item: n }: NewsItemProps) {
             className="h-20 w-20 sm:h-24 sm:w-24 shrink-0 rounded-xl object-cover bg-surface-2"
             onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
           />
-        ) : (
-          <div className="h-20 w-20 sm:h-24 sm:w-24 shrink-0 rounded-xl bg-surface-2 flex items-center justify-center text-accent font-black text-xl">
-            {n.source.charAt(0)}
-          </div>
-        )}
+        ) : (() => {
+          const team = findTeam(n.source);
+          return (
+            <div className="h-20 w-20 sm:h-24 sm:w-24 shrink-0 rounded-xl bg-surface-2 flex items-center justify-center">
+              {team ? (
+                <TeamLogo themeKey={team.themeKey} name={team.nickname} size={64} />
+              ) : (
+                <span className="text-accent font-black text-xl">{n.source.charAt(0)}</span>
+              )}
+            </div>
+          );
+        })()}
         <div className="flex-1 min-w-0 flex flex-col">
           <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider font-bold text-accent">
             <span>{n.source}</span>

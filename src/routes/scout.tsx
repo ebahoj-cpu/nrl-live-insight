@@ -59,6 +59,7 @@ function ScoutPage() {
     const next: Msg[] = [...messages, { role: "user", content: trimmed }];
     setMessages(next);
     setInput("");
+    if (inputRef.current) inputRef.current.style.height = "";
     const forApi = next.filter((m, i) => !(i === 0 && m === GREETING));
     mutation.mutate(forApi);
   };

@@ -180,7 +180,7 @@ function Bubble({ msg }: { msg: Msg }) {
     return (
       <div className="flex justify-end">
         <div
-          className="max-w-[80%] rounded-2xl rounded-br-md bg-white text-neutral-950 px-3.5 py-2 text-[13.5px] leading-snug font-medium shadow-md whitespace-pre-wrap tracking-tight"
+          className="font-chat max-w-[80%] rounded-2xl rounded-br-md bg-white text-neutral-950 px-3.5 py-2 text-[15px] leading-snug font-semibold shadow-md whitespace-pre-wrap tracking-tight"
           style={{ fontFeatureSettings: '"tnum" 1, "ss01" 1' }}
         >
           {msg.content}

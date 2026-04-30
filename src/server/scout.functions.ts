@@ -387,7 +387,7 @@ export const scoutChat = createServerFn({ method: "POST" })
     // fallback, because that caused false bye / matchup calls. Build the full
     // official fixture snapshot on cold cache, then reuse it briefly.
     const context = await cached(
-      "scout:context:v10-authoritative-fixtures",
+      "scout:context:v11-lineups-insights",
       CTX_TTL,
       buildScoutContext,
     ).catch((e) => { console.error("[scout] context build failed:", e); return "(official NRL snapshot unavailable)"; });

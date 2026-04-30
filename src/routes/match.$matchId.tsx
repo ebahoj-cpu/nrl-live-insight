@@ -9,7 +9,7 @@ import {
   ArrowLeft, Clock, MapPin, Users, BarChart3, Sparkles,
   Trophy, Target, Flag, Crown, TrendingUp, AlertCircle, CloudSun, Calendar, Zap, Hourglass,
   ThumbsUp, ThumbsDown, Activity, Shield, Compass, Gauge, Check,
-  Receipt, X,
+  Receipt, X, Newspaper,
 } from "lucide-react";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -318,7 +318,8 @@ const POSITION_ORDER = [
   "Interchange","Reserve",
 ];
 
-type TeamNews = { ins: string[]; outs: string[]; blurb: string; sourceUrl: string } | null;
+type NewsOut = { playerName: string; reason: string; sourceUrl: string; sourceTitle: string; source: string; publishedUtc: string };
+type TeamNews = { ins: string[]; outs: string[]; blurb: string; sourceUrl: string; newsOuts?: NewsOut[] } | null;
 
 function LineupTab({ home, away, officials, teamNews }: { home: any; away: any; officials: { position: string; firstName: string; lastName: string; headImage?: string }[]; teamNews?: { home: TeamNews; away: TeamNews } }) {
   const [side, setSide] = useState<"home" | "away" | "h2h">("home");
@@ -380,7 +381,7 @@ function LineupTab({ home, away, officials, teamNews }: { home: any; away: any; 
         <H2HPanel home={home} away={away} />
       ) : (
         <>
-          <SquadPanel team={team} />
+          <SquadPanel team={team} news={news} />
           <InjuryCard team={team} news={news} />
         </>
       )}
@@ -557,16 +558,54 @@ function InjuryCard({ team, news }: { team: { nickName: string }; news: TeamNews
     </li>
   );
 
+  const renderNewsOut = (o: NewsOut) => (
+    <li
+      key={`news-${o.playerName}`}
+      className="rounded-md bg-danger/10 ring-1 ring-danger/40 px-2 py-1.5"
+    >
+      <div className="flex items-center gap-2">
+        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-background text-danger">
+          <Newspaper className="h-3 w-3" />
+        </span>
+        <span className="flex-1 min-w-0 font-extrabold uppercase tracking-wide text-xs truncate">{o.playerName}</span>
+      </div>
+      <a
+        href={o.sourceUrl}
+        target="_blank"
+        rel="noreferrer"
+        className="mt-1 block text-[9px] uppercase tracking-wider text-danger/90 hover:text-danger hover:underline truncate"
+        title={o.sourceTitle}
+      >
+        Breaking · {o.source} ↗
+      </a>
+    </li>
+  );
+
+  const newsOuts = news?.newsOuts ?? [];
+  const hasAnyOuts = (news?.outs?.length ?? 0) > 0 || newsOuts.length > 0;
+
   return (
     <section className="card-surface p-4">
       <div className="flex items-center gap-2 mb-3">
         <AlertCircle className="h-4 w-4 text-accent shrink-0" />
         <h3 className="font-bold text-sm uppercase tracking-wider truncate">{team.nickName} · Ins & Outs</h3>
       </div>
-      {!news || (news.ins.length === 0 && news.outs.length === 0 && !news.blurb) ? (
+      {!news || (news.ins.length === 0 && !hasAnyOuts && !news.blurb) ? (
         <p className="text-xs text-muted-foreground">Late mail not yet published. Updates land Tuesday/Thursday on NRL.com.</p>
       ) : (
         <div className="space-y-3">
+          {newsOuts.length > 0 && (
+            <div className="rounded-md bg-danger/5 ring-1 ring-danger/30 p-2.5 space-y-1.5">
+              <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.2em] font-bold text-danger">
+                <Newspaper className="h-3 w-3" />
+                <span>Breaking news · ruled out</span>
+              </div>
+              <ul className="space-y-1">{newsOuts.map(renderNewsOut)}</ul>
+              <p className="text-[10px] text-muted-foreground leading-relaxed">
+                Sourced from headlines in the last 5 days. The official team list may not yet reflect this.
+              </p>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1.5">
               <div className="text-[10px] uppercase tracking-[0.2em] font-bold text-accent/80">Ins</div>
@@ -577,7 +616,7 @@ function InjuryCard({ team, news }: { team: { nickName: string }; news: TeamNews
               )}
             </div>
             <div className="space-y-1.5">
-              <div className="text-[10px] uppercase tracking-[0.2em] font-bold text-accent/80">Outs</div>
+              <div className="text-[10px] uppercase tracking-[0.2em] font-bold text-accent/80">Outs (official)</div>
               {news.outs.length === 0 ? (
                 <div className="text-xs text-muted-foreground">—</div>
               ) : (
@@ -677,7 +716,7 @@ function OfficialAvatar({ src, firstName, lastName, size }: { src?: string; firs
   );
 }
 
-function SquadPanel({ team }: { team: { nickName: string; themeKey: string; players: { firstName: string; lastName: string; position: string; jerseyNumber?: number; isCaptain?: boolean; headImage?: string }[] } }) {
+function SquadPanel({ team, news }: { team: { nickName: string; themeKey: string; players: { firstName: string; lastName: string; position: string; jerseyNumber?: number; isCaptain?: boolean; headImage?: string }[] }; news?: TeamNews }) {
   const sorted = [...team.players].sort((a, b) => {
     const ai = a.jerseyNumber ?? 999;
     const bi = b.jerseyNumber ?? 999;
@@ -686,6 +725,12 @@ function SquadPanel({ team }: { team: { nickName: string; themeKey: string; play
     const pj = POSITION_ORDER.indexOf(b.position);
     return (pi === -1 ? 99 : pi) - (pj === -1 ? 99 : pj);
   });
+
+  // Build a lookup of names that have been ruled out either by the official
+  // Team Lists article OR by breaking news (cross-referenced from the news feed).
+  const officialOutsLc = new Set((news?.outs ?? []).map((n) => n.toLowerCase()));
+  const newsOutsByName = new Map<string, NewsOut>();
+  for (const o of news?.newsOuts ?? []) newsOutsByName.set(o.playerName.toLowerCase(), o);
 
   type P = (typeof sorted)[number];
   const starters: P[] = [];
@@ -706,11 +751,16 @@ function SquadPanel({ team }: { team: { nickName: string; themeKey: string; play
     const positionLabel = p.jerseyNumber != null && JERSEY_POSITION[p.jerseyNumber]
       ? JERSEY_POSITION[p.jerseyNumber]
       : p.position;
+    const fullName = `${p.firstName} ${p.lastName}`.toLowerCase();
+    const newsOut = newsOutsByName.get(fullName);
+    const isOut = officialOutsLc.has(fullName) || !!newsOut;
     return (
       <li
         key={i}
         // overflow-visible so the headshot can extend above the card edge.
-        className="relative flex items-stretch h-24 sm:h-28 rounded-lg bg-accent/15 ring-1 ring-accent/25 overflow-visible"
+        className={`relative flex items-stretch h-24 sm:h-28 rounded-lg overflow-visible ${
+          isOut ? "bg-danger/10 ring-1 ring-danger/40" : "bg-accent/15 ring-1 ring-accent/25"
+        }`}
       >
         {/* Headshot pinned to the left edge, bottom-aligned, overflows above and to the right */}
         <div className="relative shrink-0 self-stretch w-28 sm:w-32">
@@ -719,7 +769,9 @@ function SquadPanel({ team }: { team: { nickName: string; themeKey: string; play
               src={p.headImage}
               alt=""
               loading="lazy"
-              className="pointer-events-none absolute bottom-0 left-0 h-[150%] w-auto max-w-none object-contain object-bottom drop-shadow-[0_4px_10px_rgba(0,0,0,0.5)]"
+              className={`pointer-events-none absolute bottom-0 left-0 h-[150%] w-auto max-w-none object-contain object-bottom drop-shadow-[0_4px_10px_rgba(0,0,0,0.5)] ${
+                isOut ? "grayscale opacity-60" : ""
+              }`}
               onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
             />
           ) : null}
@@ -727,7 +779,9 @@ function SquadPanel({ team }: { team: { nickName: string; themeKey: string; play
 
         {/* Jersey number badge — pushed well clear of the overlapping headshot */}
         <div className="shrink-0 flex flex-col items-center justify-center w-14 sm:w-16 ml-20 sm:ml-28">
-          <span className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-md bg-accent text-accent-foreground font-black text-base sm:text-lg tabular-nums">
+          <span className={`flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-md font-black text-base sm:text-lg tabular-nums ${
+            isOut ? "bg-danger text-background line-through" : "bg-accent text-accent-foreground"
+          }`}>
             {p.jerseyNumber ?? "—"}
           </span>
         </div>
@@ -745,13 +799,26 @@ function SquadPanel({ team }: { team: { nickName: string; themeKey: string; play
                 : (p.lastName?.length ?? 0) >= 9
                   ? "text-xs sm:text-lg"
                   : "text-sm sm:text-lg"
-          }`}>
+          } ${isOut ? "text-danger line-through decoration-2" : ""}`}>
             {p.lastName}
             {p.isCaptain && <Crown className="inline h-3 w-3 sm:h-3.5 sm:w-3.5 mx-1 text-accent align-[-1px]" />}
           </div>
           <div className="text-[9px] sm:text-[10px] uppercase tracking-wider text-accent/70 font-bold mt-0.5 whitespace-nowrap">
             {positionLabel}
           </div>
+          {isOut && (
+            <a
+              href={newsOut?.sourceUrl ?? news?.sourceUrl ?? "#"}
+              target="_blank"
+              rel="noreferrer"
+              onClick={(e) => { if (!newsOut?.sourceUrl && !news?.sourceUrl) e.preventDefault(); }}
+              className="mt-1 inline-flex items-center gap-1 self-start rounded-sm bg-danger/20 ring-1 ring-danger/50 px-1.5 py-0.5 text-[8px] sm:text-[9px] uppercase tracking-wider font-bold text-danger hover:bg-danger/30"
+              title={newsOut?.sourceTitle ?? "Ruled out per official team list"}
+            >
+              {newsOut ? <Newspaper className="h-2.5 w-2.5" /> : <X className="h-2.5 w-2.5" />}
+              <span>Ruled out{newsOut ? ` · ${newsOut.source}` : ""}</span>
+            </a>
+          )}
         </div>
       </li>
     );

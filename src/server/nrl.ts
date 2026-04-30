@@ -4,7 +4,8 @@
 //   https://www.nrl.com/ladder/data?competition=111&season=YYYY
 //   https://www.nrl.com{matchCentreUrl}data
 
-import { fetchMatchTeamNews, type TeamNews } from "./team-news";
+import { fetchMatchTeamNews, type TeamNews, type NewsOut } from "./team-news";
+import { findNewsRulingsForSquads } from "./news-rulings";
 
 const UA = "Mozilla/5.0 (compatible; LineBreak/1.0)";
 const COMP = 111; // Telstra Premiership
@@ -268,8 +269,43 @@ export async function fetchMatchDetails(matchId: string): Promise<NrlMatchDetail
   // Never blocks: failure -> nulls and the UI shows "Not yet announced".
   const season = Number(String(matchId).slice(0, 4));
   const round = Number(d.roundNumber) || 0;
-  const teamNews = await fetchMatchTeamNews(season, round, home.nickName, away.nickName)
-    .catch(() => ({ home: null, away: null }));
+  const [teamNewsBase, newsRulings] = await Promise.all([
+    fetchMatchTeamNews(season, round, home.nickName, away.nickName).catch(
+      () => ({ home: null as TeamNews | null, away: null as TeamNews | null }),
+    ),
+    findNewsRulingsForSquads([
+      { team: "home", players: home.players },
+      { team: "away", players: away.players },
+    ]).catch(() => [] as Awaited<ReturnType<typeof findNewsRulingsForSquads>>),
+  ]);
+
+  // Cross-reference the news-derived rulings against each squad and attach
+  // them. Players already in the official Outs list are skipped to avoid
+  // duplicate entries in the UI.
+  const homeNames = new Set(home.players.map((p) => `${p.firstName} ${p.lastName}`));
+  const awayNames = new Set(away.players.map((p) => `${p.firstName} ${p.lastName}`));
+  const homeNewsOuts: NewsOut[] = [];
+  const awayNewsOuts: NewsOut[] = [];
+  const officialHomeOuts = new Set((teamNewsBase.home?.outs ?? []).map((n) => n.toLowerCase()));
+  const officialAwayOuts = new Set((teamNewsBase.away?.outs ?? []).map((n) => n.toLowerCase()));
+  for (const r of newsRulings) {
+    if (homeNames.has(r.playerName) && !officialHomeOuts.has(r.playerName.toLowerCase())) {
+      homeNewsOuts.push(r);
+    } else if (awayNames.has(r.playerName) && !officialAwayOuts.has(r.playerName.toLowerCase())) {
+      awayNewsOuts.push(r);
+    }
+  }
+
+  const ensureTeamNews = (tn: TeamNews | null, outs: NewsOut[]): TeamNews | null => {
+    if (outs.length === 0) return tn;
+    if (tn) return { ...tn, newsOuts: outs };
+    return { ins: [], outs: [], blurb: "", sourceUrl: "", newsOuts: outs };
+  };
+  const teamNews = {
+    home: ensureTeamNews(teamNewsBase.home, homeNewsOuts),
+    away: ensureTeamNews(teamNewsBase.away, awayNewsOuts),
+  };
+
   return {
     matchId,
     matchState: d.matchState,

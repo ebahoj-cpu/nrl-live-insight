@@ -9,11 +9,21 @@
 
 const UA = "Mozilla/5.0 (compatible; NRLLiveInsight/1.0)";
 
+export type NewsOut = {
+  playerName: string;
+  reason: string;
+  sourceUrl: string;
+  sourceTitle: string;
+  source: string;
+  publishedUtc: string;
+};
+
 export type TeamNews = {
   ins: string[];           // player names
-  outs: string[];          // player names
+  outs: string[];          // player names (from official Team Lists article)
   blurb: string;           // 1–3 sentence late-mail summary (NRL.com)
   sourceUrl: string;       // article URL we parsed
+  newsOuts?: NewsOut[];    // breaking-news rulings cross-referenced from the news feed
 };
 
 export type MatchTeamNews = {

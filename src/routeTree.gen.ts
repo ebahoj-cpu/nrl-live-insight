@@ -11,10 +11,10 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as ScoutRouteImport } from './routes/scout'
 import { Route as NewsRouteImport } from './routes/news'
-import { Route as ManifestDotwebmanifestRouteImport } from './routes/manifest[.]webmanifest'
 import { Route as LadderRouteImport } from './routes/ladder'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as MatchMatchIdRouteImport } from './routes/match.$matchId'
+import { Route as ApiPublicManifestRouteImport } from './routes/api/public/manifest'
 import { Route as ApiPublicHooksPrecomputeInsightsRouteImport } from './routes/api/public/hooks/precompute-insights'
 
 const ScoutRoute = ScoutRouteImport.update({
@@ -25,11 +25,6 @@ const ScoutRoute = ScoutRouteImport.update({
 const NewsRoute = NewsRouteImport.update({
   id: '/news',
   path: '/news',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ManifestDotwebmanifestRoute = ManifestDotwebmanifestRouteImport.update({
-  id: '/manifest.webmanifest',
-  path: '/manifest.webmanifest',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LadderRoute = LadderRouteImport.update({
@@ -47,6 +42,11 @@ const MatchMatchIdRoute = MatchMatchIdRouteImport.update({
   path: '/match/$matchId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicManifestRoute = ApiPublicManifestRouteImport.update({
+  id: '/api/public/manifest',
+  path: '/api/public/manifest',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicHooksPrecomputeInsightsRoute =
   ApiPublicHooksPrecomputeInsightsRouteImport.update({
     id: '/api/public/hooks/precompute-insights',
@@ -57,29 +57,29 @@ const ApiPublicHooksPrecomputeInsightsRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/ladder': typeof LadderRoute
-  '/manifest.webmanifest': typeof ManifestDotwebmanifestRoute
   '/news': typeof NewsRoute
   '/scout': typeof ScoutRoute
   '/match/$matchId': typeof MatchMatchIdRoute
+  '/api/public/manifest': typeof ApiPublicManifestRoute
   '/api/public/hooks/precompute-insights': typeof ApiPublicHooksPrecomputeInsightsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/ladder': typeof LadderRoute
-  '/manifest.webmanifest': typeof ManifestDotwebmanifestRoute
   '/news': typeof NewsRoute
   '/scout': typeof ScoutRoute
   '/match/$matchId': typeof MatchMatchIdRoute
+  '/api/public/manifest': typeof ApiPublicManifestRoute
   '/api/public/hooks/precompute-insights': typeof ApiPublicHooksPrecomputeInsightsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/ladder': typeof LadderRoute
-  '/manifest.webmanifest': typeof ManifestDotwebmanifestRoute
   '/news': typeof NewsRoute
   '/scout': typeof ScoutRoute
   '/match/$matchId': typeof MatchMatchIdRoute
+  '/api/public/manifest': typeof ApiPublicManifestRoute
   '/api/public/hooks/precompute-insights': typeof ApiPublicHooksPrecomputeInsightsRoute
 }
 export interface FileRouteTypes {
@@ -87,38 +87,38 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/ladder'
-    | '/manifest.webmanifest'
     | '/news'
     | '/scout'
     | '/match/$matchId'
+    | '/api/public/manifest'
     | '/api/public/hooks/precompute-insights'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/ladder'
-    | '/manifest.webmanifest'
     | '/news'
     | '/scout'
     | '/match/$matchId'
+    | '/api/public/manifest'
     | '/api/public/hooks/precompute-insights'
   id:
     | '__root__'
     | '/'
     | '/ladder'
-    | '/manifest.webmanifest'
     | '/news'
     | '/scout'
     | '/match/$matchId'
+    | '/api/public/manifest'
     | '/api/public/hooks/precompute-insights'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   LadderRoute: typeof LadderRoute
-  ManifestDotwebmanifestRoute: typeof ManifestDotwebmanifestRoute
   NewsRoute: typeof NewsRoute
   ScoutRoute: typeof ScoutRoute
   MatchMatchIdRoute: typeof MatchMatchIdRoute
+  ApiPublicManifestRoute: typeof ApiPublicManifestRoute
   ApiPublicHooksPrecomputeInsightsRoute: typeof ApiPublicHooksPrecomputeInsightsRoute
 }
 
@@ -136,13 +136,6 @@ declare module '@tanstack/react-router' {
       path: '/news'
       fullPath: '/news'
       preLoaderRoute: typeof NewsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/manifest.webmanifest': {
-      id: '/manifest.webmanifest'
-      path: '/manifest.webmanifest'
-      fullPath: '/manifest.webmanifest'
-      preLoaderRoute: typeof ManifestDotwebmanifestRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/ladder': {
@@ -166,6 +159,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MatchMatchIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/manifest': {
+      id: '/api/public/manifest'
+      path: '/api/public/manifest'
+      fullPath: '/api/public/manifest'
+      preLoaderRoute: typeof ApiPublicManifestRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/precompute-insights': {
       id: '/api/public/hooks/precompute-insights'
       path: '/api/public/hooks/precompute-insights'
@@ -179,10 +179,10 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   LadderRoute: LadderRoute,
-  ManifestDotwebmanifestRoute: ManifestDotwebmanifestRoute,
   NewsRoute: NewsRoute,
   ScoutRoute: ScoutRoute,
   MatchMatchIdRoute: MatchMatchIdRoute,
+  ApiPublicManifestRoute: ApiPublicManifestRoute,
   ApiPublicHooksPrecomputeInsightsRoute: ApiPublicHooksPrecomputeInsightsRoute,
 }
 export const routeTree = rootRouteImport

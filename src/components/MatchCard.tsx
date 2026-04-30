@@ -171,14 +171,14 @@ function shortCondition(c: string): string {
 function OddsPill({ odds, isFav }: { odds: { price: number; book: string } | null; isFav: boolean }) {
   if (!odds) {
     return (
-      <span className="relative z-10 mt-2 inline-flex items-center px-3 py-1 rounded-full bg-surface-2 text-[11px] font-bold tabular-nums text-muted-foreground border border-border">
+      <span className="relative z-10 inline-flex items-center px-2.5 py-1 rounded-full bg-surface-2 text-[11px] font-bold tabular-nums text-muted-foreground border border-border shrink-0">
         —
       </span>
     );
   }
   return (
     <span
-      className="relative z-10 mt-2 inline-flex items-center px-3.5 py-1 rounded-full bg-accent !text-black text-[12px] font-black tabular-nums tracking-tight shadow-[0_4px_14px_-4px_color-mix(in_oklab,var(--accent)_60%,transparent)]"
+      className="relative z-10 inline-flex items-center px-3 py-1 rounded-full bg-accent !text-black text-[12px] font-black tabular-nums tracking-tight shadow-[0_4px_14px_-4px_color-mix(in_oklab,var(--accent)_60%,transparent)] shrink-0"
       title={`Best price: ${odds.book}${isFav ? " · favourite" : ""}`}
     >
       {odds.price.toFixed(2)}

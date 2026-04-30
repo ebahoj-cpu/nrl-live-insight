@@ -146,7 +146,14 @@ function ScoutPage() {
             <textarea
               ref={inputRef}
               value={input}
-              onChange={(e) => setInput(e.target.value)}
+              onChange={(e) => {
+                setInput(e.target.value);
+                const el = e.currentTarget;
+                el.style.height = "auto";
+                const cap = Math.round(window.innerHeight * 0.4);
+                el.style.height = Math.min(el.scrollHeight, cap) + "px";
+                scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
+              }}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
@@ -155,7 +162,8 @@ function ScoutPage() {
               }}
               placeholder="Message Scout…"
               rows={1}
-              className="font-chat flex-1 resize-none bg-transparent outline-none text-[15px] font-medium placeholder:text-muted-foreground placeholder:font-normal max-h-32 py-1"
+              className="font-chat flex-1 resize-none bg-transparent outline-none text-[15px] font-medium placeholder:text-muted-foreground placeholder:font-normal py-1 overflow-y-auto"
+              style={{ minHeight: "28px" }}
             />
             <button
               type="submit"

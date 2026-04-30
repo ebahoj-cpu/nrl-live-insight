@@ -27,6 +27,7 @@ const GREETING: Msg = {
 };
 
 export const Route = createFileRoute("/scout")({
+  validateSearch: searchSchema,
   head: () => ({
     meta: [
       { title: "Scout — Your NRL Betting AI · LINEBREAK" },
@@ -39,10 +40,12 @@ export const Route = createFileRoute("/scout")({
 });
 
 function ScoutPage() {
+  const { q: initialQuery } = Route.useSearch();
   const [messages, setMessages] = useState<Msg[]>([GREETING]);
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const autoSentRef = useRef(false);
 
   const mutation = useMutation({
     mutationFn: async (msgs: Msg[]) => {

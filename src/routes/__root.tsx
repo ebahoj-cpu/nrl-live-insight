@@ -4,17 +4,17 @@ import {
 } from "@tanstack/react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import appCss from "../styles.css?url";
-import { Download, Menu, X, Calendar, BarChart3, Newspaper, Sparkles } from "lucide-react";
+import { Download, Menu, X, Swords, ListOrdered, Newspaper } from "lucide-react";
 import { useEffect, useState } from "react";
 import scoutAvatar from "@/assets/scout-avatar.png";
 
 interface RouterContext { queryClient: QueryClient }
 
 const NAV_ITEMS = [
-  { to: "/", label: "Fixtures", icon: Calendar, exact: true },
-  { to: "/ladder", label: "Ladder", icon: BarChart3, exact: false },
+  { to: "/", label: "Fixtures", icon: Swords, exact: true },
+  { to: "/ladder", label: "Ladder", icon: ListOrdered, exact: false },
   { to: "/news", label: "News", icon: Newspaper, exact: false },
-  { to: "/scout", label: "Scout", icon: Sparkles, exact: false },
+  { to: "/scout", label: "Scout", icon: Newspaper /* unused */, exact: false },
 ] as const;
 
 function NotFoundComponent() {

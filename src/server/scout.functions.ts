@@ -233,6 +233,23 @@ async function buildScoutContext(): Promise<string> {
     return lines.join("\n");
   });
 
+  // GROUND-TRUTH fixtures table — explicit "who plays who" so Scout never
+  // pairs the wrong opponents based on ladder proximity or odds confusion.
+  const fmtKickoff = (iso: string | undefined) => {
+    if (!iso) return "TBD";
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return "TBD";
+    return d.toLocaleString("en-AU", {
+      weekday: "short", day: "2-digit", month: "short",
+      hour: "2-digit", minute: "2-digit", timeZone: "Australia/Sydney",
+    }) + " AEST";
+  };
+  const groundTruthFixtures = upcoming.length
+    ? upcoming.map((f) =>
+        `- Round ${f.roundNumber ?? "?"}: **${f.homeTeam.nickName} v ${f.awayTeam.nickName}** — ${f.venue ?? "venue TBD"} · ${fmtKickoff(f.kickoffUtc)}`,
+      ).join("\n")
+    : "(no upcoming fixtures found)";
+
   // Per-team season profiles (one line each)
   const teamProfiles = snap
     ? ladder.slice(0, 17).map((r) => teamLine(getTeam(snap, r.nickname), r.nickname)).join("\n")
@@ -249,13 +266,16 @@ async function buildScoutContext(): Promise<string> {
   return [
     `# NRL Snapshot · season ${season} · generated ${new Date().toISOString()}`,
     "",
+    "## GROUND TRUTH — Current Round Fixtures (authoritative who-plays-who)",
+    groundTruthFixtures,
+    "",
     "## Ladder",
     ladderLines || "(unavailable)",
     "",
     "## Team season profiles",
     teamProfiles,
     "",
-    "## Upcoming fixtures (deep briefs — odds, lineups, H2H, tryscorer markets)",
+    "## Upcoming fixtures (briefs — odds, season form per matchup)",
     briefs.join("\n\n") || "(no upcoming fixtures found)",
     "",
     "## Recent news headlines",

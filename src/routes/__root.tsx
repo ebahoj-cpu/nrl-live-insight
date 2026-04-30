@@ -265,19 +265,21 @@ function BottomNav() {
                     {isActive && (
                       <span className="absolute top-0 left-1/2 -translate-x-1/2 h-1 w-12 rounded-b-full bg-accent" />
                     )}
-                    <span className={`inline-flex h-9 w-14 items-center justify-center rounded-full transition ${isActive ? "bg-accent text-accent-foreground shadow-lg shadow-accent/30 scale-105" : "text-muted-foreground group-hover:text-foreground group-hover:bg-surface-2"}`}>
-                      {to === "/scout" ? (
+                    {to === "/scout" ? (
+                      <span className="inline-flex h-11 w-11 items-center justify-center">
                         <img
                           src={scoutAvatar}
                           alt=""
-                          width={24}
-                          height={24}
-                          className={`h-6 w-6 rounded-full object-cover ${isActive ? "ring-2 ring-accent-foreground/40" : "opacity-90 group-hover:opacity-100"}`}
+                          width={44}
+                          height={44}
+                          className={`h-11 w-11 object-contain transition ${isActive ? "drop-shadow-[0_0_8px_var(--accent)] scale-110" : "opacity-90 group-hover:opacity-100 group-hover:scale-105"}`}
                         />
-                      ) : (
+                      </span>
+                    ) : (
+                      <span className={`inline-flex h-9 w-14 items-center justify-center rounded-full transition ${isActive ? "bg-accent text-accent-foreground shadow-lg shadow-accent/30 scale-105" : "text-muted-foreground group-hover:text-foreground group-hover:bg-surface-2"}`}>
                         <Icon className="h-5 w-5" strokeWidth={isActive ? 2.5 : 2} />
-                      )}
-                    </span>
+                      </span>
+                    )}
                     <span className={`text-[10px] font-extrabold uppercase tracking-wider transition ${isActive ? "text-accent" : "text-muted-foreground group-hover:text-foreground"}`}>
                       {label}
                     </span>

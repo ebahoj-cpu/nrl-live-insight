@@ -22,8 +22,7 @@ const STARTER_PROMPTS = [
 
 const GREETING: Msg = {
   role: "assistant",
-  content:
-    "G'day — I'm **Scout**, your NRL betting brain. I read every fixture, the ladder, live odds and the latest news so you don't have to.\n\nAsk me about a team, player, fixture, or market. I'll point out the angle.",
+  content: "How can I be of assistance?",
 };
 
 export const Route = createFileRoute("/scout")({

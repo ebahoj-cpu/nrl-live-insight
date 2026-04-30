@@ -179,7 +179,7 @@ async function buildFixtureBrief(
 async function buildScoutContext(): Promise<string> {
   const season = NOW_SEASON();
   const [fixtures, ladder, liveOdds, news, snap] = await Promise.all([
-    cached(`fixtures:${season}:current`, TTL.fixtures, () => fetchDraw(season)).catch(() => []),
+    cached(`scout:fixtures:${season}:v2-official`, 60_000, () => fetchDraw(season)).catch(() => []),
     cached(`ladder:${season}`, TTL.ladder, () => fetchLadder(season)).catch(() => []),
     cached(`odds:nrl`, TTL.odds, () => fetchNrlOdds()).catch(() => []),
     cached("news:all", 15 * 60_000, () => fetchNews()).catch(() => [] as NewsItem[]),

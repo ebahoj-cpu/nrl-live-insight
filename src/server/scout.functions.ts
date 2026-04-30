@@ -13,6 +13,8 @@ import { buildEstimatedOdds, fetchNrlOdds, fetchTryscorerOdds, bestH2H, type Odd
 import { fetchNews, type NewsItem } from "./news";
 import { getSeasonSnapshot, getTeam, type TeamSeasonStats } from "./season-stats";
 import { findTeam } from "@/lib/teams";
+import { readAnySharedInsights } from "./insights-store";
+import type { Insights } from "./ai-insights";
 
 const Message = z.object({
   role: z.enum(["user", "assistant"]),
@@ -77,6 +79,41 @@ function pickLineTotal(ev: OddsEvent | undefined, homeNick: string | null, awayN
     if (line && total) break;
   }
   return { line, total };
+}
+
+// Compact one-liner squad list — same starters/bench shown on the match page.
+function formatSquad(players: { firstName: string; lastName: string; position: string; jerseyNumber?: number; isCaptain?: boolean }[] | undefined, label: string): string {
+  if (!players || players.length === 0) return `${label} squad: not yet named`;
+  const sorted = [...players].sort((a, b) => (a.jerseyNumber ?? 99) - (b.jerseyNumber ?? 99));
+  const starters = sorted.filter((p) => (p.jerseyNumber ?? 99) <= 13);
+  const bench = sorted.filter((p) => (p.jerseyNumber ?? 99) > 13 && (p.jerseyNumber ?? 99) <= 17);
+  const fmt = (p: typeof sorted[number]) => `${p.jerseyNumber ?? "?"}. ${p.firstName} ${p.lastName}${p.isCaptain ? " (C)" : ""}`;
+  const parts: string[] = [];
+  parts.push(`${label} starting 13: ${starters.map(fmt).join(", ") || "—"}`);
+  if (bench.length) parts.push(`${label} bench: ${bench.map(fmt).join(", ")}`);
+  return parts.join("\n");
+}
+
+// Pull the SAME AI insights the user sees on the match page (winner pick,
+// margin, predicted score, totals lean, HT/FT, top tryscorers, top recommended
+// plays). This guarantees Scout's chat answers stay aligned with the Insights tab.
+async function summarizeStoredInsights(matchId: string, homeNick: string, awayNick: string): Promise<string> {
+  const stored = await readAnySharedInsights(matchId).catch(() => null);
+  if (!stored) return "";
+  const i: Insights = stored.payload;
+  const winnerNick = i.winner.team === "home" ? homeNick : awayNick;
+  const lines: string[] = [];
+  lines.push(`App-Insights pick: ${winnerNick} (${i.winner.confidence}% conf), margin ${i.margin.bucket}, score ${homeNick} ${i.predictedScore.home}–${i.predictedScore.away} ${awayNick}`);
+  lines.push(`Total: ${i.total.pick.toUpperCase()} ${i.total.line} · HT/FT: ${i.htft.pick}`);
+  if (i.firstTryscorer?.pick) lines.push(`First-tryscorer pick: ${i.firstTryscorer.pick}`);
+  const anytimes = (i.anytimeTryscorers ?? []).slice(0, 5).map((p) => p.pick).filter(Boolean);
+  if (anytimes.length) lines.push(`Anytime tryscorer picks: ${anytimes.join(", ")}`);
+  if (i.multiTryscorer?.pick) lines.push(`2+ tries pick: ${i.multiTryscorer.pick}`);
+  const plays = (i.simulation?.recommendedPlays ?? []).slice(0, 5).map((p) =>
+    `${p.pick}${p.decimalOdds ? ` @${p.decimalOdds}` : ""} (${p.confidence}, edge ${p.edgePct.toFixed(0)}%)`,
+  );
+  if (plays.length) lines.push(`Top recommended plays: ${plays.join(" | ")}`);
+  return lines.join("\n");
 }
 
 // Build a deep per-fixture brief: odds, lineups, ins/outs, H2H, top tryscorers.
@@ -145,6 +182,14 @@ async function buildFixtureBrief(
     }
   }
 
+  // Squads (1-13 + bench) — same lineup that's rendered on the match page.
+  if (details?.homeTeam?.players?.length) {
+    lines.push(formatSquad(details.homeTeam.players, homeNick));
+  }
+  if (details?.awayTeam?.players?.length) {
+    lines.push(formatSquad(details.awayTeam.players, awayNick));
+  }
+
   // Recent form per side (last 5 from match-centre)
   if (details) {
     const homeForm = details.homeTeam.recentForm.slice(0, 5).map((r) => `${r.result}(${r.score})`).join(" ");
@@ -156,7 +201,6 @@ async function buildFixtureBrief(
   // Head-to-head history (the match-centre 'history' block when present)
   const hist = details?.history;
   if (hist) {
-    // Common shapes: { matches: [...] } or { stats: [...] }. Extract last few results.
     const recent: any[] = (hist.matches ?? hist.recent ?? hist.results ?? []) as any[];
     if (Array.isArray(recent) && recent.length) {
       const head = recent.slice(0, 5).map((m: any) => {
@@ -171,6 +215,13 @@ async function buildFixtureBrief(
     } else if (typeof hist.summary === "string") {
       lines.push(`H2H: ${hist.summary.slice(0, 200)}`);
     }
+  }
+
+  // App Insights summary — mirrors what the user sees on the Insights tab so
+  // Scout's chat answers stay consistent with the on-app projections.
+  const insightsSummary = await summarizeStoredInsights(matchId, homeNick, awayNick).catch(() => "");
+  if (insightsSummary) {
+    lines.push(insightsSummary);
   }
 
   return lines.join("\n");
@@ -336,7 +387,7 @@ export const scoutChat = createServerFn({ method: "POST" })
     // fallback, because that caused false bye / matchup calls. Build the full
     // official fixture snapshot on cold cache, then reuse it briefly.
     const context = await cached(
-      "scout:context:v10-authoritative-fixtures",
+      "scout:context:v11-lineups-insights",
       CTX_TTL,
       buildScoutContext,
     ).catch((e) => { console.error("[scout] context build failed:", e); return "(official NRL snapshot unavailable)"; });
@@ -362,19 +413,27 @@ export const scoutChat = createServerFn({ method: "POST" })
       "• Live ladder with W-L, points, points-diff",
       "• Live odds across multiple bookies: H2H best, line/spread, totals (O/U)",
       "• Tryscorer markets per fixture (anytime + first-tryscorer favs) — if listed under a fixture, USE THEM",
+      "• Full SQUADS per fixture (starting 13 + bench, jersey numbers, captains) — if listed, USE THEM",
       "• Lineups / late mail per fixture (ins, outs, blurb) — if listed under a fixture, USE THEM",
       "• Season form per team: W-L-D, PPG for/against, HT-lead %, HT→W conversion %, last-5",
       "• Per-fixture recent form (last-5 of each side) and head-to-head history",
+      "• APP-INSIGHTS line per fixture: the same projected winner, margin, predicted score, totals lean, HT/FT, first/anytime tryscorer picks and top recommended plays the user sees on the Insights tab. When asked 'who do we like / what does the app project / what's the prediction', cite this line directly so chat stays consistent with the Insights tab.",
       "• Recent news headlines",
       "",
       "DATA RULES for missing fields:",
       "• If a fixture brief says 'Tryscorer markets: not posted yet' → say markets aren't out yet for that game.",
       "• If a fixture has no ins/outs lines → say lineups aren't released yet for that game.",
+      "• If a squad block isn't shown for a fixture → say the squad hasn't been named yet.",
       "• Otherwise NEVER claim you lack data that IS in SNAPSHOT. Read the relevant fixture block carefully before answering.",
       "",
-      "DATA YOU DO NOT HAVE — never invent:",
-      "• Multi-season historical logs (current season only, plus the H2H history block when shown)",
-      "• Play-by-play stats, possession %, completions",
+      "EXTERNAL STATS — when the user asks about historical stats, career numbers, or league-wide records that are NOT in the snapshot (e.g. 'how many tries has Reece Walsh scored this season', 'most points in a game', 'all-time meeting record'):",
+      "• You MAY draw on widely-known NRL knowledge to give a useful answer.",
+      "• Be explicit about uncertainty — say 'as of my last training data' or 'roughly' rather than fabricating exact numbers.",
+      "• NEVER override SNAPSHOT data with memory. The snapshot is the source of truth for fixtures, lineups, odds, ladder and current-season form.",
+      "",
+      "DATA YOU DO NOT HAVE in SNAPSHOT — be honest if asked for exact numbers:",
+      "• Live in-game play-by-play, possession %, completions",
+      "• Multi-season historical logs beyond the H2H block",
       "",
       "RESPONSE MODE — pick the right format:",
       "1) CONVERSATIONAL — default for chat, opinions, comparisons, who/what/why questions.",

@@ -297,11 +297,18 @@ async function buildScoutContext(): Promise<string> {
     `- [${n.source}] ${n.title}${n.summary ? ` — ${n.summary.slice(0, 140)}` : ""}`,
   ).join("\n");
 
+  const roundLabel = currentRoundNum != null ? `Round ${currentRoundNum}` : "Current round";
+  const byesLine = currentRoundNum != null
+    ? (byeNicknames.length ? byeNicknames.join(", ") : "(none)")
+    : "(round boundary unclear)";
+
   return [
-    `# NRL Snapshot · season ${season} · generated ${new Date().toISOString()}`,
+    `# NRL Snapshot · season ${season} · ${roundLabel} · generated ${new Date().toISOString()}`,
     "",
-    "## GROUND TRUTH — Current Round Fixtures (authoritative who-plays-who)",
+    `## GROUND TRUTH — ${roundLabel} Fixtures (authoritative who-plays-who)`,
     groundTruthFixtures,
+    "",
+    `## GROUND TRUTH — Teams on the BYE this round: ${byesLine}`,
     "",
     "## Ladder",
     ladderLines || "(unavailable)",

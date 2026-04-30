@@ -95,16 +95,19 @@ export function MatchCard({ fixture, odds }: { fixture: NrlFixture & { weather?:
       </div>
 
       {/* Teams + odds OR scores */}
-      <div className="grid grid-cols-3 items-center gap-3 flex-1">
-        <div className="flex flex-col items-center text-center">
-          <TeamLogo themeKey={fixture.homeTeam.themeKey} name={fixture.homeTeam.nickName} size={56} />
-          <div className="mt-2 text-sm font-semibold leading-tight">{fixture.homeTeam.nickName}</div>
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 sm:gap-3 flex-1">
+        {/* Home: logo + odds beside it */}
+        <div className="flex items-center justify-end gap-2 sm:gap-3 min-w-0">
+          <div className="flex flex-col items-center text-center min-w-0">
+            <TeamLogo themeKey={fixture.homeTeam.themeKey} name={fixture.homeTeam.nickName} size={56} />
+            <div className="mt-2 text-sm font-semibold leading-tight truncate max-w-[110px]">{fixture.homeTeam.nickName}</div>
+          </div>
           {!(isFinished || isLive) && (
             <OddsPill odds={homeOdds} isFav={fav === "home"} />
           )}
         </div>
 
-        <div className="flex flex-col items-center justify-center">
+        <div className="flex flex-col items-center justify-center px-1">
           {(isFinished || isLive) ? (
             <>
               <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
@@ -125,12 +128,15 @@ export function MatchCard({ fixture, odds }: { fixture: NrlFixture & { weather?:
           )}
         </div>
 
-        <div className="flex flex-col items-center text-center">
-          <TeamLogo themeKey={fixture.awayTeam.themeKey} name={fixture.awayTeam.nickName} size={56} />
-          <div className="mt-2 text-sm font-semibold leading-tight">{fixture.awayTeam.nickName}</div>
+        {/* Away: odds beside logo */}
+        <div className="flex items-center justify-start gap-2 sm:gap-3 min-w-0">
           {!(isFinished || isLive) && (
             <OddsPill odds={awayOdds} isFav={fav === "away"} />
           )}
+          <div className="flex flex-col items-center text-center min-w-0">
+            <TeamLogo themeKey={fixture.awayTeam.themeKey} name={fixture.awayTeam.nickName} size={56} />
+            <div className="mt-2 text-sm font-semibold leading-tight truncate max-w-[110px]">{fixture.awayTeam.nickName}</div>
+          </div>
         </div>
       </div>
 

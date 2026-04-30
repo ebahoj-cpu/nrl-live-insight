@@ -187,21 +187,49 @@ async function buildScoutContext(): Promise<string> {
   ]);
   const odds = liveOdds.length ? liveOdds : buildEstimatedOdds(fixtures, ladder);
 
-  // Pick the next chronological 8 fixtures that haven't finished yet.
+  // Lock to the CURRENT round (per NRL.com's isCurrentRound flag) so a live
+  // matchup never gets crowded out by future-round fixtures sneaking in by
+  // kickoff sort. Fall back to "next 8 chronological" only if NRL hasn't
+  // flagged a current round yet.
   const nowMs = Date.now();
-  const upcoming = fixtures
-    .filter((f) => !/full\s*time|fulltime/i.test(f.matchState))
+  const notFinished = fixtures.filter((f) => !/full\s*time|fulltime/i.test(f.matchState));
+  const currentRoundFixtures = notFinished.filter((f) => f.isCurrentRound);
+  const currentRoundNum = currentRoundFixtures[0]?.roundNumber;
+  // Include all fixtures from the current round (so byes are obvious by absence)
+  // PLUS any from the next round if the current round is mostly done — gives Scout
+  // forward visibility without losing tonight's games.
+  const fromCurrent = currentRoundNum != null
+    ? notFinished.filter((f) => f.roundNumber === currentRoundNum)
+    : [];
+  const fromNext = currentRoundNum != null
+    ? notFinished.filter((f) => f.roundNumber === currentRoundNum + 1)
+    : [];
+  const pool = (fromCurrent.length ? [...fromCurrent, ...fromNext] : notFinished)
     .filter((f) => {
       const t = f.kickoffUtc ? Date.parse(f.kickoffUtc) : NaN;
-      // keep if kickoff unknown, in the future, or within last 4h (live)
       return isNaN(t) || t > nowMs - 4 * 3600_000;
     })
     .sort((a, b) => {
+      const ra = a.roundNumber || 0;
+      const rb = b.roundNumber || 0;
+      if (ra !== rb) return ra - rb;
       const ta = a.kickoffUtc ? Date.parse(a.kickoffUtc) : Number.MAX_SAFE_INTEGER;
       const tb = b.kickoffUtc ? Date.parse(b.kickoffUtc) : Number.MAX_SAFE_INTEGER;
       return ta - tb;
-    })
-    .slice(0, 6);
+    });
+  const upcoming = pool.slice(0, 10);
+
+  // Compute byes for the current round so Scout can answer "is X playing?" correctly.
+  const playingTeamIds = new Set<number>();
+  for (const f of fromCurrent) {
+    playingTeamIds.add(f.homeTeam.teamId);
+    playingTeamIds.add(f.awayTeam.teamId);
+  }
+  const byeNicknames = currentRoundNum != null
+    ? ladder
+        .filter((r) => !playingTeamIds.has(r.teamId))
+        .map((r) => r.nickname)
+    : [];
 
   // DEEP briefs in parallel — odds + season form + lineups + late mail + tryscorers + H2H.
   // Each per-fixture deep fetch is cached (FIXTURE_TTL/TRYSCORER_TTL) so steady-state
@@ -269,11 +297,18 @@ async function buildScoutContext(): Promise<string> {
     `- [${n.source}] ${n.title}${n.summary ? ` — ${n.summary.slice(0, 140)}` : ""}`,
   ).join("\n");
 
+  const roundLabel = currentRoundNum != null ? `Round ${currentRoundNum}` : "Current round";
+  const byesLine = currentRoundNum != null
+    ? (byeNicknames.length ? byeNicknames.join(", ") : "(none)")
+    : "(round boundary unclear)";
+
   return [
-    `# NRL Snapshot · season ${season} · generated ${new Date().toISOString()}`,
+    `# NRL Snapshot · season ${season} · ${roundLabel} · generated ${new Date().toISOString()}`,
     "",
-    "## GROUND TRUTH — Current Round Fixtures (authoritative who-plays-who)",
+    `## GROUND TRUTH — ${roundLabel} Fixtures (authoritative who-plays-who)`,
     groundTruthFixtures,
+    "",
+    `## GROUND TRUTH — Teams on the BYE this round: ${byesLine}`,
     "",
     "## Ladder",
     ladderLines || "(unavailable)",
@@ -312,7 +347,7 @@ export const scoutChat = createServerFn({ method: "POST" })
     // minimal snapshot now (just the ladder) and queue the full one.
     const fallback = await buildMinimalContext().catch(() => "(snapshot unavailable)");
     const context = await staleWhileRevalidate(
-      "scout:context:v8-deep",
+      "scout:context:v9-currentround",
       CTX_TTL,
       buildScoutContext,
       fallback,
@@ -322,11 +357,13 @@ export const scoutChat = createServerFn({ method: "POST" })
       "You are SCOUT — a sharp, friendly NRL betting analyst inside LINEBREAK. Sporty, confident, plain-spoken Aussie tone.",
       "",
       "GROUND TRUTH PROTOCOL — read this BEFORE every reply:",
-      "• The 'GROUND TRUTH — Current Round Fixtures' block is the ONLY authoritative source for who plays who this round.",
-      "• Before naming any matchup, cross-reference it against that fixtures list. Never infer an opponent from ladder proximity, odds order, or memory.",
-      "• If a user mentions a matchup that isn't in the fixtures list (e.g. 'Knights v Dolphins' when it's actually 'Storm v Dolphins'), correct them politely and use the real fixture.",
+      "• The 'GROUND TRUTH — Round Fixtures' block is the ONLY authoritative source for who plays who this round. The round number is in the snapshot header.",
+      "• The 'GROUND TRUTH — Teams on the BYE this round' line lists every team NOT playing. If a user asks about a team on that bye list, say so directly — do not invent a fixture for them.",
+      "• Before naming any matchup, scan the fixtures list for BOTH team names. If you can't find both teams together on the same line, the matchup does not exist this round — correct the user.",
+      "• Never infer an opponent from ladder proximity, odds order, alphabetical order, or memory. The fixtures list is the only source of truth.",
+      "• When a user names a team (e.g. 'Cowboys'), look up that exact team in the fixtures list to find their real opponent THIS round before answering. If they're on the bye list, say 'X are on the bye this round' — don't guess.",
       "• When recommending a pick, name BOTH teams in the matchup so it's unambiguous (e.g. 'Broncos H2H @2.15 vs Cowboys' — never just 'Broncos H2H').",
-      "• If a team isn't playing this round per the fixtures list, do NOT include them in picks/recommendations.",
+      "• If a team is on the bye list, do NOT include them in picks/recommendations.",
       "",
       "DATA YOU HAVE in SNAPSHOT below — never ask for it, never claim you lack it:",
       "• Authoritative round fixtures (home v away, venue, kickoff)",

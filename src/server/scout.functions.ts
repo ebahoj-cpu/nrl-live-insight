@@ -455,15 +455,28 @@ export const scoutChat = createServerFn({ method: "POST" })
     const key = process.env.LOVABLE_API_KEY;
     if (!key) throw new Error("LOVABLE_API_KEY not configured");
 
-    // Correctness beats speed here: Scout must never answer from a ladder-only
-    // fallback, because that caused false bye / matchup calls. Build the full
-    // official fixture snapshot on cold cache, then reuse it briefly.
-    const context = await cached(
-      "scout:context:v11-lineups-insights",
-      CTX_TTL,
-      buildScoutContext,
-    ).catch((e) => { console.error("[scout] context build failed:", e); return "(official NRL snapshot unavailable)"; });
-    if (context.includes("official NRL snapshot unavailable") || !context.includes("## GROUND TRUTH")) {
+    // Two-tier context for snappy first reply + accurate steady-state:
+    //   • DEEP context (lineups, late mail, app-insights, tryscorers per fixture)
+    //     is built in the background and cached. Once warm, every reply uses it.
+    //   • FAST context (fixtures + ladder + odds + season form) is the fallback
+    //     for the very first cold-cache request so users don't wait 60-120s for
+    //     NRL.com round-trips. It STILL contains the authoritative GROUND TRUTH
+    //     fixtures + byes block, so all grounding rules still hold.
+    const DEEP_KEY = "scout:context:v12-fast-fallback";
+    let context: string;
+    try {
+      const fastFallback = await buildFastContext();
+      context = await staleWhileRevalidate<string>(
+        DEEP_KEY,
+        CTX_TTL,
+        buildDeepContext,
+        fastFallback,
+      );
+    } catch (e) {
+      console.error("[scout] context build failed:", e);
+      throw new Error("Scout can't verify the latest official fixtures right now — try again shortly.");
+    }
+    if (!context.includes("## GROUND TRUTH")) {
       throw new Error("Scout can't verify the latest official fixtures right now — try again shortly.");
     }
 

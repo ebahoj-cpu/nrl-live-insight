@@ -182,6 +182,14 @@ async function buildFixtureBrief(
     }
   }
 
+  // Squads (1-13 + bench) — same lineup that's rendered on the match page.
+  if (details?.homeTeam?.players?.length) {
+    lines.push(formatSquad(details.homeTeam.players, homeNick));
+  }
+  if (details?.awayTeam?.players?.length) {
+    lines.push(formatSquad(details.awayTeam.players, awayNick));
+  }
+
   // Recent form per side (last 5 from match-centre)
   if (details) {
     const homeForm = details.homeTeam.recentForm.slice(0, 5).map((r) => `${r.result}(${r.score})`).join(" ");
@@ -193,7 +201,6 @@ async function buildFixtureBrief(
   // Head-to-head history (the match-centre 'history' block when present)
   const hist = details?.history;
   if (hist) {
-    // Common shapes: { matches: [...] } or { stats: [...] }. Extract last few results.
     const recent: any[] = (hist.matches ?? hist.recent ?? hist.results ?? []) as any[];
     if (Array.isArray(recent) && recent.length) {
       const head = recent.slice(0, 5).map((m: any) => {
@@ -208,6 +215,13 @@ async function buildFixtureBrief(
     } else if (typeof hist.summary === "string") {
       lines.push(`H2H: ${hist.summary.slice(0, 200)}`);
     }
+  }
+
+  // App Insights summary — mirrors what the user sees on the Insights tab so
+  // Scout's chat answers stay consistent with the on-app projections.
+  const insightsSummary = await summarizeStoredInsights(matchId, homeNick, awayNick).catch(() => "");
+  if (insightsSummary) {
+    lines.push(insightsSummary);
   }
 
   return lines.join("\n");

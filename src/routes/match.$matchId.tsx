@@ -1368,8 +1368,8 @@ function PredictedScoreCard({ model, home, away }:
     <Card title="Predicted score" icon={Target}>
       <div className="grid grid-cols-3 items-center gap-3">
         <div className="flex flex-col items-center text-center min-w-0">
-          <TeamLogo themeKey={home.themeKey} name={home.nickName} size={36} />
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground mt-1 truncate w-full">{home.nickName}</div>
+          <TeamLogo themeKey={home.themeKey} name={home.nickName} size={64} />
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground mt-1.5 truncate w-full">{home.nickName}</div>
         </div>
         <div className="text-center kbd">
           <span className={`text-3xl sm:text-4xl font-black tabular-nums ${model.predictedHome > model.predictedAway ? "text-accent" : ""}`}>{model.predictedHome}</span>

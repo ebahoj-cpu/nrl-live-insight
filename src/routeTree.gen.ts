@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as ScoutRouteImport } from './routes/scout'
 import { Route as NewsRouteImport } from './routes/news'
+import { Route as ManifestDotwebmanifestRouteImport } from './routes/manifest[.]webmanifest'
 import { Route as LadderRouteImport } from './routes/ladder'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as MatchMatchIdRouteImport } from './routes/match.$matchId'
@@ -24,6 +25,11 @@ const ScoutRoute = ScoutRouteImport.update({
 const NewsRoute = NewsRouteImport.update({
   id: '/news',
   path: '/news',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ManifestDotwebmanifestRoute = ManifestDotwebmanifestRouteImport.update({
+  id: '/manifest.webmanifest',
+  path: '/manifest.webmanifest',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LadderRoute = LadderRouteImport.update({
@@ -51,6 +57,7 @@ const ApiPublicHooksPrecomputeInsightsRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/ladder': typeof LadderRoute
+  '/manifest.webmanifest': typeof ManifestDotwebmanifestRoute
   '/news': typeof NewsRoute
   '/scout': typeof ScoutRoute
   '/match/$matchId': typeof MatchMatchIdRoute
@@ -59,6 +66,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/ladder': typeof LadderRoute
+  '/manifest.webmanifest': typeof ManifestDotwebmanifestRoute
   '/news': typeof NewsRoute
   '/scout': typeof ScoutRoute
   '/match/$matchId': typeof MatchMatchIdRoute
@@ -68,6 +76,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/ladder': typeof LadderRoute
+  '/manifest.webmanifest': typeof ManifestDotwebmanifestRoute
   '/news': typeof NewsRoute
   '/scout': typeof ScoutRoute
   '/match/$matchId': typeof MatchMatchIdRoute
@@ -78,6 +87,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/ladder'
+    | '/manifest.webmanifest'
     | '/news'
     | '/scout'
     | '/match/$matchId'
@@ -86,6 +96,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/ladder'
+    | '/manifest.webmanifest'
     | '/news'
     | '/scout'
     | '/match/$matchId'
@@ -94,6 +105,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/ladder'
+    | '/manifest.webmanifest'
     | '/news'
     | '/scout'
     | '/match/$matchId'
@@ -103,6 +115,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   LadderRoute: typeof LadderRoute
+  ManifestDotwebmanifestRoute: typeof ManifestDotwebmanifestRoute
   NewsRoute: typeof NewsRoute
   ScoutRoute: typeof ScoutRoute
   MatchMatchIdRoute: typeof MatchMatchIdRoute
@@ -123,6 +136,13 @@ declare module '@tanstack/react-router' {
       path: '/news'
       fullPath: '/news'
       preLoaderRoute: typeof NewsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/manifest.webmanifest': {
+      id: '/manifest.webmanifest'
+      path: '/manifest.webmanifest'
+      fullPath: '/manifest.webmanifest'
+      preLoaderRoute: typeof ManifestDotwebmanifestRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/ladder': {
@@ -159,6 +179,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   LadderRoute: LadderRoute,
+  ManifestDotwebmanifestRoute: ManifestDotwebmanifestRoute,
   NewsRoute: NewsRoute,
   ScoutRoute: ScoutRoute,
   MatchMatchIdRoute: MatchMatchIdRoute,

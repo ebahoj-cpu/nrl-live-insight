@@ -1,11 +1,12 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useSuspenseQuery, useQuery, queryOptions } from "@tanstack/react-query";
 import { Suspense, useState } from "react";
 import { getNews } from "@/server/news.functions";
 import { summariseArticle, type ArticleSummary } from "@/server/news-summary.functions";
-import { ExternalLink, Sparkles, TrendingUp, TrendingDown, Minus, Loader2 } from "lucide-react";
+import { ExternalLink, Sparkles, TrendingUp, TrendingDown, Minus, Loader2, MessageSquare } from "lucide-react";
 import { findTeam } from "@/lib/teams";
 import { TeamLogo } from "@/components/TeamLogo";
+import scoutAvatar from "@/assets/scout-avatar.png";
 
 // Publisher logos for known sources (matched case-insensitively, substring).
 const PUBLISHER_LOGOS: { match: RegExp; src: string; alt: string }[] = [

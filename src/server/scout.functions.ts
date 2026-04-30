@@ -7,7 +7,7 @@
 // Heavy lifting is cached so chat turns stay snappy.
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { cached, staleWhileRevalidate, TTL } from "./cache";
+import { cached, TTL } from "./cache";
 import { fetchDraw, fetchLadder, fetchMatchDetails, type NrlMatchDetails } from "./nrl";
 import { buildEstimatedOdds, fetchNrlOdds, fetchTryscorerOdds, bestH2H, type OddsEvent } from "./odds";
 import { fetchNews, type NewsItem } from "./news";
@@ -324,17 +324,6 @@ async function buildScoutContext(): Promise<string> {
   ].join("\n");
 }
 
-// A tiny instant-fallback snapshot for the very first cold request, so users
-// never wait on the full context build. SWR will replace it on the next turn.
-async function buildMinimalContext(): Promise<string> {
-  const season = NOW_SEASON();
-  const ladder = await cached(`ladder:${season}`, TTL.ladder, () => fetchLadder(season)).catch(() => []);
-  const ladderLines = ladder.slice(0, 17).map((r) =>
-    `${r.position}. ${r.nickname} — ${r.played}P ${r.wins}W ${r.losses}L, ${r.points}pts`,
-  ).join("\n");
-  return `# NRL quick snapshot · season ${season}\n\n## Ladder\n${ladderLines || "(unavailable)"}`;
-}
-
 export const scoutChat = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => Input.parse(i))
   .handler(async ({ data }): Promise<{ reply: string }> => {
@@ -342,21 +331,20 @@ export const scoutChat = createServerFn({ method: "POST" })
     const key = process.env.LOVABLE_API_KEY;
     if (!key) throw new Error("LOVABLE_API_KEY not configured");
 
-    // Stale-while-revalidate: if we have any cached snapshot (even expired),
-    // use it instantly and refresh in the background. Otherwise, build a
-    // minimal snapshot now (just the ladder) and queue the full one.
-    const fallback = await buildMinimalContext().catch(() => "(snapshot unavailable)");
-    const context = await staleWhileRevalidate(
-      "scout:context:v9-currentround",
+    // Correctness beats speed here: Scout must never answer from a ladder-only
+    // fallback, because that caused false bye / matchup calls. Build the full
+    // official fixture snapshot on cold cache, then reuse it briefly.
+    const context = await cached(
+      "scout:context:v10-authoritative-fixtures",
       CTX_TTL,
       buildScoutContext,
-      fallback,
-    ).catch((e) => { console.error("[scout] context build failed:", e); return fallback; });
+    ).catch((e) => { console.error("[scout] context build failed:", e); return "(official NRL snapshot unavailable)"; });
 
     const system = [
       "You are SCOUT — a sharp, friendly NRL betting analyst inside LINEBREAK. Sporty, confident, plain-spoken Aussie tone.",
       "",
       "GROUND TRUTH PROTOCOL — read this BEFORE every reply:",
+      "• If the snapshot says '(official NRL snapshot unavailable)' or has no GROUND TRUTH fixtures, say you can't verify the latest fixtures right now. Do not answer from memory.",
       "• The 'GROUND TRUTH — Round Fixtures' block is the ONLY authoritative source for who plays who this round. The round number is in the snapshot header.",
       "• The 'GROUND TRUTH — Teams on the BYE this round' line lists every team NOT playing. If a user asks about a team on that bye list, say so directly — do not invent a fixture for them.",
       "• Before naming any matchup, scan the fixtures list for BOTH team names. If you can't find both teams together on the same line, the matchup does not exist this round — correct the user.",

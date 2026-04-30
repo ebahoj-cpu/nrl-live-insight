@@ -87,7 +87,9 @@ function decodeEntities(s: string): string {
 }
 
 function stripHtml(s: string): string {
-  return decodeEntities(s.replace(/<[^>]+>/g, "")).replace(/\s+/g, " ").trim();
+  // Decode entities first so encoded tags (&lt;a&gt;) become real tags and get stripped.
+  const decoded = decodeEntities(s);
+  return decodeEntities(decoded.replace(/<[^>]+>/g, "")).replace(/\s+/g, " ").trim();
 }
 
 function findImage(itemXml: string): string | undefined {
@@ -127,9 +129,13 @@ async function parseFeed(source: string, url: string, team?: string): Promise<Ne
       // For per-team feeds, summary becomes the publisher attribution so the
       // card shows "{Team} · {Publisher}" semantics without losing the brand.
       const rawDescription = pick(block, "description") ?? "";
+      const cleanedDesc = stripHtml(rawDescription);
+      // Drop summaries that are just URLs / link soup (common in Google News items).
+      const looksLikeUrl = /^https?:\/\//i.test(cleanedDesc) || /^<?a\s+href=/i.test(cleanedDesc);
+      const usableDesc = looksLikeUrl ? "" : cleanedDesc;
       const summary = team
         ? (publisher ? `via ${stripHtml(publisher)}` : undefined)
-        : (stripHtml(rawDescription).slice(0, 220) || undefined);
+        : (usableDesc.slice(0, 220) || (publisher ? `via ${stripHtml(publisher)}` : undefined));
 
       items.push({
         id: link,

@@ -81,6 +81,41 @@ function pickLineTotal(ev: OddsEvent | undefined, homeNick: string | null, awayN
   return { line, total };
 }
 
+// Compact one-liner squad list — same starters/bench shown on the match page.
+function formatSquad(players: { firstName: string; lastName: string; position: string; jerseyNumber?: number; isCaptain?: boolean }[] | undefined, label: string): string {
+  if (!players || players.length === 0) return `${label} squad: not yet named`;
+  const sorted = [...players].sort((a, b) => (a.jerseyNumber ?? 99) - (b.jerseyNumber ?? 99));
+  const starters = sorted.filter((p) => (p.jerseyNumber ?? 99) <= 13);
+  const bench = sorted.filter((p) => (p.jerseyNumber ?? 99) > 13 && (p.jerseyNumber ?? 99) <= 17);
+  const fmt = (p: typeof sorted[number]) => `${p.jerseyNumber ?? "?"}. ${p.firstName} ${p.lastName}${p.isCaptain ? " (C)" : ""}`;
+  const parts: string[] = [];
+  parts.push(`${label} starting 13: ${starters.map(fmt).join(", ") || "—"}`);
+  if (bench.length) parts.push(`${label} bench: ${bench.map(fmt).join(", ")}`);
+  return parts.join("\n");
+}
+
+// Pull the SAME AI insights the user sees on the match page (winner pick,
+// margin, predicted score, totals lean, HT/FT, top tryscorers, top recommended
+// plays). This guarantees Scout's chat answers stay aligned with the Insights tab.
+async function summarizeStoredInsights(matchId: string, homeNick: string, awayNick: string): Promise<string> {
+  const stored = await readAnySharedInsights(matchId).catch(() => null);
+  if (!stored) return "";
+  const i: Insights = stored.payload;
+  const winnerNick = i.winner.team === "home" ? homeNick : awayNick;
+  const lines: string[] = [];
+  lines.push(`App-Insights pick: ${winnerNick} (${i.winner.confidence}% conf), margin ${i.margin.bucket}, score ${homeNick} ${i.predictedScore.home}–${i.predictedScore.away} ${awayNick}`);
+  lines.push(`Total: ${i.total.pick.toUpperCase()} ${i.total.line} · HT/FT: ${i.htft.pick}`);
+  if (i.firstTryscorer?.pick) lines.push(`First-tryscorer pick: ${i.firstTryscorer.pick}`);
+  const anytimes = (i.anytimeTryscorers ?? []).slice(0, 5).map((p) => p.pick).filter(Boolean);
+  if (anytimes.length) lines.push(`Anytime tryscorer picks: ${anytimes.join(", ")}`);
+  if (i.multiTryscorer?.pick) lines.push(`2+ tries pick: ${i.multiTryscorer.pick}`);
+  const plays = (i.simulation?.recommendedPlays ?? []).slice(0, 5).map((p) =>
+    `${p.pick}${p.decimalOdds ? ` @${p.decimalOdds}` : ""} (${p.confidence}, edge ${p.edgePct.toFixed(0)}%)`,
+  );
+  if (plays.length) lines.push(`Top recommended plays: ${plays.join(" | ")}`);
+  return lines.join("\n");
+}
+
 // Build a deep per-fixture brief: odds, lineups, ins/outs, H2H, top tryscorers.
 async function buildFixtureBrief(
   matchId: string,

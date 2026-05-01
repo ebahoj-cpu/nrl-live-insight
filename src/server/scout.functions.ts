@@ -197,6 +197,8 @@ async function buildFixtureBrief(
   homeNick: string,
   awayNick: string,
   oddsAll: OddsEvent[],
+  ladder: NrlLadderRow[],
+  snap: SeasonSnapshot | null,
 ): Promise<string> {
   const details = await cached<NrlMatchDetails | null>(
     `scout:fix:${matchId}`,
@@ -212,6 +214,8 @@ async function buildFixtureBrief(
   lines.push(`### ${homeNick} v ${awayNick}`);
   if (details) {
     lines.push(`Venue: ${details.venue}, ${details.venueCity} · Round ${details.roundNumber}`);
+    const hasScore = typeof details.homeTeam.score === "number" && typeof details.awayTeam.score === "number";
+    if (hasScore) lines.push(`Status: ${details.matchState} · Actual score: ${homeNick} ${details.homeTeam.score}–${details.awayTeam.score} ${awayNick}`);
   }
 
   // Markets

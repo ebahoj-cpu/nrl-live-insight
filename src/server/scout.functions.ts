@@ -528,7 +528,7 @@ async function buildDeepContext(): Promise<string> {
       if (i >= upcoming.length) return;
       const f = upcoming[i];
       briefs[i] = await withTimeout(
-        buildFixtureBrief(f.matchId, f.homeTeam.nickName, f.awayTeam.nickName, odds),
+        buildFixtureBrief(f.matchId, f.homeTeam.nickName, f.awayTeam.nickName, odds, ladder, snap),
         8000,
         `### ${f.homeTeam.nickName} v ${f.awayTeam.nickName}\n(deep brief still loading)`,
       );

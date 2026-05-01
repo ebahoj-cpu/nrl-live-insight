@@ -306,6 +306,9 @@ async function buildFixtureBrief(
   if (details?.awayTeam?.players?.length) {
     lines.push(formatSquad(details.awayTeam.players, awayNick));
   }
+  if (details) {
+    lines.push(summarizeStatsTab(details, ladder));
+  }
 
   // Recent form per side (last 5 from match-centre)
   if (details) {

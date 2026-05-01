@@ -579,16 +579,20 @@ export const scoutChat = createServerFn({ method: "POST" })
     //     for the very first cold-cache request so users don't wait 60-120s for
     //     NRL.com round-trips. It STILL contains the authoritative GROUND TRUTH
     //     fixtures + byes block, so all grounding rules still hold.
-    const DEEP_KEY = "scout:context:v12-fast-fallback";
+    const DEEP_KEY = "scout:context:v13-app-insights-targeted";
     let context: string;
     try {
-      const fastFallback = await buildFastContext();
-      context = await staleWhileRevalidate<string>(
+      const [fastFallback, targetContext] = await Promise.all([
+        buildFastContext(),
+        buildTargetBriefsContext(data.messages),
+      ]);
+      const roundContext = await staleWhileRevalidate<string>(
         DEEP_KEY,
         CTX_TTL,
         buildDeepContext,
         fastFallback,
       );
+      context = targetContext ? `${roundContext}\n\n${targetContext}` : roundContext;
     } catch (e) {
       console.error("[scout] context build failed:", e);
       throw new Error("Scout can't verify the latest official fixtures right now — try again shortly.");
@@ -619,7 +623,7 @@ export const scoutChat = createServerFn({ method: "POST" })
       "• Lineups / late mail per fixture (ins, outs, blurb) — if listed under a fixture, USE THEM",
       "• Season form per team: W-L-D, PPG for/against, HT-lead %, HT→W conversion %, last-5",
       "• Per-fixture recent form (last-5 of each side) and head-to-head history",
-      "• APP-INSIGHTS line per fixture: the same projected winner, margin, predicted score, totals lean, HT/FT, first/anytime tryscorer picks and top recommended plays the user sees on the Insights tab. When asked 'who do we like / what does the app project / what's the prediction', cite this line directly so chat stays consistent with the Insights tab.",
+      "• APP INSIGHTS TAB per fixture: the exact deterministic cards shown on the match page Insights tab (winner, margin, predicted score, total, HT/FT, tryscorers, predicted outcome). When asked to check the Insights tab or app projection, cite this block directly — do not replace it with your own prediction.",
       "• Recent news headlines",
       "",
       "DATA RULES for missing fields:",
@@ -646,6 +650,7 @@ export const scoutChat = createServerFn({ method: "POST" })
       "DATA RULES:",
       "• Quote exact prices/lines from SNAPSHOT only. Never invent prices, players, or matchups.",
       "• Every pick must reference a matchup that exists in the GROUND TRUTH fixtures list.",
+      "• If USER-REQUESTED MATCH BRIEFS are present, use them first even if the match is already completed or not in the current round.",
       "• No disclaimers, no 'bet responsibly' (UI handles that).",
       "",
       "=== SNAPSHOT ===",

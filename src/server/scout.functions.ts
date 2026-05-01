@@ -306,6 +306,21 @@ async function buildFixtureBrief(
   );
   if (insightsSummary) {
     lines.push(insightsSummary);
+  } else if (details && snap) {
+    const deterministic = generateDeterministicInsights({
+      homeNickname: details.homeTeam.nickName,
+      awayNickname: details.awayTeam.nickName,
+      homeThemeKey: details.homeTeam.themeKey,
+      awayThemeKey: details.awayTeam.themeKey,
+      homeSquad: details.homeTeam.players,
+      awaySquad: details.awayTeam.players,
+      ladder,
+      snapshot: snap,
+      weather: null,
+      tryscorers: tryscorer as TryscorerMarkets | null,
+      venue: details.venue,
+    });
+    lines.push(summarizeDeterministicInsights(deterministic, homeNick, awayNick));
   }
 
   return lines.join("\n");

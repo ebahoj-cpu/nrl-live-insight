@@ -543,6 +543,28 @@ async function buildDeepContext(): Promise<string> {
   return assembleSnapshot({ season, fixtures, ladder, odds, news, snap, briefs, briefsAreDeep: true });
 }
 
+async function buildTargetBriefsContext(messages: ChatMessage[]): Promise<string> {
+  const season = NOW_SEASON();
+  const [fixtures, ladder, liveOdds, snap] = await Promise.all([
+    cached(`scout:fixtures:${season}:v2-official`, 60_000, () => fetchDraw(season)).catch(() => [] as NrlFixture[]),
+    cached(`ladder:${season}`, TTL.ladder, () => fetchLadder(season)).catch(() => [] as NrlLadderRow[]),
+    cached(`odds:nrl`, TTL.odds, () => fetchNrlOdds()).catch(() => [] as OddsEvent[]),
+    getSeasonSnapshot(season).catch(() => null),
+  ]);
+  const targets = await resolveTargetFixtures(season, fixtures, messages);
+  if (!targets.length) return "";
+  const odds = liveOdds.length ? liveOdds : buildEstimatedOdds(fixtures, ladder);
+  const briefs = await Promise.all(targets.map((f) => withTimeout(
+    buildFixtureBrief(f.matchId, f.homeTeam.nickName, f.awayTeam.nickName, odds, ladder, snap),
+    12_000,
+    `### ${f.homeTeam.nickName} v ${f.awayTeam.nickName}\n(targeted app brief did not finish loading)`,
+  )));
+  return [
+    "## USER-REQUESTED MATCH BRIEFS — exact app data for named teams/matches; use this before generic/current-round context",
+    ...briefs,
+  ].join("\n\n");
+}
+
 export const scoutChat = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => Input.parse(i))
   .handler(async ({ data }): Promise<{ reply: string }> => {

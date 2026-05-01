@@ -8,13 +8,14 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { cached, staleWhileRevalidate, TTL } from "./cache";
-import { fetchDraw, fetchLadder, fetchMatchDetails, type NrlMatchDetails } from "./nrl";
-import { buildEstimatedOdds, fetchNrlOdds, fetchTryscorerOdds, bestH2H, type OddsEvent } from "./odds";
+import { fetchDraw, fetchLadder, fetchMatchDetails, type NrlFixture, type NrlLadderRow, type NrlMatchDetails } from "./nrl";
+import { fetchNrlOdds, fetchTryscorerOdds, bestH2H, type OddsEvent, type TryscorerMarkets } from "./odds";
 import { fetchNews, type NewsItem } from "./news";
-import { getSeasonSnapshot, getTeam, type TeamSeasonStats } from "./season-stats";
-import { findTeam } from "@/lib/teams";
+import { getSeasonSnapshot, getTeam, type SeasonSnapshot, type TeamSeasonStats } from "./season-stats";
+import { findTeam, ALL_TEAMS } from "@/lib/teams";
 import { readAnySharedInsights } from "./insights-store";
 import type { Insights } from "./ai-insights";
+import { generateDeterministicInsights, type DeterministicInsights } from "./insights-engine";
 
 // Race a promise against a timeout, returning a fallback if it doesn't beat the clock.
 function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {

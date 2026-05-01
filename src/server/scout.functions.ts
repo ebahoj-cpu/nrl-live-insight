@@ -72,13 +72,18 @@ async function fetchSeasonDraw(season: number): Promise<NrlFixture[]> {
 async function resolveTargetFixtures(season: number, baseFixtures: NrlFixture[], messages: ChatMessage[]): Promise<NrlFixture[]> {
   const mentioned = detectMentionedTeams(messages);
   if (mentioned.length === 0) return [];
-  const allFixtures = mentioned.length >= 2 ? await fetchSeasonDraw(season) : baseFixtures;
+  const allFixtures = await fetchSeasonDraw(season).catch(() => baseFixtures);
   const now = Date.now();
+  const queryText = messages.filter((m) => m.role === "user").slice(-3).map((m) => m.content.toLowerCase()).join("\n");
+  const wantsPast = /\b(last|previous|past|result|score|happened|actual|review|recap|after)\b/.test(queryText);
+  const wantsFuture = /\b(next|tonight|today|upcoming|playing|before|preview|lineup|odds|tips?|bets?)\b/.test(queryText);
   const contains = (f: NrlFixture, nick: string) =>
     normaliseTeamNick(f.homeTeam.nickName) === nick || normaliseTeamNick(f.awayTeam.nickName) === nick;
-  const matches = mentioned.length >= 2
+  let matches = mentioned.length >= 2
     ? allFixtures.filter((f) => mentioned.every((team) => contains(f, team)))
     : allFixtures.filter((f) => contains(f, mentioned[0]));
+  if (wantsPast && !wantsFuture) matches = matches.filter((f) => /full\s*time|fulltime|final|completed/i.test(f.matchState) || Date.parse(f.kickoffUtc) < now);
+  if (wantsFuture && !wantsPast) matches = matches.filter((f) => !/full\s*time|fulltime|final|completed/i.test(f.matchState) && Date.parse(f.kickoffUtc) >= now - 4 * 3600_000);
   return matches
     .sort((a, b) => Math.abs(Date.parse(a.kickoffUtc) - now) - Math.abs(Date.parse(b.kickoffUtc) - now))
     .slice(0, 3);

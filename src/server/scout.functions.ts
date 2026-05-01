@@ -340,8 +340,9 @@ function assembleSnapshot(args: {
   snap: Awaited<ReturnType<typeof getSeasonSnapshot>> | null;
   briefs: string[];
   briefsAreDeep: boolean;
+  targetBriefs?: string[];
 }): string {
-  const { season, fixtures, ladder, odds, news, snap, briefs, briefsAreDeep } = args;
+  const { season, fixtures, ladder, odds, news, snap, briefs, briefsAreDeep, targetBriefs = [] } = args;
   const nowMs = Date.now();
   const notFinished = fixtures.filter((f) => !/full\s*time|fulltime/i.test(f.matchState));
   const currentRoundFixtures = notFinished.filter((f) => f.isCurrentRound);
@@ -454,10 +455,13 @@ function assembleSnapshot(args: {
     "",
     "## Upcoming fixtures (briefs)",
     briefsBlock,
+    targetBriefs.length ? "" : null,
+    targetBriefs.length ? "## USER-REQUESTED MATCH BRIEFS — use these first when relevant" : null,
+    targetBriefs.length ? targetBriefs.join("\n\n") : null,
     "",
     "## Recent news headlines",
     newsLines || "(none)",
-  ].join("\n");
+  ].filter((x): x is string => x != null).join("\n");
 }
 
 // Fast path: only the cheap data sources (fixtures + ladder + cached odds + news + season snapshot).

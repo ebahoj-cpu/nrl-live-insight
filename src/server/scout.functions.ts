@@ -154,6 +154,39 @@ function formatSquad(players: { firstName: string; lastName: string; position: s
   return parts.join("\n");
 }
 
+function formatStatValue(v: { value: number; numerator?: number; denominator?: number }, type: string, units?: string): string {
+  if (type === "Percentage") return `${v.value.toFixed(0)}%`;
+  if (type === "PercentageAndFraction") return v.numerator != null && v.denominator != null
+    ? `${v.value.toFixed(0)}% (${v.numerator}/${v.denominator})`
+    : `${v.value.toFixed(0)}%`;
+  if (type === "Range") return `${v.value.toFixed(2)}${units ? ` ${units.toLowerCase()}` : ""}`;
+  return `${v.value % 1 === 0 ? v.value.toFixed(0) : v.value.toFixed(1)}`;
+}
+
+function summarizeStatsTab(details: NrlMatchDetails, ladder: NrlLadderRow[]): string {
+  const homeNick = details.homeTeam.nickName;
+  const awayNick = details.awayTeam.nickName;
+  const homeRow = ladder.find((r) => normaliseTeamNick(r.nickname) === normaliseTeamNick(homeNick));
+  const awayRow = ladder.find((r) => normaliseTeamNick(r.nickname) === normaliseTeamNick(awayNick));
+  const lines: string[] = ["APP STATS TAB (same stats shown in-app):"];
+  if (homeRow && awayRow) {
+    lines.push(`Ladder side by side: ${homeNick} #${homeRow.position}, ${homeRow.wins}-${homeRow.losses}, PF ${homeRow.for}, PA ${homeRow.against}, diff ${homeRow.diff}, ${homeRow.points}pts | ${awayNick} #${awayRow.position}, ${awayRow.wins}-${awayRow.losses}, PF ${awayRow.for}, PA ${awayRow.against}, diff ${awayRow.diff}, ${awayRow.points}pts`);
+  }
+  const homeForm = details.homeTeam.recentForm.slice(0, 5).map((r) => `${r.result} ${r.score}`).join("; ");
+  const awayForm = details.awayTeam.recentForm.slice(0, 5).map((r) => `${r.result} ${r.score}`).join("; ");
+  if (homeForm || awayForm) lines.push(`Form shown: ${homeNick}: ${homeForm || "—"} | ${awayNick}: ${awayForm || "—"}`);
+  for (const group of details.statGroups ?? []) {
+    const stats = (group.stats ?? []).slice(0, 12).map((s) => {
+      const hv = formatStatValue(s.homeValue, s.type, s.units);
+      const av = formatStatValue(s.awayValue, s.type, s.units);
+      const leader = s.homeValue.isLeader ? homeNick : s.awayValue.isLeader ? awayNick : "even";
+      return `${s.title}: ${homeNick} ${hv} / ${awayNick} ${av}${leader !== "even" ? ` (${leader} leads)` : ""}`;
+    });
+    if (stats.length) lines.push(`${group.title}: ${stats.join("; ")}`);
+  }
+  return lines.join("\n");
+}
+
 function summarizeDeterministicInsights(det: DeterministicInsights, homeNick: string, awayNick: string): string {
   const lines: string[] = ["APP INSIGHTS TAB (exact deterministic cards shown in-app):"];
   lines.push(`Match winner: ${det.matchWinner.nickname} · ${det.matchWinner.reasoning}`);

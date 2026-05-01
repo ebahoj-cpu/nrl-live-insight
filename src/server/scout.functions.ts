@@ -149,6 +149,23 @@ function formatSquad(players: { firstName: string; lastName: string; position: s
   return parts.join("\n");
 }
 
+function summarizeDeterministicInsights(det: DeterministicInsights, homeNick: string, awayNick: string): string {
+  const lines: string[] = ["APP INSIGHTS TAB (exact deterministic cards shown in-app):"];
+  lines.push(`Match winner: ${det.matchWinner.nickname} · ${det.matchWinner.reasoning}`);
+  lines.push(`Winning margin: ${det.margin.bucket} · ${det.margin.reasoning}`);
+  lines.push(`Predicted score: ${homeNick} ${det.predictedScore.home}–${det.predictedScore.away} ${awayNick} · ${det.predictedScore.reasoning}`);
+  lines.push(`Points over/under: ${det.totalPoints.lean.toUpperCase()} ${det.totalPoints.line} · ${det.totalPoints.reasoning}`);
+  lines.push(`HT/FT: ${det.htft.pick} · ${det.htft.reasoning}`);
+  lines.push(`First tryscorer: ${det.firstTryscorer.name} (${det.firstTryscorer.team}${det.firstTryscorer.price ? ` @${det.firstTryscorer.price}` : ""})`);
+  if (det.playerDouble?.name) lines.push(`2+ tries: ${det.playerDouble.name} (${det.playerDouble.team}${det.playerDouble.price ? ` @${det.playerDouble.price}` : ""})`);
+  const outcomePicks = (det.predictedOutcome?.picks ?? []).map((p) => `${p.name}${p.price ? ` @${p.price}` : ""}`).join(", ");
+  if (det.predictedOutcome?.summary) lines.push(`Predicted outcome: ${det.predictedOutcome.summary}${outcomePicks ? ` Picks: ${outcomePicks}` : ""}`);
+  const topHome = (det.topAnytimeHome ?? []).map((p) => `${p.name}${p.price ? ` @${p.price}` : ""}`).join(", ");
+  const topAway = (det.topAnytimeAway ?? []).map((p) => `${p.name}${p.price ? ` @${p.price}` : ""}`).join(", ");
+  if (topHome || topAway) lines.push(`Top anytime: ${homeNick}: ${topHome || "—"} | ${awayNick}: ${topAway || "—"}`);
+  return lines.join("\n");
+}
+
 // Pull the SAME AI insights the user sees on the match page (winner pick,
 // margin, predicted score, totals lean, HT/FT, top tryscorers, top recommended
 // plays). This guarantees Scout's chat answers stay aligned with the Insights tab.

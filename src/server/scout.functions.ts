@@ -37,6 +37,52 @@ const NOW_SEASON = () => new Date().getUTCFullYear();
 const CTX_TTL = 5 * 60_000;            // 5 min – whole context bundle
 const FIXTURE_TTL = 10 * 60_000;       // 10 min – per-match deep data
 const TRYSCORER_TTL = 15 * 60_000;     // 15 min – player markets
+const SEASON_ROUNDS = 27;
+type ChatMessage = z.infer<typeof Message>;
+
+function normaliseTeamNick(input: string): string {
+  return findTeam(input)?.nickname ?? input;
+}
+
+function detectMentionedTeams(messages: ChatMessage[]): string[] {
+  const text = messages
+    .filter((m) => m.role === "user")
+    .slice(-8)
+    .map((m) => m.content.toLowerCase())
+    .join("\n");
+  const hits = ALL_TEAMS.filter((t) => {
+    const names = [t.nickname, t.name, t.themeKey.replace(/-/g, " ")].map((x) => x.toLowerCase());
+    return names.some((name) => new RegExp(`(^|[^a-z])${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^a-z]|$)`).test(text));
+  }).map((t) => t.nickname);
+  return Array.from(new Set(hits));
+}
+
+async function fetchSeasonDraw(season: number): Promise<NrlFixture[]> {
+  const rounds = await Promise.all(
+    Array.from({ length: SEASON_ROUNDS }, (_, i) => i + 1).map((round) =>
+      cached(`scout:fixtures:${season}:round:${round}:v1`, 6 * 60 * 60_000, () => fetchDraw(season, round))
+        .catch(() => [] as NrlFixture[]),
+    ),
+  );
+  const byId = new Map<string, NrlFixture>();
+  for (const f of rounds.flat()) byId.set(f.matchId, f);
+  return Array.from(byId.values());
+}
+
+async function resolveTargetFixtures(season: number, baseFixtures: NrlFixture[], messages: ChatMessage[]): Promise<NrlFixture[]> {
+  const mentioned = detectMentionedTeams(messages);
+  if (mentioned.length === 0) return [];
+  const allFixtures = mentioned.length >= 2 ? await fetchSeasonDraw(season) : baseFixtures;
+  const now = Date.now();
+  const contains = (f: NrlFixture, nick: string) =>
+    normaliseTeamNick(f.homeTeam.nickName) === nick || normaliseTeamNick(f.awayTeam.nickName) === nick;
+  const matches = mentioned.length >= 2
+    ? allFixtures.filter((f) => mentioned.every((team) => contains(f, team)))
+    : allFixtures.filter((f) => contains(f, mentioned[0]));
+  return matches
+    .sort((a, b) => Math.abs(Date.parse(a.kickoffUtc) - now) - Math.abs(Date.parse(b.kickoffUtc) - now))
+    .slice(0, 3);
+}
 
 // Find the matching odds event for a fixture (by nicknames either direction)
 function matchOddsEvent(

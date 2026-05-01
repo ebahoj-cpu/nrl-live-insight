@@ -173,9 +173,12 @@ async function summarizeStoredInsights(matchId: string, homeNick: string, awayNi
   const stored = await readAnySharedInsights(matchId).catch(() => null);
   if (!stored) return "";
   const i: Insights = stored.payload;
+  const det = (i as unknown as { deterministic?: DeterministicInsights }).deterministic;
+  if (det) return summarizeDeterministicInsights(det, homeNick, awayNick);
+  if (!i.winner || !i.predictedScore || !i.total || !i.htft) return "";
   const winnerNick = i.winner.team === "home" ? homeNick : awayNick;
   const lines: string[] = [];
-  lines.push(`App-Insights pick: ${winnerNick} (${i.winner.confidence}% conf), margin ${i.margin.bucket}, score ${homeNick} ${i.predictedScore.home}–${i.predictedScore.away} ${awayNick}`);
+  lines.push(`APP INSIGHTS TAB: ${winnerNick} (${i.winner.confidence}% conf), margin ${i.margin?.bucket}, score ${homeNick} ${i.predictedScore.home}–${i.predictedScore.away} ${awayNick}`);
   lines.push(`Total: ${i.total.pick.toUpperCase()} ${i.total.line} · HT/FT: ${i.htft.pick}`);
   if (i.firstTryscorer?.pick) lines.push(`First-tryscorer pick: ${i.firstTryscorer.pick}`);
   const anytimes = (i.anytimeTryscorers ?? []).slice(0, 5).map((p) => p.pick).filter(Boolean);

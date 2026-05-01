@@ -8,13 +8,14 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { cached, staleWhileRevalidate, TTL } from "./cache";
-import { fetchDraw, fetchLadder, fetchMatchDetails, type NrlMatchDetails } from "./nrl";
-import { buildEstimatedOdds, fetchNrlOdds, fetchTryscorerOdds, bestH2H, type OddsEvent } from "./odds";
+import { fetchDraw, fetchLadder, fetchMatchDetails, type NrlFixture, type NrlLadderRow, type NrlMatchDetails } from "./nrl";
+import { buildEstimatedOdds, fetchNrlOdds, fetchTryscorerOdds, bestH2H, type OddsEvent, type TryscorerMarkets } from "./odds";
 import { fetchNews, type NewsItem } from "./news";
-import { getSeasonSnapshot, getTeam, type TeamSeasonStats } from "./season-stats";
-import { findTeam } from "@/lib/teams";
+import { getSeasonSnapshot, getTeam, type SeasonSnapshot, type TeamSeasonStats } from "./season-stats";
+import { findTeam, ALL_TEAMS } from "@/lib/teams";
 import { readAnySharedInsights } from "./insights-store";
 import type { Insights } from "./ai-insights";
+import { generateDeterministicInsights, type DeterministicInsights } from "./insights-engine";
 
 // Race a promise against a timeout, returning a fallback if it doesn't beat the clock.
 function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
@@ -36,6 +37,52 @@ const NOW_SEASON = () => new Date().getUTCFullYear();
 const CTX_TTL = 5 * 60_000;            // 5 min – whole context bundle
 const FIXTURE_TTL = 10 * 60_000;       // 10 min – per-match deep data
 const TRYSCORER_TTL = 15 * 60_000;     // 15 min – player markets
+const SEASON_ROUNDS = 27;
+type ChatMessage = z.infer<typeof Message>;
+
+function normaliseTeamNick(input: string): string {
+  return findTeam(input)?.nickname ?? input;
+}
+
+function detectMentionedTeams(messages: ChatMessage[]): string[] {
+  const text = messages
+    .filter((m) => m.role === "user")
+    .slice(-8)
+    .map((m) => m.content.toLowerCase())
+    .join("\n");
+  const hits = ALL_TEAMS.filter((t) => {
+    const names = [t.nickname, t.name, t.themeKey.replace(/-/g, " ")].map((x) => x.toLowerCase());
+    return names.some((name) => new RegExp(`(^|[^a-z])${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^a-z]|$)`).test(text));
+  }).map((t) => t.nickname);
+  return Array.from(new Set(hits));
+}
+
+async function fetchSeasonDraw(season: number): Promise<NrlFixture[]> {
+  const rounds = await Promise.all(
+    Array.from({ length: SEASON_ROUNDS }, (_, i) => i + 1).map((round) =>
+      cached(`scout:fixtures:${season}:round:${round}:v1`, 6 * 60 * 60_000, () => fetchDraw(season, round))
+        .catch(() => [] as NrlFixture[]),
+    ),
+  );
+  const byId = new Map<string, NrlFixture>();
+  for (const f of rounds.flat()) byId.set(f.matchId, f);
+  return Array.from(byId.values());
+}
+
+async function resolveTargetFixtures(season: number, baseFixtures: NrlFixture[], messages: ChatMessage[]): Promise<NrlFixture[]> {
+  const mentioned = detectMentionedTeams(messages);
+  if (mentioned.length === 0) return [];
+  const allFixtures = mentioned.length >= 2 ? await fetchSeasonDraw(season) : baseFixtures;
+  const now = Date.now();
+  const contains = (f: NrlFixture, nick: string) =>
+    normaliseTeamNick(f.homeTeam.nickName) === nick || normaliseTeamNick(f.awayTeam.nickName) === nick;
+  const matches = mentioned.length >= 2
+    ? allFixtures.filter((f) => mentioned.every((team) => contains(f, team)))
+    : allFixtures.filter((f) => contains(f, mentioned[0]));
+  return matches
+    .sort((a, b) => Math.abs(Date.parse(a.kickoffUtc) - now) - Math.abs(Date.parse(b.kickoffUtc) - now))
+    .slice(0, 3);
+}
 
 // Find the matching odds event for a fixture (by nicknames either direction)
 function matchOddsEvent(
@@ -102,6 +149,23 @@ function formatSquad(players: { firstName: string; lastName: string; position: s
   return parts.join("\n");
 }
 
+function summarizeDeterministicInsights(det: DeterministicInsights, homeNick: string, awayNick: string): string {
+  const lines: string[] = ["APP INSIGHTS TAB (exact deterministic cards shown in-app):"];
+  lines.push(`Match winner: ${det.matchWinner.nickname} · ${det.matchWinner.reasoning}`);
+  lines.push(`Winning margin: ${det.margin.bucket} · ${det.margin.reasoning}`);
+  lines.push(`Predicted score: ${homeNick} ${det.predictedScore.home}–${det.predictedScore.away} ${awayNick} · ${det.predictedScore.reasoning}`);
+  lines.push(`Points over/under: ${det.totalPoints.lean.toUpperCase()} ${det.totalPoints.line} · ${det.totalPoints.reasoning}`);
+  lines.push(`HT/FT: ${det.htft.pick} · ${det.htft.reasoning}`);
+  lines.push(`First tryscorer: ${det.firstTryscorer.name} (${det.firstTryscorer.team}${det.firstTryscorer.price ? ` @${det.firstTryscorer.price}` : ""})`);
+  if (det.playerDouble?.name) lines.push(`2+ tries: ${det.playerDouble.name} (${det.playerDouble.team}${det.playerDouble.price ? ` @${det.playerDouble.price}` : ""})`);
+  const outcomePicks = (det.predictedOutcome?.picks ?? []).map((p) => `${p.name}${p.price ? ` @${p.price}` : ""}`).join(", ");
+  if (det.predictedOutcome?.summary) lines.push(`Predicted outcome: ${det.predictedOutcome.summary}${outcomePicks ? ` Picks: ${outcomePicks}` : ""}`);
+  const topHome = (det.topAnytimeHome ?? []).map((p) => `${p.name}${p.price ? ` @${p.price}` : ""}`).join(", ");
+  const topAway = (det.topAnytimeAway ?? []).map((p) => `${p.name}${p.price ? ` @${p.price}` : ""}`).join(", ");
+  if (topHome || topAway) lines.push(`Top anytime: ${homeNick}: ${topHome || "—"} | ${awayNick}: ${topAway || "—"}`);
+  return lines.join("\n");
+}
+
 // Pull the SAME AI insights the user sees on the match page (winner pick,
 // margin, predicted score, totals lean, HT/FT, top tryscorers, top recommended
 // plays). This guarantees Scout's chat answers stay aligned with the Insights tab.
@@ -109,9 +173,12 @@ async function summarizeStoredInsights(matchId: string, homeNick: string, awayNi
   const stored = await readAnySharedInsights(matchId).catch(() => null);
   if (!stored) return "";
   const i: Insights = stored.payload;
+  const det = (i as unknown as { deterministic?: DeterministicInsights }).deterministic;
+  if (det) return summarizeDeterministicInsights(det, homeNick, awayNick);
+  if (!i.winner || !i.predictedScore || !i.total || !i.htft) return "";
   const winnerNick = i.winner.team === "home" ? homeNick : awayNick;
   const lines: string[] = [];
-  lines.push(`App-Insights pick: ${winnerNick} (${i.winner.confidence}% conf), margin ${i.margin.bucket}, score ${homeNick} ${i.predictedScore.home}–${i.predictedScore.away} ${awayNick}`);
+  lines.push(`APP INSIGHTS TAB: ${winnerNick} (${i.winner.confidence}% conf), margin ${i.margin?.bucket}, score ${homeNick} ${i.predictedScore.home}–${i.predictedScore.away} ${awayNick}`);
   lines.push(`Total: ${i.total.pick.toUpperCase()} ${i.total.line} · HT/FT: ${i.htft.pick}`);
   if (i.firstTryscorer?.pick) lines.push(`First-tryscorer pick: ${i.firstTryscorer.pick}`);
   const anytimes = (i.anytimeTryscorers ?? []).slice(0, 5).map((p) => p.pick).filter(Boolean);
@@ -130,6 +197,8 @@ async function buildFixtureBrief(
   homeNick: string,
   awayNick: string,
   oddsAll: OddsEvent[],
+  ladder: NrlLadderRow[],
+  snap: SeasonSnapshot | null,
 ): Promise<string> {
   const details = await cached<NrlMatchDetails | null>(
     `scout:fix:${matchId}`,
@@ -145,6 +214,8 @@ async function buildFixtureBrief(
   lines.push(`### ${homeNick} v ${awayNick}`);
   if (details) {
     lines.push(`Venue: ${details.venue}, ${details.venueCity} · Round ${details.roundNumber}`);
+    const hasScore = typeof details.homeTeam.score === "number" && typeof details.awayTeam.score === "number";
+    if (hasScore) lines.push(`Status: ${details.matchState} · Actual score: ${homeNick} ${details.homeTeam.score}–${details.awayTeam.score} ${awayNick}`);
   }
 
   // Markets
@@ -235,6 +306,21 @@ async function buildFixtureBrief(
   );
   if (insightsSummary) {
     lines.push(insightsSummary);
+  } else if (details && snap) {
+    const deterministic = generateDeterministicInsights({
+      homeNickname: details.homeTeam.nickName,
+      awayNickname: details.awayTeam.nickName,
+      homeThemeKey: details.homeTeam.themeKey,
+      awayThemeKey: details.awayTeam.themeKey,
+      homeSquad: details.homeTeam.players,
+      awaySquad: details.awayTeam.players,
+      ladder,
+      snapshot: snap,
+      weather: null,
+      tryscorers: tryscorer as TryscorerMarkets | null,
+      venue: details.venue,
+    });
+    lines.push(summarizeDeterministicInsights(deterministic, homeNick, awayNick));
   }
 
   return lines.join("\n");
@@ -254,8 +340,9 @@ function assembleSnapshot(args: {
   snap: Awaited<ReturnType<typeof getSeasonSnapshot>> | null;
   briefs: string[];
   briefsAreDeep: boolean;
+  targetBriefs?: string[];
 }): string {
-  const { season, fixtures, ladder, odds, news, snap, briefs, briefsAreDeep } = args;
+  const { season, fixtures, ladder, odds, news, snap, briefs, briefsAreDeep, targetBriefs = [] } = args;
   const nowMs = Date.now();
   const notFinished = fixtures.filter((f) => !/full\s*time|fulltime/i.test(f.matchState));
   const currentRoundFixtures = notFinished.filter((f) => f.isCurrentRound);
@@ -368,10 +455,13 @@ function assembleSnapshot(args: {
     "",
     "## Upcoming fixtures (briefs)",
     briefsBlock,
+    targetBriefs.length ? "" : null,
+    targetBriefs.length ? "## USER-REQUESTED MATCH BRIEFS — use these first when relevant" : null,
+    targetBriefs.length ? targetBriefs.join("\n\n") : null,
     "",
     "## Recent news headlines",
     newsLines || "(none)",
-  ].join("\n");
+  ].filter((x): x is string => x != null).join("\n");
 }
 
 // Fast path: only the cheap data sources (fixtures + ladder + cached odds + news + season snapshot).
@@ -442,7 +532,7 @@ async function buildDeepContext(): Promise<string> {
       if (i >= upcoming.length) return;
       const f = upcoming[i];
       briefs[i] = await withTimeout(
-        buildFixtureBrief(f.matchId, f.homeTeam.nickName, f.awayTeam.nickName, odds),
+        buildFixtureBrief(f.matchId, f.homeTeam.nickName, f.awayTeam.nickName, odds, ladder, snap),
         8000,
         `### ${f.homeTeam.nickName} v ${f.awayTeam.nickName}\n(deep brief still loading)`,
       );
@@ -451,6 +541,28 @@ async function buildDeepContext(): Promise<string> {
   await Promise.all(Array.from({ length: Math.min(CONCURRENCY, upcoming.length) }, worker));
 
   return assembleSnapshot({ season, fixtures, ladder, odds, news, snap, briefs, briefsAreDeep: true });
+}
+
+async function buildTargetBriefsContext(messages: ChatMessage[]): Promise<string> {
+  const season = NOW_SEASON();
+  const [fixtures, ladder, liveOdds, snap] = await Promise.all([
+    cached(`scout:fixtures:${season}:v2-official`, 60_000, () => fetchDraw(season)).catch(() => [] as NrlFixture[]),
+    cached(`ladder:${season}`, TTL.ladder, () => fetchLadder(season)).catch(() => [] as NrlLadderRow[]),
+    cached(`odds:nrl`, TTL.odds, () => fetchNrlOdds()).catch(() => [] as OddsEvent[]),
+    getSeasonSnapshot(season).catch(() => null),
+  ]);
+  const targets = await resolveTargetFixtures(season, fixtures, messages);
+  if (!targets.length) return "";
+  const odds = liveOdds.length ? liveOdds : buildEstimatedOdds(fixtures, ladder);
+  const briefs = await Promise.all(targets.map((f) => withTimeout(
+    buildFixtureBrief(f.matchId, f.homeTeam.nickName, f.awayTeam.nickName, odds, ladder, snap),
+    12_000,
+    `### ${f.homeTeam.nickName} v ${f.awayTeam.nickName}\n(targeted app brief did not finish loading)`,
+  )));
+  return [
+    "## USER-REQUESTED MATCH BRIEFS — exact app data for named teams/matches; use this before generic/current-round context",
+    ...briefs,
+  ].join("\n\n");
 }
 
 export const scoutChat = createServerFn({ method: "POST" })
@@ -467,16 +579,20 @@ export const scoutChat = createServerFn({ method: "POST" })
     //     for the very first cold-cache request so users don't wait 60-120s for
     //     NRL.com round-trips. It STILL contains the authoritative GROUND TRUTH
     //     fixtures + byes block, so all grounding rules still hold.
-    const DEEP_KEY = "scout:context:v12-fast-fallback";
+    const DEEP_KEY = "scout:context:v13-app-insights-targeted";
     let context: string;
     try {
-      const fastFallback = await buildFastContext();
-      context = await staleWhileRevalidate<string>(
+      const [fastFallback, targetContext] = await Promise.all([
+        buildFastContext(),
+        buildTargetBriefsContext(data.messages),
+      ]);
+      const roundContext = await staleWhileRevalidate<string>(
         DEEP_KEY,
         CTX_TTL,
         buildDeepContext,
         fastFallback,
       );
+      context = targetContext ? `${roundContext}\n\n${targetContext}` : roundContext;
     } catch (e) {
       console.error("[scout] context build failed:", e);
       throw new Error("Scout can't verify the latest official fixtures right now — try again shortly.");
@@ -490,9 +606,9 @@ export const scoutChat = createServerFn({ method: "POST" })
       "",
       "GROUND TRUTH PROTOCOL — read this BEFORE every reply:",
       "• If the snapshot says '(official NRL snapshot unavailable)' or has no GROUND TRUTH fixtures, say you can't verify the latest fixtures right now. Do not answer from memory.",
-      "• The 'GROUND TRUTH — Round Fixtures' block is the ONLY authoritative source for who plays who this round. The round number is in the snapshot header.",
+      "• The 'GROUND TRUTH — Round Fixtures' block is the authoritative source for who plays who this round. The 'USER-REQUESTED MATCH BRIEFS' block is authoritative for specifically named teams/matches, including completed games outside the current round.",
       "• The 'GROUND TRUTH — Teams on the BYE this round' line lists every team NOT playing. If a user asks about a team on that bye list, say so directly — do not invent a fixture for them.",
-      "• Before naming any matchup, scan the fixtures list for BOTH team names. If you can't find both teams together on the same line, the matchup does not exist this round — correct the user.",
+      "• Before naming any matchup, scan the fixtures list and USER-REQUESTED MATCH BRIEFS for BOTH team names. If you can't find both teams together, correct the user.",
       "• Never infer an opponent from ladder proximity, odds order, alphabetical order, or memory. The fixtures list is the only source of truth.",
       "• When a user names a team (e.g. 'Cowboys'), look up that exact team in the fixtures list to find their real opponent THIS round before answering. If they're on the bye list, say 'X are on the bye this round' — don't guess.",
       "• When recommending a pick, name BOTH teams in the matchup so it's unambiguous (e.g. 'Broncos H2H @2.15 vs Cowboys' — never just 'Broncos H2H').",
@@ -507,7 +623,7 @@ export const scoutChat = createServerFn({ method: "POST" })
       "• Lineups / late mail per fixture (ins, outs, blurb) — if listed under a fixture, USE THEM",
       "• Season form per team: W-L-D, PPG for/against, HT-lead %, HT→W conversion %, last-5",
       "• Per-fixture recent form (last-5 of each side) and head-to-head history",
-      "• APP-INSIGHTS line per fixture: the same projected winner, margin, predicted score, totals lean, HT/FT, first/anytime tryscorer picks and top recommended plays the user sees on the Insights tab. When asked 'who do we like / what does the app project / what's the prediction', cite this line directly so chat stays consistent with the Insights tab.",
+      "• APP INSIGHTS TAB per fixture: the exact deterministic cards shown on the match page Insights tab (winner, margin, predicted score, total, HT/FT, tryscorers, predicted outcome). When asked to check the Insights tab or app projection, cite this block directly — do not replace it with your own prediction.",
       "• Recent news headlines",
       "",
       "DATA RULES for missing fields:",
@@ -533,7 +649,8 @@ export const scoutChat = createServerFn({ method: "POST" })
       "",
       "DATA RULES:",
       "• Quote exact prices/lines from SNAPSHOT only. Never invent prices, players, or matchups.",
-      "• Every pick must reference a matchup that exists in the GROUND TRUTH fixtures list.",
+      "• Every pick must reference a matchup that exists in the GROUND TRUTH fixtures list or USER-REQUESTED MATCH BRIEFS.",
+      "• If USER-REQUESTED MATCH BRIEFS are present, use them first even if the match is already completed or not in the current round.",
       "• No disclaimers, no 'bet responsibly' (UI handles that).",
       "",
       "=== SNAPSHOT ===",

@@ -72,13 +72,18 @@ async function fetchSeasonDraw(season: number): Promise<NrlFixture[]> {
 async function resolveTargetFixtures(season: number, baseFixtures: NrlFixture[], messages: ChatMessage[]): Promise<NrlFixture[]> {
   const mentioned = detectMentionedTeams(messages);
   if (mentioned.length === 0) return [];
-  const allFixtures = mentioned.length >= 2 ? await fetchSeasonDraw(season) : baseFixtures;
+  const allFixtures = await fetchSeasonDraw(season).catch(() => baseFixtures);
   const now = Date.now();
+  const queryText = messages.filter((m) => m.role === "user").slice(-3).map((m) => m.content.toLowerCase()).join("\n");
+  const wantsPast = /\b(last|previous|past|result|score|happened|actual|review|recap|after)\b/.test(queryText);
+  const wantsFuture = /\b(next|tonight|today|upcoming|playing|before|preview|lineup|odds|tips?|bets?)\b/.test(queryText);
   const contains = (f: NrlFixture, nick: string) =>
     normaliseTeamNick(f.homeTeam.nickName) === nick || normaliseTeamNick(f.awayTeam.nickName) === nick;
-  const matches = mentioned.length >= 2
+  let matches = mentioned.length >= 2
     ? allFixtures.filter((f) => mentioned.every((team) => contains(f, team)))
     : allFixtures.filter((f) => contains(f, mentioned[0]));
+  if (wantsPast && !wantsFuture) matches = matches.filter((f) => /full\s*time|fulltime|final|completed/i.test(f.matchState) || Date.parse(f.kickoffUtc) < now);
+  if (wantsFuture && !wantsPast) matches = matches.filter((f) => !/full\s*time|fulltime|final|completed/i.test(f.matchState) && Date.parse(f.kickoffUtc) >= now - 4 * 3600_000);
   return matches
     .sort((a, b) => Math.abs(Date.parse(a.kickoffUtc) - now) - Math.abs(Date.parse(b.kickoffUtc) - now))
     .slice(0, 3);
@@ -147,6 +152,39 @@ function formatSquad(players: { firstName: string; lastName: string; position: s
   parts.push(`${label} starting 13: ${starters.map(fmt).join(", ") || "—"}`);
   if (bench.length) parts.push(`${label} bench: ${bench.map(fmt).join(", ")}`);
   return parts.join("\n");
+}
+
+function formatStatValue(v: { value: number; numerator?: number; denominator?: number }, type: string, units?: string): string {
+  if (type === "Percentage") return `${v.value.toFixed(0)}%`;
+  if (type === "PercentageAndFraction") return v.numerator != null && v.denominator != null
+    ? `${v.value.toFixed(0)}% (${v.numerator}/${v.denominator})`
+    : `${v.value.toFixed(0)}%`;
+  if (type === "Range") return `${v.value.toFixed(2)}${units ? ` ${units.toLowerCase()}` : ""}`;
+  return `${v.value % 1 === 0 ? v.value.toFixed(0) : v.value.toFixed(1)}`;
+}
+
+function summarizeStatsTab(details: NrlMatchDetails, ladder: NrlLadderRow[]): string {
+  const homeNick = details.homeTeam.nickName;
+  const awayNick = details.awayTeam.nickName;
+  const homeRow = ladder.find((r) => normaliseTeamNick(r.nickname) === normaliseTeamNick(homeNick));
+  const awayRow = ladder.find((r) => normaliseTeamNick(r.nickname) === normaliseTeamNick(awayNick));
+  const lines: string[] = ["APP STATS TAB (same stats shown in-app):"];
+  if (homeRow && awayRow) {
+    lines.push(`Ladder side by side: ${homeNick} #${homeRow.position}, ${homeRow.wins}-${homeRow.losses}, PF ${homeRow.for}, PA ${homeRow.against}, diff ${homeRow.diff}, ${homeRow.points}pts | ${awayNick} #${awayRow.position}, ${awayRow.wins}-${awayRow.losses}, PF ${awayRow.for}, PA ${awayRow.against}, diff ${awayRow.diff}, ${awayRow.points}pts`);
+  }
+  const homeForm = details.homeTeam.recentForm.slice(0, 5).map((r) => `${r.result} ${r.score}`).join("; ");
+  const awayForm = details.awayTeam.recentForm.slice(0, 5).map((r) => `${r.result} ${r.score}`).join("; ");
+  if (homeForm || awayForm) lines.push(`Form shown: ${homeNick}: ${homeForm || "—"} | ${awayNick}: ${awayForm || "—"}`);
+  for (const group of details.statGroups ?? []) {
+    const stats = (group.stats ?? []).slice(0, 12).map((s) => {
+      const hv = formatStatValue(s.homeValue, s.type, s.units);
+      const av = formatStatValue(s.awayValue, s.type, s.units);
+      const leader = s.homeValue.isLeader ? homeNick : s.awayValue.isLeader ? awayNick : "even";
+      return `${s.title}: ${homeNick} ${hv} / ${awayNick} ${av}${leader !== "even" ? ` (${leader} leads)` : ""}`;
+    });
+    if (stats.length) lines.push(`${group.title}: ${stats.join("; ")}`);
+  }
+  return lines.join("\n");
 }
 
 function summarizeDeterministicInsights(det: DeterministicInsights, homeNick: string, awayNick: string): string {
@@ -267,6 +305,9 @@ async function buildFixtureBrief(
   }
   if (details?.awayTeam?.players?.length) {
     lines.push(formatSquad(details.awayTeam.players, awayNick));
+  }
+  if (details) {
+    lines.push(summarizeStatsTab(details, ladder));
   }
 
   // Recent form per side (last 5 from match-centre)
@@ -610,7 +651,7 @@ export const scoutChat = createServerFn({ method: "POST" })
       "• The 'GROUND TRUTH — Teams on the BYE this round' line lists every team NOT playing. If a user asks about a team on that bye list, say so directly — do not invent a fixture for them.",
       "• Before naming any matchup, scan the fixtures list and USER-REQUESTED MATCH BRIEFS for BOTH team names. If you can't find both teams together, correct the user.",
       "• Never infer an opponent from ladder proximity, odds order, alphabetical order, or memory. The fixtures list is the only source of truth.",
-      "• When a user names a team (e.g. 'Cowboys'), look up that exact team in the fixtures list to find their real opponent THIS round before answering. If they're on the bye list, say 'X are on the bye this round' — don't guess.",
+      "• When a user names a team, first check USER-REQUESTED MATCH BRIEFS for that team, then the fixture list for their current/next opponent. If they're on the bye list and no requested brief exists, say so — don't guess.",
       "• When recommending a pick, name BOTH teams in the matchup so it's unambiguous (e.g. 'Broncos H2H @2.15 vs Cowboys' — never just 'Broncos H2H').",
       "• If a team is on the bye list, do NOT include them in picks/recommendations.",
       "",
@@ -621,6 +662,7 @@ export const scoutChat = createServerFn({ method: "POST" })
       "• Tryscorer markets per fixture (anytime + first-tryscorer favs) — if listed under a fixture, USE THEM",
       "• Full SQUADS per fixture (starting 13 + bench, jersey numbers, captains) — if listed, USE THEM",
       "• Lineups / late mail per fixture (ins, outs, blurb) — if listed under a fixture, USE THEM",
+      "• APP STATS TAB per fixture: the same side-by-side ladder/form/statGroups shown on the match page Stats tab — use this before external stats.",
       "• Season form per team: W-L-D, PPG for/against, HT-lead %, HT→W conversion %, last-5",
       "• Per-fixture recent form (last-5 of each side) and head-to-head history",
       "• APP INSIGHTS TAB per fixture: the exact deterministic cards shown on the match page Insights tab (winner, margin, predicted score, total, HT/FT, tryscorers, predicted outcome). When asked to check the Insights tab or app projection, cite this block directly — do not replace it with your own prediction.",
@@ -632,10 +674,10 @@ export const scoutChat = createServerFn({ method: "POST" })
       "• If a squad block isn't shown for a fixture → say the squad hasn't been named yet.",
       "• Otherwise NEVER claim you lack data that IS in SNAPSHOT. Read the relevant fixture block carefully before answering.",
       "",
-      "EXTERNAL STATS — when the user asks about historical stats, career numbers, or league-wide records that are NOT in the snapshot (e.g. 'how many tries has Reece Walsh scored this season', 'most points in a game', 'all-time meeting record'):",
-      "• You MAY draw on widely-known NRL knowledge to give a useful answer.",
-      "• Be explicit about uncertainty — say 'as of my last training data' or 'roughly' rather than fabricating exact numbers.",
-      "• NEVER override SNAPSHOT data with memory. The snapshot is the source of truth for fixtures, lineups, odds, ladder and current-season form.",
+      "EXTERNAL STATS — only when the answer is NOT in USER-REQUESTED MATCH BRIEFS / app Stats / app Insights / lineups:",
+      "• Use NRL.com-derived knowledge where possible: player, team, fixture and historical stats.",
+      "• If you cannot verify an exact external number from the snapshot, be explicit about uncertainty instead of fabricating precision.",
+      "• NEVER override app data with memory. The snapshot is the source of truth for fixtures, lineups, odds, ladder, app stats and app insights.",
       "",
       "DATA YOU DO NOT HAVE in SNAPSHOT — be honest if asked for exact numbers:",
       "• Live in-game play-by-play, possession %, completions",

@@ -110,7 +110,7 @@ function latestUserText(messages: ChatMessage[]): string {
 }
 
 function needsFreshWebCheck(text: string): boolean {
-  return /\b(up\s*to\s*date|latest|today|tonight|now|current|fresh|late mail|lineups?|squads?|teams?|injur(?:y|ies|ed)|ruled out|playing|named|available|transfers?|signed|moved|weather|nrl\.com|stats?|history|snap(?:shot)?|missing)\b/i.test(text);
+  return /\b(up\s*to\s*date|latest|today|tonight|now|current|fresh|late mail|lineups?|squads?|teams?|players?|plays?|playing|club|roster|injur(?:y|ies|ed)|ruled out|named|available|transfers?|signed|moved|weather|nrl\.com|stats?|history|snap(?:shot)?|missing)\b/i.test(text);
 }
 
 function normaliseTeamNick(input: string): string {

@@ -787,28 +787,82 @@ export const scoutChat = createServerFn({ method: "POST" })
       "=== END SNAPSHOT ===",
     ].join("\n");
 
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${key}`,
-        "Content-Type": "application/json",
+    const tools = [
+      {
+        type: "function",
+        function: {
+          name: "web_search",
+          description:
+            "Search the public web for live NRL information (news, late team changes, weather, injuries, head-to-head history, anything time-sensitive). Returns ranked snippets with source URLs. Only use when the in-app snapshot doesn't already cover it.",
+          parameters: {
+            type: "object",
+            properties: {
+              query: { type: "string", description: "Search query, e.g. 'Broncos late mail Round 5 2025'" },
+              max_results: { type: "number", description: "How many results to return (1–8). Default 5.", minimum: 1, maximum: 8 },
+            },
+            required: ["query"],
+            additionalProperties: false,
+          },
+        },
       },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          { role: "system", content: system },
-          ...data.messages,
-        ],
-      }),
-    });
+    ];
 
-    if (res.status === 429) throw new Error("Scout is busy — too many requests. Try again shortly.");
-    if (res.status === 402) throw new Error("AI credits exhausted — top up in Settings → Workspace → Usage.");
-    if (!res.ok) throw new Error(`AI gateway error (${res.status})`);
+    const convo: any[] = [
+      { role: "system", content: system },
+      ...data.messages,
+    ];
 
-    const json = await res.json() as any;
-    const reply = json?.choices?.[0]?.message?.content;
-    if (!reply || typeof reply !== "string") throw new Error("Scout returned no reply");
+    // Tool-call loop — up to 4 rounds so Scout can chain searches.
+    let reply: string | undefined;
+    for (let round = 0; round < 4; round++) {
+      const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${key}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-3-flash-preview",
+          messages: convo,
+          tools,
+        }),
+      });
+
+      if (res.status === 429) throw new Error("Scout is busy — too many requests. Try again shortly.");
+      if (res.status === 402) throw new Error("AI credits exhausted — top up in Settings → Workspace → Usage.");
+      if (!res.ok) throw new Error(`AI gateway error (${res.status})`);
+
+      const json = await res.json() as any;
+      const msg = json?.choices?.[0]?.message;
+      if (!msg) throw new Error("Scout returned no message");
+
+      const toolCalls = msg.tool_calls as Array<{ id: string; function: { name: string; arguments: string } }> | undefined;
+      if (toolCalls && toolCalls.length > 0) {
+        // Push assistant turn that issued the calls
+        convo.push({ role: "assistant", content: msg.content ?? "", tool_calls: toolCalls });
+        // Resolve each tool call
+        for (const tc of toolCalls) {
+          let result: string;
+          try {
+            const args = JSON.parse(tc.function.arguments || "{}");
+            if (tc.function.name === "web_search") {
+              result = await runWebSearch(args.query, args.max_results);
+            } else {
+              result = `Unknown tool: ${tc.function.name}`;
+            }
+          } catch (err) {
+            result = `Tool error: ${err instanceof Error ? err.message : String(err)}`;
+          }
+          convo.push({ role: "tool", tool_call_id: tc.id, content: result });
+        }
+        continue;
+      }
+
+      reply = typeof msg.content === "string" ? msg.content : undefined;
+      break;
+    }
+
+    if (!reply) throw new Error("Scout returned no reply");
     return { reply };
     } catch (e) {
       console.error("[scout] handler error:", e);

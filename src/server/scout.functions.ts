@@ -74,6 +74,22 @@ async function runWebSearch(query: string, maxResults = 5): Promise<string> {
   });
 }
 
+async function buildFreshWebContext(messages: ChatMessage[]): Promise<string> {
+  const userText = latestUserText(messages);
+  if (!needsFreshWebCheck(userText)) return "";
+  const mentioned = detectMentionedTeams(messages);
+  const suffix = mentioned.length ? ` ${mentioned.join(" ")}` : "";
+  const queries = [
+    `site:nrl.com ${userText}${suffix}`,
+    `NRL latest ${userText}${suffix}`,
+  ];
+  const results = await Promise.all(queries.map((q) => runWebSearch(q, 4)));
+  return [
+    "## FRESH WEB CHECK — current external context; use only to fill gaps or update time-sensitive info, cite domains inline",
+    ...results.map((r, i) => `### Search ${i + 1}: ${queries[i]}\n${r}`),
+  ].join("\n\n");
+}
+
 const Message = z.object({
   role: z.enum(["user", "assistant"]),
   content: z.string().min(1).max(4000),

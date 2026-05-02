@@ -89,6 +89,14 @@ const TRYSCORER_TTL = 15 * 60_000;     // 15 min – player markets
 const SEASON_ROUNDS = 27;
 type ChatMessage = z.infer<typeof Message>;
 
+function latestUserText(messages: ChatMessage[]): string {
+  return [...messages].reverse().find((m) => m.role === "user")?.content.trim() ?? "";
+}
+
+function needsFreshWebCheck(text: string): boolean {
+  return /\b(up\s*to\s*date|latest|today|tonight|now|current|fresh|late mail|lineups?|squads?|teams?|injur(?:y|ies|ed)|ruled out|playing|named|available|transfers?|signed|moved|weather|nrl\.com|stats?|history|snap(?:shot)?|missing)\b/i.test(text);
+}
+
 function normaliseTeamNick(input: string): string {
   return findTeam(input)?.nickname ?? input;
 }

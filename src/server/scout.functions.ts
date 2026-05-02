@@ -298,12 +298,54 @@ async function buildFixtureBrief(
     lines.push(`Markets: not yet posted`);
   }
 
-  // Tryscorer top picks (compact — top 6 anytime + top 4 first)
+  // Build squad allowlists from the OFFICIAL match-day squads (same lineup
+  // shown on the app's Lineup tab). Bookmaker tryscorer markets sometimes
+  // contain ex-players who have transferred — we strip them so Scout never
+  // recommends a player on the wrong club.
+  const homeSquadSet = squadNameSet(details?.homeTeam?.players);
+  const awaySquadSet = squadNameSet(details?.awayTeam?.players);
+  const fullName = (p: { firstName: string; lastName: string }) => `${p.firstName} ${p.lastName}`.trim();
+  const homeRoster = (details?.homeTeam?.players ?? []).map(fullName).filter(Boolean);
+  const awayRoster = (details?.awayTeam?.players ?? []).map(fullName).filter(Boolean);
+
+  // Determine which squad a tryscorer market entry belongs to. If a name only
+  // matches one squad, assign it. If it matches both (rare, common surnames)
+  // we keep it but tag ambiguously. If neither, drop it as a transfer/stale entry.
+  const classifyPlayer = (name: string): "home" | "away" | null => {
+    const inHome = playerInSquad(name, homeSquadSet);
+    const inAway = playerInSquad(name, awaySquadSet);
+    if (inHome && !inAway) return "home";
+    if (inAway && !inHome) return "away";
+    if (inHome && inAway) return "home"; // ambiguous — pick one rather than drop
+    return null;
+  };
+  const filterMarket = <T extends { player: string }>(arr: T[] | undefined): { kept: T[]; dropped: string[] } => {
+    const kept: T[] = [];
+    const dropped: string[] = [];
+    for (const t of arr ?? []) {
+      // If neither squad has been named yet, don't filter — preserve markets.
+      if (homeSquadSet.size === 0 && awaySquadSet.size === 0) { kept.push(t); continue; }
+      if (classifyPlayer(t.player)) kept.push(t);
+      else dropped.push(t.player);
+    }
+    return { kept, dropped };
+  };
+
+  // Tryscorer top picks — filtered to current rostered players only.
   if (tryscorer && tryscorer.hasAny) {
-    const fav = tryscorer.anytime.slice(0, 6).map((t) => `${t.player} ${t.price}`).join(", ");
-    const first = tryscorer.first.slice(0, 4).map((t) => `${t.player} ${t.price}`).join(", ");
-    if (fav) lines.push(`Anytime favs: ${fav}`);
-    if (first) lines.push(`First-tryscorer favs: ${first}`);
+    const anyF = filterMarket(tryscorer.anytime);
+    const firstF = filterMarket(tryscorer.first);
+    const tag = (p: { player: string; price: number }) => {
+      const side = classifyPlayer(p.player);
+      const team = side === "home" ? homeNick : side === "away" ? awayNick : "?";
+      return `${p.player} [${team}] ${p.price}`;
+    };
+    const fav = anyF.kept.slice(0, 8).map(tag).join(", ");
+    const first = firstF.kept.slice(0, 4).map(tag).join(", ");
+    if (fav) lines.push(`Anytime favs (filtered to named squads): ${fav}`);
+    if (first) lines.push(`First-tryscorer favs (filtered to named squads): ${first}`);
+    const allDropped = [...new Set([...anyF.dropped, ...firstF.dropped])];
+    if (allDropped.length) lines.push(`IGNORED stale market entries (not in current squads): ${allDropped.join(", ")}`);
   } else {
     lines.push(`Tryscorer markets: not posted yet`);
   }
@@ -331,6 +373,13 @@ async function buildFixtureBrief(
   if (details?.awayTeam?.players?.length) {
     lines.push(formatSquad(details.awayTeam.players, awayNick));
   }
+
+  // ROSTER ALLOWLIST — explicit list of every player Scout is allowed to
+  // attribute to each club for this fixture. Anything outside these lists
+  // must NOT appear in a player recommendation, tryscorer pick, or analysis.
+  if (homeRoster.length) lines.push(`ROSTER ALLOWLIST — ${homeNick} (only these players play for ${homeNick} this match): ${homeRoster.join(", ")}`);
+  if (awayRoster.length) lines.push(`ROSTER ALLOWLIST — ${awayNick} (only these players play for ${awayNick} this match): ${awayRoster.join(", ")}`);
+
   if (details) {
     lines.push(summarizeStatsTab(details, ladder));
   }

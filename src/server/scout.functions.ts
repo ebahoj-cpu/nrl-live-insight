@@ -154,6 +154,31 @@ function formatSquad(players: { firstName: string; lastName: string; position: s
   return parts.join("\n");
 }
 
+// Normalised name set used to verify a player actually plays for a club this round.
+// Bookmaker tryscorer markets occasionally lag behind transfers and list ex-players
+// against the wrong club — we strip anyone not on the named match-day squad.
+function normPlayerName(s: string): string {
+  return s.toLowerCase().replace(/[^a-z\s]/g, "").replace(/\s+/g, " ").trim();
+}
+function squadNameSet(players: { firstName: string; lastName: string }[] | undefined): Set<string> {
+  const out = new Set<string>();
+  for (const p of players ?? []) {
+    const full = normPlayerName(`${p.firstName} ${p.lastName}`);
+    if (!full) continue;
+    out.add(full);
+    const last = full.split(/\s+/).pop();
+    if (last) out.add(last);
+  }
+  return out;
+}
+function playerInSquad(name: string, squadSet: Set<string>): boolean {
+  if (squadSet.size === 0) return true; // no squad named yet → don't filter
+  const k = normPlayerName(name);
+  if (squadSet.has(k)) return true;
+  const last = k.split(/\s+/).pop();
+  return !!last && squadSet.has(last);
+}
+
 function formatStatValue(v: { value: number; numerator?: number; denominator?: number }, type: string, units?: string): string {
   if (type === "Percentage") return `${v.value.toFixed(0)}%`;
   if (type === "PercentageAndFraction") return v.numerator != null && v.denominator != null

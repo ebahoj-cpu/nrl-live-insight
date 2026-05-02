@@ -25,6 +25,55 @@ function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
   });
 }
 
+// ───────────────────────── Web search tool ─────────────────────────
+// Uses DuckDuckGo's no-key HTML endpoint. Cached per query for 10min.
+async function runWebSearch(query: string, maxResults = 5): Promise<string> {
+  const q = String(query || "").trim();
+  if (!q) return "No query provided.";
+  const n = Math.max(1, Math.min(8, Number(maxResults) || 5));
+  const cacheKey = `scout:websearch:v1:${n}:${q.toLowerCase()}`;
+  return cached(cacheKey, 10 * 60_000, async () => {
+    try {
+      const url = `https://duckduckgo.com/html/?q=${encodeURIComponent(q)}`;
+      const res = await withTimeout(
+        fetch(url, {
+          headers: {
+            "User-Agent": "Mozilla/5.0 (compatible; LineBreak-Scout/1.0)",
+            Accept: "text/html",
+          },
+        }),
+        7000,
+        null as any,
+      );
+      if (!res || !res.ok) return `Web search failed (${res ? res.status : "timeout"}).`;
+      const html = await res.text();
+      const results: { title: string; url: string; snippet: string }[] = [];
+      // Match each result block.
+      const blockRe = /<a[^>]+class="result__a"[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?<a[^>]+class="result__snippet"[^>]*>([\s\S]*?)<\/a>/g;
+      let m: RegExpExecArray | null;
+      while ((m = blockRe.exec(html)) && results.length < n) {
+        let href = m[1];
+        // DDG wraps links: /l/?uddg=<encoded>
+        const wrapped = href.match(/[?&]uddg=([^&]+)/);
+        if (wrapped) { try { href = decodeURIComponent(wrapped[1]); } catch {} }
+        const strip = (s: string) => s.replace(/<[^>]+>/g, "").replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
+        const title = strip(m[2]);
+        const snippet = strip(m[3]);
+        if (title && href.startsWith("http")) results.push({ title, url: href, snippet });
+      }
+      if (results.length === 0) return `No web results for "${q}".`;
+      return results
+        .map((r, i) => {
+          const domain = (() => { try { return new URL(r.url).hostname.replace(/^www\./, ""); } catch { return r.url; } })();
+          return `${i + 1}. ${r.title} — ${domain}\n   ${r.snippet}\n   ${r.url}`;
+        })
+        .join("\n\n");
+    } catch (err) {
+      return `Web search error: ${err instanceof Error ? err.message : String(err)}`;
+    }
+  });
+}
+
 const Message = z.object({
   role: z.enum(["user", "assistant"]),
   content: z.string().min(1).max(4000),
@@ -769,6 +818,12 @@ export const scoutChat = createServerFn({ method: "POST" })
       "• If USER-REQUESTED MATCH BRIEFS are present, use them first even if the match is already completed or not in the current round.",
       "• No disclaimers, no 'bet responsibly' (UI handles that).",
       "",
+      "WEB SEARCH:",
+      "• You have a `web_search` tool. Use it whenever the snapshot lacks the info needed (breaking news, late mail, weather, head-to-head history, player form outside what's provided, anything time-sensitive).",
+      "• Prefer trusted NRL sources: nrl.com, foxsports.com.au, smh.com.au, theroar.com.au, zerotackle.com, leagueunlimited.com, official club sites.",
+      "• After searching, cite source domains inline like (nrl.com) so the user can sanity-check.",
+      "• Don't search for things already in the snapshot (lineups, odds, insights, ladder, stats) — that data is already authoritative.",
+      "",
       "ROSTER ALLOWLIST RULE — CRITICAL, applies to EVERY player you name:",
       "• Each fixture brief contains 'ROSTER ALLOWLIST — <Team>' lines listing the ONLY players who play for that team in this match. This reflects the current squad shown on the app's Lineup tab.",
       "• Before naming any player as a tryscorer / pick / threat / option for a team, verify their name appears in that team's ROSTER ALLOWLIST for the relevant fixture.",
@@ -781,28 +836,82 @@ export const scoutChat = createServerFn({ method: "POST" })
       "=== END SNAPSHOT ===",
     ].join("\n");
 
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${key}`,
-        "Content-Type": "application/json",
+    const tools = [
+      {
+        type: "function",
+        function: {
+          name: "web_search",
+          description:
+            "Search the public web for live NRL information (news, late team changes, weather, injuries, head-to-head history, anything time-sensitive). Returns ranked snippets with source URLs. Only use when the in-app snapshot doesn't already cover it.",
+          parameters: {
+            type: "object",
+            properties: {
+              query: { type: "string", description: "Search query, e.g. 'Broncos late mail Round 5 2025'" },
+              max_results: { type: "number", description: "How many results to return (1–8). Default 5.", minimum: 1, maximum: 8 },
+            },
+            required: ["query"],
+            additionalProperties: false,
+          },
+        },
       },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          { role: "system", content: system },
-          ...data.messages,
-        ],
-      }),
-    });
+    ];
 
-    if (res.status === 429) throw new Error("Scout is busy — too many requests. Try again shortly.");
-    if (res.status === 402) throw new Error("AI credits exhausted — top up in Settings → Workspace → Usage.");
-    if (!res.ok) throw new Error(`AI gateway error (${res.status})`);
+    const convo: any[] = [
+      { role: "system", content: system },
+      ...data.messages,
+    ];
 
-    const json = await res.json() as any;
-    const reply = json?.choices?.[0]?.message?.content;
-    if (!reply || typeof reply !== "string") throw new Error("Scout returned no reply");
+    // Tool-call loop — up to 4 rounds so Scout can chain searches.
+    let reply: string | undefined;
+    for (let round = 0; round < 4; round++) {
+      const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${key}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-3-flash-preview",
+          messages: convo,
+          tools,
+        }),
+      });
+
+      if (res.status === 429) throw new Error("Scout is busy — too many requests. Try again shortly.");
+      if (res.status === 402) throw new Error("AI credits exhausted — top up in Settings → Workspace → Usage.");
+      if (!res.ok) throw new Error(`AI gateway error (${res.status})`);
+
+      const json = await res.json() as any;
+      const msg = json?.choices?.[0]?.message;
+      if (!msg) throw new Error("Scout returned no message");
+
+      const toolCalls = msg.tool_calls as Array<{ id: string; function: { name: string; arguments: string } }> | undefined;
+      if (toolCalls && toolCalls.length > 0) {
+        // Push assistant turn that issued the calls
+        convo.push({ role: "assistant", content: msg.content ?? "", tool_calls: toolCalls });
+        // Resolve each tool call
+        for (const tc of toolCalls) {
+          let result: string;
+          try {
+            const args = JSON.parse(tc.function.arguments || "{}");
+            if (tc.function.name === "web_search") {
+              result = await runWebSearch(args.query, args.max_results);
+            } else {
+              result = `Unknown tool: ${tc.function.name}`;
+            }
+          } catch (err) {
+            result = `Tool error: ${err instanceof Error ? err.message : String(err)}`;
+          }
+          convo.push({ role: "tool", tool_call_id: tc.id, content: result });
+        }
+        continue;
+      }
+
+      reply = typeof msg.content === "string" ? msg.content : undefined;
+      break;
+    }
+
+    if (!reply) throw new Error("Scout returned no reply");
     return { reply };
     } catch (e) {
       console.error("[scout] handler error:", e);

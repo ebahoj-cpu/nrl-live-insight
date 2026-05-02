@@ -76,8 +76,10 @@ async function runWebSearch(query: string, maxResults = 5): Promise<string> {
 
 async function buildFreshWebContext(messages: ChatMessage[]): Promise<string> {
   const userText = latestUserText(messages);
-  if (!needsFreshWebCheck(userText)) return "";
+  const isSmallTalk = /^(hi|hey|hello|thanks|thank you|cheers)\b/i.test(userText);
   const mentioned = detectMentionedTeams(messages);
+  const hasNamedEntity = /\b[A-Z][a-z]{2,}(?:\s+[A-Z][a-z]{2,})?\b/.test(userText);
+  if (isSmallTalk || (!needsFreshWebCheck(userText) && mentioned.length === 0 && !hasNamedEntity)) return "";
   const suffix = mentioned.length ? ` ${mentioned.join(" ")}` : "";
   const queries = [
     `site:nrl.com ${userText}${suffix}`,

@@ -767,12 +767,13 @@ export const scoutChat = createServerFn({ method: "POST" })
     //     for the very first cold-cache request so users don't wait 60-120s for
     //     NRL.com round-trips. It STILL contains the authoritative GROUND TRUTH
     //     fixtures + byes block, so all grounding rules still hold.
-    const DEEP_KEY = "scout:context:v14-roster-allowlist";
+    const DEEP_KEY = "scout:context:v15-fresh-web-grounded";
     let context: string;
     try {
-      const [fastFallback, targetContext] = await Promise.all([
+      const [fastFallback, targetContext, freshWebContext] = await Promise.all([
         buildFastContext(),
         buildTargetBriefsContext(data.messages),
+        buildFreshWebContext(data.messages),
       ]);
       const roundContext = await staleWhileRevalidate<string>(
         DEEP_KEY,
@@ -780,7 +781,7 @@ export const scoutChat = createServerFn({ method: "POST" })
         buildDeepContext,
         fastFallback,
       );
-      context = targetContext ? `${roundContext}\n\n${targetContext}` : roundContext;
+      context = [roundContext, targetContext, freshWebContext].filter(Boolean).join("\n\n");
     } catch (e) {
       console.error("[scout] context build failed:", e);
       throw new Error("Scout can't verify the latest official fixtures right now — try again shortly.");
@@ -843,6 +844,8 @@ export const scoutChat = createServerFn({ method: "POST" })
       "• No disclaimers, no 'bet responsibly' (UI handles that).",
       "",
       "WEB SEARCH:",
+      "• Never tell the user you are missing 'snapshot' information. Snapshot/context is internal. If app context is thin or stale, search the web and answer with sourced current information.",
+      "• For any question about whether a player currently plays for a team, is named, injured, transferred, or available, search the web unless the relevant ROSTER ALLOWLIST already proves it.",
       "• You have a `web_search` tool. Use it whenever the snapshot lacks the info needed (breaking news, late mail, weather, head-to-head history, player form outside what's provided, anything time-sensitive).",
       "• Prefer trusted NRL sources: nrl.com, foxsports.com.au, smh.com.au, theroar.com.au, zerotackle.com, leagueunlimited.com, official club sites.",
       "• After searching, cite source domains inline like (nrl.com) so the user can sanity-check.",

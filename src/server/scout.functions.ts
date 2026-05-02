@@ -25,6 +25,55 @@ function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
   });
 }
 
+// ───────────────────────── Web search tool ─────────────────────────
+// Uses DuckDuckGo's no-key HTML endpoint. Cached per query for 10min.
+async function runWebSearch(query: string, maxResults = 5): Promise<string> {
+  const q = String(query || "").trim();
+  if (!q) return "No query provided.";
+  const n = Math.max(1, Math.min(8, Number(maxResults) || 5));
+  const cacheKey = `scout:websearch:v1:${n}:${q.toLowerCase()}`;
+  return cached(cacheKey, 10 * 60_000, async () => {
+    try {
+      const url = `https://duckduckgo.com/html/?q=${encodeURIComponent(q)}`;
+      const res = await withTimeout(
+        fetch(url, {
+          headers: {
+            "User-Agent": "Mozilla/5.0 (compatible; LineBreak-Scout/1.0)",
+            Accept: "text/html",
+          },
+        }),
+        7000,
+        null as any,
+      );
+      if (!res || !res.ok) return `Web search failed (${res ? res.status : "timeout"}).`;
+      const html = await res.text();
+      const results: { title: string; url: string; snippet: string }[] = [];
+      // Match each result block.
+      const blockRe = /<a[^>]+class="result__a"[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?<a[^>]+class="result__snippet"[^>]*>([\s\S]*?)<\/a>/g;
+      let m: RegExpExecArray | null;
+      while ((m = blockRe.exec(html)) && results.length < n) {
+        let href = m[1];
+        // DDG wraps links: /l/?uddg=<encoded>
+        const wrapped = href.match(/[?&]uddg=([^&]+)/);
+        if (wrapped) { try { href = decodeURIComponent(wrapped[1]); } catch {} }
+        const strip = (s: string) => s.replace(/<[^>]+>/g, "").replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
+        const title = strip(m[2]);
+        const snippet = strip(m[3]);
+        if (title && href.startsWith("http")) results.push({ title, url: href, snippet });
+      }
+      if (results.length === 0) return `No web results for "${q}".`;
+      return results
+        .map((r, i) => {
+          const domain = (() => { try { return new URL(r.url).hostname.replace(/^www\./, ""); } catch { return r.url; } })();
+          return `${i + 1}. ${r.title} — ${domain}\n   ${r.snippet}\n   ${r.url}`;
+        })
+        .join("\n\n");
+    } catch (err) {
+      return `Web search error: ${err instanceof Error ? err.message : String(err)}`;
+    }
+  });
+}
+
 const Message = z.object({
   role: z.enum(["user", "assistant"]),
   content: z.string().min(1).max(4000),

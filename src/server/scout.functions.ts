@@ -154,6 +154,31 @@ function formatSquad(players: { firstName: string; lastName: string; position: s
   return parts.join("\n");
 }
 
+// Normalised name set used to verify a player actually plays for a club this round.
+// Bookmaker tryscorer markets occasionally lag behind transfers and list ex-players
+// against the wrong club — we strip anyone not on the named match-day squad.
+function normPlayerName(s: string): string {
+  return s.toLowerCase().replace(/[^a-z\s]/g, "").replace(/\s+/g, " ").trim();
+}
+function squadNameSet(players: { firstName: string; lastName: string }[] | undefined): Set<string> {
+  const out = new Set<string>();
+  for (const p of players ?? []) {
+    const full = normPlayerName(`${p.firstName} ${p.lastName}`);
+    if (!full) continue;
+    out.add(full);
+    const last = full.split(/\s+/).pop();
+    if (last) out.add(last);
+  }
+  return out;
+}
+function playerInSquad(name: string, squadSet: Set<string>): boolean {
+  if (squadSet.size === 0) return true; // no squad named yet → don't filter
+  const k = normPlayerName(name);
+  if (squadSet.has(k)) return true;
+  const last = k.split(/\s+/).pop();
+  return !!last && squadSet.has(last);
+}
+
 function formatStatValue(v: { value: number; numerator?: number; denominator?: number }, type: string, units?: string): string {
   if (type === "Percentage") return `${v.value.toFixed(0)}%`;
   if (type === "PercentageAndFraction") return v.numerator != null && v.denominator != null
@@ -273,12 +298,54 @@ async function buildFixtureBrief(
     lines.push(`Markets: not yet posted`);
   }
 
-  // Tryscorer top picks (compact — top 6 anytime + top 4 first)
+  // Build squad allowlists from the OFFICIAL match-day squads (same lineup
+  // shown on the app's Lineup tab). Bookmaker tryscorer markets sometimes
+  // contain ex-players who have transferred — we strip them so Scout never
+  // recommends a player on the wrong club.
+  const homeSquadSet = squadNameSet(details?.homeTeam?.players);
+  const awaySquadSet = squadNameSet(details?.awayTeam?.players);
+  const fullName = (p: { firstName: string; lastName: string }) => `${p.firstName} ${p.lastName}`.trim();
+  const homeRoster = (details?.homeTeam?.players ?? []).map(fullName).filter(Boolean);
+  const awayRoster = (details?.awayTeam?.players ?? []).map(fullName).filter(Boolean);
+
+  // Determine which squad a tryscorer market entry belongs to. If a name only
+  // matches one squad, assign it. If it matches both (rare, common surnames)
+  // we keep it but tag ambiguously. If neither, drop it as a transfer/stale entry.
+  const classifyPlayer = (name: string): "home" | "away" | null => {
+    const inHome = playerInSquad(name, homeSquadSet);
+    const inAway = playerInSquad(name, awaySquadSet);
+    if (inHome && !inAway) return "home";
+    if (inAway && !inHome) return "away";
+    if (inHome && inAway) return "home"; // ambiguous — pick one rather than drop
+    return null;
+  };
+  const filterMarket = <T extends { player: string }>(arr: T[] | undefined): { kept: T[]; dropped: string[] } => {
+    const kept: T[] = [];
+    const dropped: string[] = [];
+    for (const t of arr ?? []) {
+      // If neither squad has been named yet, don't filter — preserve markets.
+      if (homeSquadSet.size === 0 && awaySquadSet.size === 0) { kept.push(t); continue; }
+      if (classifyPlayer(t.player)) kept.push(t);
+      else dropped.push(t.player);
+    }
+    return { kept, dropped };
+  };
+
+  // Tryscorer top picks — filtered to current rostered players only.
   if (tryscorer && tryscorer.hasAny) {
-    const fav = tryscorer.anytime.slice(0, 6).map((t) => `${t.player} ${t.price}`).join(", ");
-    const first = tryscorer.first.slice(0, 4).map((t) => `${t.player} ${t.price}`).join(", ");
-    if (fav) lines.push(`Anytime favs: ${fav}`);
-    if (first) lines.push(`First-tryscorer favs: ${first}`);
+    const anyF = filterMarket(tryscorer.anytime);
+    const firstF = filterMarket(tryscorer.first);
+    const tag = (p: { player: string; price: number }) => {
+      const side = classifyPlayer(p.player);
+      const team = side === "home" ? homeNick : side === "away" ? awayNick : "?";
+      return `${p.player} [${team}] ${p.price}`;
+    };
+    const fav = anyF.kept.slice(0, 8).map(tag).join(", ");
+    const first = firstF.kept.slice(0, 4).map(tag).join(", ");
+    if (fav) lines.push(`Anytime favs (filtered to named squads): ${fav}`);
+    if (first) lines.push(`First-tryscorer favs (filtered to named squads): ${first}`);
+    const allDropped = [...new Set([...anyF.dropped, ...firstF.dropped])];
+    if (allDropped.length) lines.push(`IGNORED stale market entries (not in current squads): ${allDropped.join(", ")}`);
   } else {
     lines.push(`Tryscorer markets: not posted yet`);
   }
@@ -306,6 +373,13 @@ async function buildFixtureBrief(
   if (details?.awayTeam?.players?.length) {
     lines.push(formatSquad(details.awayTeam.players, awayNick));
   }
+
+  // ROSTER ALLOWLIST — explicit list of every player Scout is allowed to
+  // attribute to each club for this fixture. Anything outside these lists
+  // must NOT appear in a player recommendation, tryscorer pick, or analysis.
+  if (homeRoster.length) lines.push(`ROSTER ALLOWLIST — ${homeNick} (only these players play for ${homeNick} this match): ${homeRoster.join(", ")}`);
+  if (awayRoster.length) lines.push(`ROSTER ALLOWLIST — ${awayNick} (only these players play for ${awayNick} this match): ${awayRoster.join(", ")}`);
+
   if (details) {
     lines.push(summarizeStatsTab(details, ladder));
   }
@@ -620,7 +694,7 @@ export const scoutChat = createServerFn({ method: "POST" })
     //     for the very first cold-cache request so users don't wait 60-120s for
     //     NRL.com round-trips. It STILL contains the authoritative GROUND TRUTH
     //     fixtures + byes block, so all grounding rules still hold.
-    const DEEP_KEY = "scout:context:v13-app-insights-targeted";
+    const DEEP_KEY = "scout:context:v14-roster-allowlist";
     let context: string;
     try {
       const [fastFallback, targetContext] = await Promise.all([
@@ -694,6 +768,13 @@ export const scoutChat = createServerFn({ method: "POST" })
       "• Every pick must reference a matchup that exists in the GROUND TRUTH fixtures list or USER-REQUESTED MATCH BRIEFS.",
       "• If USER-REQUESTED MATCH BRIEFS are present, use them first even if the match is already completed or not in the current round.",
       "• No disclaimers, no 'bet responsibly' (UI handles that).",
+      "",
+      "ROSTER ALLOWLIST RULE — CRITICAL, applies to EVERY player you name:",
+      "• Each fixture brief contains 'ROSTER ALLOWLIST — <Team>' lines listing the ONLY players who play for that team in this match. This reflects the current squad shown on the app's Lineup tab.",
+      "• Before naming any player as a tryscorer / pick / threat / option for a team, verify their name appears in that team's ROSTER ALLOWLIST for the relevant fixture.",
+      "• If a player is NOT in the allowlist for the team you're attributing them to, DO NOT mention them — they have transferred, are injured, or are not in this squad. Pick the next eligible name from the allowlist instead.",
+      "• Bookmaker tryscorer markets sometimes lag transfers. The 'IGNORED stale market entries' line lists names already filtered out — never resurrect them.",
+      "• If the squad has not been named yet (no ROSTER ALLOWLIST present, or 'squad: not yet named'), say lineups aren't released yet rather than guessing players.",
       "",
       "=== SNAPSHOT ===",
       context,

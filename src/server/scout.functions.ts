@@ -74,6 +74,24 @@ async function runWebSearch(query: string, maxResults = 5): Promise<string> {
   });
 }
 
+async function buildFreshWebContext(messages: ChatMessage[]): Promise<string> {
+  const userText = latestUserText(messages);
+  const isSmallTalk = /^(hi|hey|hello|thanks|thank you|cheers)\b/i.test(userText);
+  const mentioned = detectMentionedTeams(messages);
+  const hasNamedEntity = /\b[A-Z][a-z]{2,}(?:\s+[A-Z][a-z]{2,})?\b/.test(userText);
+  if (isSmallTalk || (!needsFreshWebCheck(userText) && mentioned.length === 0 && !hasNamedEntity)) return "";
+  const suffix = mentioned.length ? ` ${mentioned.join(" ")}` : "";
+  const queries = [
+    `site:nrl.com ${userText}${suffix}`,
+    `NRL latest ${userText}${suffix}`,
+  ];
+  const results = await Promise.all(queries.map((q) => runWebSearch(q, 4)));
+  return [
+    "## FRESH WEB CHECK — current external context; use only to fill gaps or update time-sensitive info, cite domains inline",
+    ...results.map((r, i) => `### Search ${i + 1}: ${queries[i]}\n${r}`),
+  ].join("\n\n");
+}
+
 const Message = z.object({
   role: z.enum(["user", "assistant"]),
   content: z.string().min(1).max(4000),
@@ -88,6 +106,14 @@ const FIXTURE_TTL = 10 * 60_000;       // 10 min – per-match deep data
 const TRYSCORER_TTL = 15 * 60_000;     // 15 min – player markets
 const SEASON_ROUNDS = 27;
 type ChatMessage = z.infer<typeof Message>;
+
+function latestUserText(messages: ChatMessage[]): string {
+  return [...messages].reverse().find((m) => m.role === "user")?.content.trim() ?? "";
+}
+
+function needsFreshWebCheck(text: string): boolean {
+  return /\b(up\s*to\s*date|latest|today|tonight|now|current|fresh|late mail|lineups?|squads?|teams?|players?|plays?|playing|club|roster|injur(?:y|ies|ed)|ruled out|named|available|transfers?|signed|moved|weather|nrl\.com|stats?|history|snap(?:shot)?|missing)\b/i.test(text);
+}
 
 function normaliseTeamNick(input: string): string {
   return findTeam(input)?.nickname ?? input;
@@ -604,7 +630,7 @@ function assembleSnapshot(args: {
     : "(quick: odds + season form only — deep briefs warming in background)";
 
   return [
-    `# NRL Snapshot · season ${season} · ${roundLabel} · generated ${new Date().toISOString()} ${depthNote}`,
+    `# NRL App Data · season ${season} · ${roundLabel} · generated ${new Date().toISOString()} ${depthNote}`,
     "",
     `## GROUND TRUTH — ${roundLabel} Fixtures (authoritative who-plays-who)`,
     groundTruthFixtures,
@@ -743,12 +769,13 @@ export const scoutChat = createServerFn({ method: "POST" })
     //     for the very first cold-cache request so users don't wait 60-120s for
     //     NRL.com round-trips. It STILL contains the authoritative GROUND TRUTH
     //     fixtures + byes block, so all grounding rules still hold.
-    const DEEP_KEY = "scout:context:v14-roster-allowlist";
+    const DEEP_KEY = "scout:context:v15-fresh-web-grounded";
     let context: string;
     try {
-      const [fastFallback, targetContext] = await Promise.all([
+      const [fastFallback, targetContext, freshWebContext] = await Promise.all([
         buildFastContext(),
         buildTargetBriefsContext(data.messages),
+        buildFreshWebContext(data.messages),
       ]);
       const roundContext = await staleWhileRevalidate<string>(
         DEEP_KEY,
@@ -756,7 +783,7 @@ export const scoutChat = createServerFn({ method: "POST" })
         buildDeepContext,
         fastFallback,
       );
-      context = targetContext ? `${roundContext}\n\n${targetContext}` : roundContext;
+      context = [roundContext, targetContext, freshWebContext].filter(Boolean).join("\n\n");
     } catch (e) {
       console.error("[scout] context build failed:", e);
       throw new Error("Scout can't verify the latest official fixtures right now — try again shortly.");
@@ -769,7 +796,7 @@ export const scoutChat = createServerFn({ method: "POST" })
       "You are SCOUT — a sharp, friendly NRL betting analyst inside LINEBREAK. Sporty, confident, plain-spoken Aussie tone.",
       "",
       "GROUND TRUTH PROTOCOL — read this BEFORE every reply:",
-      "• If the snapshot says '(official NRL snapshot unavailable)' or has no GROUND TRUTH fixtures, say you can't verify the latest fixtures right now. Do not answer from memory.",
+      "• If the app data has no GROUND TRUTH fixtures, say you can't verify the latest fixtures right now, then use web_search for current public info. Do not answer from memory.",
       "• The 'GROUND TRUTH — Round Fixtures' block is the authoritative source for who plays who this round. The 'USER-REQUESTED MATCH BRIEFS' block is authoritative for specifically named teams/matches, including completed games outside the current round.",
       "• The 'GROUND TRUTH — Teams on the BYE this round' line lists every team NOT playing. If a user asks about a team on that bye list, say so directly — do not invent a fixture for them.",
       "• Before naming any matchup, scan the fixtures list and USER-REQUESTED MATCH BRIEFS for BOTH team names. If you can't find both teams together, correct the user.",
@@ -778,7 +805,7 @@ export const scoutChat = createServerFn({ method: "POST" })
       "• When recommending a pick, name BOTH teams in the matchup so it's unambiguous (e.g. 'Broncos H2H @2.15 vs Cowboys' — never just 'Broncos H2H').",
       "• If a team is on the bye list, do NOT include them in picks/recommendations.",
       "",
-      "DATA YOU HAVE in SNAPSHOT below — never ask for it, never claim you lack it:",
+      "DATA YOU HAVE in APP DATA below — never ask for it, never claim you lack it:",
       "• Authoritative round fixtures (home v away, venue, kickoff)",
       "• Live ladder with W-L, points, points-diff",
       "• Live odds across multiple bookies: H2H best, line/spread, totals (O/U)",
@@ -795,14 +822,14 @@ export const scoutChat = createServerFn({ method: "POST" })
       "• If a fixture brief says 'Tryscorer markets: not posted yet' → say markets aren't out yet for that game.",
       "• If a fixture has no ins/outs lines → say lineups aren't released yet for that game.",
       "• If a squad block isn't shown for a fixture → say the squad hasn't been named yet.",
-      "• Otherwise NEVER claim you lack data that IS in SNAPSHOT. Read the relevant fixture block carefully before answering.",
+      "• Otherwise NEVER claim you lack data that IS in APP DATA. Read the relevant fixture block carefully before answering.",
       "",
       "EXTERNAL STATS — only when the answer is NOT in USER-REQUESTED MATCH BRIEFS / app Stats / app Insights / lineups:",
       "• Use NRL.com-derived knowledge where possible: player, team, fixture and historical stats.",
-      "• If you cannot verify an exact external number from the snapshot, be explicit about uncertainty instead of fabricating precision.",
-      "• NEVER override app data with memory. The snapshot is the source of truth for fixtures, lineups, odds, ladder, app stats and app insights.",
+      "• If you cannot verify an exact external number from app data or web_search, be explicit about uncertainty instead of fabricating precision.",
+      "• NEVER override app data with memory. App data is the source of truth for fixtures, lineups, odds, ladder, app stats and app insights.",
       "",
-      "DATA YOU DO NOT HAVE in SNAPSHOT — be honest if asked for exact numbers:",
+      "DATA NOT ALWAYS AVAILABLE IN APP DATA — verify with web_search when asked for exact current numbers:",
       "• Live in-game play-by-play, possession %, completions",
       "• Multi-season historical logs beyond the H2H block",
       "",
@@ -813,16 +840,18 @@ export const scoutChat = createServerFn({ method: "POST" })
       "   • 5–8 markdown bullets, no intro/outro. Format: `- **TEAM market** \\`@PRICE\\` vs OPPONENT — sharp reason (≤14 words)`",
       "",
       "DATA RULES:",
-      "• Quote exact prices/lines from SNAPSHOT only. Never invent prices, players, or matchups.",
+      "• Quote exact prices/lines from APP DATA only. Never invent prices, players, or matchups.",
       "• Every pick must reference a matchup that exists in the GROUND TRUTH fixtures list or USER-REQUESTED MATCH BRIEFS.",
       "• If USER-REQUESTED MATCH BRIEFS are present, use them first even if the match is already completed or not in the current round.",
       "• No disclaimers, no 'bet responsibly' (UI handles that).",
       "",
       "WEB SEARCH:",
-      "• You have a `web_search` tool. Use it whenever the snapshot lacks the info needed (breaking news, late mail, weather, head-to-head history, player form outside what's provided, anything time-sensitive).",
+      "• Never use the words snapshot, context, or Snapchat in the answer. Those are internal/mistaken wording. If app data is thin or stale, search the web and answer with sourced current information.",
+      "• For any question about whether a player currently plays for a team, is named, injured, transferred, or available, search the web unless the relevant ROSTER ALLOWLIST already proves it.",
+      "• You have a `web_search` tool. Use it whenever app data lacks the info needed (breaking news, late mail, weather, head-to-head history, player form outside what's provided, anything time-sensitive).",
       "• Prefer trusted NRL sources: nrl.com, foxsports.com.au, smh.com.au, theroar.com.au, zerotackle.com, leagueunlimited.com, official club sites.",
       "• After searching, cite source domains inline like (nrl.com) so the user can sanity-check.",
-      "• Don't search for things already in the snapshot (lineups, odds, insights, ladder, stats) — that data is already authoritative.",
+      "• Don't search for things already in APP DATA (lineups, odds, insights, ladder, stats) — that data is already authoritative.",
       "",
       "ROSTER ALLOWLIST RULE — CRITICAL, applies to EVERY player you name:",
       "• Each fixture brief contains 'ROSTER ALLOWLIST — <Team>' lines listing the ONLY players who play for that team in this match. This reflects the current squad shown on the app's Lineup tab.",
@@ -831,9 +860,9 @@ export const scoutChat = createServerFn({ method: "POST" })
       "• Bookmaker tryscorer markets sometimes lag transfers. The 'IGNORED stale market entries' line lists names already filtered out — never resurrect them.",
       "• If the squad has not been named yet (no ROSTER ALLOWLIST present, or 'squad: not yet named'), say lineups aren't released yet rather than guessing players.",
       "",
-      "=== SNAPSHOT ===",
+      "=== APP DATA ===",
       context,
-      "=== END SNAPSHOT ===",
+      "=== END APP DATA ===",
     ].join("\n");
 
     const tools = [
@@ -842,7 +871,7 @@ export const scoutChat = createServerFn({ method: "POST" })
         function: {
           name: "web_search",
           description:
-            "Search the public web for live NRL information (news, late team changes, weather, injuries, head-to-head history, anything time-sensitive). Returns ranked snippets with source URLs. Only use when the in-app snapshot doesn't already cover it.",
+            "Search the public web for live NRL information (news, late team changes, weather, injuries, head-to-head history, anything time-sensitive). Returns ranked snippets with source URLs. Only use when the in-app app data doesn't already cover it.",
           parameters: {
             type: "object",
             properties: {

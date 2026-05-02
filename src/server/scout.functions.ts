@@ -844,7 +844,7 @@ export const scoutChat = createServerFn({ method: "POST" })
       "• No disclaimers, no 'bet responsibly' (UI handles that).",
       "",
       "WEB SEARCH:",
-      "• Never tell the user you are missing 'snapshot' information. Snapshot/context is internal. If app context is thin or stale, search the web and answer with sourced current information.",
+      "• Never use the words snapshot or context in the answer. Those are internal. If app data is thin or stale, search the web and answer with sourced current information.",
       "• For any question about whether a player currently plays for a team, is named, injured, transferred, or available, search the web unless the relevant ROSTER ALLOWLIST already proves it.",
       "• You have a `web_search` tool. Use it whenever the snapshot lacks the info needed (breaking news, late mail, weather, head-to-head history, player form outside what's provided, anything time-sensitive).",
       "• Prefer trusted NRL sources: nrl.com, foxsports.com.au, smh.com.au, theroar.com.au, zerotackle.com, leagueunlimited.com, official club sites.",
@@ -858,9 +858,9 @@ export const scoutChat = createServerFn({ method: "POST" })
       "• Bookmaker tryscorer markets sometimes lag transfers. The 'IGNORED stale market entries' line lists names already filtered out — never resurrect them.",
       "• If the squad has not been named yet (no ROSTER ALLOWLIST present, or 'squad: not yet named'), say lineups aren't released yet rather than guessing players.",
       "",
-      "=== SNAPSHOT ===",
+      "=== APP DATA ===",
       context,
-      "=== END SNAPSHOT ===",
+      "=== END APP DATA ===",
     ].join("\n");
 
     const tools = [

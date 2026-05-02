@@ -694,7 +694,7 @@ export const scoutChat = createServerFn({ method: "POST" })
     //     for the very first cold-cache request so users don't wait 60-120s for
     //     NRL.com round-trips. It STILL contains the authoritative GROUND TRUTH
     //     fixtures + byes block, so all grounding rules still hold.
-    const DEEP_KEY = "scout:context:v13-app-insights-targeted";
+    const DEEP_KEY = "scout:context:v14-roster-allowlist";
     let context: string;
     try {
       const [fastFallback, targetContext] = await Promise.all([

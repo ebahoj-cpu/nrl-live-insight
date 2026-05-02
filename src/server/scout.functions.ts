@@ -846,7 +846,7 @@ export const scoutChat = createServerFn({ method: "POST" })
       "• No disclaimers, no 'bet responsibly' (UI handles that).",
       "",
       "WEB SEARCH:",
-      "• Never use the words snapshot or context in the answer. Those are internal. If app data is thin or stale, search the web and answer with sourced current information.",
+      "• Never use the words snapshot, context, or Snapchat in the answer. Those are internal/mistaken wording. If app data is thin or stale, search the web and answer with sourced current information.",
       "• For any question about whether a player currently plays for a team, is named, injured, transferred, or available, search the web unless the relevant ROSTER ALLOWLIST already proves it.",
       "• You have a `web_search` tool. Use it whenever app data lacks the info needed (breaking news, late mail, weather, head-to-head history, player form outside what's provided, anything time-sensitive).",
       "• Prefer trusted NRL sources: nrl.com, foxsports.com.au, smh.com.au, theroar.com.au, zerotackle.com, leagueunlimited.com, official club sites.",

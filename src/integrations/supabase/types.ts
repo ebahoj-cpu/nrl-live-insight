@@ -14,6 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      match_aftermatch: {
+        Row: {
+          expires_at: string
+          generated_at: string
+          match_id: string
+          payload: Json
+        }
+        Insert: {
+          expires_at: string
+          generated_at?: string
+          match_id: string
+          payload: Json
+        }
+        Update: {
+          expires_at?: string
+          generated_at?: string
+          match_id?: string
+          payload?: Json
+        }
+        Relationships: []
+      }
       match_insights: {
         Row: {
           expires_at: string

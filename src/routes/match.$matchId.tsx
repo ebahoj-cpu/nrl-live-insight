@@ -1873,13 +1873,16 @@ function AnytimeOddsTag({ price }: { price: number | null }) {
   );
 }
 
-function InsightsTab({ insights, insightsError, insightsLoading, home, away, tryscorers, odds }:
+function InsightsTab({ insights, insightsError, insightsLoading, home, away, tryscorers, odds, lessons }:
   { insights: any; insightsError: string | null; insightsLoading?: boolean;
     home: TeamWithPlayers; away: TeamWithPlayers;
     homeRow?: LadderRow; awayRow?: LadderRow;
     tryscorers: TryscorerMarkets | null; tryscorersError?: string | null;
-    odds?: OddsEvent | null }) {
+    odds?: OddsEvent | null;
+    lessons?: { home: any | null; away: any | null } }) {
   if (insightsLoading) return <InsightsLoading />;
+  if (insightsError && !insights) return <Empty msg={insightsError} />;
+  if (!insights) return <Empty msg="Insights unavailable." />;
   if (insightsError && !insights) return <Empty msg={insightsError} />;
   if (!insights) return <Empty msg="Insights unavailable." />;
 

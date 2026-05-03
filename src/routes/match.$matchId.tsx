@@ -9,7 +9,7 @@ import {
   ArrowLeft, Clock, MapPin, Users, BarChart3, Sparkles,
   Trophy, Target, Flag, Crown, TrendingUp, AlertCircle, CloudSun, Calendar, Zap, Hourglass,
   ThumbsUp, ThumbsDown, Activity, Shield, Compass, Gauge, Check,
-  Receipt, X, Newspaper,
+  Receipt, X, Newspaper, History, GraduationCap,
 } from "lucide-react";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -51,7 +51,7 @@ export const Route = createFileRoute("/match/$matchId")({
   },
 });
 
-type TabKey = "lineup" | "stats" | "insights" | "bet" | "script";
+type TabKey = "lineup" | "stats" | "insights" | "bet" | "aftermatch" | "script";
 
 function MatchPage() {
   return (
@@ -64,7 +64,7 @@ function MatchPage() {
 function MatchInner() {
   const { matchId } = Route.useParams();
   const { data } = useSuspenseQuery(matchQO(matchId));
-  const { details, ladder, odds, tryscorers, oddsError, oddsStale, tryscorersError, recentRecaps } = data as any;
+  const { details, ladder, odds, tryscorers, oddsError, oddsStale, tryscorersError, recentRecaps, aftermatch, lessons } = data as any;
 
   // Lazy AI insights — fetched in background after the page renders.
   // Initial value comes from the page payload (cache hit on the server).
@@ -77,6 +77,8 @@ function MatchInner() {
   const insightsLoading = insightsQ.isFetching && !insights;
 
   const [tab, setTab] = useState<TabKey>("lineup");
+
+  const isFinished = /^(FullTime|Final|Completed)$/i.test(details.matchState);
 
   const homeRow = ladder.find((r: any) => r.nickname === details.homeTeam.nickName);
   const awayRow = ladder.find((r: any) => r.nickname === details.awayTeam.nickName);
@@ -167,7 +169,11 @@ function MatchInner() {
         <TabButton active={tab === "lineup"} onClick={() => setTab("lineup")} icon={Users} label="Lineup" />
         <TabButton active={tab === "stats"} onClick={() => setTab("stats")} icon={BarChart3} label="Stats" />
         <TabButton active={tab === "insights"} onClick={() => setTab("insights")} icon={Target} label="Insights" />
-        <TabButton active={tab === "bet"} onClick={() => setTab("bet")} icon={Receipt} label="Bet" />
+        {isFinished ? (
+          <TabButton active={tab === "aftermatch"} onClick={() => setTab("aftermatch")} icon={History} label="Aftermatch" />
+        ) : (
+          <TabButton active={tab === "bet"} onClick={() => setTab("bet")} icon={Receipt} label="Bet" />
+        )}
       </nav>
 
       <div className="mt-6">
@@ -185,9 +191,10 @@ function MatchInner() {
             tryscorers={tryscorers}
             tryscorersError={tryscorersError}
             odds={odds}
+            lessons={lessons}
           />
         )}
-        {tab === "bet" && (
+        {tab === "bet" && !isFinished && (
           <BetTab
             insights={insights}
             insightsError={insightsLoading ? null : insightsError}
@@ -196,6 +203,13 @@ function MatchInner() {
             away={details.awayTeam}
             tryscorers={tryscorers}
             odds={odds}
+          />
+        )}
+        {tab === "aftermatch" && isFinished && (
+          <AftermatchTab
+            aftermatch={aftermatch}
+            home={details.homeTeam}
+            away={details.awayTeam}
           />
         )}
       </div>

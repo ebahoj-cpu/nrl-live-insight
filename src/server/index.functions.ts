@@ -18,6 +18,7 @@ import { findTeam } from "@/lib/teams";
 import { readSharedInsights, readAnySharedInsights, writeSharedInsights } from "./insights-store";
 import { getSeasonSnapshot } from "./season-stats";
 import { generateDeterministicInsights, type DeterministicInsights } from "./insights-engine";
+import { ensureAftermatch, getLastLessonForTeam, readAftermatch, type AftermatchPayload, type TeamLesson } from "./aftermatch";
 
 // In-flight generation lock — if multiple visitors hit the same uncached match
 // simultaneously within a single worker, only one actually invokes the AI;

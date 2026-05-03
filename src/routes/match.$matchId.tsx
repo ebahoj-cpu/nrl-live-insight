@@ -9,7 +9,7 @@ import {
   ArrowLeft, Clock, MapPin, Users, BarChart3, Sparkles,
   Trophy, Target, Flag, Crown, TrendingUp, AlertCircle, CloudSun, Calendar, Zap, Hourglass,
   ThumbsUp, ThumbsDown, Activity, Shield, Compass, Gauge, Check,
-  Receipt, X, Newspaper,
+  Receipt, X, Newspaper, History, GraduationCap,
 } from "lucide-react";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -51,7 +51,7 @@ export const Route = createFileRoute("/match/$matchId")({
   },
 });
 
-type TabKey = "lineup" | "stats" | "insights" | "bet" | "script";
+type TabKey = "lineup" | "stats" | "insights" | "bet" | "aftermatch" | "script";
 
 function MatchPage() {
   return (
@@ -64,7 +64,7 @@ function MatchPage() {
 function MatchInner() {
   const { matchId } = Route.useParams();
   const { data } = useSuspenseQuery(matchQO(matchId));
-  const { details, ladder, odds, tryscorers, oddsError, oddsStale, tryscorersError, recentRecaps } = data as any;
+  const { details, ladder, odds, tryscorers, oddsError, oddsStale, tryscorersError, recentRecaps, aftermatch, lessons } = data as any;
 
   // Lazy AI insights — fetched in background after the page renders.
   // Initial value comes from the page payload (cache hit on the server).
@@ -77,6 +77,8 @@ function MatchInner() {
   const insightsLoading = insightsQ.isFetching && !insights;
 
   const [tab, setTab] = useState<TabKey>("lineup");
+
+  const isFinished = /^(FullTime|Final|Completed)$/i.test(details.matchState);
 
   const homeRow = ladder.find((r: any) => r.nickname === details.homeTeam.nickName);
   const awayRow = ladder.find((r: any) => r.nickname === details.awayTeam.nickName);
@@ -167,7 +169,11 @@ function MatchInner() {
         <TabButton active={tab === "lineup"} onClick={() => setTab("lineup")} icon={Users} label="Lineup" />
         <TabButton active={tab === "stats"} onClick={() => setTab("stats")} icon={BarChart3} label="Stats" />
         <TabButton active={tab === "insights"} onClick={() => setTab("insights")} icon={Target} label="Insights" />
-        <TabButton active={tab === "bet"} onClick={() => setTab("bet")} icon={Receipt} label="Bet" />
+        {isFinished ? (
+          <TabButton active={tab === "aftermatch"} onClick={() => setTab("aftermatch")} icon={History} label="Aftermatch" />
+        ) : (
+          <TabButton active={tab === "bet"} onClick={() => setTab("bet")} icon={Receipt} label="Bet" />
+        )}
       </nav>
 
       <div className="mt-6">
@@ -185,9 +191,10 @@ function MatchInner() {
             tryscorers={tryscorers}
             tryscorersError={tryscorersError}
             odds={odds}
+            lessons={lessons}
           />
         )}
-        {tab === "bet" && (
+        {tab === "bet" && !isFinished && (
           <BetTab
             insights={insights}
             insightsError={insightsLoading ? null : insightsError}
@@ -196,6 +203,13 @@ function MatchInner() {
             away={details.awayTeam}
             tryscorers={tryscorers}
             odds={odds}
+          />
+        )}
+        {tab === "aftermatch" && isFinished && (
+          <AftermatchTab
+            aftermatch={aftermatch}
+            home={details.homeTeam}
+            away={details.awayTeam}
           />
         )}
       </div>
@@ -1859,13 +1873,16 @@ function AnytimeOddsTag({ price }: { price: number | null }) {
   );
 }
 
-function InsightsTab({ insights, insightsError, insightsLoading, home, away, tryscorers, odds }:
+function InsightsTab({ insights, insightsError, insightsLoading, home, away, tryscorers, odds, lessons }:
   { insights: any; insightsError: string | null; insightsLoading?: boolean;
     home: TeamWithPlayers; away: TeamWithPlayers;
     homeRow?: LadderRow; awayRow?: LadderRow;
     tryscorers: TryscorerMarkets | null; tryscorersError?: string | null;
-    odds?: OddsEvent | null }) {
+    odds?: OddsEvent | null;
+    lessons?: { home: any | null; away: any | null } }) {
   if (insightsLoading) return <InsightsLoading />;
+  if (insightsError && !insights) return <Empty msg={insightsError} />;
+  if (!insights) return <Empty msg="Insights unavailable." />;
   if (insightsError && !insights) return <Empty msg={insightsError} />;
   if (!insights) return <Empty msg="Insights unavailable." />;
 
@@ -1906,6 +1923,10 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
 
   return (
     <div className="space-y-4">
+      {/* Last week's lessons (carry-forward from previous Aftermatch) */}
+      {(lessons?.home || lessons?.away) && (
+        <LessonsCard home={home} away={away} lessons={lessons!} />
+      )}
       {/* 1 — Match Winner */}
       <Card title="Match winner" icon={Trophy} className="accent-glow">
         <div className="flex items-center gap-3 mb-2">
@@ -2654,6 +2675,236 @@ function BetTab({ insights, insightsError, insightsLoading, home, away, tryscore
           </p>
         </div>
       </Card>
+    </div>
+  );
+}
+
+/* ================= AFTERMATCH TAB ================= */
+
+type AftermatchHit = { market: string; predicted: string; actual: string; status: "hit" | "miss" | "partial"; detail?: string };
+type AftermatchPlayerHit = { name: string; predictedAs: string; scored: number; status: "hit" | "miss" };
+type AftermatchPayload = {
+  finalScore: { home: number; away: number };
+  hits: AftermatchHit[];
+  tryscorerHits: AftermatchPlayerHit[];
+  scoreLine: { hits: number; total: number };
+  consistencies: string[];
+  inconsistencies: string[];
+  summary: string;
+};
+
+function AftermatchTab({ aftermatch, home, away }:
+  { aftermatch: AftermatchPayload | null; home: TeamWithPlayers; away: TeamWithPlayers }) {
+  if (!aftermatch) {
+    return <Empty msg="Aftermatch comparison is being generated — refresh in a moment." />;
+  }
+  const pct = aftermatch.scoreLine.total > 0
+    ? Math.round((aftermatch.scoreLine.hits / aftermatch.scoreLine.total) * 100)
+    : 0;
+  return (
+    <div className="space-y-4">
+      <Card title="Aftermatch read" icon={History} className="accent-glow">
+        <div className="flex items-center gap-3 mb-3">
+          <TeamLogo themeKey={home.themeKey} name={home.nickName} size={36} />
+          <div className="kbd flex items-center gap-2 px-3 py-1.5">
+            <span className={`text-2xl font-black tabular-nums ${aftermatch.finalScore.home > aftermatch.finalScore.away ? "text-accent" : ""}`}>{aftermatch.finalScore.home}</span>
+            <span className="text-muted-foreground">–</span>
+            <span className={`text-2xl font-black tabular-nums ${aftermatch.finalScore.away > aftermatch.finalScore.home ? "text-accent" : ""}`}>{aftermatch.finalScore.away}</span>
+          </div>
+          <TeamLogo themeKey={away.themeKey} name={away.nickName} size={36} />
+          <div className="ml-auto text-right">
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Hit rate</div>
+            <div className="text-lg font-black tabular-nums text-accent">{aftermatch.scoreLine.hits}/{aftermatch.scoreLine.total} <span className="text-muted-foreground text-xs font-bold">({pct}%)</span></div>
+          </div>
+        </div>
+        <p className="text-sm leading-relaxed text-foreground/90">{aftermatch.summary || "No summary available."}</p>
+      </Card>
+
+      <Card title="Predicted vs actual" icon={Target}>
+        <div className="space-y-2">
+          {aftermatch.hits.map((h, i) => (
+            <div key={i} className="flex items-start gap-3 p-3 rounded-lg bg-surface-2/50 border border-border">
+              <StatusBadge status={h.status} />
+              <div className="flex-1 min-w-0">
+                <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{h.market}</div>
+                <div className="text-sm mt-0.5">
+                  <span className="text-muted-foreground">Predicted:</span> <span className="font-semibold">{h.predicted}</span>
+                </div>
+                <div className="text-sm">
+                  <span className="text-muted-foreground">Actual:</span> <span className="font-semibold">{h.actual}</span>
+                </div>
+                {h.detail && <div className="text-[11px] text-muted-foreground mt-0.5">{h.detail}</div>}
+              </div>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      {aftermatch.tryscorerHits.length > 0 && (
+        <Card title="Tryscorer picks" icon={Flag}>
+          <div className="space-y-1.5">
+            {aftermatch.tryscorerHits.map((p, i) => (
+              <div key={i} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-surface-2/50 border border-border">
+                <StatusBadge status={p.status} />
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-semibold truncate">{p.name}</div>
+                  <div className="text-[11px] text-muted-foreground">{p.predictedAs}</div>
+                </div>
+                <div className="text-sm font-black tabular-nums">
+                  {p.scored} {p.scored === 1 ? "try" : "tries"}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {(aftermatch.consistencies.length > 0 || aftermatch.inconsistencies.length > 0) && (
+        <Card title="Where the model held / slipped" icon={Activity}>
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <ThumbsUp className="h-4 w-4 text-accent" />
+                <h4 className="text-xs font-bold uppercase tracking-wider">Consistencies</h4>
+              </div>
+              {aftermatch.consistencies.length === 0 ? (
+                <p className="text-xs text-muted-foreground">None this match.</p>
+              ) : (
+                <ul className="space-y-1.5">
+                  {aftermatch.consistencies.map((c, i) => (
+                    <li key={i} className="text-xs leading-relaxed text-foreground/90 flex gap-2">
+                      <Check className="h-3.5 w-3.5 text-accent shrink-0 mt-0.5" />
+                      <span>{c}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <ThumbsDown className="h-4 w-4 text-danger" />
+                <h4 className="text-xs font-bold uppercase tracking-wider">Inconsistencies</h4>
+              </div>
+              {aftermatch.inconsistencies.length === 0 ? (
+                <p className="text-xs text-muted-foreground">None — a clean read.</p>
+              ) : (
+                <ul className="space-y-1.5">
+                  {aftermatch.inconsistencies.map((c, i) => (
+                    <li key={i} className="text-xs leading-relaxed text-foreground/90 flex gap-2">
+                      <X className="h-3.5 w-3.5 text-danger shrink-0 mt-0.5" />
+                      <span>{c}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+function StatusBadge({ status }: { status: "hit" | "miss" | "partial" }) {
+  if (status === "hit") {
+    return (
+      <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-accent !text-white shrink-0" title="Hit">
+        <Check className="h-3.5 w-3.5" />
+      </span>
+    );
+  }
+  if (status === "partial") {
+    return (
+      <span className="inline-flex items-center justify-center h-6 px-2 rounded-full bg-surface-2 text-[10px] font-black uppercase tracking-wider text-foreground border border-border shrink-0" title="Partial">
+        Part
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-danger/15 text-danger border border-danger/40 shrink-0" title="Miss">
+      <X className="h-3.5 w-3.5" />
+    </span>
+  );
+}
+
+/* ================= LESSONS CARD (carry-forward in Insights tab) ================= */
+
+type TeamLessonShape = {
+  matchId: string;
+  opponentNickname: string;
+  finalScore: { team: number; opponent: number };
+  result: "W" | "L" | "D";
+  scoreLine: { hits: number; total: number };
+  topConsistencies: string[];
+  topInconsistencies: string[];
+  summary: string;
+};
+
+function LessonsCard({ home, away, lessons }:
+  { home: TeamWithPlayers; away: TeamWithPlayers; lessons: { home: TeamLessonShape | null; away: TeamLessonShape | null } }) {
+  return (
+    <Card title="Last week's lessons" icon={GraduationCap}>
+      <p className="text-[11px] text-muted-foreground mb-3 leading-relaxed">
+        What the model learned from each side's most recent game — used to sharpen this week's read.
+      </p>
+      <div className="grid sm:grid-cols-2 gap-3">
+        <LessonColumn team={home} lesson={lessons.home} />
+        <LessonColumn team={away} lesson={lessons.away} />
+      </div>
+    </Card>
+  );
+}
+
+function LessonColumn({ team, lesson }: { team: TeamWithPlayers; lesson: TeamLessonShape | null }) {
+  return (
+    <div className="rounded-lg border border-border bg-surface-2/40 p-3">
+      <div className="flex items-center gap-2 mb-2">
+        <TeamLogo themeKey={team.themeKey} name={team.nickName} size={28} />
+        <div className="min-w-0">
+          <div className="text-xs font-extrabold uppercase tracking-wider truncate">{team.nickName}</div>
+          {lesson ? (
+            <div className="text-[10px] text-muted-foreground">
+              {lesson.result === "W" ? "Won" : lesson.result === "L" ? "Lost" : "Drew"} {lesson.finalScore.team}-{lesson.finalScore.opponent} v {lesson.opponentNickname}
+            </div>
+          ) : (
+            <div className="text-[10px] text-muted-foreground">No prior comparison yet.</div>
+          )}
+        </div>
+        {lesson && (
+          <div className="ml-auto text-[10px] font-black tabular-nums text-accent">
+            {lesson.scoreLine.hits}/{lesson.scoreLine.total}
+          </div>
+        )}
+      </div>
+      {lesson ? (
+        <>
+          {lesson.summary && (
+            <p className="text-xs leading-relaxed text-foreground/90 mb-2">{lesson.summary}</p>
+          )}
+          {lesson.topConsistencies.length > 0 && (
+            <div className="mb-1.5">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-accent mb-0.5">What worked</div>
+              <ul className="space-y-0.5">
+                {lesson.topConsistencies.slice(0, 2).map((c, i) => (
+                  <li key={i} className="text-[11px] leading-snug text-foreground/85">• {c}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {lesson.topInconsistencies.length > 0 && (
+            <div>
+              <div className="text-[10px] font-bold uppercase tracking-wider text-danger mb-0.5">What missed</div>
+              <ul className="space-y-0.5">
+                {lesson.topInconsistencies.slice(0, 2).map((c, i) => (
+                  <li key={i} className="text-[11px] leading-snug text-foreground/85">• {c}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </>
+      ) : (
+        <p className="text-[11px] text-muted-foreground">Lessons will appear here after this team plays a finished round.</p>
+      )}
     </div>
   );
 }

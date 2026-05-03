@@ -230,6 +230,42 @@ export const getMatchPage = createServerFn({ method: "GET" })
     // getMatchInsights() to generate (single-flight) and persist it.
     const stored = await readSharedInsights(data.matchId);
 
+    // Aftermatch (only for finished matches) + lessons-from-last-week per team.
+    const finished = /^(FullTime|Final|Completed)$/i.test(details.matchState);
+    let aftermatch: AftermatchPayload | null = null;
+    if (finished) {
+      // Read existing first; if missing, generate in the background but don't
+      // block the page render. Cached forever once written.
+      aftermatch = await readAftermatch(data.matchId);
+      if (!aftermatch) {
+        // Use the most recent recap pair (recaps are past matches for the
+        // teams; not the current). Fetch this match's own recap directly.
+        try {
+          const ownRecap = await fetchMatchRecap(`https://www.nrl.com${matchIdToPath(data.matchId)}`);
+          aftermatch = await ensureAftermatch({
+            matchId: data.matchId,
+            details,
+            recap: ownRecap,
+            insights: stored?.payload ?? null,
+          });
+        } catch (e) {
+          console.warn("aftermatch generation failed:", e);
+        }
+      }
+    }
+
+    // Lessons from each team's previous finished match (only relevant for
+    // upcoming/in-progress fixtures — for finished matches the aftermatch
+    // is the latest data anyway).
+    let lessons: { home: TeamLesson | null; away: TeamLesson | null } = { home: null, away: null };
+    if (!finished) {
+      const [homeLesson, awayLesson] = await Promise.all([
+        getLastLessonForTeam({ nickname: details.homeTeam.nickName, excludeMatchId: data.matchId }),
+        getLastLessonForTeam({ nickname: details.awayTeam.nickName, excludeMatchId: data.matchId }),
+      ]);
+      lessons = { home: homeLesson, away: awayLesson };
+    }
+
     return {
       details: { ...details, weather },
       odds,
@@ -241,6 +277,8 @@ export const getMatchPage = createServerFn({ method: "GET" })
       insights: stored?.payload ?? null,
       insightsError: null,
       recentRecaps: { home: homeRecaps, away: awayRecaps },
+      aftermatch,
+      lessons,
       generatedAt: new Date().toISOString(),
     };
   });

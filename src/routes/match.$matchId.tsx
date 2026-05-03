@@ -1923,6 +1923,10 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
 
   return (
     <div className="space-y-4">
+      {/* Last week's lessons (carry-forward from previous Aftermatch) */}
+      {(lessons?.home || lessons?.away) && (
+        <LessonsCard home={home} away={away} lessons={lessons!} />
+      )}
       {/* 1 — Match Winner */}
       <Card title="Match winner" icon={Trophy} className="accent-glow">
         <div className="flex items-center gap-3 mb-2">

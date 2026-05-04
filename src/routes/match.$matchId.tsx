@@ -335,70 +335,10 @@ const POSITION_ORDER = [
 type NewsOut = { playerName: string; reason: string; sourceUrl: string; sourceTitle: string; source: string; publishedUtc: string };
 type TeamNews = { ins: string[]; outs: string[]; blurb: string; sourceUrl: string; newsOuts?: NewsOut[] } | null;
 
-function LineupTab({ home, away, officials, teamNews }: { home: any; away: any; officials: { position: string; firstName: string; lastName: string; headImage?: string }[]; teamNews?: { home: TeamNews; away: TeamNews } }) {
-  const [side, setSide] = useState<"home" | "away" | "h2h">("home");
-  const team = side === "home" ? home : away;
-  const news = side === "home" ? (teamNews?.home ?? null) : (teamNews?.away ?? null);
-
-  const TeamTab = ({ value, t, label }: { value: "home" | "away"; t: any; label: string }) => {
-    const active = side === value;
-    return (
-      <button
-        type="button"
-        onClick={() => setSide(value)}
-        aria-pressed={active}
-        className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-md transition-all ${
-          active
-            ? "bg-accent/15 ring-1 ring-accent/40 text-foreground"
-            : "bg-surface-2/50 text-muted-foreground hover:text-foreground"
-        }`}
-      >
-        <TeamLogo themeKey={t.themeKey} name={t.nickName} size={28} />
-        <div className="flex flex-col items-start leading-tight min-w-0">
-          <span className="text-[9px] uppercase tracking-wider opacity-70">{label}</span>
-          <span className="text-sm font-extrabold uppercase truncate">{t.nickName}</span>
-        </div>
-      </button>
-    );
-  };
-
-  const H2HTab = () => {
-    const active = side === "h2h";
-    return (
-      <button
-        type="button"
-        onClick={() => setSide("h2h")}
-        aria-pressed={active}
-        className={`shrink-0 flex items-center justify-center gap-1.5 px-3 sm:px-4 py-2.5 rounded-md transition-all ${
-          active
-            ? "bg-accent text-accent-foreground"
-            : "bg-surface-2/50 text-muted-foreground hover:text-foreground"
-        }`}
-        title="Head-to-head matchups"
-      >
-        <Zap className="h-4 w-4" />
-        <span className="text-xs font-extrabold uppercase tracking-wider">H2H</span>
-      </button>
-    );
-  };
-
+function LineupTab({ home, away, officials, teamNews: _teamNews }: { home: any; away: any; officials: { position: string; firstName: string; lastName: string; headImage?: string }[]; teamNews?: { home: TeamNews; away: TeamNews } }) {
   return (
     <div className="space-y-4">
-      <section className="card-surface p-2">
-        <div className="flex items-stretch gap-2">
-          <TeamTab value="home" t={home} label="Home" />
-          <H2HTab />
-          <TeamTab value="away" t={away} label="Away" />
-        </div>
-      </section>
-      {side === "h2h" ? (
-        <H2HPanel home={home} away={away} />
-      ) : (
-        <>
-          <SquadPanel team={team} news={news} />
-          <InjuryCard team={team} news={news} />
-        </>
-      )}
+      <H2HPanel home={home} away={away} />
       <OfficialsCard officials={officials} />
     </div>
   );
@@ -412,7 +352,19 @@ function H2HPanel({ home, away }: { home: any; away: any }) {
     return m;
   };
   const homeMap = byNumber(home.players);
-  const awayMap = byNumber(away.players);
+  const rawAwayMap = byNumber(away.players);
+  // Mirror the away backline so matchups align positionally:
+  // home #2 (LW) faces away #5 (RW), home #3 (LC) faces away #4 (RC), and vice versa.
+  // FB (#1) and forwards (#6+) keep their numbers.
+  const awayMap = new Map(rawAwayMap);
+  const swap = (a: number, b: number) => {
+    const pa = rawAwayMap.get(a);
+    const pb = rawAwayMap.get(b);
+    if (pa) awayMap.set(b, pa); else awayMap.delete(b);
+    if (pb) awayMap.set(a, pb); else awayMap.delete(a);
+  };
+  swap(2, 5);
+  swap(3, 4);
 
   const positionFor = (n: number): string => {
     if (n >= 1 && n <= 13) return JERSEY_POSITION[n] ?? "";

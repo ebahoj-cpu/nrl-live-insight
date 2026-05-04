@@ -352,7 +352,19 @@ function H2HPanel({ home, away }: { home: any; away: any }) {
     return m;
   };
   const homeMap = byNumber(home.players);
-  const awayMap = byNumber(away.players);
+  const rawAwayMap = byNumber(away.players);
+  // Mirror the away backline so matchups align positionally:
+  // home #2 (LW) faces away #5 (RW), home #3 (LC) faces away #4 (RC), and vice versa.
+  // FB (#1) and forwards (#6+) keep their numbers.
+  const awayMap = new Map(rawAwayMap);
+  const swap = (a: number, b: number) => {
+    const pa = rawAwayMap.get(a);
+    const pb = rawAwayMap.get(b);
+    if (pa) awayMap.set(b, pa); else awayMap.delete(b);
+    if (pb) awayMap.set(a, pb); else awayMap.delete(a);
+  };
+  swap(2, 5);
+  swap(3, 4);
 
   const positionFor = (n: number): string => {
     if (n >= 1 && n <= 13) return JERSEY_POSITION[n] ?? "";

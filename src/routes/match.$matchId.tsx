@@ -448,16 +448,24 @@ function H2HPanel({ home, away }: { home: any; away: any }) {
 
   // For backline matchups (2-5) the away jersey is mirrored, so show "home/away".
   const BACKLINE_PAIR: Record<number, number> = { 2: 5, 3: 4, 4: 3, 5: 2 };
+  // Combined position label for the mirrored backline (home position / away position).
+  const BACKLINE_LABEL: Record<number, string> = {
+    2: "Left/Right Wing",
+    3: "Left/Right Centre",
+    4: "Right/Left Centre",
+    5: "Right/Left Wing",
+  };
 
   const Row = ({ n, label }: { n: number; label?: string }) => {
     const h = homeMap.get(n);
     const a = awayMap.get(n);
     const displayNumber = BACKLINE_PAIR[n] ? `${n}/${BACKLINE_PAIR[n]}` : undefined;
+    const rowLabel = label ?? BACKLINE_LABEL[n];
     return (
       <li className="relative flex items-start justify-between gap-2 sm:gap-4 rounded-lg bg-accent/10 ring-1 ring-accent/25 hover:ring-accent/50 transition px-2 sm:px-4 py-2 overflow-visible">
         <HeadshotWithName p={h} side="left" />
         <div className="flex-1 flex items-center justify-center pt-4 sm:pt-6">
-          <CenterBadge n={n} label={label} displayNumber={displayNumber} />
+          <CenterBadge n={n} label={rowLabel} displayNumber={displayNumber} />
         </div>
         <HeadshotWithName p={a} side="right" />
       </li>

@@ -311,10 +311,10 @@ function InsightsLoading() {
 // so we map by jersey number rather than indexing a flat array.
 const JERSEY_POSITION: Record<number, string> = {
   1: "Fullback",
-  2: "Right Wing",
-  3: "Right Centre",
-  4: "Left Centre",
-  5: "Left Wing",
+  2: "Left Wing",
+  3: "Left Centre",
+  4: "Right Centre",
+  5: "Right Wing",
   6: "Five-Eighth",
   7: "Halfback",
   8: "Prop",
@@ -327,7 +327,7 @@ const JERSEY_POSITION: Record<number, string> = {
 
 // Used for stable secondary-sort of squad lists when jersey numbers tie.
 const POSITION_ORDER = [
-  "Fullback","Right Wing","Right Centre","Left Centre","Left Wing",
+  "Fullback","Left Wing","Left Centre","Right Centre","Right Wing",
   "Five-Eighth","Halfback","Prop","Hooker","2nd Row","Lock",
   "Interchange","Reserve",
 ];
@@ -448,16 +448,24 @@ function H2HPanel({ home, away }: { home: any; away: any }) {
 
   // For backline matchups (2-5) the away jersey is mirrored, so show "home/away".
   const BACKLINE_PAIR: Record<number, number> = { 2: 5, 3: 4, 4: 3, 5: 2 };
+  // Combined position label for the mirrored backline (home position / away position).
+  const BACKLINE_LABEL: Record<number, string> = {
+    2: "Left/Right Wing",
+    3: "Left/Right Centre",
+    4: "Right/Left Centre",
+    5: "Right/Left Wing",
+  };
 
   const Row = ({ n, label }: { n: number; label?: string }) => {
     const h = homeMap.get(n);
     const a = awayMap.get(n);
     const displayNumber = BACKLINE_PAIR[n] ? `${n}/${BACKLINE_PAIR[n]}` : undefined;
+    const rowLabel = label ?? BACKLINE_LABEL[n];
     return (
       <li className="relative flex items-start justify-between gap-2 sm:gap-4 rounded-lg bg-accent/10 ring-1 ring-accent/25 hover:ring-accent/50 transition px-2 sm:px-4 py-2 overflow-visible">
         <HeadshotWithName p={h} side="left" />
         <div className="flex-1 flex items-center justify-center pt-4 sm:pt-6">
-          <CenterBadge n={n} label={label} displayNumber={displayNumber} />
+          <CenterBadge n={n} label={rowLabel} displayNumber={displayNumber} />
         </div>
         <HeadshotWithName p={a} side="right" />
       </li>
@@ -469,16 +477,16 @@ function H2HPanel({ home, away }: { home: any; away: any }) {
       {numbers.length === 0 && extras.length === 0 ? (
         <div className="text-xs text-muted-foreground text-center py-6">Squads not yet named.</div>
       ) : (
-        <div className="space-y-10 pt-2">
+        <div className="space-y-12 pt-0">
           <div>
-            <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-accent/80 mb-3">Starters</div>
+            <div className="text-[11px] font-bold uppercase tracking-[0.25em] text-accent/80 mb-6">Starters</div>
             <ul className="space-y-10 sm:space-y-14">
               {numbers.filter((n) => n <= 13).map((n) => <Row key={n} n={n} />)}
             </ul>
           </div>
           {numbers.some((n) => n > 13 && n <= 20) && (
             <div>
-              <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-accent/80 mb-3">Interchange</div>
+              <div className="text-[11px] font-bold uppercase tracking-[0.25em] text-accent/80 mb-6">Interchange</div>
               <ul className="space-y-10 sm:space-y-14">
                 {numbers.filter((n) => n > 13 && n <= 20).map((n) => <Row key={n} n={n} label="Bench" />)}
               </ul>
@@ -486,7 +494,7 @@ function H2HPanel({ home, away }: { home: any; away: any }) {
           )}
           {extras.length > 0 && (
             <div>
-              <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-accent/80 mb-3">Reserves</div>
+              <div className="text-[11px] font-bold uppercase tracking-[0.25em] text-accent/80 mb-6">Reserves</div>
               <ul className="space-y-10 sm:space-y-14">
                 {extras.map((n) => <Row key={n} n={n} label="Reserve" />)}
               </ul>

@@ -311,10 +311,10 @@ function InsightsLoading() {
 // so we map by jersey number rather than indexing a flat array.
 const JERSEY_POSITION: Record<number, string> = {
   1: "Fullback",
-  2: "Right Wing",
-  3: "Right Centre",
-  4: "Left Centre",
-  5: "Left Wing",
+  2: "Left Wing",
+  3: "Left Centre",
+  4: "Right Centre",
+  5: "Right Wing",
   6: "Five-Eighth",
   7: "Halfback",
   8: "Prop",

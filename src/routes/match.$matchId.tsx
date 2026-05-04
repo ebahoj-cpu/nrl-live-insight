@@ -463,14 +463,14 @@ function H2HPanel({ home, away }: { home: any; away: any }) {
   return (
     <section className="card-surface p-4 sm:p-5">
       <div className="flex items-center justify-between gap-3 mb-5">
-        <div className="flex items-center gap-2 min-w-0 flex-1 justify-start">
-          <TeamLogo themeKey={home.themeKey} name={home.nickName} size={32} />
-          <span className="font-extrabold uppercase text-xs sm:text-sm truncate">{home.nickName}</span>
+        <div className="flex items-center gap-3 min-w-0 flex-1 justify-start">
+          <TeamLogo themeKey={home.themeKey} name={home.nickName} size={56} />
+          <span className="font-extrabold uppercase text-lg sm:text-2xl truncate">{home.nickName}</span>
         </div>
-        <span className="text-[10px] sm:text-xs font-black uppercase tracking-[0.25em] text-accent shrink-0">vs</span>
-        <div className="flex items-center gap-2 min-w-0 flex-1 justify-end">
-          <span className="font-extrabold uppercase text-xs sm:text-sm truncate">{away.nickName}</span>
-          <TeamLogo themeKey={away.themeKey} name={away.nickName} size={32} />
+        <span className="text-xs sm:text-sm font-black uppercase tracking-[0.25em] text-accent shrink-0">vs</span>
+        <div className="flex items-center gap-3 min-w-0 flex-1 justify-end">
+          <span className="font-extrabold uppercase text-lg sm:text-2xl truncate">{away.nickName}</span>
+          <TeamLogo themeKey={away.themeKey} name={away.nickName} size={56} />
         </div>
       </div>
 

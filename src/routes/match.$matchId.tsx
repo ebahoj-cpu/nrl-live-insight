@@ -466,23 +466,10 @@ function H2HPanel({ home, away }: { home: any; away: any }) {
 
   return (
     <section className="card-surface p-4 sm:p-5">
-      <div className="flex items-center justify-between gap-3 mb-5">
-        <div className="flex items-center gap-3 min-w-0 flex-1 justify-start">
-          <TeamLogo themeKey={home.themeKey} name={home.nickName} size={56} />
-          <span className="font-extrabold uppercase text-lg sm:text-2xl truncate">{home.nickName}</span>
-        </div>
-        <span className="text-xs sm:text-sm font-black uppercase tracking-[0.25em] text-accent shrink-0">vs</span>
-        <div className="flex items-center gap-3 min-w-0 flex-1 justify-end">
-          <span className="font-extrabold uppercase text-lg sm:text-2xl truncate">{away.nickName}</span>
-          <TeamLogo themeKey={away.themeKey} name={away.nickName} size={56} />
-        </div>
-      </div>
-
       {numbers.length === 0 && extras.length === 0 ? (
         <div className="text-xs text-muted-foreground text-center py-6">Squads not yet named.</div>
       ) : (
-        // pt-12 keeps first-row headshot overflow from clipping against the section header.
-        <div className="space-y-10 pt-12">
+        <div className="space-y-10 pt-2">
           <div>
             <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-accent/80 mb-3">Starters</div>
             <ul className="space-y-10 sm:space-y-14">

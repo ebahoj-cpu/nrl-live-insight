@@ -327,7 +327,7 @@ const JERSEY_POSITION: Record<number, string> = {
 
 // Used for stable secondary-sort of squad lists when jersey numbers tie.
 const POSITION_ORDER = [
-  "Fullback","Right Wing","Right Centre","Left Centre","Left Wing",
+  "Fullback","Left Wing","Left Centre","Right Centre","Right Wing",
   "Five-Eighth","Halfback","Prop","Hooker","2nd Row","Lock",
   "Interchange","Reserve",
 ];

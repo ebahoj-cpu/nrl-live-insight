@@ -469,11 +469,8 @@ export async function ensureAftermatch(args: {
   if (!built) return null;
 
   const summary = await summariseWithAI(built);
-  built.summary = summary || (
-    built.consistencies.length
-      ? `The model nailed ${built.scoreLine.hits} of ${built.scoreLine.total} key calls — strongest on ${built.consistencies[0].split(":")[0]}. ${built.inconsistencies[0] ?? ""} Carry into this week: weight the pattern that worked and stay cautious where the read missed.`.trim()
-      : `The model struggled this week (${built.scoreLine.hits}/${built.scoreLine.total} correct). Carry into this week: treat similar matchups with extra caution and lean on live signals before locking picks.`
-  );
+  built.summary = summary || buildFallbackSummary(built);
+
   await writeAftermatch(args.matchId, built);
   return built;
 }

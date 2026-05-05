@@ -302,10 +302,9 @@ function InsightsLoading() {
   return (
     <div className="glass p-8 text-center text-sm text-muted-foreground">
       <div className="inline-flex items-center gap-3">
-        <Sparkles className="h-5 w-5 text-accent animate-pulse" />
-        <span>Generating AI insights — this can take 20–40 seconds…</span>
+        <Sparkles className="h-5 w-5 text-accent animate-pulse drop-shadow-[0_0_8px_hsl(var(--accent))]" />
       </div>
-      <p className="text-[11px] mt-2 opacity-70">Cached for an hour after first load.</p>
+      <p className="text-[11px] mt-3 opacity-70">If this hasn't generated, refresh in 1 minute.</p>
     </div>
   );
 }

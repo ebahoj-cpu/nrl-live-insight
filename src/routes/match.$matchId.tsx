@@ -1116,7 +1116,7 @@ function GameScriptTab({ insights, insightsLoading, home, away }:
   { insights: any; insightsLoading?: boolean; home: TeamWithPlayers; away: TeamWithPlayers }) {
   if (insightsLoading && !insights) return <InsightsLoading />;
   if (insights && !insights.script && insightsLoading) return <InsightsLoading />;
-  const script = insights?.script as
+  const script = (insights?.script ?? buildScriptFallback(insights?.deterministic, home, away)) as
     | { mode: string; confidence: string; summary: string;
         phases: { first20: string; twenty40: string; forty60: string; sixty80: string };
         edges: { left: string; right: string; middle: string };
@@ -1190,6 +1190,37 @@ function GameScriptTab({ insights, insightsLoading, home, away }:
       </Card>
     </div>
   );
+}
+
+function buildScriptFallback(det: any, home: TeamWithPlayers, away: TeamWithPlayers) {
+  if (!det?.predictedScore || !det?.matchWinner || !det?.margin || !det?.totalPoints || !det?.htft) return null;
+  const winner = det.matchWinner.nickname ?? home.nickName;
+  const loser = winner === home.nickName ? away.nickName : home.nickName;
+  const total = (Number(det.predictedScore.home) || 0) + (Number(det.predictedScore.away) || 0);
+  const firstTry = det.firstTryscorer?.name && !/^awaiting/i.test(det.firstTryscorer.name) ? det.firstTryscorer.name : null;
+  const anytime = det.topAnytimeOverall?.[0]?.name ?? det.topAnytimeHome?.[0]?.name ?? det.topAnytimeAway?.[0]?.name ?? firstTry;
+  return {
+    mode: det.mode ?? "market",
+    confidence: det.confidence ?? "high",
+    summary: `${winner} project to control the main scoring script, with ${loser} needing transition tries to keep the margin tight. Projected score sits ${det.predictedScore.home}-${det.predictedScore.away}.`,
+    phases: {
+      first20: det.matchWinner.reasoning,
+      twenty40: det.htft.reasoning,
+      forty60: det.totalPoints.reasoning,
+      sixty80: det.margin.reasoning,
+    },
+    edges: {
+      left: det.rankedTryscorers?.first?.reasoning ?? det.firstTryscorer?.reasoning ?? "Primary edge read follows the ranked tryscorer board.",
+      right: det.rankedTryscorers?.second?.reasoning ?? det.playerDouble?.reasoning ?? "Secondary edge read follows the anytime and double-try board.",
+      middle: `Projected total lands at ${total}, so middle control backs ${winner} ${det.margin.bucket} rather than random forward tryscorer exposure.`,
+    },
+    betting: {
+      winnerLean: winner,
+      marginLean: `${winner} ${det.margin.bucket}`,
+      totalLean: `${String(det.totalPoints.lean).toUpperCase()} ${det.totalPoints.line}`,
+      tryscorerLean: firstTry ? `${firstTry} first / ${anytime ?? firstTry} anytime` : `${anytime ?? "Awaiting market"} anytime`,
+    },
+  };
 }
 
 function ScriptTab({ insights, insightsError, insightsLoading, home, away, homeRow, awayRow, tryscorers, odds }:

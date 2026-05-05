@@ -79,10 +79,14 @@ export function insightsTtlMs(kickoffUtc: string): number {
 }
 
 export const TTL = {
-  fixtures: 15 * 60_000,
-  ladder: 30 * 60_000,
-  match: 10 * 60_000,
-  odds: 5 * 60_000,
+  fixtures: 30 * 60_000,
+  ladder: 60 * 60_000,
+  match: 15 * 60_000,
+  // Odds quota is the constraint — bookmaker prices barely move outside the
+  // final hour pre-kickoff, so cache aggressively. The match page also gates
+  // tryscorer fetches to fixtures within 48h of kickoff.
+  odds: 60 * 60_000,
+  oddsTryscorer: 2 * 60 * 60_000,
   insights: 60 * 60_000, // legacy default; prefer insightsTtlMs(kickoffUtc)
-  weather: 30 * 60_000,
+  weather: 60 * 60_000,
 };

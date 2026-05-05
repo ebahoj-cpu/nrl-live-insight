@@ -1114,6 +1114,7 @@ type TeamWithPlayers = TeamLite & { players?: { firstName: string; lastName: str
 function GameScriptTab({ insights, insightsLoading, home, away }:
   { insights: any; insightsLoading?: boolean; home: TeamWithPlayers; away: TeamWithPlayers }) {
   if (insightsLoading && !insights) return <InsightsLoading />;
+  if (insights && !insights.script && insightsLoading) return <InsightsLoading />;
   const script = insights?.script as
     | { mode: string; confidence: string; summary: string;
         phases: { first20: string; twenty40: string; forty60: string; sixty80: string };
@@ -1128,7 +1129,7 @@ function GameScriptTab({ insights, insightsLoading, home, away }:
   const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
     <div>
       <div className="text-[10px] uppercase tracking-wider font-bold text-accent mb-1">{title}</div>
-      <p className="text-sm leading-relaxed text-foreground/90">{children}</p>
+      <p className="font-chat text-sm leading-relaxed text-foreground/90">{children}</p>
     </div>
   );
 
@@ -1143,7 +1144,7 @@ function GameScriptTab({ insights, insightsLoading, home, away }:
             {script.mode} · {script.confidence}
           </span>
         </div>
-        <p className="text-sm leading-relaxed text-foreground/90">{script.summary}</p>
+        <p className="font-chat text-sm leading-relaxed text-foreground/90">{script.summary}</p>
         {script.earlyNote && (
           <p className="text-[11px] mt-3 italic text-muted-foreground border-l-2 border-accent/40 pl-2">{script.earlyNote}</p>
         )}

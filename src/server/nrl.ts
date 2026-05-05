@@ -359,11 +359,14 @@ export async function fetchMatchRecap(matchUrl: string): Promise<NrlMatchRecap |
       if (id != null) idToName.set(id, `${p.firstName ?? ""} ${p.lastName ?? ""}`.trim());
     }
   }
-  // playerId -> teamId from timeline tries
-  const tries: { playerId: number; teamId: number }[] = [];
+  // playerId -> teamId from timeline tries (in order)
+  const tries: { playerId: number; teamId: number; minute: number | null }[] = [];
   for (const ev of (d.timeline ?? [])) {
     if ((ev?.type ?? ev?.title) === "Try" && ev.playerId != null && ev.teamId != null) {
-      tries.push({ playerId: ev.playerId, teamId: ev.teamId });
+      const minute = typeof ev.minute === "number" ? ev.minute
+        : typeof ev.gameMinute === "number" ? ev.gameMinute
+        : null;
+      tries.push({ playerId: ev.playerId, teamId: ev.teamId, minute });
     }
   }
   const tally = (teamId: number) => {
@@ -373,6 +376,14 @@ export async function fetchMatchRecap(matchUrl: string): Promise<NrlMatchRecap |
       .map(([pid, count]) => ({ name: idToName.get(pid) ?? `#${pid}`, count }))
       .sort((a, b) => b.count - a.count);
   };
+  const tryOrder = tries.map((t) => ({
+    name: idToName.get(t.playerId) ?? `#${t.playerId}`,
+    team: (t.teamId === ht.teamId ? "home" : "away") as "home" | "away",
+    minute: t.minute,
+  }));
+  const firstTry = tryOrder[0]
+    ? { name: tryOrder[0].name, team: tryOrder[0].team }
+    : null;
   return {
     url: matchUrl,
     homeNick: ht.nickName ?? "",
@@ -383,5 +394,7 @@ export async function fetchMatchRecap(matchUrl: string): Promise<NrlMatchRecap |
     awayScore: at.score ?? null,
     homeTryscorers: tally(ht.teamId),
     awayTryscorers: tally(at.teamId),
+    tryOrder,
+    firstTry,
   };
 }

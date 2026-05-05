@@ -1,0 +1,1 @@
+DELETE FROM public.match_insights WHERE match_id LIKE '2026/round-10/%::v19-involvement';

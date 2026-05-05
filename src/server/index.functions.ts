@@ -415,28 +415,30 @@ export const getMatchInsights = createServerFn({ method: "GET" })
         // ---- PRIMARY: deterministic stats engine. Runs always, no AI. ----
         let deterministic: DeterministicInsights | null = null;
         let scriptPayload: ScriptPayload | null = null;
-        try {
-          const snap = await getSeasonSnapshot(season);
-          const engineInputs = {
-            homeNickname: details.homeTeam.nickName,
-            awayNickname: details.awayTeam.nickName,
-            homeThemeKey: details.homeTeam.themeKey,
-            awayThemeKey: details.awayTeam.themeKey,
-            homeSquad: details.homeTeam.players,
-            awaySquad: details.awayTeam.players,
-            ladder,
-            snapshot: snap,
-            weather,
-            tryscorers,
-            venue: details.venue,
-            mode: resolved.mode,
-            confidence: resolved.confidence,
-          };
-          deterministic = generateDeterministicInsights(engineInputs);
-          try { scriptPayload = generateScript(engineInputs, deterministic); }
-          catch (e) { console.warn("script-engine failed:", e); }
-        } catch (err) {
-          console.warn("deterministic engine failed:", err);
+        const snap = await getSeasonSnapshot(season).catch(() => null);
+        const engineInputs = snap ? {
+          homeNickname: details.homeTeam.nickName,
+          awayNickname: details.awayTeam.nickName,
+          homeThemeKey: details.homeTeam.themeKey,
+          awayThemeKey: details.awayTeam.themeKey,
+          homeSquad: details.homeTeam.players,
+          awaySquad: details.awayTeam.players,
+          ladder,
+          snapshot: snap,
+          weather,
+          tryscorers,
+          venue: details.venue,
+          mode: resolved.mode,
+          confidence: resolved.confidence,
+        } : null;
+        if (engineInputs) {
+          try {
+            deterministic = generateDeterministicInsights(engineInputs);
+            try { scriptPayload = generateScript(engineInputs, deterministic); }
+            catch (e) { console.warn("script-engine failed:", e); }
+          } catch (err) {
+            console.warn("deterministic engine failed:", err);
+          }
         }
 
         // Persist deterministic-only payload IMMEDIATELY so the Insights tab
@@ -485,6 +487,12 @@ export const getMatchInsights = createServerFn({ method: "GET" })
           });
           if (deterministic) {
             (generated as unknown as { deterministic: DeterministicInsights }).deterministic = deterministic;
+            // Always attach a script — retry generation if the first pass failed
+            // so the Script tab never ends up missing the field on disk.
+            if (!scriptPayload && engineInputs) {
+              try { scriptPayload = generateScript(engineInputs, deterministic); }
+              catch (e) { console.warn("script-engine retry failed:", e); }
+            }
             if (scriptPayload) {
               (generated as unknown as { script: ScriptPayload }).script = scriptPayload;
             }

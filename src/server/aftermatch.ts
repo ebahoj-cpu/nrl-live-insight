@@ -303,7 +303,7 @@ async function summariseWithAI(payload: AftermatchPayload): Promise<string> {
           { role: "user", content: user },
         ],
         temperature: 0.3,
-        max_tokens: 220,
+        max_tokens: 320,
       }),
     });
     if (!res.ok) return "";

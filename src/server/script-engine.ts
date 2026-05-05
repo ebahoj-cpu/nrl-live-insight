@@ -16,6 +16,8 @@ import type { TeamSeasonStats } from "./season-stats";
 import { getTeam } from "./season-stats";
 import type { ModelMode, ModelConfidence } from "./model-mode";
 
+export type EdgeConfidence = "proxy" | "market-supported" | "unclear";
+
 export type ScriptPayload = {
   mode: ModelMode;
   confidence: ModelConfidence;

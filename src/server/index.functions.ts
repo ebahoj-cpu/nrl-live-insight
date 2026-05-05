@@ -315,8 +315,8 @@ export const getMatchPage = createServerFn({ method: "GET" })
     let lessons: { home: TeamLesson | null; away: TeamLesson | null } = { home: null, away: null };
     if (!finished) {
       const [homeLesson, awayLesson] = await Promise.all([
-        getLastLessonForTeam({ nickname: details.homeTeam.nickName, excludeMatchId: data.matchId }),
-        getLastLessonForTeam({ nickname: details.awayTeam.nickName, excludeMatchId: data.matchId }),
+        getLastLessonForTeam({ nickname: details.homeTeam.nickName, excludeMatchId: data.matchId, recentForm: details.homeTeam.recentForm }),
+        getLastLessonForTeam({ nickname: details.awayTeam.nickName, excludeMatchId: data.matchId, recentForm: details.awayTeam.recentForm }),
       ]);
       lessons = { home: homeLesson, away: awayLesson };
     }

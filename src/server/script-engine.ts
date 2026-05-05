@@ -30,6 +30,8 @@ export type ScriptPayload = {
     left: string;
     right: string;
     middle: string;
+    leftConfidence: EdgeConfidence;
+    rightConfidence: EdgeConfidence;
   };
   betting: {
     winnerLean: string;

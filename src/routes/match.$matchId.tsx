@@ -223,9 +223,6 @@ function MatchInner() {
         )}
       </div>
 
-      <p className="text-[11px] text-muted-foreground text-center mt-10">
-        Updated {new Date(data.generatedAt).toLocaleTimeString()} · Bet responsibly · 18+
-      </p>
     </div>
   );
 }
@@ -2219,9 +2216,6 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
         )}
       </Card>
 
-      <p className="text-[10px] text-muted-foreground text-center px-4 leading-relaxed">
-        Stats-driven projections from 2026 season-to-date team & player data. Bet responsibly · 18+
-      </p>
     </div>
   );
 }

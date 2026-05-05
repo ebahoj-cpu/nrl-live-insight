@@ -392,13 +392,42 @@ async function summariseWithAI(payload: AftermatchPayload): Promise<string> {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), AI_TIMEOUT_MS);
   try {
-    const sys = "You are a sharp NRL analyst. Write 3-4 short sentences. First, summarise where the pre-match insights matched the actual result and where they diverged (cite markets, players, or score). Then end with one sentence beginning with 'Carry into this week:' that gives a concrete takeaway both teams in the upcoming fixture should heed based on the lessons. Plain prose, no bullets, no headings, no betting hype, no emojis.";
+    const c = payload.comparison;
+    const sys = [
+      "You are a sharp NRL analyst writing a 'Last Week's Lessons' card.",
+      "You MUST compare what the model PREDICTED vs what ACTUALLY happened — never invent results.",
+      "Write EXACTLY 3-4 short sentences in plain prose. No bullets, headings, hype, or emojis.",
+      "Structure: Sentence 1 = team outcome accuracy (winner/margin/total). Sentence 2 = game script accuracy (tempo, flow, dominant team). Sentence 3 = player market performance (first try + anytime hits). Sentence 4 = key takeaway (begin with 'Carry into this week:').",
+      "Rules:",
+      "- Do NOT say 'completely missed' unless winner, margin, total AND script are all wrong AND there were no tryscorer hits.",
+      "- Reward partial success: correct margin band, close score (combined error <=10), correct dominant team, anytime hits.",
+      "- If script was right but result flipped: say 'Game script read was correct but execution differed.'",
+      "- If predicted players didn't score but were named anyway: say 'Attacking reads were correct, execution missed.'",
+      "- If combined score error <=10: say 'Score projection stayed close to the final result.'",
+      "- If tempo wrong open vs controlled: say 'Game opened up more than expected' or 'Tempo stayed controlled'.",
+    ].join("\n");
     const user = [
       `Match: ${payload.homeNickname} vs ${payload.awayNickname} — final ${payload.finalScore.home}-${payload.finalScore.away}.`,
-      `Score: ${payload.scoreLine.hits}/${payload.scoreLine.total} predictions correct.`,
-      payload.consistencies.length ? `Consistencies:\n- ${payload.consistencies.join("\n- ")}` : "Consistencies: none.",
-      payload.inconsistencies.length ? `Inconsistencies:\n- ${payload.inconsistencies.join("\n- ")}` : "Inconsistencies: none.",
-    ].join("\n\n");
+      "",
+      "TEAM COMPARISON:",
+      `- Winner: predicted ${c.team.winner.predicted}, actual ${c.team.winner.actual} → ${c.team.winner.correct ? "CORRECT" : "WRONG"}.`,
+      `- Margin band: predicted ${c.team.margin.predicted}, actual ${c.team.margin.actual} (${c.team.margin.actualMargin} pts) → ${c.team.margin.correct ? "CORRECT" : "WRONG"}.`,
+      `- Total points: predicted ${c.team.total.predictedLean ?? "—"} ${c.team.total.predictedLine ?? ""}, actual ${c.team.total.actual} → ${c.team.total.correct === null ? "n/a" : c.team.total.correct ? "CORRECT" : "WRONG"}.`,
+      `- Predicted score: ${c.team.score.predicted ?? "n/a"}, actual ${c.team.score.actual}${c.team.score.combinedError != null ? ` (combined error ${c.team.score.combinedError})` : ""}${c.team.score.close ? " — CLOSE" : ""}.`,
+      `- HT/FT pick: ${c.team.htft.predicted ?? "n/a"} (final winner ${c.team.htft.actualWinner}).`,
+      "",
+      "SCRIPT COMPARISON:",
+      `- Tempo: predicted ${c.script.tempo.predicted ?? "n/a"}, actual ${c.script.tempo.actual} → ${c.script.tempo.correct === null ? "n/a" : c.script.tempo.correct ? "CORRECT" : "WRONG"}.`,
+      `- Flow: predicted ${c.script.flow.predicted ?? "n/a"}, actual ${c.script.flow.actual} → ${c.script.flow.correct === null ? "n/a" : c.script.flow.correct ? "CORRECT" : "WRONG"}.`,
+      `- Dominant team: predicted ${c.script.dominantTeam.predicted ?? "n/a"}, actual ${c.script.dominantTeam.actual} → ${c.script.dominantTeam.correct === null ? "n/a" : c.script.dominantTeam.correct ? "CORRECT" : "WRONG"}.`,
+      `- Predicted attacking edge: ${c.script.edge.predicted ?? "n/a"} (actual edge unmeasured).`,
+      "",
+      "PLAYER COMPARISON:",
+      `- First tryscorer: predicted ${c.players.firstTry.predicted ?? "n/a"}, actual ${c.players.firstTry.actual ?? "n/a"} → ${c.players.firstTry.correct ? "CORRECT" : "WRONG"}.`,
+      `- Anytime hits: ${c.players.anytimeHits} of ${c.players.anytimeChecked} predicted players scored.`,
+      c.players.namedHits.length ? `- Hits: ${c.players.namedHits.map((p) => `${p.name} (${p.scored})`).join(", ")}.` : "- Hits: none.",
+      c.players.namedMisses.length ? `- Missed: ${c.players.namedMisses.join(", ")}.` : "- Missed: none.",
+    ].join("\n");
     const res = await fetch(GATEWAY, {
       method: "POST",
       headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
@@ -409,7 +438,7 @@ async function summariseWithAI(payload: AftermatchPayload): Promise<string> {
           { role: "system", content: sys },
           { role: "user", content: user },
         ],
-        temperature: 0.3,
+        temperature: 0.25,
         max_tokens: 320,
       }),
     });

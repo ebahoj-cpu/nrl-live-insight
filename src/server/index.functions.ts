@@ -400,9 +400,10 @@ export const getMatchInsights = createServerFn({ method: "GET" })
 
         // ---- PRIMARY: deterministic stats engine. Runs always, no AI. ----
         let deterministic: DeterministicInsights | null = null;
+        let scriptPayload: ScriptPayload | null = null;
         try {
           const snap = await getSeasonSnapshot(season);
-          deterministic = generateDeterministicInsights({
+          const engineInputs = {
             homeNickname: details.homeTeam.nickName,
             awayNickname: details.awayTeam.nickName,
             homeThemeKey: details.homeTeam.themeKey,
@@ -416,7 +417,10 @@ export const getMatchInsights = createServerFn({ method: "GET" })
             venue: details.venue,
             mode: resolved.mode,
             confidence: resolved.confidence,
-          });
+          };
+          deterministic = generateDeterministicInsights(engineInputs);
+          try { scriptPayload = generateScript(engineInputs, deterministic); }
+          catch (e) { console.warn("script-engine failed:", e); }
         } catch (err) {
           console.warn("deterministic engine failed:", err);
         }
@@ -427,6 +431,7 @@ export const getMatchInsights = createServerFn({ method: "GET" })
         const awaySig = squadSignature(details.awayTeam.players);
         const minimalPayload = {
           deterministic,
+          script: scriptPayload,
           modelMode: resolved.mode,
           modelConfidence: resolved.confidence,
           squadSig: { home: homeSig, away: awaySig },

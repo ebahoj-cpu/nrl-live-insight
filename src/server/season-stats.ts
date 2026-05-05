@@ -271,6 +271,57 @@ async function buildSeasonSnapshot(season: number): Promise<SeasonSnapshot> {
     // Recent form rolling list
     h.last5.push({ result: hScore > aScore ? "W" : hScore < aScore ? "L" : "D", pf: hScore, pa: aScore, round });
     a.last5.push({ result: aScore > hScore ? "W" : aScore < hScore ? "L" : "D", pf: aScore, pa: hScore, round });
+
+    // Per-match Hard Earned input stats — pull whatever the NRL stat groups
+    // expose. Missing fields stay undefined; hard-earned-history.ts handles
+    // gaps with proxies and clamps the result.
+    const groups = (d.stats?.groups ?? []) as Array<{ stats?: Array<{ title?: string; homeValue?: { value?: number }; awayValue?: { value?: number } }> }>;
+    const findStat = (matcher: RegExp): { home: number | undefined; away: number | undefined } => {
+      for (const g of groups) {
+        for (const s of (g.stats ?? [])) {
+          if (s.title && matcher.test(s.title)) {
+            return {
+              home: typeof s.homeValue?.value === "number" ? s.homeValue.value : undefined,
+              away: typeof s.awayValue?.value === "number" ? s.awayValue.value : undefined,
+            };
+          }
+        }
+      }
+      return { home: undefined, away: undefined };
+    };
+    const runs = findStat(/^all runs$|^runs$/i);
+    const runMetres = findStat(/all run metres|^run metres$/i);
+    const postContact = findStat(/post contact metres|post[- ]contact/i);
+    const tackles = findStat(/^tackles made$|^tackles$/i);
+    const tackleBreaks = findStat(/tackle breaks/i);
+    const missedTackles = findStat(/missed tackles/i);
+    const offloads = findStat(/^offloads$/i);
+    const errors = findStat(/^errors$|all errors/i);
+    const penalties = findStat(/penalties conceded/i);
+    const sinBins = findStat(/sin bins?/i);
+    const supports = findStat(/^support runs?$|^supports$/i);
+    const decoys = findStat(/^dummy half runs$|decoy/i);
+    const chargeDowns = findStat(/charge downs?/i);
+    const lineEngagements = findStat(/line engaged|line break engagements/i);
+
+    const hRes: "W" | "L" | "D" = hScore > aScore ? "W" : hScore < aScore ? "L" : "D";
+    const aRes: "W" | "L" | "D" = aRes_(aScore, hScore);
+    function aRes_(a: number, b: number): "W" | "L" | "D" { return a > b ? "W" : a < b ? "L" : "D"; }
+
+    (h.matchStats ||= []).push({
+      matchId, round, kickoffUtc, result: hRes, pf: hScore, pa: aScore, opponentNickname: awayNick,
+      runs: runs.home, runMetres: runMetres.home, postContactMetres: postContact.home,
+      tackles: tackles.home, tackleBreaks: tackleBreaks.home, missedTackles: missedTackles.home,
+      offloads: offloads.home, errors: errors.home, penaltiesConceded: penalties.home, sinBins: sinBins.home,
+      supports: supports.home, decoys: decoys.home, chargeDowns: chargeDowns.home, lineEngagements: lineEngagements.home,
+    });
+    (a.matchStats ||= []).push({
+      matchId, round, kickoffUtc, result: aRes, pf: aScore, pa: hScore, opponentNickname: homeNick,
+      runs: runs.away, runMetres: runMetres.away, postContactMetres: postContact.away,
+      tackles: tackles.away, tackleBreaks: tackleBreaks.away, missedTackles: missedTackles.away,
+      offloads: offloads.away, errors: errors.away, penaltiesConceded: penalties.away, sinBins: sinBins.away,
+      supports: supports.away, decoys: decoys.away, chargeDowns: chargeDowns.away, lineEngagements: lineEngagements.away,
+    });
   }
 
   // Final derived rates + trim last5

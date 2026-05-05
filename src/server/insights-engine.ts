@@ -45,6 +45,9 @@ export type EnginePlayerPick = {
   price: number | null; // best live anytime price if available
   // Optional value-vs-market tag from the ranker. UI may render or ignore.
   confidence?: "high" | "medium" | "speculative";
+  // True when the score used real per-player advanced stats (line breaks,
+  // try assists, etc). False when only proxy fallbacks were available.
+  usingRealStats?: boolean;
 };
 
 export type DeterministicInsights = {
@@ -263,6 +266,7 @@ function stripInternal(r: RankedRow | undefined, fallbackReason: string): Engine
     reasoning: r.reasoning || fallbackReason,
     price: r.price,
     confidence: r.confidence,
+    usingRealStats: r.usingRealStats,
   };
 }
 
@@ -414,6 +418,11 @@ function rankTryscorers(inp: EngineInputs, home: TeamSeasonStats, away: TeamSeas
         hasAdvanced: !!(s?.lineBreaks || s?.tryAssists || s?.tackleBusts),
       });
 
+      const usingRealStats = !!(
+        s?.lineBreaks != null || s?.lineBreakAssists != null || s?.tryAssists != null ||
+        s?.tackleBusts != null || s?.runMetresPerGame != null || s?.offloads != null
+      );
+
       rows.push({
         name: c.name,
         team: teamNick,
@@ -422,6 +431,7 @@ function rankTryscorers(inp: EngineInputs, home: TeamSeasonStats, away: TeamSeas
         _openingBoost: openingBoost,
         price,
         reasoning,
+        usingRealStats,
       });
     }
   };

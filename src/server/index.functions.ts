@@ -359,7 +359,17 @@ export const getMatchInsights = createServerFn({ method: "GET" })
       //    mode match what's stored. Stale rows (e.g. generated before squads
       //    were named, or before late team-list changes) are ignored.
       if (!data.refresh) {
-        const stored = await readFreshInsights(data.matchId, detailsForCheck, null);
+        // Pull tryscorers up-front so cache invalidation accounts for the
+        // mode jump (squad → market) once player odds drop.
+        const oddsForCheck = await safeOdds();
+        const homeNickC = findTeam(detailsForCheck.homeTeam.nickName)?.nickname ?? detailsForCheck.homeTeam.nickName;
+        const awayNickC = findTeam(detailsForCheck.awayTeam.nickName)?.nickname ?? detailsForCheck.awayTeam.nickName;
+        const oddsC = oddsForCheck.data.find((e) => {
+          const eh = e.homeNickname; const ea = e.awayNickname;
+          return (eh === homeNickC && ea === awayNickC) || (eh === awayNickC && ea === homeNickC);
+        }) ?? null;
+        const tryscorersC = oddsC ? (await safeTryscorers(oddsC.id)).data : null;
+        const stored = await readFreshInsights(data.matchId, detailsForCheck, tryscorersC);
         if (
           stored &&
           (stored.payload as unknown as { deterministic?: unknown }).deterministic &&

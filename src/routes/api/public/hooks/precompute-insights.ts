@@ -12,6 +12,9 @@ import { resolveModelMode, squadIsNamed, squadSignature } from "@/server/model-m
 import { writeSharedInsights } from "@/server/insights-store";
 import { fetchVenueWeather } from "@/server/weather";
 import { insightsTtlMs } from "@/server/cache";
+import { generateScript } from "@/server/script-engine";
+import { buildDeterministicBets } from "@/server/bets-engine";
+import { snapshotPrediction, buildSnapshotRow } from "@/server/prediction-tracking";
 import type { Insights } from "@/server/ai-insights";
 
 export const Route = createFileRoute("/api/public/hooks/precompute-insights")({
@@ -64,7 +67,7 @@ export const Route = createFileRoute("/api/public/hooks/precompute-insights")({
               hasPlayerOdds: !!tryscorers?.hasAny,
             });
 
-            const deterministic = generateDeterministicInsights({
+            const engineInputs = {
               homeNickname: details.homeTeam.nickName,
               awayNickname: details.awayTeam.nickName,
               homeThemeKey: details.homeTeam.themeKey,
@@ -78,10 +81,24 @@ export const Route = createFileRoute("/api/public/hooks/precompute-insights")({
               venue: details.venue,
               mode: resolved.mode,
               confidence: resolved.confidence,
+            };
+            const deterministic = generateDeterministicInsights(engineInputs);
+            let scriptPayload = null;
+            try { scriptPayload = generateScript(engineInputs, deterministic); }
+            catch (e) { console.warn("script-engine failed:", e); }
+
+            const bets = buildDeterministicBets({
+              engine: deterministic,
+              realOdds: null,
+              homeNickname: details.homeTeam.nickName,
+              awayNickname: details.awayTeam.nickName,
+              mode: resolved.mode,
             });
 
             const payload = {
               deterministic,
+              script: scriptPayload,
+              bets,
               modelMode: resolved.mode,
               modelConfidence: resolved.confidence,
               squadSig: {
@@ -90,6 +107,16 @@ export const Route = createFileRoute("/api/public/hooks/precompute-insights")({
               },
             } as unknown as Insights;
             await writeSharedInsights(f.matchId, payload, insightsTtlMs(details.kickoffUtc));
+            try {
+              await snapshotPrediction(buildSnapshotRow({
+                matchId: f.matchId,
+                details,
+                insights: deterministic,
+                script: scriptPayload,
+                odds: event,
+                tryscorers,
+              }));
+            } catch (e) { console.warn("snapshotPrediction failed:", e); }
             results.push({ matchId: f.matchId, ok: true });
           } catch (e) {
             results.push({

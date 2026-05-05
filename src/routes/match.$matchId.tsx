@@ -298,14 +298,31 @@ function Empty({ msg }: { msg: string }) {
   );
 }
 
+// Name-based initials avatar — used when NRL.com has no real headshot
+// (or returns the generic silhouette fallback).
+function InitialsAvatar({ firstName, lastName, hidden, dimmed }:
+  { firstName?: string; lastName?: string; hidden?: boolean; dimmed?: boolean }) {
+  const i1 = (firstName?.[0] ?? "").toUpperCase();
+  const i2 = (lastName?.[0] ?? "").toUpperCase();
+  return (
+    <div
+      style={{ display: hidden ? "none" : "flex" }}
+      className={`absolute inset-0 items-center justify-center pointer-events-none ${dimmed ? "opacity-60" : ""}`}
+    >
+      <div className="flex h-14 w-14 sm:h-16 sm:w-16 items-center justify-center rounded-full bg-surface-2 ring-1 ring-border text-base sm:text-lg font-black tracking-wider text-foreground/80">
+        {i1}{i2}
+      </div>
+    </div>
+  );
+}
+
 function InsightsLoading() {
   return (
     <div className="glass p-8 text-center text-sm text-muted-foreground">
       <div className="inline-flex items-center gap-3">
-        <Sparkles className="h-5 w-5 text-accent animate-pulse" />
-        <span>Generating AI insights — this can take 20–40 seconds…</span>
+        <Sparkles className="h-5 w-5 text-accent animate-pulse drop-shadow-[0_0_8px_hsl(var(--accent))]" />
       </div>
-      <p className="text-[11px] mt-2 opacity-70">Cached for an hour after first load.</p>
+      <p className="text-[11px] mt-3 opacity-70">If this hasn't generated, refresh in 1 minute.</p>
     </div>
   );
 }
@@ -416,9 +433,15 @@ function H2HPanel({ home, away }: { home: any; away: any }) {
               className={`pointer-events-none absolute bottom-0 h-[150%] w-auto max-w-none object-contain object-bottom drop-shadow-[0_4px_10px_rgba(0,0,0,0.5)] ${
                 side === "left" ? "left-0" : "right-0"
               }`}
-              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+              onError={(e) => {
+                const img = e.currentTarget as HTMLImageElement;
+                img.style.display = "none";
+                const sib = img.nextElementSibling as HTMLElement | null;
+                if (sib) sib.style.display = "flex";
+              }}
             />
           ) : null}
+          {p ? <InitialsAvatar firstName={p.firstName} lastName={p.lastName} hidden={!!p.headImage} /> : null}
         </div>
         {/* Caption centered under the player's face. Stays within the player's half so it never collides with the centre badge. */}
         <div className="mt-3 w-[88px] sm:w-32 leading-tight text-center">
@@ -743,9 +766,15 @@ function SquadPanel({ team, news }: { team: { nickName: string; themeKey: string
               className={`pointer-events-none absolute bottom-0 left-0 h-[150%] w-auto max-w-none object-contain object-bottom drop-shadow-[0_4px_10px_rgba(0,0,0,0.5)] ${
                 isOut ? "grayscale opacity-60" : ""
               }`}
-              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+              onError={(e) => {
+                const img = e.currentTarget as HTMLImageElement;
+                img.style.display = "none";
+                const sib = img.nextElementSibling as HTMLElement | null;
+                if (sib) sib.style.display = "flex";
+              }}
             />
           ) : null}
+          <InitialsAvatar firstName={p.firstName} lastName={p.lastName} hidden={!!p.headImage} dimmed={isOut} />
         </div>
 
         {/* Jersey number badge — pushed well clear of the overlapping headshot */}

@@ -43,6 +43,8 @@ export type EnginePlayerPick = {
   position: string;
   reasoning: string;
   price: number | null; // best live anytime price if available
+  // Optional value-vs-market tag from the ranker. UI may render or ignore.
+  confidence?: "high" | "medium" | "speculative";
 };
 
 export type DeterministicInsights = {
@@ -254,7 +256,14 @@ function stripInternal(r: RankedRow | undefined, fallbackReason: string): Engine
   if (!r) {
     return { name: "Awaiting team list", team: "", position: "", reasoning: fallbackReason, price: null };
   }
-  return { name: r.name, team: r.team, position: r.position, reasoning: r.reasoning || fallbackReason, price: r.price };
+  return {
+    name: r.name,
+    team: r.team,
+    position: r.position,
+    reasoning: r.reasoning || fallbackReason,
+    price: r.price,
+    confidence: r.confidence,
+  };
 }
 
 function pickRanked123(ranking: RankedRow[], firstPick: RankedRow | undefined): [RankedRow | undefined, RankedRow | undefined, RankedRow | undefined] {
@@ -270,6 +279,29 @@ function pickRanked123(ranking: RankedRow[], firstPick: RankedRow | undefined): 
 }
 
 // ---------- Try-scoring ranker ----------
+// ============================================================================
+// Try-scoring ranker — attacking-involvement model
+//
+//   attackingInvolvement =
+//       tries              * 1.0
+//     + lineBreaks         * 0.75
+//     + lineBreakAssists   * 0.55
+//     + tryAssists         * 0.50
+//     + tackleBusts        * 0.18
+//     + offloads           * 0.12
+//     + runMetresScore     * 0.20      // runMetresPerGame / 100
+//     + recentFormBoost                // recentTries * 0.6 + recentInvolv * 0.15
+//
+//   baseScore =
+//       attackingInvolvement
+//     * positionWeight * teamFactor * winnerBoost * blowoutBoost
+//     + oddsFloor                       // +0.6 if anytime price < $8
+//
+// Role logic then clamps/boosts halves, fullbacks, back-rowers and middles.
+// Fallback chain (when an advanced metric is undefined): proxies derived from
+// the existing season tries breakdown — model never collapses to "tries only"
+// and never invents a number.
+// ============================================================================
 function rankTryscorers(inp: EngineInputs, home: TeamSeasonStats, away: TeamSeasonStats, winnerSide: "home" | "away", projectedMargin: number): RankedRow[] {
   const homePlayers = getTeamPlayers(inp.snapshot, inp.homeNickname);
   const awayPlayers = getTeamPlayers(inp.snapshot, inp.awayNickname);
@@ -297,9 +329,6 @@ function rankTryscorers(inp: EngineInputs, home: TeamSeasonStats, away: TeamSeas
   const rows: RankedRow[] = [];
 
   const considerSquad = (squad: NrlPlayer[], teamNick: string, teamSeason: TeamSeasonStats, oppSeason: TeamSeasonStats, isWinner: boolean, byId: Map<number, PlayerSeasonStats>, byName: Map<string, PlayerSeasonStats>) => {
-    // Hard rule: never produce tryscorer picks for a team without a named squad.
-    // The mode gate above already skips this in EARLY mode; this guards SQUAD+
-    // calls where one side's lineup hasn't dropped yet.
     if (squad.length === 0) return;
     const candidates = squad.map((p) => {
       const pid = (p as any).playerId as number | undefined;
@@ -314,28 +343,76 @@ function rankTryscorers(inp: EngineInputs, home: TeamSeasonStats, away: TeamSeas
       const firstTeamTries = s?.firstTeamTries ?? 0;
       const firstHalfTries = s?.firstHalfTries ?? 0;
       const tpm = s?.triesPerMatch ?? 0;
-
-      // Position weighting: outside backs + edge forwards get a structural boost
+      const role = roleBucket(c.position);
       const posWeight = positionScoringWeight(c.position);
-
-      // Team scoring environment
       const teamFactor = teamSeason.scoringEfficiency / Math.max(2, oppSeason.scoringEfficiency || 2);
-      // Winner of match gets a small boost (more opportunities to score)
       const winnerBoost = isWinner ? 1.05 : 0.97;
-      // Margin boost: blowouts pile on tries from outside backs
       const blowoutBoost = projectedMargin >= 16 ? 1.04 : 1.0;
 
-      const baseScore = (tries * 1.0 + firstHalfTries * 0.4 + firstTeamTries * 0.3) * posWeight * teamFactor * winnerBoost * blowoutBoost;
+      // ---- Advanced metrics with fallbacks ----
+      const lineBreaks       = s?.lineBreaks       ?? firstHalfTries * 0.5;
+      const lineBreakAssists = s?.lineBreakAssists ?? (role === "halves" || role === "hooker" ? tpm * 1.2 : 0);
+      const tryAssists       = s?.tryAssists       ?? (role === "halves" || role === "hooker" ? tpm * 1.5 : 0);
+      const tackleBusts      = s?.tackleBusts      ?? (tpm * teamFactor * 2);
+      const offloads         = s?.offloads         ?? 0;
+      const runMetresScore   = (s?.runMetresPerGame ?? 0) / 100;
+      const recentTries      = s?.recentTries      ?? Math.min(tries, Math.round(tpm * 3));
+      const recentInvolv     = s?.recentInvolvements ?? 0;
+      const recentFormBoost  = recentTries * 0.6 + recentInvolv * 0.15;
+
+      // Role-specific weight tweaks (halves down-weight tries, up-weight assists)
+      const wTries   = role === "halves" ? 0.6 : 1.0;
+      const wAssists = role === "halves" ? 1.4 : 1.0;
+
+      const attackingInvolvement =
+          tries              * 1.0 * wTries
+        + lineBreaks         * 0.75
+        + lineBreakAssists   * 0.55 * wAssists
+        + tryAssists         * 0.50 * wAssists
+        + tackleBusts        * 0.18
+        + offloads           * 0.12
+        + runMetresScore     * 0.20
+        + recentFormBoost;
+
+      let baseScore = attackingInvolvement * posWeight * teamFactor * winnerBoost * blowoutBoost;
+
       const price = priceFor(c.name);
-      // Sanity floor: if bookies have priced them <$8 anytime, give a small lift
       const oddsFloor = price && price > 0 && price < 8 ? 0.6 : 0;
-      const finalScore = baseScore + oddsFloor;
-      // Opening-try boost — for first-tryscorer ordering only
+      let finalScore = baseScore + oddsFloor;
+
+      // ---- Role gates ----
+      if (role === "wing" || role === "centre") {
+        finalScore *= 1.05; // headline scoring lanes
+      } else if (role === "fullback") {
+        // Fullbacks: support play (firstTeamTries proxy) + line breaks + assists
+        finalScore *= 1.05;
+        finalScore += firstTeamTries * 0.15;
+      } else if (role === "backrow") {
+        const hasEdge = recentTries > 0 || lineBreaks >= 1.5 || tackleBusts >= 4 || (price !== null && price < 9);
+        if (!hasEdge) finalScore *= 0.75;
+      } else if (role === "middle") {
+        // Props / hookers / locks: cap unless real signal
+        const hasSignal =
+          recentTries >= 1 ||
+          firstTeamTries >= 2 ||
+          (price !== null && price < 8) ||
+          (isWinner && teamSeason.scoringEfficiency > 4.5);
+        if (!hasSignal) finalScore = Math.min(finalScore, 1.5);
+      }
+
       const openingBoost = (firstTries * 1.0 + firstTeamTries * 0.6 + firstHalfTries * 0.25) * posWeight + (price && price < 11 ? 0.4 : 0);
 
-      // Filter: must have either a try this season OR be in a try-scoring position (1,2,3,4,5,11,12,13)
+      // Eligibility: scoring position OR has a try OR has a market price OR
+      // is a halves/hooker (assist contribution).
       const isScoringPosition = posWeight >= 1.0;
-      if (tries === 0 && !isScoringPosition && !price) continue;
+      const isPlaymaker = role === "halves" || role === "hooker";
+      if (tries === 0 && !isScoringPosition && !price && !isPlaymaker) continue;
+
+      const reasoning = buildInvolvementReason(c.name, teamNick, c.position, role, {
+        tries, firstTries, firstTeamTries, lineBreaks, tryAssists,
+        tackleBusts, recentTries, price, isWinner, projectedMargin,
+        hasAdvanced: !!(s?.lineBreaks || s?.tryAssists || s?.tackleBusts),
+      });
 
       rows.push({
         name: c.name,
@@ -344,7 +421,7 @@ function rankTryscorers(inp: EngineInputs, home: TeamSeasonStats, away: TeamSeas
         score: finalScore,
         _openingBoost: openingBoost,
         price,
-        reasoning: buildPlayerReason(c.name, teamNick, c.position, tries, tpm, firstTries, firstTeamTries, isWinner, projectedMargin),
+        reasoning,
       });
     }
   };
@@ -353,6 +430,7 @@ function rankTryscorers(inp: EngineInputs, home: TeamSeasonStats, away: TeamSeas
   considerSquad(inp.awaySquad, inp.awayNickname, away, home, winnerSide === "away", awayPlayersById, awayPlayersByName);
 
   rows.sort((a, b) => b.score - a.score);
+
   // Dedupe by normalised name
   const dedup: RankedRow[] = [];
   const seen = new Set<string>();
@@ -362,7 +440,83 @@ function rankTryscorers(inp: EngineInputs, home: TeamSeasonStats, away: TeamSeas
     seen.add(k);
     dedup.push(r);
   }
+
+  // Apply value-vs-market confidence tags based on overall rank + price
+  for (let i = 0; i < dedup.length; i++) {
+    dedup[i].confidence = valueTag(i, dedup[i].price, dedup[i].position, dedup[i].team, winnerSide === "home" ? inp.homeNickname : inp.awayNickname);
+  }
   return dedup;
+}
+
+type RoleBucket = "wing" | "centre" | "fullback" | "halves" | "hooker" | "backrow" | "middle" | "other";
+function roleBucket(pos: string): RoleBucket {
+  const p = (pos || "").toLowerCase();
+  if (/wing/.test(p)) return "wing";
+  if (/centre/.test(p)) return "centre";
+  if (/full\s*back/.test(p)) return "fullback";
+  if (/half|five\s*eighth|stand\s*off/.test(p)) return "halves";
+  if (/hook/.test(p)) return "hooker";
+  if (/back\s*row|second\s*row/.test(p)) return "backrow";
+  if (/prop|lock/.test(p)) return "middle";
+  return "other";
+}
+
+function valueTag(rank: number, price: number | null, position: string, team: string, winnerNick: string): "high" | "medium" | "speculative" | undefined {
+  const isWinnerTeam = team.toLowerCase() === winnerNick.toLowerCase();
+  if (rank < 3) {
+    if (price !== null && price <= 4.0) return "high";
+    if (price !== null && price >= 6.0) return "speculative";
+    return "high";
+  }
+  if (rank < 8) {
+    const scoringRole = positionScoringWeight(position) >= 1.0;
+    if (scoringRole || isWinnerTeam) return "medium";
+  }
+  return undefined;
+}
+
+function buildInvolvementReason(
+  name: string,
+  teamNick: string,
+  position: string,
+  role: RoleBucket,
+  ctx: {
+    tries: number; firstTries: number; firstTeamTries: number;
+    lineBreaks: number; tryAssists: number; tackleBusts: number;
+    recentTries: number; price: number | null; isWinner: boolean;
+    projectedMargin: number; hasAdvanced: boolean;
+  },
+): string {
+  const last = name.split(/\s+/).pop() || name;
+  const env = ctx.isWinner && ctx.projectedMargin >= 12 ? "in a contest projecting to open up late" : "in a structured attacking script";
+  const priceTag = ctx.price !== null
+    ? (ctx.price < 4 ? " market backs them in" : ctx.price < 7 ? " bookies have them in the headline group" : " price suggests speculative value")
+    : "";
+
+  if (role === "wing") {
+    return `${last} named on the wing for ${teamNick} — strong line-break profile and finishing involvement keep them on the headline scoring lane${priceTag}.`;
+  }
+  if (role === "centre") {
+    const recent = ctx.recentTries > 0 ? " with recent try involvement" : "";
+    return `${last} in the centres for ${teamNick}${recent} — edge matchup and tackle-bust upside ${env}${priceTag}.`;
+  }
+  if (role === "fullback") {
+    return `${last} at fullback for ${teamNick} — support-play upside, line-break threat and kick-return metres in transition${priceTag}.`;
+  }
+  if (role === "halves") {
+    return `${last} controls ${teamNick}'s shape — try-assist and line-break-assist involvement keep them on the scoring board ${env}${priceTag}.`;
+  }
+  if (role === "hooker") {
+    return `${last} from dummy-half for ${teamNick} — short-side strike and goal-line involvement profile${priceTag}.`;
+  }
+  if (role === "backrow") {
+    const valueTag = ctx.price !== null && ctx.price > 6 ? "Back-rower value only — " : "";
+    return `${valueTag}${last} as ${teamNick}'s edge runner with tackle-bust upside${ctx.recentTries > 0 ? " and recent try form" : ""}${priceTag}.`;
+  }
+  if (role === "middle") {
+    return `${last} for ${teamNick} — close-range carries and middle dominance back the scoring trend${priceTag}.`;
+  }
+  return `${last} (${positionRole(position).toLowerCase()}) lines up for ${teamNick} ${env}${priceTag}.`;
 }
 
 // ---------- Helpers / scoring functions ----------

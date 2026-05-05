@@ -77,6 +77,20 @@ export type PlayerSeasonStats = {
   firstTeamTries: number;     // times scored their team's first try
   firstHalfTries: number;
   triesPerMatch: number;      // tries / max(1, teamGames) — uses team played for context
+  // ---- Optional advanced attacking-involvement metrics ----
+  // Not populated by the current snapshot builder (NRL.com match-detail JSON
+  // only exposes per-team aggregates). Left optional so the engine can use
+  // them the moment a per-player feed is wired in, without a schema change.
+  lineBreaks?: number;
+  lineBreakAssists?: number;
+  tryAssists?: number;
+  tackleBusts?: number;
+  offloads?: number;
+  runMetresPerGame?: number;
+  postContactMetres?: number;
+  kickReturnMetres?: number;
+  recentTries?: number;          // last 3-5 game tries
+  recentInvolvements?: number;   // last 3-5 game line breaks + assists + tackle busts
 };
 
 // ---------- Helpers ----------

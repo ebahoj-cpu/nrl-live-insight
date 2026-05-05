@@ -15,6 +15,10 @@ const COMP = 111; // Telstra Premiership
 // strip the proxy prefix and force https for browser loading.
 function extractHeadshotUrl(raw: unknown): string | undefined {
   if (typeof raw !== "string" || !raw) return undefined;
+  // NRL.com serves a generic silhouette at /Resources/Images/fallback/head-shot.png
+  // when no real headshot exists. Treat it as missing so the UI can render
+  // a name-based initials avatar instead of a blank silhouette.
+  if (/\/fallback\/head-shot/i.test(raw)) return undefined;
   // Pattern: "/remote.axd?http://..." or "/remote.axd?https://..."
   const m = raw.match(/^\/remote\.axd\?(https?:\/\/.+)$/i);
   if (m) return m[1].replace(/^http:\/\//i, "https://");

@@ -285,10 +285,11 @@ export const getMatchPage = createServerFn({ method: "GET" })
     const oddsError = oddsResult.error;
     const oddsStale = oddsResult.stale;
 
-    // Tryscorer markets — only attempt if we have an odds event matched.
+    // Tryscorer markets — only attempt if we have an odds event matched AND
+    // kickoff is within 48h (markets aren't released earlier; saves API quota).
     let tryscorers: TryscorerMarkets | null = null;
     let tryscorersError: string | null = null;
-    if (odds) {
+    if (odds && tryscorerFetchAllowed(details.kickoffUtc)) {
       const r = await safeTryscorers(odds.id, data.refresh);
       tryscorers = r.data;
       tryscorersError = r.error;

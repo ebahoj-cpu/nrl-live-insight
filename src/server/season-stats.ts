@@ -305,8 +305,7 @@ async function buildSeasonSnapshot(season: number): Promise<SeasonSnapshot> {
     const lineEngagements = findStat(/line engaged|line break engagements/i);
 
     const hRes: "W" | "L" | "D" = hScore > aScore ? "W" : hScore < aScore ? "L" : "D";
-    const aRes: "W" | "L" | "D" = aRes_(aScore, hScore);
-    function aRes_(a: number, b: number): "W" | "L" | "D" { return a > b ? "W" : a < b ? "L" : "D"; }
+    const aRes: "W" | "L" | "D" = aScore > hScore ? "W" : aScore < hScore ? "L" : "D";
 
     (h.matchStats ||= []).push({
       matchId, round, kickoffUtc, result: hRes, pf: hScore, pa: aScore, opponentNickname: awayNick,

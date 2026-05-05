@@ -8,8 +8,8 @@ import { Suspense, useState, useRef, useEffect } from "react";
 import { ChevronDown, Check } from "lucide-react";
 
 const searchSchema = z.object({
-  round: fallback(z.number().int().positive(), 0).default(0),
-});
+  round: fallback(z.coerce.number().int().min(0).optional(), undefined),
+}).passthrough();
 
 const fixturesQO = (round?: number) => queryOptions({
   queryKey: ["fixtures", round ?? "current"],
@@ -65,7 +65,7 @@ function Fixtures() {
               current={fx.round}
               currentRound={fx.currentRound}
               rounds={fx.rounds}
-              onChange={(r) => navigate({ search: (prev) => ({ ...prev, round: r === fx.currentRound ? 0 : r }) })}
+              onChange={(r) => navigate({ search: (prev) => ({ ...prev, round: r === fx.currentRound ? undefined : r }) })}
             />
           </h1>
           {isHistorical && (

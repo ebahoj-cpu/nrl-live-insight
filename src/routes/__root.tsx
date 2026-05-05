@@ -23,7 +23,7 @@ function NotFoundComponent() {
       <div className="text-center">
         <h1 className="text-7xl font-bold tracking-tight">404</h1>
         <p className="mt-3 text-muted-foreground">That page doesn't exist.</p>
-        <Link to="/" className="mt-6 inline-block px-5 py-2 bg-accent text-accent-foreground rounded-full font-semibold">
+        <Link to="/" search={{ round: undefined }} className="mt-6 inline-block px-5 py-2 bg-accent text-accent-foreground rounded-full font-semibold">
           Back to fixtures
         </Link>
       </div>
@@ -144,7 +144,7 @@ function Header() {
   return (
     <header className="sticky top-0 z-30 backdrop-blur-xl bg-background/70 border-b border-border relative">
       <div className="mx-auto max-w-6xl px-4 sm:px-6 h-16 flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-2 group">
+        <Link to="/" search={{ round: undefined }} className="flex items-center gap-2 group">
           <span className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-accent text-accent-foreground font-black">
             L
           </span>

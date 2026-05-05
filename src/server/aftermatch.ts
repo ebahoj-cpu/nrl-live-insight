@@ -233,10 +233,35 @@ export function buildDeterministicAftermatch(args: {
     if (h.status === "hit") consistencies.push(`${h.market}: predicted ${h.predicted}, got ${h.actual}.`);
     else if (h.status === "miss") inconsistencies.push(`${h.market}: predicted ${h.predicted}, actual ${h.actual}.`);
   }
-  const tryHits = tryscorerHits.filter((t) => t.status === "hit");
-  const tryMiss = tryscorerHits.filter((t) => t.status === "miss");
-  if (tryHits.length) consistencies.push(`Tryscorer picks landed: ${tryHits.map((t) => `${t.name} (${t.scored})`).join(", ")}.`);
-  if (tryMiss.length) inconsistencies.push(`Tryscorer picks missed: ${tryMiss.map((t) => t.name).join(", ")}.`);
+  // Aggregate by player so the same name doesn't appear as both "hit" (Anytime)
+  // AND "miss" (First Tryscorer) — that misrepresents the read. A player who
+  // scored at least once is a TRYSCORER hit; First Tryscorer becomes a separate
+  // partial note when they scored but weren't first.
+  const byPlayer = new Map<string, { name: string; scored: number; markets: string[] }>();
+  for (const t of tryscorerHits) {
+    const k = normName(t.name);
+    const existing = byPlayer.get(k);
+    if (existing) {
+      existing.markets.push(t.predictedAs);
+      existing.scored = Math.max(existing.scored, t.scored);
+    } else {
+      byPlayer.set(k, { name: t.name, scored: t.scored, markets: [t.predictedAs] });
+    }
+  }
+  const landed = [...byPlayer.values()].filter((p) => p.scored >= 1);
+  const blanked = [...byPlayer.values()].filter((p) => p.scored === 0);
+  if (landed.length) consistencies.push(`Tryscorer picks landed: ${landed.map((p) => `${p.name} (${p.scored})`).join(", ")}.`);
+  if (blanked.length) inconsistencies.push(`Tryscorer picks missed (no try): ${blanked.map((p) => p.name).join(", ")}.`);
+  // First-tryscorer specifically: note when our pick scored but wasn't first.
+  const firstPickName = pickName(det?.firstTryscorer);
+  if (firstPickName) {
+    const fp = byPlayer.get(normName(firstPickName));
+    if (fp && fp.scored >= 1) {
+      // they scored — first tryscorer was technically a miss but Anytime hit.
+      // Only annotate if not already covered.
+      inconsistencies.push(`First Tryscorer (${firstPickName}): scored ${fp.scored} but wasn't first on the board.`);
+    }
+  }
 
   return {
     version: VERSION,

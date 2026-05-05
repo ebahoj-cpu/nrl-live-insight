@@ -28,6 +28,37 @@ import { ensureAftermatch, getLastLessonForTeam, readAftermatch, type Aftermatch
 // the rest await the same promise and read the freshly persisted DB row.
 const inFlight = new Map<string, Promise<Insights | null>>();
 
+// Cache freshness gate. A stored insights row is only valid when:
+//   1. The squad signature on disk matches the current NRL.com squads, AND
+//   2. The model mode hasn't advanced (early → squad → market → final) since
+//      the row was generated.
+// This is the fix for "insights didn't update when team lists dropped" —
+// previously the row sat for hours until its TTL expired.
+async function readFreshInsights(
+  matchId: string,
+  details: Awaited<ReturnType<typeof fetchMatchDetails>>,
+  tryscorers: TryscorerMarkets | null,
+): Promise<Awaited<ReturnType<typeof readSharedInsights>>> {
+  const stored = await readSharedInsights(matchId);
+  if (!stored) return null;
+  const payload = stored.payload as unknown as {
+    modelMode?: ModelMode;
+    squadSig?: { home?: string; away?: string };
+  };
+  const homeSig = squadSignature(details.homeTeam.players);
+  const awaySig = squadSignature(details.awayTeam.players);
+  if (payload.squadSig?.home !== homeSig || payload.squadSig?.away !== awaySig) {
+    return null; // squads changed since payload was written
+  }
+  const hasSquads = squadIsNamed(details.homeTeam.players) && squadIsNamed(details.awayTeam.players);
+  const hasPlayerOdds = !!tryscorers?.hasAny;
+  const current = resolveModelMode({ kickoffUtc: details.kickoffUtc, hasSquads, hasPlayerOdds }).mode;
+  if (modeAdvanced(payload.modelMode, current)) {
+    return null; // mode advanced (e.g. early → squad once team lists dropped)
+  }
+  return stored;
+}
+
 // ---------- Last-good snapshots (graceful degradation) ----------
 // Survive across requests within a worker; replaced only on success.
 let lastGoodOdds: { at: number; data: OddsEvent[] } | null = null;

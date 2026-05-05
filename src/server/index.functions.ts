@@ -88,7 +88,7 @@ async function safeOdds(refresh?: boolean): Promise<{ data: OddsEvent[]; error: 
 
 async function safeTryscorers(eventId: string, refresh?: boolean): Promise<{ data: TryscorerMarkets | null; error: string | null }> {
   try {
-    const data = await cached(`tryscorers:${eventId}`, TTL.odds, () => fetchTryscorerOdds(eventId), { bypass: refresh });
+    const data = await cached(`tryscorers:${eventId}`, TTL.oddsTryscorer, () => fetchTryscorerOdds(eventId), { bypass: refresh });
     lastGoodTryscorers.set(eventId, { at: Date.now(), data });
     return { data, error: null };
   } catch (e) {
@@ -97,6 +97,17 @@ async function safeTryscorers(eventId: string, refresh?: boolean): Promise<{ dat
     if (prev) return { data: prev.data, error: msg };
     return { data: null, error: msg };
   }
+}
+
+// Tryscorer markets only get released by bookies ~24-48h before kickoff.
+// Skip the API call entirely for fixtures further out — saves significant quota
+// when users browse upcoming rounds.
+function tryscorerFetchAllowed(kickoffUtc: string): boolean {
+  const ko = Date.parse(kickoffUtc);
+  if (!Number.isFinite(ko)) return false;
+  const msUntil = ko - Date.now();
+  // Allow from 48h before kickoff through 4h after (covers in-play / just-finished).
+  return msUntil <= 48 * 60 * 60_000 && msUntil >= -4 * 60 * 60_000;
 }
 
 async function safeWeather(matchId: string, venue: string, city: string, kickoffUtc: string, refresh?: boolean): Promise<WeatherSnapshot | null> {

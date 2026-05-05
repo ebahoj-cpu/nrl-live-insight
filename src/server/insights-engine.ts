@@ -266,6 +266,7 @@ function stripInternal(r: RankedRow | undefined, fallbackReason: string): Engine
     reasoning: r.reasoning || fallbackReason,
     price: r.price,
     confidence: r.confidence,
+    usingRealStats: r.usingRealStats,
   };
 }
 

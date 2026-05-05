@@ -2041,13 +2041,13 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
           <span className="text-2xl font-black text-accent uppercase">{det.totalPoints?.lean}</span>
           <span className="text-2xl font-black tabular-nums">{det.totalPoints?.line}</span>
         </div>
-        <p className="text-sm leading-relaxed text-foreground/90">{det.totalPoints?.reasoning}</p>
+        <p className="font-chat text-sm leading-relaxed text-foreground/90">{det.totalPoints?.reasoning}</p>
       </Card>
 
       {/* 5 — HT/FT Double */}
       <Card title="Halftime / fulltime double" icon={Hourglass}>
         <div className="text-2xl font-black mb-2 text-accent">{det.htft?.pick}</div>
-        <p className="text-sm leading-relaxed text-foreground/90">{det.htft?.reasoning}</p>
+        <p className="font-chat text-sm leading-relaxed text-foreground/90">{det.htft?.reasoning}</p>
       </Card>
 
       {/* 6 — First Tryscorer */}
@@ -2061,7 +2061,7 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
             <div className="text-xl font-black truncate">{det.firstTryscorer?.name}</div>
             <div className="text-[11px] text-muted-foreground">{det.firstTryscorer?.team} · {det.firstTryscorer?.position}</div>
             {det.firstTryscorer?.reasoning && (
-              <p className="text-sm leading-relaxed text-foreground/90 mt-2">{det.firstTryscorer.reasoning}</p>
+              <p className="font-chat text-sm leading-relaxed text-foreground/90 mt-2">{det.firstTryscorer.reasoning}</p>
             )}
           </div>
           <div className="flex flex-col items-end gap-1.5 shrink-0">

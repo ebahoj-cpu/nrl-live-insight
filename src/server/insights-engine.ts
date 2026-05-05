@@ -85,6 +85,8 @@ export type DeterministicInsights = {
     summary: string;
     picks: EnginePlayerPick[]; // 3 anytime tryscorers with bespoke reasoning
   };
+  // 11 — Hard Earned form report (work-rate trend from past completed matches)
+  hardEarned?: import("./hard-earned-history").MatchHardEarnedReport;
 };
 
 // ---------- Public API ----------

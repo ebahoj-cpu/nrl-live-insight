@@ -54,6 +54,39 @@ export type TeamSeasonStats = {
   htLeadRate: number;            // htLeads / played
   // Recent form (last 5 matches, oldest→newest of those 5)
   last5: { result: "W" | "L" | "D"; pf: number; pa: number; round: number }[];
+  // Per-match Hard Earned input stats — populated from NRL.com stat groups for
+  // every completed match. Oldest→newest. Used by hard-earned-history.ts to
+  // derive work-rate ratings, trend, fatigue, bounce-back, false-positive.
+  matchStats?: TeamMatchStats[];
+};
+
+// Per-match team stat snapshot. All fields are optional because NRL.com's
+// stat group set varies by match. Estimated fields are not flagged here —
+// they are derived in hard-earned-history.ts when raw values are missing.
+export type TeamMatchStats = {
+  matchId: string;
+  round: number;
+  kickoffUtc: string;
+  result: "W" | "L" | "D";
+  pf: number;
+  pa: number;
+  opponentNickname: string;
+  // Raw inputs (when available from NRL stat groups)
+  runs?: number;
+  runMetres?: number;
+  postContactMetres?: number;
+  tackles?: number;
+  tackleBreaks?: number;
+  missedTackles?: number;
+  offloads?: number;
+  errors?: number;
+  penaltiesConceded?: number;
+  sinBins?: number;
+  // Less common — present when NRL.com surfaces them in a given group
+  supports?: number;
+  decoys?: number;
+  chargeDowns?: number;
+  lineEngagements?: number;
 };
 
 export type SeasonSnapshot = {
@@ -122,7 +155,7 @@ async function buildSeasonSnapshot(season: number): Promise<SeasonSnapshot> {
   }
 
   // 2. Fetch match details (limited concurrency to be polite to NRL.com)
-  type MatchPayload = { matchId: string; round: number; data: any };
+  type MatchPayload = { matchId: string; round: number; kickoffUtc: string; data: any };
   const payloads: MatchPayload[] = [];
   const CONCURRENCY = 6;
   for (let i = 0; i < fixtures.length; i += CONCURRENCY) {
@@ -133,7 +166,7 @@ async function buildSeasonSnapshot(season: number): Promise<SeasonSnapshot> {
         const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0", "Accept": "application/json" } });
         if (!res.ok) return null;
         const d = await res.json();
-        return { matchId: f.matchId, round: f.roundNumber, data: d } as MatchPayload;
+        return { matchId: f.matchId, round: f.roundNumber, kickoffUtc: f.kickoffUtc, data: d } as MatchPayload;
       } catch {
         return null;
       }
@@ -145,7 +178,7 @@ async function buildSeasonSnapshot(season: number): Promise<SeasonSnapshot> {
   const teams: Record<string, TeamSeasonStats> = {};
   const playerMap = new Map<number, PlayerSeasonStats>();
 
-  for (const { matchId, round, data: d } of payloads) {
+  for (const { matchId, round, kickoffUtc, data: d } of payloads) {
     const home = d.homeTeam ?? {};
     const away = d.awayTeam ?? {};
     const homeNick = home.nickName ?? "";
@@ -238,6 +271,56 @@ async function buildSeasonSnapshot(season: number): Promise<SeasonSnapshot> {
     // Recent form rolling list
     h.last5.push({ result: hScore > aScore ? "W" : hScore < aScore ? "L" : "D", pf: hScore, pa: aScore, round });
     a.last5.push({ result: aScore > hScore ? "W" : aScore < hScore ? "L" : "D", pf: aScore, pa: hScore, round });
+
+    // Per-match Hard Earned input stats — pull whatever the NRL stat groups
+    // expose. Missing fields stay undefined; hard-earned-history.ts handles
+    // gaps with proxies and clamps the result.
+    const groups = (d.stats?.groups ?? []) as Array<{ stats?: Array<{ title?: string; homeValue?: { value?: number }; awayValue?: { value?: number } }> }>;
+    const findStat = (matcher: RegExp): { home: number | undefined; away: number | undefined } => {
+      for (const g of groups) {
+        for (const s of (g.stats ?? [])) {
+          if (s.title && matcher.test(s.title)) {
+            return {
+              home: typeof s.homeValue?.value === "number" ? s.homeValue.value : undefined,
+              away: typeof s.awayValue?.value === "number" ? s.awayValue.value : undefined,
+            };
+          }
+        }
+      }
+      return { home: undefined, away: undefined };
+    };
+    const runs = findStat(/^all runs$|^runs$/i);
+    const runMetres = findStat(/all run metres|^run metres$/i);
+    const postContact = findStat(/post contact metres|post[- ]contact/i);
+    const tackles = findStat(/^tackles made$|^tackles$/i);
+    const tackleBreaks = findStat(/tackle breaks/i);
+    const missedTackles = findStat(/missed tackles/i);
+    const offloads = findStat(/^offloads$/i);
+    const errors = findStat(/^errors$|all errors/i);
+    const penalties = findStat(/penalties conceded/i);
+    const sinBins = findStat(/sin bins?/i);
+    const supports = findStat(/^support runs?$|^supports$/i);
+    const decoys = findStat(/^dummy half runs$|decoy/i);
+    const chargeDowns = findStat(/charge downs?/i);
+    const lineEngagements = findStat(/line engaged|line break engagements/i);
+
+    const hRes: "W" | "L" | "D" = hScore > aScore ? "W" : hScore < aScore ? "L" : "D";
+    const aRes: "W" | "L" | "D" = aScore > hScore ? "W" : aScore < hScore ? "L" : "D";
+
+    (h.matchStats ||= []).push({
+      matchId, round, kickoffUtc, result: hRes, pf: hScore, pa: aScore, opponentNickname: awayNick,
+      runs: runs.home, runMetres: runMetres.home, postContactMetres: postContact.home,
+      tackles: tackles.home, tackleBreaks: tackleBreaks.home, missedTackles: missedTackles.home,
+      offloads: offloads.home, errors: errors.home, penaltiesConceded: penalties.home, sinBins: sinBins.home,
+      supports: supports.home, decoys: decoys.home, chargeDowns: chargeDowns.home, lineEngagements: lineEngagements.home,
+    });
+    (a.matchStats ||= []).push({
+      matchId, round, kickoffUtc, result: aRes, pf: aScore, pa: hScore, opponentNickname: homeNick,
+      runs: runs.away, runMetres: runMetres.away, postContactMetres: postContact.away,
+      tackles: tackles.away, tackleBreaks: tackleBreaks.away, missedTackles: missedTackles.away,
+      offloads: offloads.away, errors: errors.away, penaltiesConceded: penalties.away, sinBins: sinBins.away,
+      supports: supports.away, decoys: decoys.away, chargeDowns: chargeDowns.away, lineEngagements: lineEngagements.away,
+    });
   }
 
   // Final derived rates + trim last5
@@ -249,6 +332,11 @@ async function buildSeasonSnapshot(season: number): Promise<SeasonSnapshot> {
     t.htLeadRate = t.played > 0 ? t.htLeads / t.played : 0;
     t.last5.sort((x, y) => x.round - y.round);
     t.last5 = t.last5.slice(-5);
+    if (t.matchStats) {
+      t.matchStats.sort((x, y) => x.round - y.round);
+      // Keep last 8 — covers all trend windows (last 1, 3, 5).
+      t.matchStats = t.matchStats.slice(-8);
+    }
   }
 
   // Compute per-player triesPerMatch using their team's games played as denominator

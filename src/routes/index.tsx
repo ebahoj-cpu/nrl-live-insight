@@ -8,7 +8,7 @@ import { Suspense, useState, useRef, useEffect } from "react";
 import { ChevronDown, Check } from "lucide-react";
 
 const searchSchema = z.object({
-  round: fallback(z.number().int().min(0), 0).default(0),
+  round: fallback(z.coerce.number().int().min(0).optional(), undefined),
 }).passthrough();
 
 const fixturesQO = (round?: number) => queryOptions({

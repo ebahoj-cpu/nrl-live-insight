@@ -11,7 +11,7 @@ import type { Insights } from "./ai-insights";
 import type { DeterministicInsights, EnginePlayerPick } from "./insights-engine";
 
 const TABLE = "match_aftermatch";
-const VERSION = "v1";
+const VERSION = "v2";
 const GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
 const AI_MODEL = "google/gemini-2.5-flash";
 const AI_TIMEOUT_MS = 25_000;

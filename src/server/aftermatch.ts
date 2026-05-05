@@ -31,6 +31,29 @@ export type AftermatchPlayerHit = {
   status: "hit" | "miss";
 };
 
+export type AftermatchComparison = {
+  team: {
+    winner: { predicted: string; actual: string; correct: boolean };
+    margin: { predicted: string; actual: string; actualMargin: number; correct: boolean };
+    total: { predictedLine: number | null; predictedLean: "over" | "under" | null; actual: number; correct: boolean | null };
+    htft: { predicted: string | null; actualWinner: string; partial: boolean | null };
+    score: { predicted: string | null; actual: string; combinedError: number | null; close: boolean };
+  };
+  script: {
+    tempo: { predicted: "slow" | "controlled" | "open" | null; actual: "slow" | "controlled" | "open"; correct: boolean | null };
+    flow: { predicted: "tight" | "blowout" | null; actual: "tight" | "blowout"; correct: boolean | null };
+    dominantTeam: { predicted: string | null; actual: string; correct: boolean | null };
+    edge: { predicted: "left" | "right" | "middle" | null; actual: "left" | "right" | "middle" | null; correct: boolean | null };
+  };
+  players: {
+    firstTry: { predicted: string | null; actual: string | null; correct: boolean };
+    anytimeHits: number;        // number of distinct predicted players who scored
+    anytimeChecked: number;     // number of distinct predicted players considered
+    namedHits: { name: string; scored: number }[];
+    namedMisses: string[];
+  };
+};
+
 export type AftermatchPayload = {
   version: string;
   generatedAt: string;
@@ -43,6 +66,7 @@ export type AftermatchPayload = {
   scoreLine: { hits: number; total: number };
   consistencies: string[];
   inconsistencies: string[];
+  comparison: AftermatchComparison;
   summary: string;            // short AI paragraph
 };
 

@@ -22,6 +22,10 @@ import { resolveModelMode, squadIsNamed, squadSignature, modeAdvanced, type Mode
 import { buildDeterministicBets } from "./bets-engine";
 import { indexSquads, isInSquad } from "./validate-picks";
 import { ensureAftermatch, getLastLessonForTeam, readAftermatch, type AftermatchPayload, type TeamLesson } from "./aftermatch";
+import { fetchZylaLadder, fetchZylaFixtures, getZylaRequestCount } from "./zyla";
+
+// Source tracking — surfaced in server logs and (where harmless) on payloads.
+export type DataSource = "nrl_com" | "zyla" | "mixed" | "proxy";
 
 // In-flight generation lock — if multiple visitors hit the same uncached match
 // simultaneously within a single worker, only one actually invokes the AI;

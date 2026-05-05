@@ -178,7 +178,7 @@ async function buildSeasonSnapshot(season: number): Promise<SeasonSnapshot> {
   const teams: Record<string, TeamSeasonStats> = {};
   const playerMap = new Map<number, PlayerSeasonStats>();
 
-  for (const { matchId, round, data: d } of payloads) {
+  for (const { matchId, round, kickoffUtc, data: d } of payloads) {
     const home = d.homeTeam ?? {};
     const away = d.awayTeam ?? {};
     const homeNick = home.nickName ?? "";

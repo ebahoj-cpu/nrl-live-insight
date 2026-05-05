@@ -2089,7 +2089,7 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
               <div className="text-xl font-black truncate">{det.playerDouble.name}</div>
               <div className="text-[11px] text-muted-foreground">{det.playerDouble.team} · {det.playerDouble.position}</div>
               {det.playerDouble.reasoning && (
-                <p className="text-sm leading-relaxed text-foreground/90 mt-2">{det.playerDouble.reasoning}</p>
+                <p className="font-chat text-sm leading-relaxed text-foreground/90 mt-2">{det.playerDouble.reasoning}</p>
               )}
             </div>
             <div className="flex flex-col items-end gap-1.5 shrink-0">
@@ -2127,7 +2127,7 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
       {/* 10 — Predicted Outcome (moved above Top 3 anytime) */}
       {det.predictedOutcome && (
         <Card title="Predicted outcome" icon={Trophy} className="accent-glow">
-          <p className="text-sm leading-relaxed text-foreground/90 mb-3">{det.predictedOutcome.summary}</p>
+          <p className="font-chat text-sm leading-relaxed text-foreground/90 mb-3">{det.predictedOutcome.summary}</p>
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Three anytime tryscorers backing this script</div>
           <ul className="space-y-2.5">
             {(det.predictedOutcome.picks ?? []).map((p: any, i: number) => (

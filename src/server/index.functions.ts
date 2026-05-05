@@ -25,6 +25,7 @@ import { ensureAftermatch, getLastLessonForTeam, readAftermatch, type Aftermatch
 import { fetchZylaLadder, getZylaRequestCount } from "./zyla";
 import { generateScript, type ScriptPayload } from "./script-engine";
 import { readOddsCache, readOddsCacheStale, writeOddsCache } from "./odds-store";
+import { snapshotPrediction, buildSnapshotRow } from "./prediction-tracking";
 
 // Source tracking — surfaced in server logs and (where harmless) on payloads.
 export type DataSource = "nrl_com" | "zyla" | "mixed" | "proxy";

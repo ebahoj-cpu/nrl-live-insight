@@ -372,10 +372,13 @@ export const getMatchInsights = createServerFn({ method: "GET" })
 
         // Persist deterministic-only payload IMMEDIATELY so the Insights tab
         // becomes available even if AI enrichment below fails or times out.
+        const homeSig = squadSignature(details.homeTeam.players);
+        const awaySig = squadSignature(details.awayTeam.players);
         const minimalPayload = {
           deterministic,
           modelMode: resolved.mode,
           modelConfidence: resolved.confidence,
+          squadSig: { home: homeSig, away: awaySig },
         } as unknown as Insights;
         if (deterministic) {
           await writeSharedInsights(data.matchId, minimalPayload, insightsTtlMs(details.kickoffUtc));
@@ -428,6 +431,7 @@ export const getMatchInsights = createServerFn({ method: "GET" })
           }
           generated.modelMode = resolved.mode;
           generated.modelConfidence = resolved.confidence;
+          (generated as unknown as { squadSig: { home: string; away: string } }).squadSig = { home: homeSig, away: awaySig };
           await writeSharedInsights(data.matchId, generated, insightsTtlMs(details.kickoffUtc));
           return generated;
         } catch (err) {

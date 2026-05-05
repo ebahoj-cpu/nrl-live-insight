@@ -63,7 +63,7 @@ export type NrlLadderRow = {
   movement: string;
 };
 
-function pathToMatchId(path: string): string {
+export function pathToMatchId(path: string): string {
   // /draw/nrl-premiership/2026/round-8/wests-tigers-v-raiders/
   return path.replace(/^\/+|\/+$/g, "").split("/").slice(-3).join("/"); // 2026/round-8/wests-tigers-v-raiders
 }

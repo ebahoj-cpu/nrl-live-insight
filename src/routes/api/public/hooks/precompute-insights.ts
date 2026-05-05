@@ -12,6 +12,9 @@ import { resolveModelMode, squadIsNamed, squadSignature } from "@/server/model-m
 import { writeSharedInsights } from "@/server/insights-store";
 import { fetchVenueWeather } from "@/server/weather";
 import { insightsTtlMs } from "@/server/cache";
+import { generateScript } from "@/server/script-engine";
+import { buildDeterministicBets } from "@/server/bets-engine";
+import { snapshotPrediction, buildSnapshotRow } from "@/server/prediction-tracking";
 import type { Insights } from "@/server/ai-insights";
 
 export const Route = createFileRoute("/api/public/hooks/precompute-insights")({

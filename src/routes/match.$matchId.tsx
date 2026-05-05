@@ -742,9 +742,15 @@ function SquadPanel({ team, news }: { team: { nickName: string; themeKey: string
               className={`pointer-events-none absolute bottom-0 left-0 h-[150%] w-auto max-w-none object-contain object-bottom drop-shadow-[0_4px_10px_rgba(0,0,0,0.5)] ${
                 isOut ? "grayscale opacity-60" : ""
               }`}
-              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+              onError={(e) => {
+                const img = e.currentTarget as HTMLImageElement;
+                img.style.display = "none";
+                const sib = img.nextElementSibling as HTMLElement | null;
+                if (sib) sib.style.display = "flex";
+              }}
             />
           ) : null}
+          <InitialsAvatar firstName={p.firstName} lastName={p.lastName} hidden={!!p.headImage} dimmed={isOut} />
         </div>
 
         {/* Jersey number badge — pushed well clear of the overlapping headshot */}

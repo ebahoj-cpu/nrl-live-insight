@@ -54,6 +54,39 @@ export type TeamSeasonStats = {
   htLeadRate: number;            // htLeads / played
   // Recent form (last 5 matches, oldest→newest of those 5)
   last5: { result: "W" | "L" | "D"; pf: number; pa: number; round: number }[];
+  // Per-match Hard Earned input stats — populated from NRL.com stat groups for
+  // every completed match. Oldest→newest. Used by hard-earned-history.ts to
+  // derive work-rate ratings, trend, fatigue, bounce-back, false-positive.
+  matchStats?: TeamMatchStats[];
+};
+
+// Per-match team stat snapshot. All fields are optional because NRL.com's
+// stat group set varies by match. Estimated fields are not flagged here —
+// they are derived in hard-earned-history.ts when raw values are missing.
+export type TeamMatchStats = {
+  matchId: string;
+  round: number;
+  kickoffUtc: string;
+  result: "W" | "L" | "D";
+  pf: number;
+  pa: number;
+  opponentNickname: string;
+  // Raw inputs (when available from NRL stat groups)
+  runs?: number;
+  runMetres?: number;
+  postContactMetres?: number;
+  tackles?: number;
+  tackleBreaks?: number;
+  missedTackles?: number;
+  offloads?: number;
+  errors?: number;
+  penaltiesConceded?: number;
+  sinBins?: number;
+  // Less common — present when NRL.com surfaces them in a given group
+  supports?: number;
+  decoys?: number;
+  chargeDowns?: number;
+  lineEngagements?: number;
 };
 
 export type SeasonSnapshot = {

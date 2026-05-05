@@ -22,6 +22,10 @@ import { resolveModelMode, squadIsNamed, squadSignature, modeAdvanced, type Mode
 import { buildDeterministicBets } from "./bets-engine";
 import { indexSquads, isInSquad } from "./validate-picks";
 import { ensureAftermatch, getLastLessonForTeam, readAftermatch, type AftermatchPayload, type TeamLesson } from "./aftermatch";
+import { fetchZylaLadder, fetchZylaFixtures, getZylaRequestCount } from "./zyla";
+
+// Source tracking — surfaced in server logs and (where harmless) on payloads.
+export type DataSource = "nrl_com" | "zyla" | "mixed" | "proxy";
 
 // In-flight generation lock — if multiple visitors hit the same uncached match
 // simultaneously within a single worker, only one actually invokes the AI;
@@ -189,11 +193,26 @@ export const getCurrentRoundFixtures = createServerFn({ method: "GET" })
   });
 
 // ---------- Ladder ----------
+// Primary: NRL.com. Fallback: Zyla (12h cached).
 export const getLadder = createServerFn({ method: "GET" })
   .inputValidator((i: { refresh?: boolean } | undefined) => i ?? {})
   .handler(async ({ data }) => {
     const season = currentSeason();
-    return cached(`ladder:${season}`, TTL.ladder, () => fetchLadder(season), { bypass: data.refresh });
+    try {
+      const rows = await cached(`ladder:${season}`, TTL.ladder, () => fetchLadder(season), { bypass: data.refresh });
+      console.info(`[ladder] source=nrl_com rows=${rows.length}`);
+      return rows;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.warn(`[ladder] NRL.com failed (${msg}) — trying Zyla fallback`);
+      const zyla = await fetchZylaLadder(season);
+      if (zyla && zyla.length > 0) {
+        console.info(`[ladder] source=zyla rows=${zyla.length} zylaCount=${getZylaRequestCount()}`);
+        return zyla;
+      }
+      console.error(`[ladder] BOTH sources failed (NRL.com + Zyla)`);
+      throw e;
+    }
   });
 
 // ---------- Live odds (NEVER throws — Tier 2) ----------

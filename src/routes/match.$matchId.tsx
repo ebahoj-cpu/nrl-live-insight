@@ -433,9 +433,15 @@ function H2HPanel({ home, away }: { home: any; away: any }) {
               className={`pointer-events-none absolute bottom-0 h-[150%] w-auto max-w-none object-contain object-bottom drop-shadow-[0_4px_10px_rgba(0,0,0,0.5)] ${
                 side === "left" ? "left-0" : "right-0"
               }`}
-              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+              onError={(e) => {
+                const img = e.currentTarget as HTMLImageElement;
+                img.style.display = "none";
+                const sib = img.nextElementSibling as HTMLElement | null;
+                if (sib) sib.style.display = "flex";
+              }}
             />
           ) : null}
+          {p ? <InitialsAvatar firstName={p.firstName} lastName={p.lastName} hidden={!!p.headImage} /> : null}
         </div>
         {/* Caption centered under the player's face. Stays within the player's half so it never collides with the centre badge. */}
         <div className="mt-3 w-[88px] sm:w-32 leading-tight text-center">

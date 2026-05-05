@@ -25,6 +25,7 @@ import { ensureAftermatch, getLastLessonForTeam, readAftermatch, type Aftermatch
 import { fetchZylaLadder, getZylaRequestCount } from "./zyla";
 import { generateScript, type ScriptPayload } from "./script-engine";
 import { readOddsCache, readOddsCacheStale, writeOddsCache } from "./odds-store";
+import { snapshotPrediction, buildSnapshotRow } from "./prediction-tracking";
 
 // Source tracking — surfaced in server logs and (where harmless) on payloads.
 export type DataSource = "nrl_com" | "zyla" | "mixed" | "proxy";
@@ -498,6 +499,18 @@ export const getMatchInsights = createServerFn({ method: "GET" })
         } as unknown as Insights;
         if (deterministic) {
           await writeSharedInsights(data.matchId, minimalPayload, insightsTtlMs(details.kickoffUtc));
+          // Lock the prediction snapshot before kickoff (insert-only — never
+          // overwrites an existing locked row).
+          try {
+            await snapshotPrediction(buildSnapshotRow({
+              matchId: data.matchId,
+              details,
+              insights: deterministic,
+              script: scriptPayload,
+              odds,
+              tryscorers,
+            }));
+          } catch (e) { console.warn("snapshotPrediction failed:", e); }
         }
 
         // ---- Skip AI entirely in EARLY mode (no squads → no narrative value) ----

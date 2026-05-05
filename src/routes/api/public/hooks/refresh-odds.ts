@@ -59,9 +59,11 @@ async function handle(request: Request): Promise<Response> {
 
   // Mode determines which fixtures are "in window" for tryscorer fetches.
   //   players: from now through 5 days out (covers the whole upcoming round)
-  //   pregame: only fixtures kicking off within the next 90 minutes
-  const windowMs = mode === "pregame" ? 90 * 60_000 : 5 * 24 * 60 * 60_000;
-  const minLeadMs = mode === "pregame" ? -10 * 60_000 : -4 * 60 * 60_000;
+  //   pregame: fixtures kicking off in 30-90 min — runs hourly, so each game
+  //            gets exactly one refresh at ~T-60min.
+  const isPregame = mode === "pregame";
+  const windowMs = isPregame ? 90 * 60_000 : 5 * 24 * 60 * 60_000;
+  const minLeadMs = isPregame ? 30 * 60_000 : -4 * 60 * 60_000;
 
   const targets = draw.filter((f) => {
     const ko = Date.parse(f.kickoffUtc);

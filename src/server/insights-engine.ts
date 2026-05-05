@@ -47,6 +47,9 @@ export type EnginePlayerPick = {
 
 export type DeterministicInsights = {
   generatedAt: string;
+  // Timing-aware mode this payload was generated under.
+  mode: ModelMode;
+  confidence: ModelConfidence;
   // 1
   matchWinner: { team: "home" | "away"; nickname: string; reasoning: string };
   // 2

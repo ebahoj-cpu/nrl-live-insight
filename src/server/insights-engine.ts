@@ -214,6 +214,8 @@ export function generateDeterministicInsights(inp: EngineInputs): DeterministicI
 
   return {
     generatedAt: new Date().toISOString(),
+    mode,
+    confidence,
     matchWinner,
     margin,
     predictedScore,

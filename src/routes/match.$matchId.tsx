@@ -223,9 +223,6 @@ function MatchInner() {
         )}
       </div>
 
-      <p className="text-[11px] text-muted-foreground text-center mt-10">
-        Updated {new Date(data.generatedAt).toLocaleTimeString()} · Bet responsibly · 18+
-      </p>
     </div>
   );
 }

@@ -285,7 +285,7 @@ async function summariseWithAI(payload: AftermatchPayload): Promise<string> {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), AI_TIMEOUT_MS);
   try {
-    const sys = "You are a sharp NRL analyst. In 2-3 short sentences, summarise where the pre-match insights matched the actual result and where they diverged. Be specific (cite markets, players, or score). Plain prose, no bullets, no headings, no betting hype, no emojis.";
+    const sys = "You are a sharp NRL analyst. Write 3-4 short sentences. First, summarise where the pre-match insights matched the actual result and where they diverged (cite markets, players, or score). Then end with one sentence beginning with 'Carry into this week:' that gives a concrete takeaway both teams in the upcoming fixture should heed based on the lessons. Plain prose, no bullets, no headings, no betting hype, no emojis.";
     const user = [
       `Match: ${payload.homeNickname} vs ${payload.awayNickname} — final ${payload.finalScore.home}-${payload.finalScore.away}.`,
       `Score: ${payload.scoreLine.hits}/${payload.scoreLine.total} predictions correct.`,

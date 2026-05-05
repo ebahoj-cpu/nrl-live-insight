@@ -2212,6 +2212,9 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
         )}
       </Card>
 
+      {/* Last week's lessons (carry-forward from previous Aftermatch) — always render so empty states are visible */}
+      <LessonsCard home={home} away={away} lessons={lessons ?? { home: null, away: null }} />
+
     </div>
   );
 }

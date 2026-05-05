@@ -332,6 +332,11 @@ async function buildSeasonSnapshot(season: number): Promise<SeasonSnapshot> {
     t.htLeadRate = t.played > 0 ? t.htLeads / t.played : 0;
     t.last5.sort((x, y) => x.round - y.round);
     t.last5 = t.last5.slice(-5);
+    if (t.matchStats) {
+      t.matchStats.sort((x, y) => x.round - y.round);
+      // Keep last 8 — covers all trend windows (last 1, 3, 5).
+      t.matchStats = t.matchStats.slice(-8);
+    }
   }
 
   // Compute per-player triesPerMatch using their team's games played as denominator

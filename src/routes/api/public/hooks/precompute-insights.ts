@@ -8,7 +8,7 @@ import { fetchNrlOdds, fetchTryscorerOdds } from "@/server/odds";
 import { findTeam } from "@/lib/teams";
 import { getSeasonSnapshot } from "@/server/season-stats";
 import { generateDeterministicInsights } from "@/server/insights-engine";
-import { resolveModelMode, squadIsNamed } from "@/server/model-mode";
+import { resolveModelMode, squadIsNamed, squadSignature } from "@/server/model-mode";
 import { writeSharedInsights } from "@/server/insights-store";
 import { fetchVenueWeather } from "@/server/weather";
 import { insightsTtlMs } from "@/server/cache";
@@ -84,6 +84,10 @@ export const Route = createFileRoute("/api/public/hooks/precompute-insights")({
               deterministic,
               modelMode: resolved.mode,
               modelConfidence: resolved.confidence,
+              squadSig: {
+                home: squadSignature(details.homeTeam.players),
+                away: squadSignature(details.awayTeam.players),
+              },
             } as unknown as Insights;
             await writeSharedInsights(f.matchId, payload, insightsTtlMs(details.kickoffUtc));
             results.push({ matchId: f.matchId, ok: true });

@@ -18,7 +18,7 @@ import { findTeam } from "@/lib/teams";
 import { readSharedInsights, readAnySharedInsights, writeSharedInsights } from "./insights-store";
 import { getSeasonSnapshot } from "./season-stats";
 import { generateDeterministicInsights, type DeterministicInsights } from "./insights-engine";
-import { resolveModelMode, squadIsNamed } from "./model-mode";
+import { resolveModelMode, squadIsNamed, squadSignature, modeAdvanced, type ModelMode } from "./model-mode";
 import { buildDeterministicBets } from "./bets-engine";
 import { indexSquads, isInSquad } from "./validate-picks";
 import { ensureAftermatch, getLastLessonForTeam, readAftermatch, type AftermatchPayload, type TeamLesson } from "./aftermatch";
@@ -27,6 +27,37 @@ import { ensureAftermatch, getLastLessonForTeam, readAftermatch, type Aftermatch
 // simultaneously within a single worker, only one actually invokes the AI;
 // the rest await the same promise and read the freshly persisted DB row.
 const inFlight = new Map<string, Promise<Insights | null>>();
+
+// Cache freshness gate. A stored insights row is only valid when:
+//   1. The squad signature on disk matches the current NRL.com squads, AND
+//   2. The model mode hasn't advanced (early → squad → market → final) since
+//      the row was generated.
+// This is the fix for "insights didn't update when team lists dropped" —
+// previously the row sat for hours until its TTL expired.
+async function readFreshInsights(
+  matchId: string,
+  details: Awaited<ReturnType<typeof fetchMatchDetails>>,
+  tryscorers: TryscorerMarkets | null,
+): Promise<Awaited<ReturnType<typeof readSharedInsights>>> {
+  const stored = await readSharedInsights(matchId);
+  if (!stored) return null;
+  const payload = stored.payload as unknown as {
+    modelMode?: ModelMode;
+    squadSig?: { home?: string; away?: string };
+  };
+  const homeSig = squadSignature(details.homeTeam.players);
+  const awaySig = squadSignature(details.awayTeam.players);
+  if (payload.squadSig?.home !== homeSig || payload.squadSig?.away !== awaySig) {
+    return null; // squads changed since payload was written
+  }
+  const hasSquads = squadIsNamed(details.homeTeam.players) && squadIsNamed(details.awayTeam.players);
+  const hasPlayerOdds = !!tryscorers?.hasAny;
+  const current = resolveModelMode({ kickoffUtc: details.kickoffUtc, hasSquads, hasPlayerOdds }).mode;
+  if (modeAdvanced(payload.modelMode, current)) {
+    return null; // mode advanced (e.g. early → squad once team lists dropped)
+  }
+  return stored;
+}
 
 // ---------- Last-good snapshots (graceful degradation) ----------
 // Survive across requests within a worker; replaced only on success.
@@ -231,7 +262,8 @@ export const getMatchPage = createServerFn({ method: "GET" })
     // and abort the whole page). Read the shared DB cache so every visitor sees
     // the same payload; if no fresh row exists, the client lazily calls
     // getMatchInsights() to generate (single-flight) and persist it.
-    const stored = await readSharedInsights(data.matchId);
+    // Invalidate the cache when squads or mode have advanced since storage.
+    const stored = await readFreshInsights(data.matchId, details, tryscorers);
 
     // Aftermatch (only for finished matches) + lessons-from-last-week per team.
     const finished = /^(FullTime|Final|Completed)$/i.test(details.matchState);
@@ -299,9 +331,15 @@ export const getMatchInsights = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     const season = currentSeason();
     try {
-      // 1) Fast-path: shared DB cache hit with deterministic payload present.
+      // Resolve current mode + squad signature up front so we can
+      // validate any cached payload against today's reality.
+      const detailsForCheck = await cached(`match:${data.matchId}`, TTL.match, () => fetchMatchDetails(data.matchId), { bypass: data.refresh });
+
+      // 1) Fast-path: shared DB cache hit, but ONLY if the squad signature and
+      //    mode match what's stored. Stale rows (e.g. generated before squads
+      //    were named, or before late team-list changes) are ignored.
       if (!data.refresh) {
-        const stored = await readSharedInsights(data.matchId);
+        const stored = await readFreshInsights(data.matchId, detailsForCheck, null);
         if (stored && (stored.payload as unknown as { deterministic?: unknown }).deterministic) {
           return { insights: stored.payload, insightsError: null as string | null };
         }
@@ -365,10 +403,13 @@ export const getMatchInsights = createServerFn({ method: "GET" })
 
         // Persist deterministic-only payload IMMEDIATELY so the Insights tab
         // becomes available even if AI enrichment below fails or times out.
+        const homeSig = squadSignature(details.homeTeam.players);
+        const awaySig = squadSignature(details.awayTeam.players);
         const minimalPayload = {
           deterministic,
           modelMode: resolved.mode,
           modelConfidence: resolved.confidence,
+          squadSig: { home: homeSig, away: awaySig },
         } as unknown as Insights;
         if (deterministic) {
           await writeSharedInsights(data.matchId, minimalPayload, insightsTtlMs(details.kickoffUtc));
@@ -421,6 +462,7 @@ export const getMatchInsights = createServerFn({ method: "GET" })
           }
           generated.modelMode = resolved.mode;
           generated.modelConfidence = resolved.confidence;
+          (generated as unknown as { squadSig: { home: string; away: string } }).squadSig = { home: homeSig, away: awaySig };
           await writeSharedInsights(data.matchId, generated, insightsTtlMs(details.kickoffUtc));
           return generated;
         } catch (err) {

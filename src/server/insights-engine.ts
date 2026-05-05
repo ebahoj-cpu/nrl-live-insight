@@ -297,16 +297,15 @@ function rankTryscorers(inp: EngineInputs, home: TeamSeasonStats, away: TeamSeas
   const rows: RankedRow[] = [];
 
   const considerSquad = (squad: NrlPlayer[], teamNick: string, teamSeason: TeamSeasonStats, oppSeason: TeamSeasonStats, isWinner: boolean, byId: Map<number, PlayerSeasonStats>, byName: Map<string, PlayerSeasonStats>) => {
-    // Squad may be empty for upcoming fixtures (team lists not announced yet).
-    // Fall back to: every season player on this team regardless of named squad.
-    const candidates = squad.length > 0
-      ? squad.map((p) => {
-          const pid = (p as any).playerId as number | undefined;
-          // We don't have playerId on the NrlPlayer type; match by name
-          const seasonRow = byName.get(normName(`${p.firstName} ${p.lastName}`)) ?? (pid ? byId.get(pid) : undefined);
-          return { name: `${p.firstName} ${p.lastName}`.trim(), position: p.position || seasonRow?.position || "", season: seasonRow };
-        })
-      : Array.from(byName.values()).map((s) => ({ name: s.name, position: s.position, season: s }));
+    // Hard rule: never produce tryscorer picks for a team without a named squad.
+    // The mode gate above already skips this in EARLY mode; this guards SQUAD+
+    // calls where one side's lineup hasn't dropped yet.
+    if (squad.length === 0) return;
+    const candidates = squad.map((p) => {
+      const pid = (p as any).playerId as number | undefined;
+      const seasonRow = byName.get(normName(`${p.firstName} ${p.lastName}`)) ?? (pid ? byId.get(pid) : undefined);
+      return { name: `${p.firstName} ${p.lastName}`.trim(), position: p.position || seasonRow?.position || "", season: seasonRow };
+    });
 
     for (const c of candidates) {
       const s = c.season;

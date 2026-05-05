@@ -85,6 +85,8 @@ export type DeterministicInsights = {
 // ---------- Public API ----------
 
 export function generateDeterministicInsights(inp: EngineInputs): DeterministicInsights {
+  const mode: ModelMode = inp.mode ?? "final";
+  const confidence: ModelConfidence = inp.confidence ?? (mode === "early" ? "low" : mode === "squad" ? "medium" : "high");
   const home = getTeamOrSynthetic(inp.snapshot, inp.homeNickname);
   const away = getTeamOrSynthetic(inp.snapshot, inp.awayNickname);
   const homeLadder = inp.ladder.find((r) => r.nickname.toLowerCase() === inp.homeNickname.toLowerCase()) ?? null;

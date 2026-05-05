@@ -196,7 +196,7 @@ function MatchInner() {
           />
         )}
         {tab === "script" && (
-          <ScriptTab
+          <GameScriptTab
             insights={insights}
             insightsLoading={insightsLoading}
             home={details.homeTeam}

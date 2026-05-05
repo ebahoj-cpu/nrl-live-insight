@@ -57,3 +57,14 @@ export function squadIsNamed(players: { position?: string }[] | undefined): bool
   const named = players.filter((p) => (p.position ?? "").trim().length > 0);
   return named.length >= 13;
 }
+
+// Stable signature of a squad — changes whenever a player is added, removed,
+// renamed, or reassigned. Used to invalidate cached insights when team lists
+// are updated by NRL.com (e.g. late ins/outs after the official Tuesday drop).
+export function squadSignature(players: { firstName?: string; lastName?: string; position?: string; jerseyNumber?: number }[] | undefined): string {
+  if (!players || players.length === 0) return "empty";
+  return players
+    .map((p) => `${p.jerseyNumber ?? "?"}:${(p.firstName ?? "").toLowerCase()}-${(p.lastName ?? "").toLowerCase()}:${(p.position ?? "").toLowerCase()}`)
+    .sort()
+    .join("|");
+}

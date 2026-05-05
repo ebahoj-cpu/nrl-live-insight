@@ -360,7 +360,11 @@ export const getMatchInsights = createServerFn({ method: "GET" })
       //    were named, or before late team-list changes) are ignored.
       if (!data.refresh) {
         const stored = await readFreshInsights(data.matchId, detailsForCheck, null);
-        if (stored && (stored.payload as unknown as { deterministic?: unknown }).deterministic) {
+        if (
+          stored &&
+          (stored.payload as unknown as { deterministic?: unknown }).deterministic &&
+          (stored.payload as unknown as { script?: unknown }).script
+        ) {
           return { insights: stored.payload, insightsError: null as string | null };
         }
       }

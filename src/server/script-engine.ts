@@ -16,6 +16,8 @@ import type { TeamSeasonStats } from "./season-stats";
 import { getTeam } from "./season-stats";
 import type { ModelMode, ModelConfidence } from "./model-mode";
 
+export type EdgeConfidence = "proxy" | "market-supported" | "unclear";
+
 export type ScriptPayload = {
   mode: ModelMode;
   confidence: ModelConfidence;
@@ -30,6 +32,8 @@ export type ScriptPayload = {
     left: string;
     right: string;
     middle: string;
+    leftConfidence: EdgeConfidence;
+    rightConfidence: EdgeConfidence;
   };
   betting: {
     winnerLean: string;
@@ -68,11 +72,19 @@ export function generateScript(inp: EngineInputs, engine: DeterministicInsights)
 
   // ---------- 6-8. Edge scripts ----------
   const lineupReady = mode !== "early";
-  const homeEdgeName = (side: "left" | "right") => lineupReady ? edgePlayerName(inp, "home", side) : null;
-  const awayEdgeName = (side: "left" | "right") => lineupReady ? edgePlayerName(inp, "away", side) : null;
+  const homeEdge = (side: "left" | "right") => lineupReady ? edgePlayer(inp, "home", side) : null;
+  const awayEdge = (side: "left" | "right") => lineupReady ? edgePlayer(inp, "away", side) : null;
 
-  const left = buildEdge("left", inp, winnerNick, winnerStats, loserStats, homeEdgeName("left"), awayEdgeName("left"), winnerHome, lineupReady);
-  const right = buildEdge("right", inp, winnerNick, winnerStats, loserStats, homeEdgeName("right"), awayEdgeName("right"), winnerHome, lineupReady);
+  const marketSupportsName = (name: string | null): boolean => {
+    if (!name) return false;
+    if (mode !== "market" && mode !== "final") return false;
+    const first = engine.firstTryscorer?.name;
+    const any = engine.topAnytimeOverall?.map((p) => p.name) ?? [];
+    return (first && first === name) || any.includes(name);
+  };
+
+  const left = buildEdge("left", inp, mode, winnerNick, winnerStats, loserStats, homeEdge("left"), awayEdge("left"), winnerHome, lineupReady, marketSupportsName);
+  const right = buildEdge("right", inp, mode, winnerNick, winnerStats, loserStats, homeEdge("right"), awayEdge("right"), winnerHome, lineupReady, marketSupportsName);
   const middle = buildMiddle(winnerNick, loserNick, winnerStats, loserStats, projectedMargin, projectedTotal);
 
   // ---------- 9. Betting translation ----------
@@ -102,7 +114,13 @@ export function generateScript(inp: EngineInputs, engine: DeterministicInsights)
     confidence,
     summary,
     phases: { first20, twenty40, forty60, sixty80 },
-    edges: { left, right, middle },
+    edges: {
+      left: left.text,
+      right: right.text,
+      middle,
+      leftConfidence: left.confidence,
+      rightConfidence: right.confidence,
+    },
     betting: { winnerLean, marginLean, totalLean, tryscorerLean },
     earlyNote: mode === "early"
       ? "Early model — player-specific script updates after Tuesday 7pm team lists."
@@ -170,31 +188,67 @@ function build6080(w: string, _l: string, mg: number, engine: DeterministicInsig
   return `Tight finish projected — 1-12 margin is the value lane, blowout angles fade.`;
 }
 
+type EdgeInfo = { name: string | null; jerseyOk: boolean };
+
 function buildEdge(
   side: "left" | "right",
   inp: EngineInputs,
+  mode: ModelMode,
   winnerNick: string,
   winnerStats: TeamSeasonStats,
   loserStats: TeamSeasonStats,
-  homeName: string | null,
-  awayName: string | null,
+  homeEdge: EdgeInfo | null,
+  awayEdge: EdgeInfo | null,
   winnerHome: boolean,
   lineupReady: boolean,
-): string {
+  marketSupportsName: (n: string | null) => boolean,
+): { text: string; confidence: EdgeConfidence } {
   const homeAdvantage = winnerStats.scoringEfficiency >= loserStats.scoringEfficiency;
   const winningEdgeTeam = homeAdvantage ? (winnerHome ? inp.homeNickname : inp.awayNickname) : (winnerHome ? inp.awayNickname : inp.homeNickname);
   const dominant = winnerNick === winningEdgeTeam ? winnerNick : winnerNick;
-  const sideLabel = side === "left" ? "Left" : "Right";
+  const sideLabel = side === "left" ? "left" : "right";
 
   if (!lineupReady) {
-    return `${dominant}'s ${sideLabel.toLowerCase()} edge profiles as the stronger attacking lane on season scoring shape. Player-specific edge will update after team lists.`;
+    return {
+      text: `${dominant} project the stronger ${sideLabel}-edge attacking lane on season scoring shape — likely ${sideLabel}-edge route, but player-specific edge unconfirmed until team lists.`,
+      confidence: "proxy",
+    };
   }
-  const featuredName = winnerHome ? homeName : awayName;
-  const oppName = winnerHome ? awayName : homeName;
-  if (featuredName) {
-    return `${dominant} ${sideLabel.toLowerCase()} edge is the main attacking channel — ${featuredName} the headline anytime tryscorer route through that lane${oppName ? `, with ${oppName} the defensive matchup risk` : ""}.`;
+
+  const featured = winnerHome ? homeEdge : awayEdge;
+  const opp = winnerHome ? awayEdge : homeEdge;
+
+  // Jersey numbers missing/unusual on either side → fall back to role language only.
+  if (!featured || !featured.jerseyOk) {
+    return {
+      text: `${dominant}'s ${sideLabel} edge profiles as the stronger attacking lane on team shape. Player-specific edge route unclear — use team-shape only until the regular winger/centre pairing is confirmed.`,
+      confidence: "unclear",
+    };
   }
-  return `${dominant}'s ${sideLabel.toLowerCase()} edge has the stronger attacking lane on team profile — anytime tryscorer angle lives once the regular winger/centre pairing is confirmed.`;
+
+  const featuredName = featured.name;
+  const oppName = opp?.jerseyOk ? opp.name : null;
+  const supported = marketSupportsName(featuredName);
+
+  if (mode === "squad") {
+    return {
+      text: `${dominant} ${sideLabel} edge is the projected attacking channel — ${featuredName} a likely ${sideLabel}-edge tryscorer route on squad shape${oppName ? `, with ${oppName} the projected defensive matchup` : ""}. Not confirmed until player markets open.`,
+      confidence: "proxy",
+    };
+  }
+
+  if (supported) {
+    return {
+      text: `${dominant} ${sideLabel} edge is the main attacking channel — ${featuredName} the headline anytime tryscorer route through that lane${oppName ? `, with ${oppName} the defensive matchup risk` : ""}. Player markets back the edge read.`,
+      confidence: "market-supported",
+    };
+  }
+
+  // Market/final mode but no market support for the proxied player.
+  return {
+    text: `${dominant}'s ${sideLabel} edge is the projected scoring lane — ${featuredName} the proxy ${sideLabel}-edge route, but player odds do not back him strongly. Treat as speculative${oppName ? ` against ${oppName}` : ""}.`,
+    confidence: "proxy",
+  };
 }
 
 function buildMiddle(w: string, l: string, ws: TeamSeasonStats, ls: TeamSeasonStats, mg: number, projTotal: number): string {
@@ -220,13 +274,15 @@ function teamOr(inp: EngineInputs, nick: string): TeamSeasonStats {
 //   left edge  = #2 (LW), #3 (LC), #11 (left 2nd row)
 //   right edge = #5 (RW), #4 (RC), #12 (right 2nd row)
 // Returns the headline finisher (winger first, centre fallback) or null.
-function edgePlayerName(inp: EngineInputs, team: "home" | "away", side: "left" | "right"): string | null {
+function edgePlayer(inp: EngineInputs, team: "home" | "away", side: "left" | "right"): EdgeInfo {
   const squad = team === "home" ? inp.homeSquad : inp.awaySquad;
-  if (!squad || squad.length === 0) return null;
+  if (!squad || squad.length === 0) return { name: null, jerseyOk: false };
   const want = side === "left" ? [2, 3, 11] : [5, 4, 12];
+  // jerseyOk requires the proxy jerseys to actually be present on this squad
+  const present = want.some((n) => squad.some((x) => x.jerseyNumber === n));
   for (const n of want) {
     const p = squad.find((x) => x.jerseyNumber === n);
-    if (p) return `${p.firstName} ${p.lastName}`.trim();
+    if (p) return { name: `${p.firstName} ${p.lastName}`.trim(), jerseyOk: present };
   }
-  return null;
+  return { name: null, jerseyOk: false };
 }

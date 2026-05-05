@@ -18,6 +18,9 @@ import { findTeam } from "@/lib/teams";
 import { readSharedInsights, readAnySharedInsights, writeSharedInsights } from "./insights-store";
 import { getSeasonSnapshot } from "./season-stats";
 import { generateDeterministicInsights, type DeterministicInsights } from "./insights-engine";
+import { resolveModelMode, squadIsNamed } from "./model-mode";
+import { buildDeterministicBets } from "./bets-engine";
+import { indexSquads, isInSquad } from "./validate-picks";
 import { ensureAftermatch, getLastLessonForTeam, readAftermatch, type AftermatchPayload, type TeamLesson } from "./aftermatch";
 
 // In-flight generation lock — if multiple visitors hit the same uncached match

@@ -88,7 +88,7 @@ async function safeOdds(refresh?: boolean): Promise<{ data: OddsEvent[]; error: 
 
 async function safeTryscorers(eventId: string, refresh?: boolean): Promise<{ data: TryscorerMarkets | null; error: string | null }> {
   try {
-    const data = await cached(`tryscorers:${eventId}`, TTL.odds, () => fetchTryscorerOdds(eventId), { bypass: refresh });
+    const data = await cached(`tryscorers:${eventId}`, TTL.oddsTryscorer, () => fetchTryscorerOdds(eventId), { bypass: refresh });
     lastGoodTryscorers.set(eventId, { at: Date.now(), data });
     return { data, error: null };
   } catch (e) {
@@ -97,6 +97,17 @@ async function safeTryscorers(eventId: string, refresh?: boolean): Promise<{ dat
     if (prev) return { data: prev.data, error: msg };
     return { data: null, error: msg };
   }
+}
+
+// Tryscorer markets only get released by bookies ~24-48h before kickoff.
+// Skip the API call entirely for fixtures further out — saves significant quota
+// when users browse upcoming rounds.
+function tryscorerFetchAllowed(kickoffUtc: string): boolean {
+  const ko = Date.parse(kickoffUtc);
+  if (!Number.isFinite(ko)) return false;
+  const msUntil = ko - Date.now();
+  // Allow from 48h before kickoff through 4h after (covers in-play / just-finished).
+  return msUntil <= 48 * 60 * 60_000 && msUntil >= -4 * 60 * 60_000;
 }
 
 async function safeWeather(matchId: string, venue: string, city: string, kickoffUtc: string, refresh?: boolean): Promise<WeatherSnapshot | null> {
@@ -274,10 +285,11 @@ export const getMatchPage = createServerFn({ method: "GET" })
     const oddsError = oddsResult.error;
     const oddsStale = oddsResult.stale;
 
-    // Tryscorer markets — only attempt if we have an odds event matched.
+    // Tryscorer markets — only attempt if we have an odds event matched AND
+    // kickoff is within 48h (markets aren't released earlier; saves API quota).
     let tryscorers: TryscorerMarkets | null = null;
     let tryscorersError: string | null = null;
-    if (odds) {
+    if (odds && tryscorerFetchAllowed(details.kickoffUtc)) {
       const r = await safeTryscorers(odds.id, data.refresh);
       tryscorers = r.data;
       tryscorersError = r.error;
@@ -373,7 +385,7 @@ export const getMatchInsights = createServerFn({ method: "GET" })
           const eh = e.homeNickname; const ea = e.awayNickname;
           return (eh === homeNickC && ea === awayNickC) || (eh === awayNickC && ea === homeNickC);
         }) ?? null;
-        const tryscorersC = oddsC ? (await safeTryscorers(oddsC.id)).data : null;
+        const tryscorersC = (oddsC && tryscorerFetchAllowed(detailsForCheck.kickoffUtc)) ? (await safeTryscorers(oddsC.id)).data : null;
         const stored = await readFreshInsights(data.matchId, detailsForCheck, tryscorersC);
         if (
           stored &&
@@ -407,7 +419,7 @@ export const getMatchInsights = createServerFn({ method: "GET" })
         }) ?? null;
         const weather = await safeWeather(data.matchId, details.venue, details.venueCity, details.kickoffUtc);
         let tryscorers: TryscorerMarkets | null = null;
-        if (odds) {
+        if (odds && tryscorerFetchAllowed(details.kickoffUtc)) {
           const r = await safeTryscorers(odds.id);
           tryscorers = r.data;
         }

@@ -11,7 +11,7 @@ import type { Insights } from "./ai-insights";
 import type { DeterministicInsights, EnginePlayerPick } from "./insights-engine";
 
 const TABLE = "match_aftermatch";
-const VERSION = "v1";
+const VERSION = "v2";
 const GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
 const AI_MODEL = "google/gemini-2.5-flash";
 const AI_TIMEOUT_MS = 25_000;
@@ -285,7 +285,7 @@ async function summariseWithAI(payload: AftermatchPayload): Promise<string> {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), AI_TIMEOUT_MS);
   try {
-    const sys = "You are a sharp NRL analyst. In 2-3 short sentences, summarise where the pre-match insights matched the actual result and where they diverged. Be specific (cite markets, players, or score). Plain prose, no bullets, no headings, no betting hype, no emojis.";
+    const sys = "You are a sharp NRL analyst. Write 3-4 short sentences. First, summarise where the pre-match insights matched the actual result and where they diverged (cite markets, players, or score). Then end with one sentence beginning with 'Carry into this week:' that gives a concrete takeaway both teams in the upcoming fixture should heed based on the lessons. Plain prose, no bullets, no headings, no betting hype, no emojis.";
     const user = [
       `Match: ${payload.homeNickname} vs ${payload.awayNickname} — final ${payload.finalScore.home}-${payload.finalScore.away}.`,
       `Score: ${payload.scoreLine.hits}/${payload.scoreLine.total} predictions correct.`,
@@ -303,7 +303,7 @@ async function summariseWithAI(payload: AftermatchPayload): Promise<string> {
           { role: "user", content: user },
         ],
         temperature: 0.3,
-        max_tokens: 220,
+        max_tokens: 320,
       }),
     });
     if (!res.ok) return "";
@@ -335,8 +335,8 @@ export async function ensureAftermatch(args: {
   const summary = await summariseWithAI(built);
   built.summary = summary || (
     built.consistencies.length
-      ? `The model nailed ${built.scoreLine.hits} of ${built.scoreLine.total} key calls — strongest on ${built.consistencies[0].split(":")[0]}. ${built.inconsistencies[0] ?? ""}`.trim()
-      : `The model struggled this week (${built.scoreLine.hits}/${built.scoreLine.total} correct).`
+      ? `The model nailed ${built.scoreLine.hits} of ${built.scoreLine.total} key calls — strongest on ${built.consistencies[0].split(":")[0]}. ${built.inconsistencies[0] ?? ""} Carry into this week: weight the pattern that worked and stay cautious where the read missed.`.trim()
+      : `The model struggled this week (${built.scoreLine.hits}/${built.scoreLine.total} correct). Carry into this week: treat similar matchups with extra caution and lean on live signals before locking picks.`
   );
   await writeAftermatch(args.matchId, built);
   return built;

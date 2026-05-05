@@ -1138,9 +1138,6 @@ function GameScriptTab({ insights, insightsLoading, home, away }:
     <div className="space-y-4">
       <Card title="Game Script" icon={ScrollText} className="accent-glow">
         <div className="flex items-center gap-2 mb-3">
-          <TeamLogo themeKey={home.themeKey} name={home.nickName} size={22} />
-          <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">v</span>
-          <TeamLogo themeKey={away.themeKey} name={away.nickName} size={22} />
           <span className="ml-auto text-[10px] uppercase tracking-wider font-bold text-muted-foreground">
             {script.mode} · {script.confidence}
           </span>

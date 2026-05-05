@@ -489,7 +489,7 @@ export const getMatchInsights = createServerFn({ method: "GET" })
             (generated as unknown as { deterministic: DeterministicInsights }).deterministic = deterministic;
             // Always attach a script — retry generation if the first pass failed
             // so the Script tab never ends up missing the field on disk.
-            if (!scriptPayload) {
+            if (!scriptPayload && engineInputs) {
               try { scriptPayload = generateScript(engineInputs, deterministic); }
               catch (e) { console.warn("script-engine retry failed:", e); }
             }

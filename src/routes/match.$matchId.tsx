@@ -9,7 +9,7 @@ import {
   ArrowLeft, Clock, MapPin, Users, BarChart3, Sparkles,
   Trophy, Target, Flag, Crown, TrendingUp, AlertCircle, CloudSun, Calendar, Zap, Hourglass,
   ThumbsUp, ThumbsDown, Activity, Shield, Compass, Gauge, Check,
-  Receipt, X, Newspaper, History, GraduationCap,
+  Receipt, X, Newspaper, History, GraduationCap, ScrollText,
 } from "lucide-react";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -165,10 +165,11 @@ function MatchInner() {
       </section>
 
       {/* Tabs — icon-only on mobile, icon+label on sm+ */}
-      <nav className="mt-6 grid grid-cols-4 gap-1 p-1 glass" role="tablist">
+      <nav className={`mt-6 grid ${isFinished ? "grid-cols-5" : "grid-cols-5"} gap-1 p-1 glass`} role="tablist">
         <TabButton active={tab === "lineup"} onClick={() => setTab("lineup")} icon={Users} label="Lineup" />
         <TabButton active={tab === "stats"} onClick={() => setTab("stats")} icon={BarChart3} label="Stats" />
         <TabButton active={tab === "insights"} onClick={() => setTab("insights")} icon={Target} label="Insights" />
+        <TabButton active={tab === "script"} onClick={() => setTab("script")} icon={ScrollText} label="Script" />
         {isFinished ? (
           <TabButton active={tab === "aftermatch"} onClick={() => setTab("aftermatch")} icon={History} label="Aftermatch" />
         ) : (
@@ -192,6 +193,14 @@ function MatchInner() {
             tryscorersError={tryscorersError}
             odds={odds}
             lessons={lessons}
+          />
+        )}
+        {tab === "script" && (
+          <GameScriptTab
+            insights={insights}
+            insightsLoading={insightsLoading}
+            home={details.homeTeam}
+            away={details.awayTeam}
           />
         )}
         {tab === "bet" && !isFinished && (
@@ -1073,6 +1082,85 @@ type LadderRow = {
 type TeamLite = { nickName: string; themeKey: string };
 
 type TeamWithPlayers = TeamLite & { players?: { firstName: string; lastName: string; position: string }[] };
+
+/* ================= GAME SCRIPT TAB ================= */
+
+function GameScriptTab({ insights, insightsLoading, home, away }:
+  { insights: any; insightsLoading?: boolean; home: TeamWithPlayers; away: TeamWithPlayers }) {
+  if (insightsLoading && !insights) return <InsightsLoading />;
+  const script = insights?.script as
+    | { mode: string; confidence: string; summary: string;
+        phases: { first20: string; twenty40: string; forty60: string; sixty80: string };
+        edges: { left: string; right: string; middle: string };
+        betting: { winnerLean: string; marginLean: string; totalLean: string; tryscorerLean: string };
+        earlyNote?: string }
+    | undefined;
+  if (!script) return <Empty msg="Script unavailable — refresh in a moment." />;
+
+  const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
+    <div>
+      <div className="text-[10px] uppercase tracking-wider font-bold text-accent mb-1">{title}</div>
+      <p className="text-sm leading-relaxed text-foreground/90">{children}</p>
+    </div>
+  );
+
+  return (
+    <div className="space-y-4">
+      <Card title="Game Script" icon={ScrollText} className="accent-glow">
+        <div className="flex items-center gap-2 mb-3">
+          <TeamLogo themeKey={home.themeKey} name={home.nickName} size={22} />
+          <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">v</span>
+          <TeamLogo themeKey={away.themeKey} name={away.nickName} size={22} />
+          <span className="ml-auto text-[10px] uppercase tracking-wider font-bold text-muted-foreground">
+            {script.mode} · {script.confidence}
+          </span>
+        </div>
+        <p className="text-sm leading-relaxed text-foreground/90">{script.summary}</p>
+        {script.earlyNote && (
+          <p className="text-[11px] mt-3 italic text-muted-foreground border-l-2 border-accent/40 pl-2">{script.earlyNote}</p>
+        )}
+      </Card>
+
+      <Card title="Phase by phase" icon={Clock}>
+        <div className="space-y-4">
+          <Section title="First 20">{script.phases.first20}</Section>
+          <Section title="20–40">{script.phases.twenty40}</Section>
+          <Section title="40–60">{script.phases.forty60}</Section>
+          <Section title="60–80">{script.phases.sixty80}</Section>
+        </div>
+      </Card>
+
+      <Card title="Edges" icon={Compass}>
+        <div className="space-y-4">
+          <Section title="Left edge">{script.edges.left}</Section>
+          <Section title="Right edge">{script.edges.right}</Section>
+          <Section title="Middle">{script.edges.middle}</Section>
+        </div>
+      </Card>
+
+      <Card title="Betting translation" icon={Receipt} className="accent-glow">
+        <ul className="space-y-2 text-sm">
+          <li className="flex items-center justify-between gap-3 border-b border-border/50 pb-2">
+            <span className="text-muted-foreground">Winner lean</span>
+            <span className="font-bold">{script.betting.winnerLean}</span>
+          </li>
+          <li className="flex items-center justify-between gap-3 border-b border-border/50 pb-2">
+            <span className="text-muted-foreground">Margin lean</span>
+            <span className="font-bold">{script.betting.marginLean}</span>
+          </li>
+          <li className="flex items-center justify-between gap-3 border-b border-border/50 pb-2">
+            <span className="text-muted-foreground">Total lean</span>
+            <span className="font-bold">{script.betting.totalLean}</span>
+          </li>
+          <li className="flex items-center justify-between gap-3">
+            <span className="text-muted-foreground">Tryscorer lean</span>
+            <span className="font-bold text-right">{script.betting.tryscorerLean}</span>
+          </li>
+        </ul>
+      </Card>
+    </div>
+  );
+}
 
 function ScriptTab({ insights, insightsError, insightsLoading, home, away, homeRow, awayRow, tryscorers, odds }:
   { insights: any; insightsError: string | null; insightsLoading?: boolean; home: TeamWithPlayers; away: TeamWithPlayers;

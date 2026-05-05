@@ -22,7 +22,8 @@ import { resolveModelMode, squadIsNamed, squadSignature, modeAdvanced, type Mode
 import { buildDeterministicBets } from "./bets-engine";
 import { indexSquads, isInSquad } from "./validate-picks";
 import { ensureAftermatch, getLastLessonForTeam, readAftermatch, type AftermatchPayload, type TeamLesson } from "./aftermatch";
-import { fetchZylaLadder, fetchZylaFixtures, getZylaRequestCount } from "./zyla";
+import { fetchZylaLadder, getZylaRequestCount } from "./zyla";
+import { generateScript, type ScriptPayload } from "./script-engine";
 
 // Source tracking — surfaced in server logs and (where harmless) on payloads.
 export type DataSource = "nrl_com" | "zyla" | "mixed" | "proxy";
@@ -399,9 +400,10 @@ export const getMatchInsights = createServerFn({ method: "GET" })
 
         // ---- PRIMARY: deterministic stats engine. Runs always, no AI. ----
         let deterministic: DeterministicInsights | null = null;
+        let scriptPayload: ScriptPayload | null = null;
         try {
           const snap = await getSeasonSnapshot(season);
-          deterministic = generateDeterministicInsights({
+          const engineInputs = {
             homeNickname: details.homeTeam.nickName,
             awayNickname: details.awayTeam.nickName,
             homeThemeKey: details.homeTeam.themeKey,
@@ -415,7 +417,10 @@ export const getMatchInsights = createServerFn({ method: "GET" })
             venue: details.venue,
             mode: resolved.mode,
             confidence: resolved.confidence,
-          });
+          };
+          deterministic = generateDeterministicInsights(engineInputs);
+          try { scriptPayload = generateScript(engineInputs, deterministic); }
+          catch (e) { console.warn("script-engine failed:", e); }
         } catch (err) {
           console.warn("deterministic engine failed:", err);
         }
@@ -426,6 +431,7 @@ export const getMatchInsights = createServerFn({ method: "GET" })
         const awaySig = squadSignature(details.awayTeam.players);
         const minimalPayload = {
           deterministic,
+          script: scriptPayload,
           modelMode: resolved.mode,
           modelConfidence: resolved.confidence,
           squadSig: { home: homeSig, away: awaySig },
@@ -465,6 +471,9 @@ export const getMatchInsights = createServerFn({ method: "GET" })
           });
           if (deterministic) {
             (generated as unknown as { deterministic: DeterministicInsights }).deterministic = deterministic;
+            if (scriptPayload) {
+              (generated as unknown as { script: ScriptPayload }).script = scriptPayload;
+            }
             // Replace AI-built bets with the deterministic, mode-gated bets.
             generated.bets = buildDeterministicBets({
               engine: deterministic,

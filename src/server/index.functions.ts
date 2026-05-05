@@ -499,6 +499,18 @@ export const getMatchInsights = createServerFn({ method: "GET" })
         } as unknown as Insights;
         if (deterministic) {
           await writeSharedInsights(data.matchId, minimalPayload, insightsTtlMs(details.kickoffUtc));
+          // Lock the prediction snapshot before kickoff (insert-only — never
+          // overwrites an existing locked row).
+          try {
+            await snapshotPrediction(buildSnapshotRow({
+              matchId: data.matchId,
+              details,
+              insights: deterministic,
+              script: scriptPayload,
+              odds,
+              tryscorers,
+            }));
+          } catch (e) { console.warn("snapshotPrediction failed:", e); }
         }
 
         // ---- Skip AI entirely in EARLY mode (no squads → no narrative value) ----

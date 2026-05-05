@@ -71,6 +71,7 @@ function MatchInner() {
   const insightsQ = useQuery({
     ...insightsQO(matchId),
     initialData: (data as any).insights ? { insights: (data as any).insights, insightsError: null } : undefined,
+    staleTime: (data as any).insights?.script ? 60 * 60_000 : 0,
   });
   const insights = insightsQ.data?.insights ?? null;
   const insightsError = insightsQ.data?.insightsError ?? (insightsQ.error as Error | null)?.message ?? null;

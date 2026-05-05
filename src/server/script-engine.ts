@@ -274,13 +274,15 @@ function teamOr(inp: EngineInputs, nick: string): TeamSeasonStats {
 //   left edge  = #2 (LW), #3 (LC), #11 (left 2nd row)
 //   right edge = #5 (RW), #4 (RC), #12 (right 2nd row)
 // Returns the headline finisher (winger first, centre fallback) or null.
-function edgePlayerName(inp: EngineInputs, team: "home" | "away", side: "left" | "right"): string | null {
+function edgePlayer(inp: EngineInputs, team: "home" | "away", side: "left" | "right"): EdgeInfo {
   const squad = team === "home" ? inp.homeSquad : inp.awaySquad;
-  if (!squad || squad.length === 0) return null;
+  if (!squad || squad.length === 0) return { name: null, jerseyOk: false };
   const want = side === "left" ? [2, 3, 11] : [5, 4, 12];
+  // jerseyOk requires the proxy jerseys to actually be present on this squad
+  const present = want.some((n) => squad.some((x) => x.jerseyNumber === n));
   for (const n of want) {
     const p = squad.find((x) => x.jerseyNumber === n);
-    if (p) return `${p.firstName} ${p.lastName}`.trim();
+    if (p) return { name: `${p.firstName} ${p.lastName}`.trim(), jerseyOk: present };
   }
-  return null;
+  return { name: null, jerseyOk: false };
 }

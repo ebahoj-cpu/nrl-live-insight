@@ -8,6 +8,7 @@ import { fetchNrlOdds, fetchTryscorerOdds } from "@/server/odds";
 import { findTeam } from "@/lib/teams";
 import { getSeasonSnapshot } from "@/server/season-stats";
 import { generateDeterministicInsights } from "@/server/insights-engine";
+import { resolveModelMode, squadIsNamed } from "@/server/model-mode";
 import { writeSharedInsights } from "@/server/insights-store";
 import { fetchVenueWeather } from "@/server/weather";
 import { insightsTtlMs } from "@/server/cache";

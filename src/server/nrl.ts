@@ -337,6 +337,10 @@ export type NrlMatchRecap = {
   awayScore: number | null;
   homeTryscorers: { name: string; count: number }[];
   awayTryscorers: { name: string; count: number }[];
+  // Ordered list of tries in scoring order (used to identify first tryscorer
+  // and broad scoring pattern).
+  tryOrder: { name: string; team: "home" | "away"; minute: number | null }[];
+  firstTry: { name: string; team: "home" | "away" } | null;
 };
 
 export async function fetchMatchRecap(matchUrl: string): Promise<NrlMatchRecap | null> {

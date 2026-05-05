@@ -2005,14 +2005,14 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
             </span>
           ) : null}
         </div>
-        <p className="text-sm leading-relaxed text-foreground/90">{det.matchWinner?.reasoning}</p>
+        <p className="font-chat text-sm leading-relaxed text-foreground/90">{det.matchWinner?.reasoning}</p>
       </Card>
 
       {/* 2 — Winning Margin */}
       <Card title="Winning margin" icon={Gauge}>
         <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Projected margin band</div>
         <div className="text-2xl font-black mb-2 text-accent">{det.margin?.bucket}</div>
-        <p className="text-sm leading-relaxed text-foreground/90">{det.margin?.reasoning}</p>
+        <p className="font-chat text-sm leading-relaxed text-foreground/90">{det.margin?.reasoning}</p>
       </Card>
 
       {/* 3 — Predicted Score */}
@@ -2032,7 +2032,7 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
             <div className="text-[11px] font-bold truncate max-w-[100px]">{away.nickName}</div>
           </div>
         </div>
-        <p className="text-sm leading-relaxed text-foreground/90">{det.predictedScore?.reasoning}</p>
+        <p className="font-chat text-sm leading-relaxed text-foreground/90">{det.predictedScore?.reasoning}</p>
       </Card>
 
       {/* 4 — Total Points (Over/Under) */}

@@ -117,5 +117,12 @@
 }
 .kbd { font-feature-settings: "tnum"; font-variant-numeric: tabular-nums; }
 
+/* Use the Scout chat font for explanations / supporting copy. Headings and
+   numerics keep the default Inter family. */
+.text-muted-foreground,
+[class*="text-muted-foreground"] {
+  font-family: var(--font-chat);
+}
+
 @keyframes spin-slow { to { transform: rotate(360deg); } }
 .animate-spin-slow { animation: spin-slow 1.2s linear infinite; }

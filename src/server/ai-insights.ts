@@ -244,6 +244,10 @@ export type MatchSimulation = {
 };
 
 export type Insights = {
+  // Timing-aware mode + confidence label, surfaced so UI can show "Early model"
+  // / "Squad model" / "Market model" / "Final model" badges without changing layout.
+  modelMode?: "early" | "squad" | "market" | "final";
+  modelConfidence?: "low" | "medium" | "high";
   intelligence: MatchIntelligence;
   simulation: MatchSimulation;
   predictedScore: { home: number; away: number };

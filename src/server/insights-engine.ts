@@ -17,6 +17,7 @@ import type { SeasonSnapshot, TeamSeasonStats, PlayerSeasonStats } from "./seaso
 import { getTeam, getTeamPlayers } from "./season-stats";
 import type { NrlLadderRow, NrlPlayer } from "./nrl";
 import type { TryscorerMarkets } from "./odds";
+import type { ModelMode, ModelConfidence } from "./model-mode";
 
 export type EngineInputs = {
   homeNickname: string;
@@ -30,6 +31,10 @@ export type EngineInputs = {
   weather?: { tempC: number; condition: string; windKph: number; precipMm: number; groundCondition: string } | null;
   tryscorers?: TryscorerMarkets | null;
   venue?: string;
+  // Timing-aware mode. Defaults to "final" for back-compat with callers that
+  // haven't been updated yet, but new callers should always pass it.
+  mode?: ModelMode;
+  confidence?: ModelConfidence;
 };
 
 export type EnginePlayerPick = {
@@ -42,6 +47,9 @@ export type EnginePlayerPick = {
 
 export type DeterministicInsights = {
   generatedAt: string;
+  // Timing-aware mode this payload was generated under.
+  mode: ModelMode;
+  confidence: ModelConfidence;
   // 1
   matchWinner: { team: "home" | "away"; nickname: string; reasoning: string };
   // 2
@@ -77,6 +85,8 @@ export type DeterministicInsights = {
 // ---------- Public API ----------
 
 export function generateDeterministicInsights(inp: EngineInputs): DeterministicInsights {
+  const mode: ModelMode = inp.mode ?? "final";
+  const confidence: ModelConfidence = inp.confidence ?? (mode === "early" ? "low" : mode === "squad" ? "medium" : "high");
   const home = getTeamOrSynthetic(inp.snapshot, inp.homeNickname);
   const away = getTeamOrSynthetic(inp.snapshot, inp.awayNickname);
   const homeLadder = inp.ladder.find((r) => r.nickname.toLowerCase() === inp.homeNickname.toLowerCase()) ?? null;
@@ -142,7 +152,8 @@ export function generateDeterministicInsights(inp: EngineInputs): DeterministicI
   const htft = computeHtFt(inp.homeNickname, inp.awayNickname, home, away, winnerSide, projectedMargin);
 
   // ---- Player engine: try-scoring ranking ----
-  const ranking = rankTryscorers(inp, home, away, winnerSide, projectedMargin);
+  // EARLY mode: no squads → no tryscorer picks. Return placeholder cards.
+  const ranking = mode === "early" ? [] : rankTryscorers(inp, home, away, winnerSide, projectedMargin);
   const top5 = ranking.slice(0, 5);
   const homeRanked = ranking.filter((r) => r.team.toLowerCase() === inp.homeNickname.toLowerCase()).slice(0, 3);
   const awayRanked = ranking.filter((r) => r.team.toLowerCase() === inp.awayNickname.toLowerCase()).slice(0, 3);
@@ -204,12 +215,18 @@ export function generateDeterministicInsights(inp: EngineInputs): DeterministicI
 
   return {
     generatedAt: new Date().toISOString(),
+    mode,
+    confidence,
     matchWinner,
     margin,
     predictedScore,
     totalPoints,
     htft,
-    firstTryscorer: stripInternal(firstPick, "First-touch threat — opening-set carries and short-side strike role keep the early try in their lane."),
+    // First tryscorer requires market-grade signal (player odds released).
+    // In early/squad mode, surface a placeholder so the UI never invents a name.
+    firstTryscorer: (mode === "market" || mode === "final")
+      ? stripInternal(firstPick, "First-touch threat — opening-set carries and short-side strike role keep the early try in their lane.")
+      : stripInternal(undefined, "Awaiting market — first tryscorer locked until bookies release player odds."),
     rankedTryscorers: {
       first: stripInternal(ranked123[0], "First scorer of the match — opening sets and edge usage favour an early involvement."),
       second: stripInternal(ranked123[1], "Second-try profile — secondary attacking lane in the opening half hour."),
@@ -280,16 +297,15 @@ function rankTryscorers(inp: EngineInputs, home: TeamSeasonStats, away: TeamSeas
   const rows: RankedRow[] = [];
 
   const considerSquad = (squad: NrlPlayer[], teamNick: string, teamSeason: TeamSeasonStats, oppSeason: TeamSeasonStats, isWinner: boolean, byId: Map<number, PlayerSeasonStats>, byName: Map<string, PlayerSeasonStats>) => {
-    // Squad may be empty for upcoming fixtures (team lists not announced yet).
-    // Fall back to: every season player on this team regardless of named squad.
-    const candidates = squad.length > 0
-      ? squad.map((p) => {
-          const pid = (p as any).playerId as number | undefined;
-          // We don't have playerId on the NrlPlayer type; match by name
-          const seasonRow = byName.get(normName(`${p.firstName} ${p.lastName}`)) ?? (pid ? byId.get(pid) : undefined);
-          return { name: `${p.firstName} ${p.lastName}`.trim(), position: p.position || seasonRow?.position || "", season: seasonRow };
-        })
-      : Array.from(byName.values()).map((s) => ({ name: s.name, position: s.position, season: s }));
+    // Hard rule: never produce tryscorer picks for a team without a named squad.
+    // The mode gate above already skips this in EARLY mode; this guards SQUAD+
+    // calls where one side's lineup hasn't dropped yet.
+    if (squad.length === 0) return;
+    const candidates = squad.map((p) => {
+      const pid = (p as any).playerId as number | undefined;
+      const seasonRow = byName.get(normName(`${p.firstName} ${p.lastName}`)) ?? (pid ? byId.get(pid) : undefined);
+      return { name: `${p.firstName} ${p.lastName}`.trim(), position: p.position || seasonRow?.position || "", season: seasonRow };
+    });
 
     for (const c of candidates) {
       const s = c.season;

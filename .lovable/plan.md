@@ -1,93 +1,143 @@
+# Timing-Aware Prediction System
 
-The user reaffirmed the same token string. I cannot test it from chat mode (read-only), but I can plan the build and verify the token via a server function as the very first implementation step. If the token still 401s in default mode, I'll surface "Live data unavailable" everywhere and stop — per the no-fake-data rule.
+No UI redesign. Tabs (Lineups → Stats → Insights → Script → Bets) stay the same. All work is in `src/server/*` and the data the existing components read.
 
-## Plan: Build LINEBREAK – NRL Betting Insights
+---
 
-### Step 1 — Verify ZylaLabs token (first thing in default mode)
-- Hit `/5577/fixture?season=2026&round=1`, `/5576/ladder?season=2026`, `/5578/match+details?match_id=...` from a server function with `Authorization: Bearer $ZYLA_NRL_TOKEN`.
-- Try a few base URLs (`zylalabs.com/api/...`) and document the working shape.
-- If still 401: stop and report back. No mock data.
+## 1. Add a `model_mode` per match
 
-### Step 2 — Server functions (all in `src/server/`)
-Each uses 15-min in-memory cache + manual bypass via `?refresh=1`:
-- `getCurrentRound()` — derives round from today using NZ time + fixture probing. Auto-rolls Sun 23:59 Pacific/Auckland.
-- `getFixtures(round)` — Zyla `/5577/fixture`.
-- `getMatchDetails(matchId)` — Zyla `/5578/match+details`.
-- `getLadder()` — Zyla `/5576/ladder`.
-- `getOdds()` — The Odds API `americanfootball_nrl` / `rugbyleague_nrl` H2H. Cached, refreshed on demand.
-- `getTeamAssets(teamName)` — TheSportsDB lookup for logo (free tier OK for logos via team search).
-- `getPlayerHeadshot(playerName, teamId)` — TheSportsDB; falls back to initial avatar.
-- `generateBettingInsights(matchData)` — Lovable AI Gateway (`google/gemini-2.5-flash`) with structured JSON schema: predicted score, win %, O/U, HT/FT, anytime try scorers, first try scorer — each with reasoning + confidence.
+New file `src/server/model-mode.ts`:
 
-All return `{ data, error }`. UI shows "Live data unavailable" on error. No partial fakery.
+```ts
+export type ModelMode = "early" | "squad" | "market" | "final";
 
-### Step 3 — Routes
-```text
-src/routes/
-  __root.tsx          # Header + QueryClientProvider + refresh button (top-right)
-  index.tsx           # Current round fixtures
-  match.$matchId.tsx  # Full match analytics
+export function resolveModelMode(args: {
+  kickoffUtc: string;
+  hasSquads: boolean;        // both squads have ≥13 named players
+  hasPlayerOdds: boolean;    // tryscorers.hasAny === true
+}): { mode: ModelMode; confidence: "low" | "medium" | "high" };
 ```
 
-### Step 4 — Homepage (`/`)
-- Header: LINEBREAK logo, "Round X", refresh button (top-right, triggers re-fetch + odds refresh).
-- Grid of match cards: team logos, names, kickoff time (NZ), venue, weather (icon/temp/wind from match details), H2H odds, "Updated Xm ago".
-- Card → `/match/$matchId`.
+Rules:
+- `final` — kickoff in <60 min AND hasSquads.
+- `market` — hasPlayerOdds AND hasSquads.
+- `squad` — hasSquads only.
+- `early` — otherwise.
 
-### Step 5 — Match page (`/match/$matchId`)
-1. **Header** — teams, logos, venue, weather, odds, last updated.
-2. **Team Lists** — current squad from match details, side-by-side, key outs flagged.
-3. **Stats** — W/L, last 5, PF/PA, H2H (from ladder + recent fixtures).
-4. **Game Script** — AI-generated tactical breakdown.
-5. **Betting Insights** — AI predictions with reasoning + confidence %.
+Confidence: early=low, squad=medium, market=high, final=high.
 
-### Step 6 — Refresh system
-- Top-right refresh button in `__root.tsx` calls `queryClient.invalidateQueries()`.
-- Auto-refetch on app open + route change (TanStack Query `refetchOnMount`).
-- 15-min stale time.
+Surface it on the `Insights` payload so the existing match page can read `insights.modelMode` (and feed it to bets/insights/script renderers without changing layout).
 
-### Step 7 — Validation guards
-Before render: assert team names are in the canonical 17-team NRL list. Drop/error otherwise.
+---
 
-### Step 8 — UI / Theme
-- Black `#0A0A0A`, white, grey scale, accent green `#00D26A`.
-- Tailwind v4 tokens in `src/styles.css`. Mobile-first. Premium typography (Inter / SF-style stack).
-- Loading skeletons; error states say "Live data unavailable".
+## 2. Engine rewrite: gate outputs by mode
 
-### Tech notes
-- Need to add **`ODDS_API_KEY`** secret too (already present per secrets list ✓).
-- `LOVABLE_API_KEY` for AI Gateway ✓.
-- TheSportsDB logos work on free tier (`key=3` test key) — no secret needed for logo lookups.
-- All Zyla/Odds/AI calls server-only; tokens never reach the browser.
+Edit `src/server/insights-engine.ts`:
 
-### Open question
-The `13463|TIO94...` string you pasted is identical to the token from earlier when probing returned 401 Unauthenticated. Two possibilities:
-1. The token is correct but Zyla's plan needed reactivating (which you did) — it'll now work.
-2. The token format `<id>|<secret>` is wrong and Zyla actually expects only the part after `|`.
+- Accept `mode: ModelMode` in `EngineInputs`.
+- **Always compute**: winner, margin (1–12 / 13+), predicted score, total points (over/under against ref line), HT/FT.
+- **Tryscorer ranker** (`rankTryscorers`):
+  - `early`: return `[]`. Any tryscorer card returns `{ name: "Awaiting team list", … }` with low confidence.
+  - `squad`: only allow positions 1–5, 11–14 from named squads; cap at 5 picks; never produce a "first tryscorer" pick (return placeholder).
+  - `market`: include odds floor; produce first tryscorer + 1st/2nd/3rd; require player exists in named squad before emitting.
+  - `final`: full ranker as today, with stronger weight on live odds.
+- Hard rule (added in `considerSquad`): `if (mode !== "early" && squad.length === 0) return;` — never fall back to "all season players" when squads are missing.
 
-I'll test both formats in Step 1. If both 401, I'll stop and ask you to paste the exact `curl` command (including headers) from the Zyla "Test Endpoint" page so I can match it byte-for-byte.
+Total points formula already matches the brief; reaffirm:
+`expected = (avg(home PF, away PA) + avg(away PF, home PA))` then compare to bookie line if present, else season ref line.
 
-### Files I'll create
-```text
-src/server/zyla.ts
-src/server/odds.ts
-src/server/sportsdb.ts
-src/server/ai-insights.ts
-src/server/cache.ts
-src/server/round.ts
-src/server/index.functions.ts   # all createServerFn wrappers
-src/lib/teams.ts                # canonical NRL team list + name normalization
-src/components/MatchCard.tsx
-src/components/TeamLogo.tsx
-src/components/PlayerCard.tsx
-src/components/RefreshButton.tsx
-src/components/WeatherBadge.tsx
-src/components/OddsDisplay.tsx
-src/components/InsightCard.tsx
-src/routes/__root.tsx           # update
-src/routes/index.tsx            # replace
-src/routes/match.$matchId.tsx   # new
-src/styles.css                  # theme tokens
+Margin: `1–12` if `|projectedMargin| < 13`, else `13+`. No other buckets.
+
+---
+
+## 3. Bet engine: 4 risk tiers, max 8 bets, no duplicates
+
+Replace the current bet-build path inside `src/server/ai-insights.ts` (and any local fallback) with a deterministic builder that consumes the engine output.
+
+New file `src/server/bets-engine.ts`:
+
+```ts
+buildBets(engine, odds, mode): BetPlay[]
 ```
 
-Approve and I'll start with the token verification, then build top-to-bottom.
+Tier rules:
+- `low` (always): Match Winner, Over/Under (2 separate single-leg bets).
+- `medium` (always): Margin 1–12 OR 13+ (single bet — never duplicate winner).
+- `high` (squad+): up to 3 anytime tryscorers as singles; market mode adds first tryscorer single.
+- `ultra` (market/final only): ONE small multi, max 3 legs, picked from existing tier picks (winner + total + 1 tryscorer). No 6-leg defaults.
+
+Cap total bets at 8. Skip any tier whose data isn't available in the current mode (e.g. no high/ultra in `early`).
+
+Each bet carries `legCount`, `hitRateScore` (derived from confidence), and `scriptAlignment` — already in the `BetPlay` type, just populated deterministically.
+
+---
+
+## 4. AI insights: short, structured, never blocking
+
+In `src/server/ai-insights.ts`:
+
+- Pass `mode` + the deterministic engine result into the prompt; instruct the model to **only narrate**, never invent players or markets.
+- Replace verbose Insights tab payload with the structure the brief calls for:
+  - `prediction`: { winner, margin, total } — pulled straight from engine.
+  - `why`: max 3 short lines.
+  - `keyStat`: optional single line.
+- Keep existing `Insights` type shape so the UI still renders, but populate the heavy fields (`matchOverview`, `gameScript`, etc.) from the engine when AI fails or is skipped.
+- Behaviour on AI failure / timeout (already has fallback path): always return a stats-based deterministic payload — never throw, never leave the Insights tab spinning.
+- In `early` mode skip the AI call entirely (deterministic-only) — saves time and avoids fabricated tryscorer prose.
+
+---
+
+## 5. Script tab: rebuild around 3 edges
+
+Within the existing `scriptAnalyst` block in `Insights`, repurpose three cards:
+
+- `leftEdge` / `rightEdge` / `middle`, each with `{ advantage: "home" | "away" | "even", why: string, betIdea: string }`.
+- Derived deterministically from team `scoringEfficiency`, `triesFor/Against`, ladder, plus tryscorer positions when available. AI just polishes copy.
+
+The Script tab component already reads from `insights.scriptAnalyst`; add the three fields and render them in the existing card shells. No layout change.
+
+---
+
+## 6. Cache + precompute
+
+`src/routes/api/public/hooks/precompute-insights.ts` already exists. Update it to:
+
+- Recompute on data-source changes (squads released, odds released, T-60min).
+- Store `modelMode` alongside payload in `match_insights`.
+- On read, if cached `modelMode` is older than current resolved mode, regenerate; otherwise serve cached.
+
+Use existing `insightsTtlMs` shape but add a fast-path invalidation when mode advances.
+
+---
+
+## 7. Validation rules wired in one place
+
+Add `src/server/validate-picks.ts`:
+
+- `assertPlayerInSquad(name, squad)` — used by both engine and AI normaliser.
+- Strip any AI-returned tryscorer / playmaker name not in the named squad.
+- Strip any bet leg whose pick references a stripped player.
+
+This is the single guardrail that satisfies "NEVER suggest players not in lineup".
+
+---
+
+## 8. Files touched
+
+- new: `src/server/model-mode.ts`, `src/server/bets-engine.ts`, `src/server/validate-picks.ts`
+- edit: `src/server/insights-engine.ts` (mode gating, tryscorer rules)
+- edit: `src/server/ai-insights.ts` (prompt slimming, mode-aware skip, stats fallback, bet builder swap)
+- edit: `src/server/normalise-insights.ts` (run pick validator, enforce 8-bet cap, drop duplicate-logic bets)
+- edit: `src/server/insights-store.ts` (persist `modelMode`, mode-advance invalidation)
+- edit: `src/routes/api/public/hooks/precompute-insights.ts` (trigger on mode change)
+- edit: `src/routes/match.$matchId.tsx` — minimal: read `insights.modelMode` to label confidence on the existing badges (no layout change).
+
+---
+
+## 9. Acceptance checks (run after build)
+
+1. Fixture with no squads → mode `early`; bets list contains only Winner + Over/Under + Margin; tryscorer cards show "Awaiting team list".
+2. Fixture with squads, no player odds → mode `squad`; tryscorer cards populated only with named squad members; no first tryscorer; ≤8 bets, no multis.
+3. Fixture with player odds → mode `market`; first tryscorer + 1st/2nd/3rd present; one ≤3-leg multi appears in `ultra`.
+4. Force AI failure (env unset) → Insights tab still renders deterministic copy; no infinite spinner.
+5. Spot-check three matches: every player name in bets/tryscorers exists in `homeSquad ∪ awaySquad`.

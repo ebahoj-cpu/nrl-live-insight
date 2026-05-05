@@ -18,6 +18,9 @@ import { findTeam } from "@/lib/teams";
 import { readSharedInsights, readAnySharedInsights, writeSharedInsights } from "./insights-store";
 import { getSeasonSnapshot } from "./season-stats";
 import { generateDeterministicInsights, type DeterministicInsights } from "./insights-engine";
+import { resolveModelMode, squadIsNamed } from "./model-mode";
+import { buildDeterministicBets } from "./bets-engine";
+import { indexSquads, isInSquad } from "./validate-picks";
 import { ensureAftermatch, getLastLessonForTeam, readAftermatch, type AftermatchPayload, type TeamLesson } from "./aftermatch";
 
 // In-flight generation lock — if multiple visitors hit the same uncached match
@@ -332,6 +335,11 @@ export const getMatchInsights = createServerFn({ method: "GET" })
           tryscorers = r.data;
         }
 
+        // ---- Resolve timing-aware mode ----
+        const hasSquads = squadIsNamed(details.homeTeam.players) && squadIsNamed(details.awayTeam.players);
+        const hasPlayerOdds = !!tryscorers?.hasAny;
+        const resolved = resolveModelMode({ kickoffUtc: details.kickoffUtc, hasSquads, hasPlayerOdds });
+
         // ---- PRIMARY: deterministic stats engine. Runs always, no AI. ----
         let deterministic: DeterministicInsights | null = null;
         try {
@@ -348,6 +356,8 @@ export const getMatchInsights = createServerFn({ method: "GET" })
             weather,
             tryscorers,
             venue: details.venue,
+            mode: resolved.mode,
+            confidence: resolved.confidence,
           });
         } catch (err) {
           console.warn("deterministic engine failed:", err);
@@ -355,9 +365,18 @@ export const getMatchInsights = createServerFn({ method: "GET" })
 
         // Persist deterministic-only payload IMMEDIATELY so the Insights tab
         // becomes available even if AI enrichment below fails or times out.
-        const minimalPayload = { deterministic } as unknown as Insights;
+        const minimalPayload = {
+          deterministic,
+          modelMode: resolved.mode,
+          modelConfidence: resolved.confidence,
+        } as unknown as Insights;
         if (deterministic) {
           await writeSharedInsights(data.matchId, minimalPayload, insightsTtlMs(details.kickoffUtc));
+        }
+
+        // ---- Skip AI entirely in EARLY mode (no squads → no narrative value) ----
+        if (resolved.mode === "early") {
+          return deterministic ? minimalPayload : null;
         }
 
         // ---- SECONDARY: AI enrichment for Script tab. Best-effort. ----
@@ -386,7 +405,22 @@ export const getMatchInsights = createServerFn({ method: "GET" })
           });
           if (deterministic) {
             (generated as unknown as { deterministic: DeterministicInsights }).deterministic = deterministic;
+            // Replace AI-built bets with the deterministic, mode-gated bets.
+            generated.bets = buildDeterministicBets({
+              engine: deterministic,
+              realOdds,
+              homeNickname: details.homeTeam.nickName,
+              awayNickname: details.awayTeam.nickName,
+              mode: resolved.mode,
+            });
+            // Scrub any AI-named tryscorer not in the named squads.
+            const idx = indexSquads(details.homeTeam.players, details.awayTeam.players);
+            if (Array.isArray(generated.anytimeTryscorers)) {
+              generated.anytimeTryscorers = generated.anytimeTryscorers.filter((p) => isInSquad(p.pick, idx));
+            }
           }
+          generated.modelMode = resolved.mode;
+          generated.modelConfidence = resolved.confidence;
           await writeSharedInsights(data.matchId, generated, insightsTtlMs(details.kickoffUtc));
           return generated;
         } catch (err) {

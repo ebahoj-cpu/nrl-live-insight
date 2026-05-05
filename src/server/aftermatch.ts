@@ -524,6 +524,11 @@ export async function ensureAftermatch(args: {
   built.summary = summary || buildFallbackSummary(built);
 
   await writeAftermatch(args.matchId, built);
+  // Score the locked pre-kickoff prediction snapshot (idempotent — only runs
+  // once per match because both result + score rows are insert-only).
+  try {
+    await recordResultAndScore({ matchId: args.matchId, details: args.details, recap: args.recap });
+  } catch (e) { console.warn("recordResultAndScore failed:", e); }
   return built;
 }
 

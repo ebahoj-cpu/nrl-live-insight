@@ -152,7 +152,8 @@ export function generateDeterministicInsights(inp: EngineInputs): DeterministicI
   const htft = computeHtFt(inp.homeNickname, inp.awayNickname, home, away, winnerSide, projectedMargin);
 
   // ---- Player engine: try-scoring ranking ----
-  const ranking = rankTryscorers(inp, home, away, winnerSide, projectedMargin);
+  // EARLY mode: no squads → no tryscorer picks. Return placeholder cards.
+  const ranking = mode === "early" ? [] : rankTryscorers(inp, home, away, winnerSide, projectedMargin);
   const top5 = ranking.slice(0, 5);
   const homeRanked = ranking.filter((r) => r.team.toLowerCase() === inp.homeNickname.toLowerCase()).slice(0, 3);
   const awayRanked = ranking.filter((r) => r.team.toLowerCase() === inp.awayNickname.toLowerCase()).slice(0, 3);

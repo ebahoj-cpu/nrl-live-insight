@@ -85,7 +85,7 @@ function MatchInner() {
 
   return (
     <div className="pt-6">
-      <Link to="/" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-4">
+      <Link to="/" search={{ round: undefined }} className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-4">
         <ArrowLeft className="h-4 w-4" /> Back to fixtures
       </Link>
 

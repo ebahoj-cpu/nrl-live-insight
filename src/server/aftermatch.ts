@@ -142,6 +142,7 @@ export function buildDeterministicAftermatch(args: {
 }): AftermatchPayload | null {
   const { details, recap, insights } = args;
   const det = (insights as unknown as { deterministic?: DeterministicInsights } | null)?.deterministic ?? null;
+  const script = (insights as unknown as { script?: import("./script-engine").ScriptPayload } | null)?.script ?? null;
 
   const homeScore = details.homeTeam.score;
   const awayScore = details.awayTeam.score;

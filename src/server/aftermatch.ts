@@ -288,6 +288,87 @@ export function buildDeterministicAftermatch(args: {
     }
   }
 
+  // ---------- Build structured comparison block ----------
+  const predTotalLine = det?.totalPoints?.line ?? null;
+  const predTotalLean = det?.totalPoints?.lean ?? null;
+  const totalCorrect: boolean | null = predTotalLine != null && predTotalLean
+    ? ((predTotalLean === "over" && actualTotal > predTotalLine) || (predTotalLean === "under" && actualTotal <= predTotalLine))
+    : null;
+
+  const ph = det?.predictedScore?.home;
+  const pa = det?.predictedScore?.away;
+  const combinedError = (typeof ph === "number" && typeof pa === "number")
+    ? Math.abs(ph - homeScore) + Math.abs(pa - awayScore) : null;
+
+  // Tempo from actual: total points relative to predicted line, fallback 42
+  const tempoLine = predTotalLine ?? 42;
+  const actualTempo: "slow" | "controlled" | "open" =
+    actualTotal >= tempoLine + 8 ? "open" : actualTotal <= tempoLine - 8 ? "slow" : "controlled";
+  const predTempo: "slow" | "controlled" | "open" | null = predTotalLean === "over"
+    ? "open" : predTotalLean === "under" ? "slow" : (predTotalLean ? "controlled" : null);
+
+  const actualFlow: "tight" | "blowout" = actualMargin >= 13 ? "blowout" : "tight";
+  const predFlow: "tight" | "blowout" | null = det?.margin?.bucket
+    ? (det.margin.bucket === "13+" ? "blowout" : "tight") : null;
+
+  // Dominant team = projected winner from script/det
+  const predDominant = det?.matchWinner?.nickname ?? null;
+  const actualDominant = actualWinnerNick === "Draw" ? "Draw" : actualWinnerNick;
+
+  // Edge prediction: from script edges (left/right confidence) — pick the side
+  // whose confidence is "market-supported" else the projected one. Actual edge
+  // not reliably parseable, so left null unless tryscorer landed in named edge
+  const predEdge: "left" | "right" | "middle" | null = script
+    ? (script.edges.leftConfidence === "market-supported" ? "left"
+       : script.edges.rightConfidence === "market-supported" ? "right" : null)
+    : null;
+
+  // First try
+  const actualFirstTry = recap?.firstTry?.name ?? null;
+  const firstPredName = pickName(det?.firstTryscorer);
+  const firstCorrect = !!(firstPredName && actualFirstTry && normName(firstPredName) === normName(actualFirstTry));
+
+  const namedHits = [...byPlayer.values()].filter((p) => p.scored >= 1)
+    .map((p) => ({ name: p.name, scored: p.scored }));
+  const namedMisses = [...byPlayer.values()].filter((p) => p.scored === 0).map((p) => p.name);
+
+  const comparison: AftermatchComparison = {
+    team: {
+      winner: { predicted: det?.matchWinner?.nickname ?? "—", actual: actualWinnerNick, correct: !!(det?.matchWinner?.nickname && det.matchWinner.nickname === actualWinnerNick) },
+      margin: {
+        predicted: String(det?.margin?.bucket ?? "—").replace("–", "-"),
+        actual: actualMargin === 0 ? "Draw" : actualMargin <= 12 ? "1-12" : "13+",
+        actualMargin,
+        correct: !!(det?.margin?.bucket && (actualMargin === 0 ? false : (actualMargin <= 12 ? "1-12" : "13+") === det.margin.bucket)),
+      },
+      total: { predictedLine: predTotalLine, predictedLean: predTotalLean, actual: actualTotal, correct: totalCorrect },
+      htft: {
+        predicted: det?.htft?.pick ?? null,
+        actualWinner: actualWinnerNick,
+        partial: det?.htft?.pick ? det.htft.pick.endsWith(actualWinnerNick) : null,
+      },
+      score: {
+        predicted: (typeof ph === "number" && typeof pa === "number") ? `${ph}-${pa}` : null,
+        actual: `${homeScore}-${awayScore}`,
+        combinedError,
+        close: combinedError != null && combinedError <= 10,
+      },
+    },
+    script: {
+      tempo: { predicted: predTempo, actual: actualTempo, correct: predTempo ? predTempo === actualTempo : null },
+      flow: { predicted: predFlow, actual: actualFlow, correct: predFlow ? predFlow === actualFlow : null },
+      dominantTeam: { predicted: predDominant, actual: actualDominant, correct: predDominant ? predDominant === actualDominant : null },
+      edge: { predicted: predEdge, actual: null, correct: null },
+    },
+    players: {
+      firstTry: { predicted: firstPredName, actual: actualFirstTry, correct: firstCorrect },
+      anytimeHits: namedHits.length,
+      anytimeChecked: byPlayer.size,
+      namedHits,
+      namedMisses,
+    },
+  };
+
   return {
     version: VERSION,
     generatedAt: new Date().toISOString(),
@@ -300,6 +381,7 @@ export function buildDeterministicAftermatch(args: {
     scoreLine: { hits: hitCount, total: totalCount },
     consistencies,
     inconsistencies,
+    comparison,
     summary: "", // filled by AI step
   };
 }

@@ -231,7 +231,8 @@ export const getMatchPage = createServerFn({ method: "GET" })
     // and abort the whole page). Read the shared DB cache so every visitor sees
     // the same payload; if no fresh row exists, the client lazily calls
     // getMatchInsights() to generate (single-flight) and persist it.
-    const stored = await readSharedInsights(data.matchId);
+    // Invalidate the cache when squads or mode have advanced since storage.
+    const stored = await readFreshInsights(data.matchId, details, tryscorers);
 
     // Aftermatch (only for finished matches) + lessons-from-last-week per team.
     const finished = /^(FullTime|Final|Completed)$/i.test(details.matchState);
@@ -299,9 +300,15 @@ export const getMatchInsights = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     const season = currentSeason();
     try {
-      // 1) Fast-path: shared DB cache hit with deterministic payload present.
+      // Resolve current mode + squad signature up front so we can
+      // validate any cached payload against today's reality.
+      const detailsForCheck = await cached(`match:${data.matchId}`, TTL.match, () => fetchMatchDetails(data.matchId), { bypass: data.refresh });
+
+      // 1) Fast-path: shared DB cache hit, but ONLY if the squad signature and
+      //    mode match what's stored. Stale rows (e.g. generated before squads
+      //    were named, or before late team-list changes) are ignored.
       if (!data.refresh) {
-        const stored = await readSharedInsights(data.matchId);
+        const stored = await readFreshInsights(data.matchId, detailsForCheck, null);
         if (stored && (stored.payload as unknown as { deterministic?: unknown }).deterministic) {
           return { insights: stored.payload, insightsError: null as string | null };
         }

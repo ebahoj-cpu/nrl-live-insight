@@ -17,6 +17,7 @@ import type { SeasonSnapshot, TeamSeasonStats, PlayerSeasonStats } from "./seaso
 import { getTeam, getTeamPlayers } from "./season-stats";
 import type { NrlLadderRow, NrlPlayer } from "./nrl";
 import type { TryscorerMarkets } from "./odds";
+import type { ModelMode, ModelConfidence } from "./model-mode";
 
 export type EngineInputs = {
   homeNickname: string;
@@ -30,6 +31,10 @@ export type EngineInputs = {
   weather?: { tempC: number; condition: string; windKph: number; precipMm: number; groundCondition: string } | null;
   tryscorers?: TryscorerMarkets | null;
   venue?: string;
+  // Timing-aware mode. Defaults to "final" for back-compat with callers that
+  // haven't been updated yet, but new callers should always pass it.
+  mode?: ModelMode;
+  confidence?: ModelConfidence;
 };
 
 export type EnginePlayerPick = {

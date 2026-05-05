@@ -22,7 +22,8 @@ import { resolveModelMode, squadIsNamed, squadSignature, modeAdvanced, type Mode
 import { buildDeterministicBets } from "./bets-engine";
 import { indexSquads, isInSquad } from "./validate-picks";
 import { ensureAftermatch, getLastLessonForTeam, readAftermatch, type AftermatchPayload, type TeamLesson } from "./aftermatch";
-import { fetchZylaLadder, fetchZylaFixtures, getZylaRequestCount } from "./zyla";
+import { fetchZylaLadder, getZylaRequestCount } from "./zyla";
+import { generateScript, type ScriptPayload } from "./script-engine";
 
 // Source tracking — surfaced in server logs and (where harmless) on payloads.
 export type DataSource = "nrl_com" | "zyla" | "mixed" | "proxy";

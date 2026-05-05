@@ -155,7 +155,7 @@ async function buildSeasonSnapshot(season: number): Promise<SeasonSnapshot> {
   }
 
   // 2. Fetch match details (limited concurrency to be polite to NRL.com)
-  type MatchPayload = { matchId: string; round: number; data: any };
+  type MatchPayload = { matchId: string; round: number; kickoffUtc: string; data: any };
   const payloads: MatchPayload[] = [];
   const CONCURRENCY = 6;
   for (let i = 0; i < fixtures.length; i += CONCURRENCY) {
@@ -166,7 +166,7 @@ async function buildSeasonSnapshot(season: number): Promise<SeasonSnapshot> {
         const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0", "Accept": "application/json" } });
         if (!res.ok) return null;
         const d = await res.json();
-        return { matchId: f.matchId, round: f.roundNumber, data: d } as MatchPayload;
+        return { matchId: f.matchId, round: f.roundNumber, kickoffUtc: f.kickoffUtc, data: d } as MatchPayload;
       } catch {
         return null;
       }

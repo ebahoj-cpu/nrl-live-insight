@@ -11,7 +11,7 @@ import type { Insights } from "./ai-insights";
 import type { DeterministicInsights, EnginePlayerPick } from "./insights-engine";
 
 const TABLE = "match_aftermatch";
-const VERSION = "v2";
+const VERSION = "v3-structured";
 const GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
 const AI_MODEL = "google/gemini-2.5-flash";
 const AI_TIMEOUT_MS = 25_000;
@@ -31,6 +31,29 @@ export type AftermatchPlayerHit = {
   status: "hit" | "miss";
 };
 
+export type AftermatchComparison = {
+  team: {
+    winner: { predicted: string; actual: string; correct: boolean };
+    margin: { predicted: string; actual: string; actualMargin: number; correct: boolean };
+    total: { predictedLine: number | null; predictedLean: "over" | "under" | null; actual: number; correct: boolean | null };
+    htft: { predicted: string | null; actualWinner: string; partial: boolean | null };
+    score: { predicted: string | null; actual: string; combinedError: number | null; close: boolean };
+  };
+  script: {
+    tempo: { predicted: "slow" | "controlled" | "open" | null; actual: "slow" | "controlled" | "open"; correct: boolean | null };
+    flow: { predicted: "tight" | "blowout" | null; actual: "tight" | "blowout"; correct: boolean | null };
+    dominantTeam: { predicted: string | null; actual: string; correct: boolean | null };
+    edge: { predicted: "left" | "right" | "middle" | null; actual: "left" | "right" | "middle" | null; correct: boolean | null };
+  };
+  players: {
+    firstTry: { predicted: string | null; actual: string | null; correct: boolean };
+    anytimeHits: number;        // number of distinct predicted players who scored
+    anytimeChecked: number;     // number of distinct predicted players considered
+    namedHits: { name: string; scored: number }[];
+    namedMisses: string[];
+  };
+};
+
 export type AftermatchPayload = {
   version: string;
   generatedAt: string;
@@ -43,6 +66,7 @@ export type AftermatchPayload = {
   scoreLine: { hits: number; total: number };
   consistencies: string[];
   inconsistencies: string[];
+  comparison: AftermatchComparison;
   summary: string;            // short AI paragraph
 };
 
@@ -118,6 +142,7 @@ export function buildDeterministicAftermatch(args: {
 }): AftermatchPayload | null {
   const { details, recap, insights } = args;
   const det = (insights as unknown as { deterministic?: DeterministicInsights } | null)?.deterministic ?? null;
+  const script = (insights as unknown as { script?: import("./script-engine").ScriptPayload } | null)?.script ?? null;
 
   const homeScore = details.homeTeam.score;
   const awayScore = details.awayTeam.score;
@@ -263,6 +288,87 @@ export function buildDeterministicAftermatch(args: {
     }
   }
 
+  // ---------- Build structured comparison block ----------
+  const predTotalLine = det?.totalPoints?.line ?? null;
+  const predTotalLean = det?.totalPoints?.lean ?? null;
+  const totalCorrect: boolean | null = predTotalLine != null && predTotalLean
+    ? ((predTotalLean === "over" && actualTotal > predTotalLine) || (predTotalLean === "under" && actualTotal <= predTotalLine))
+    : null;
+
+  const ph = det?.predictedScore?.home;
+  const pa = det?.predictedScore?.away;
+  const combinedError = (typeof ph === "number" && typeof pa === "number")
+    ? Math.abs(ph - homeScore) + Math.abs(pa - awayScore) : null;
+
+  // Tempo from actual: total points relative to predicted line, fallback 42
+  const tempoLine = predTotalLine ?? 42;
+  const actualTempo: "slow" | "controlled" | "open" =
+    actualTotal >= tempoLine + 8 ? "open" : actualTotal <= tempoLine - 8 ? "slow" : "controlled";
+  const predTempo: "slow" | "controlled" | "open" | null = predTotalLean === "over"
+    ? "open" : predTotalLean === "under" ? "slow" : (predTotalLean ? "controlled" : null);
+
+  const actualFlow: "tight" | "blowout" = actualMargin >= 13 ? "blowout" : "tight";
+  const predFlow: "tight" | "blowout" | null = det?.margin?.bucket
+    ? (det.margin.bucket === "13+" ? "blowout" : "tight") : null;
+
+  // Dominant team = projected winner from script/det
+  const predDominant = det?.matchWinner?.nickname ?? null;
+  const actualDominant = actualWinnerNick === "Draw" ? "Draw" : actualWinnerNick;
+
+  // Edge prediction: from script edges (left/right confidence) — pick the side
+  // whose confidence is "market-supported" else the projected one. Actual edge
+  // not reliably parseable, so left null unless tryscorer landed in named edge
+  const predEdge: "left" | "right" | "middle" | null = script
+    ? (script.edges.leftConfidence === "market-supported" ? "left"
+       : script.edges.rightConfidence === "market-supported" ? "right" : null)
+    : null;
+
+  // First try
+  const actualFirstTry = recap?.firstTry?.name ?? null;
+  const firstPredName = pickName(det?.firstTryscorer);
+  const firstCorrect = !!(firstPredName && actualFirstTry && normName(firstPredName) === normName(actualFirstTry));
+
+  const namedHits = [...byPlayer.values()].filter((p) => p.scored >= 1)
+    .map((p) => ({ name: p.name, scored: p.scored }));
+  const namedMisses = [...byPlayer.values()].filter((p) => p.scored === 0).map((p) => p.name);
+
+  const comparison: AftermatchComparison = {
+    team: {
+      winner: { predicted: det?.matchWinner?.nickname ?? "—", actual: actualWinnerNick, correct: !!(det?.matchWinner?.nickname && det.matchWinner.nickname === actualWinnerNick) },
+      margin: {
+        predicted: String(det?.margin?.bucket ?? "—").replace("–", "-"),
+        actual: actualMargin === 0 ? "Draw" : actualMargin <= 12 ? "1-12" : "13+",
+        actualMargin,
+        correct: !!(det?.margin?.bucket && (actualMargin === 0 ? false : (actualMargin <= 12 ? "1-12" : "13+") === det.margin.bucket)),
+      },
+      total: { predictedLine: predTotalLine, predictedLean: predTotalLean, actual: actualTotal, correct: totalCorrect },
+      htft: {
+        predicted: det?.htft?.pick ?? null,
+        actualWinner: actualWinnerNick,
+        partial: det?.htft?.pick ? det.htft.pick.endsWith(actualWinnerNick) : null,
+      },
+      score: {
+        predicted: (typeof ph === "number" && typeof pa === "number") ? `${ph}-${pa}` : null,
+        actual: `${homeScore}-${awayScore}`,
+        combinedError,
+        close: combinedError != null && combinedError <= 10,
+      },
+    },
+    script: {
+      tempo: { predicted: predTempo, actual: actualTempo, correct: predTempo ? predTempo === actualTempo : null },
+      flow: { predicted: predFlow, actual: actualFlow, correct: predFlow ? predFlow === actualFlow : null },
+      dominantTeam: { predicted: predDominant, actual: actualDominant, correct: predDominant ? predDominant === actualDominant : null },
+      edge: { predicted: predEdge, actual: null, correct: null },
+    },
+    players: {
+      firstTry: { predicted: firstPredName, actual: actualFirstTry, correct: firstCorrect },
+      anytimeHits: namedHits.length,
+      anytimeChecked: byPlayer.size,
+      namedHits,
+      namedMisses,
+    },
+  };
+
   return {
     version: VERSION,
     generatedAt: new Date().toISOString(),
@@ -275,8 +381,60 @@ export function buildDeterministicAftermatch(args: {
     scoreLine: { hits: hitCount, total: totalCount },
     consistencies,
     inconsistencies,
+    comparison,
     summary: "", // filled by AI step
   };
+}
+
+function buildFallbackSummary(p: AftermatchPayload): string {
+  const c = p.comparison;
+  const teamCorrect = [c.team.winner.correct, c.team.margin.correct, c.team.total.correct === true].filter(Boolean).length;
+  const scriptCorrect = [c.script.tempo.correct === true, c.script.flow.correct === true, c.script.dominantTeam.correct === true].filter(Boolean).length;
+  const playerHits = c.players.anytimeHits;
+  const allWrong = !c.team.winner.correct && !c.team.margin.correct && c.team.total.correct !== true && scriptCorrect === 0 && playerHits === 0;
+
+  const s1 = c.team.winner.correct
+    ? (c.team.margin.correct
+        ? `Strong team read — winner and ${c.team.margin.predicted} margin both landed.`
+        : `Winner call landed (${c.team.winner.actual}) but margin band missed (predicted ${c.team.margin.predicted}, actual ${c.team.margin.actual}).`)
+    : (c.team.margin.correct
+        ? `Winner call missed but the ${c.team.margin.predicted} margin band still came through.`
+        : `Winner and margin both missed — final ${p.finalScore.home}-${p.finalScore.away}.`);
+
+  let s2: string;
+  if (c.script.dominantTeam.correct && c.script.flow.correct === false) {
+    s2 = `Game script read was correct but execution differed — ${c.script.flow.actual === "blowout" ? "the contest opened up wider than projected" : "it stayed tighter than projected"}.`;
+  } else if (scriptCorrect >= 2) {
+    s2 = `Game script aligned on tempo, flow and dominant team.`;
+  } else if (c.script.tempo.correct === false) {
+    s2 = c.script.tempo.actual === "open" ? "Game opened up more than expected." : "Tempo stayed controlled against the projected flow.";
+  } else {
+    s2 = "Script read was mixed — flow and dominant team didn't fully line up.";
+  }
+
+  let s3: string;
+  if (c.players.firstTry.correct) {
+    s3 = `Player markets nailed first tryscorer (${c.players.firstTry.actual})${playerHits ? ` and returned ${playerHits} anytime hit${playerHits === 1 ? "" : "s"}` : ""}.`;
+  } else if (playerHits > 0) {
+    s3 = `Player markets returned ${playerHits} anytime hit${playerHits === 1 ? "" : "s"} (${c.players.namedHits.map((x) => x.name).join(", ")}) — first tryscorer missed.`;
+  } else if (c.players.anytimeChecked > 0) {
+    s3 = "Attacking reads were correct, execution missed — none of the named tryscorer picks crossed.";
+  } else {
+    s3 = "No player markets were locked pre-match.";
+  }
+
+  let s4: string;
+  if (allWrong) {
+    s4 = "Carry into this week: rebuild from live signals — the pre-match read missed across team, script and players.";
+  } else if (c.team.score.close) {
+    s4 = "Carry into this week: score projection stayed close to the final result — trust the structure where form and matchup align.";
+  } else if (teamCorrect >= 2) {
+    s4 = "Carry into this week: trust the team-level read but stay cautious on player markets.";
+  } else {
+    s4 = "Carry into this week: lean on the parts that worked and verify with live odds before locking picks.";
+  }
+
+  return `${s1} ${s2} ${s3} ${s4}`;
 }
 
 async function summariseWithAI(payload: AftermatchPayload): Promise<string> {
@@ -285,13 +443,42 @@ async function summariseWithAI(payload: AftermatchPayload): Promise<string> {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), AI_TIMEOUT_MS);
   try {
-    const sys = "You are a sharp NRL analyst. Write 3-4 short sentences. First, summarise where the pre-match insights matched the actual result and where they diverged (cite markets, players, or score). Then end with one sentence beginning with 'Carry into this week:' that gives a concrete takeaway both teams in the upcoming fixture should heed based on the lessons. Plain prose, no bullets, no headings, no betting hype, no emojis.";
+    const c = payload.comparison;
+    const sys = [
+      "You are a sharp NRL analyst writing a 'Last Week's Lessons' card.",
+      "You MUST compare what the model PREDICTED vs what ACTUALLY happened — never invent results.",
+      "Write EXACTLY 3-4 short sentences in plain prose. No bullets, headings, hype, or emojis.",
+      "Structure: Sentence 1 = team outcome accuracy (winner/margin/total). Sentence 2 = game script accuracy (tempo, flow, dominant team). Sentence 3 = player market performance (first try + anytime hits). Sentence 4 = key takeaway (begin with 'Carry into this week:').",
+      "Rules:",
+      "- Do NOT say 'completely missed' unless winner, margin, total AND script are all wrong AND there were no tryscorer hits.",
+      "- Reward partial success: correct margin band, close score (combined error <=10), correct dominant team, anytime hits.",
+      "- If script was right but result flipped: say 'Game script read was correct but execution differed.'",
+      "- If predicted players didn't score but were named anyway: say 'Attacking reads were correct, execution missed.'",
+      "- If combined score error <=10: say 'Score projection stayed close to the final result.'",
+      "- If tempo wrong open vs controlled: say 'Game opened up more than expected' or 'Tempo stayed controlled'.",
+    ].join("\n");
     const user = [
       `Match: ${payload.homeNickname} vs ${payload.awayNickname} — final ${payload.finalScore.home}-${payload.finalScore.away}.`,
-      `Score: ${payload.scoreLine.hits}/${payload.scoreLine.total} predictions correct.`,
-      payload.consistencies.length ? `Consistencies:\n- ${payload.consistencies.join("\n- ")}` : "Consistencies: none.",
-      payload.inconsistencies.length ? `Inconsistencies:\n- ${payload.inconsistencies.join("\n- ")}` : "Inconsistencies: none.",
-    ].join("\n\n");
+      "",
+      "TEAM COMPARISON:",
+      `- Winner: predicted ${c.team.winner.predicted}, actual ${c.team.winner.actual} → ${c.team.winner.correct ? "CORRECT" : "WRONG"}.`,
+      `- Margin band: predicted ${c.team.margin.predicted}, actual ${c.team.margin.actual} (${c.team.margin.actualMargin} pts) → ${c.team.margin.correct ? "CORRECT" : "WRONG"}.`,
+      `- Total points: predicted ${c.team.total.predictedLean ?? "—"} ${c.team.total.predictedLine ?? ""}, actual ${c.team.total.actual} → ${c.team.total.correct === null ? "n/a" : c.team.total.correct ? "CORRECT" : "WRONG"}.`,
+      `- Predicted score: ${c.team.score.predicted ?? "n/a"}, actual ${c.team.score.actual}${c.team.score.combinedError != null ? ` (combined error ${c.team.score.combinedError})` : ""}${c.team.score.close ? " — CLOSE" : ""}.`,
+      `- HT/FT pick: ${c.team.htft.predicted ?? "n/a"} (final winner ${c.team.htft.actualWinner}).`,
+      "",
+      "SCRIPT COMPARISON:",
+      `- Tempo: predicted ${c.script.tempo.predicted ?? "n/a"}, actual ${c.script.tempo.actual} → ${c.script.tempo.correct === null ? "n/a" : c.script.tempo.correct ? "CORRECT" : "WRONG"}.`,
+      `- Flow: predicted ${c.script.flow.predicted ?? "n/a"}, actual ${c.script.flow.actual} → ${c.script.flow.correct === null ? "n/a" : c.script.flow.correct ? "CORRECT" : "WRONG"}.`,
+      `- Dominant team: predicted ${c.script.dominantTeam.predicted ?? "n/a"}, actual ${c.script.dominantTeam.actual} → ${c.script.dominantTeam.correct === null ? "n/a" : c.script.dominantTeam.correct ? "CORRECT" : "WRONG"}.`,
+      `- Predicted attacking edge: ${c.script.edge.predicted ?? "n/a"} (actual edge unmeasured).`,
+      "",
+      "PLAYER COMPARISON:",
+      `- First tryscorer: predicted ${c.players.firstTry.predicted ?? "n/a"}, actual ${c.players.firstTry.actual ?? "n/a"} → ${c.players.firstTry.correct ? "CORRECT" : "WRONG"}.`,
+      `- Anytime hits: ${c.players.anytimeHits} of ${c.players.anytimeChecked} predicted players scored.`,
+      c.players.namedHits.length ? `- Hits: ${c.players.namedHits.map((p) => `${p.name} (${p.scored})`).join(", ")}.` : "- Hits: none.",
+      c.players.namedMisses.length ? `- Missed: ${c.players.namedMisses.join(", ")}.` : "- Missed: none.",
+    ].join("\n");
     const res = await fetch(GATEWAY, {
       method: "POST",
       headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
@@ -302,7 +489,7 @@ async function summariseWithAI(payload: AftermatchPayload): Promise<string> {
           { role: "system", content: sys },
           { role: "user", content: user },
         ],
-        temperature: 0.3,
+        temperature: 0.25,
         max_tokens: 320,
       }),
     });
@@ -333,11 +520,8 @@ export async function ensureAftermatch(args: {
   if (!built) return null;
 
   const summary = await summariseWithAI(built);
-  built.summary = summary || (
-    built.consistencies.length
-      ? `The model nailed ${built.scoreLine.hits} of ${built.scoreLine.total} key calls — strongest on ${built.consistencies[0].split(":")[0]}. ${built.inconsistencies[0] ?? ""} Carry into this week: weight the pattern that worked and stay cautious where the read missed.`.trim()
-      : `The model struggled this week (${built.scoreLine.hits}/${built.scoreLine.total} correct). Carry into this week: treat similar matchups with extra caution and lean on live signals before locking picks.`
-  );
+  built.summary = summary || buildFallbackSummary(built);
+
   await writeAftermatch(args.matchId, built);
   return built;
 }

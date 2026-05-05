@@ -9,6 +9,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import type { NrlMatchDetails, NrlMatchRecap } from "./nrl";
 import type { Insights } from "./ai-insights";
 import type { DeterministicInsights, EnginePlayerPick } from "./insights-engine";
+import { recordResultAndScore } from "./prediction-tracking";
 
 const TABLE = "match_aftermatch";
 const VERSION = "v3-structured";

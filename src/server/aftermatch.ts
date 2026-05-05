@@ -357,10 +357,69 @@ export type TeamLesson = {
 
 // Find the most recent finished match for `nickname` (other than `excludeMatchId`)
 // and shape its aftermatch payload as a lesson card. Returns null if not found.
+//
+// Backfill: if no aftermatch row exists yet for the team's most recent finished
+// fixture (which happens when nobody has visited that match page since
+// FullTime), generate it on the fly from cached pre-match insights + a fresh
+// recap fetch. This guarantees every team has a lessons card once they've
+// played.
 export async function getLastLessonForTeam(args: {
   nickname: string;
   excludeMatchId: string;
+  recentForm?: { url?: string; result?: string }[];
 }): Promise<TeamLesson | null> {
+  // 1) Try existing aftermatch rows first (fast path).
+  const existing = await findLessonInExistingRows(args.nickname, args.excludeMatchId);
+  if (existing) return existing;
+
+  // 2) Backfill: walk the team's recentForm URLs (most-recent first) and
+  // build aftermatch from the stored pre-match insights for that match.
+  const urls = (args.recentForm ?? []).map((r) => r.url).filter((u): u is string => !!u);
+  for (const url of urls) {
+    try {
+      const matchId = url
+        .replace(/^https?:\/\/[^/]+/, "")
+        .replace(/^\/+|\/+$/g, "")
+        .split("/")
+        .slice(-3)
+        .join("/");
+      if (!matchId || matchId === args.excludeMatchId) continue;
+
+      // Already in DB?
+      const row = await readAftermatch(matchId);
+      if (row) {
+        return shapeLesson(args.nickname, row);
+      }
+
+      // Pull pre-match insights + match details, then build.
+      const [{ fetchMatchDetails, fetchMatchRecap }, { readAnySharedInsights }] = await Promise.all([
+        import("./nrl"),
+        import("./insights-store"),
+      ]);
+      const [details, recap, insightsRow] = await Promise.all([
+        fetchMatchDetails(matchId).catch(() => null),
+        fetchMatchRecap(`https://www.nrl.com/draw/nrl-premiership/${matchId}/`).catch(() => null),
+        readAnySharedInsights(matchId).catch(() => null),
+      ]);
+      if (!details) continue;
+      const built = await ensureAftermatch({
+        matchId,
+        details,
+        recap,
+        insights: insightsRow?.payload ?? null,
+      });
+      if (built) {
+        const shaped = shapeLesson(args.nickname, built);
+        if (shaped) return shaped;
+      }
+    } catch (e) {
+      console.warn("[lessons] backfill failed for", url, e);
+    }
+  }
+  return null;
+}
+
+async function findLessonInExistingRows(nickname: string, excludeMatchId: string): Promise<TeamLesson | null> {
   try {
     const { data, error } = await supabaseAdmin
       .from(TABLE as never)
@@ -369,31 +428,39 @@ export async function getLastLessonForTeam(args: {
       .limit(80);
     if (error || !data) return null;
     const rows = data as { payload: AftermatchPayload }[];
-    const target = args.nickname.trim().toLowerCase();
+    const target = nickname.trim().toLowerCase();
     for (const row of rows) {
       const p = row.payload;
       if (!p) continue;
-      if (p.matchId === args.excludeMatchId) continue;
+      if (p.matchId === excludeMatchId) continue;
       const isHome = p.homeNickname?.trim().toLowerCase() === target;
       const isAway = p.awayNickname?.trim().toLowerCase() === target;
       if (!isHome && !isAway) continue;
-      const teamScore = isHome ? p.finalScore.home : p.finalScore.away;
-      const oppScore = isHome ? p.finalScore.away : p.finalScore.home;
-      const opponentNickname = isHome ? p.awayNickname : p.homeNickname;
-      const result: "W" | "L" | "D" = teamScore > oppScore ? "W" : teamScore < oppScore ? "L" : "D";
-      return {
-        matchId: p.matchId,
-        opponentNickname,
-        finalScore: { team: teamScore, opponent: oppScore },
-        result,
-        scoreLine: p.scoreLine,
-        topConsistencies: (p.consistencies ?? []).slice(0, 3),
-        topInconsistencies: (p.inconsistencies ?? []).slice(0, 3),
-        summary: p.summary ?? "",
-      };
+      return shapeLesson(nickname, p);
     }
     return null;
   } catch {
     return null;
   }
+}
+
+function shapeLesson(nickname: string, p: AftermatchPayload): TeamLesson | null {
+  const target = nickname.trim().toLowerCase();
+  const isHome = p.homeNickname?.trim().toLowerCase() === target;
+  const isAway = p.awayNickname?.trim().toLowerCase() === target;
+  if (!isHome && !isAway) return null;
+  const teamScore = isHome ? p.finalScore.home : p.finalScore.away;
+  const oppScore = isHome ? p.finalScore.away : p.finalScore.home;
+  const opponentNickname = isHome ? p.awayNickname : p.homeNickname;
+  const result: "W" | "L" | "D" = teamScore > oppScore ? "W" : teamScore < oppScore ? "L" : "D";
+  return {
+    matchId: p.matchId,
+    opponentNickname,
+    finalScore: { team: teamScore, opponent: oppScore },
+    result,
+    scoreLine: p.scoreLine,
+    topConsistencies: (p.consistencies ?? []).slice(0, 3),
+    topInconsistencies: (p.inconsistencies ?? []).slice(0, 3),
+    summary: p.summary ?? "",
+  };
 }

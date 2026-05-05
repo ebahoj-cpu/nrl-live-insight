@@ -114,7 +114,13 @@ export function generateScript(inp: EngineInputs, engine: DeterministicInsights)
     confidence,
     summary,
     phases: { first20, twenty40, forty60, sixty80 },
-    edges: { left, right, middle },
+    edges: {
+      left: left.text,
+      right: right.text,
+      middle,
+      leftConfidence: left.confidence,
+      rightConfidence: right.confidence,
+    },
     betting: { winnerLean, marginLean, totalLean, tryscorerLean },
     earlyNote: mode === "early"
       ? "Early model — player-specific script updates after Tuesday 7pm team lists."

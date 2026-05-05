@@ -1092,7 +1092,9 @@ function GameScriptTab({ insights, insightsLoading, home, away }:
         betting: { winnerLean: string; marginLean: string; totalLean: string; tryscorerLean: string };
         earlyNote?: string }
     | undefined;
-  if (!script) return <Empty msg="Script unavailable — refresh in a moment." />;
+  if (!script || !script.phases || !script.edges || !script.betting) {
+    return <Empty msg="Script unavailable — refresh in a moment." />;
+  }
 
   const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
     <div>

@@ -471,6 +471,9 @@ export const getMatchInsights = createServerFn({ method: "GET" })
           });
           if (deterministic) {
             (generated as unknown as { deterministic: DeterministicInsights }).deterministic = deterministic;
+            if (scriptPayload) {
+              (generated as unknown as { script: ScriptPayload }).script = scriptPayload;
+            }
             // Replace AI-built bets with the deterministic, mode-gated bets.
             generated.bets = buildDeterministicBets({
               engine: deterministic,

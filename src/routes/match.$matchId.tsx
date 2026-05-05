@@ -298,6 +298,24 @@ function Empty({ msg }: { msg: string }) {
   );
 }
 
+// Name-based initials avatar — used when NRL.com has no real headshot
+// (or returns the generic silhouette fallback).
+function InitialsAvatar({ firstName, lastName, hidden, dimmed }:
+  { firstName?: string; lastName?: string; hidden?: boolean; dimmed?: boolean }) {
+  const i1 = (firstName?.[0] ?? "").toUpperCase();
+  const i2 = (lastName?.[0] ?? "").toUpperCase();
+  return (
+    <div
+      style={{ display: hidden ? "none" : "flex" }}
+      className={`absolute inset-0 items-center justify-center pointer-events-none ${dimmed ? "opacity-60" : ""}`}
+    >
+      <div className="flex h-14 w-14 sm:h-16 sm:w-16 items-center justify-center rounded-full bg-surface-2 ring-1 ring-border text-base sm:text-lg font-black tracking-wider text-foreground/80">
+        {i1}{i2}
+      </div>
+    </div>
+  );
+}
+
 function InsightsLoading() {
   return (
     <div className="glass p-8 text-center text-sm text-muted-foreground">

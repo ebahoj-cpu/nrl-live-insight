@@ -43,6 +43,8 @@ export type EnginePlayerPick = {
   position: string;
   reasoning: string;
   price: number | null; // best live anytime price if available
+  // Optional value-vs-market tag from the ranker. UI may render or ignore.
+  confidence?: "high" | "medium" | "speculative";
 };
 
 export type DeterministicInsights = {
@@ -254,7 +256,14 @@ function stripInternal(r: RankedRow | undefined, fallbackReason: string): Engine
   if (!r) {
     return { name: "Awaiting team list", team: "", position: "", reasoning: fallbackReason, price: null };
   }
-  return { name: r.name, team: r.team, position: r.position, reasoning: r.reasoning || fallbackReason, price: r.price };
+  return {
+    name: r.name,
+    team: r.team,
+    position: r.position,
+    reasoning: r.reasoning || fallbackReason,
+    price: r.price,
+    confidence: r.confidence,
+  };
 }
 
 function pickRanked123(ranking: RankedRow[], firstPick: RankedRow | undefined): [RankedRow | undefined, RankedRow | undefined, RankedRow | undefined] {

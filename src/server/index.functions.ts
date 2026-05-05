@@ -24,6 +24,7 @@ import { indexSquads, isInSquad } from "./validate-picks";
 import { ensureAftermatch, getLastLessonForTeam, readAftermatch, type AftermatchPayload, type TeamLesson } from "./aftermatch";
 import { fetchZylaLadder, getZylaRequestCount } from "./zyla";
 import { generateScript, type ScriptPayload } from "./script-engine";
+import { readOddsCache, readOddsCacheStale, writeOddsCache } from "./odds-store";
 
 // Source tracking — surfaced in server logs and (where harmless) on payloads.
 export type DataSource = "nrl_com" | "zyla" | "mixed" | "proxy";
@@ -70,31 +71,56 @@ async function readFreshInsights(
 }
 
 // ---------- Last-good snapshots (graceful degradation) ----------
-// Survive across requests within a worker; replaced only on success.
+// Two layers: in-memory (per worker, instant) and DB-backed (survives cold
+// starts, written by cron warmers). The DB layer is the key quota saver —
+// without it, every new worker re-hits the Odds API on first use.
 let lastGoodOdds: { at: number; data: OddsEvent[] } | null = null;
 const lastGoodTryscorers = new Map<string, { at: number; data: TryscorerMarkets }>();
 
 async function safeOdds(refresh?: boolean): Promise<{ data: OddsEvent[]; error: string | null; stale: boolean }> {
+  // 1) Memory cache first (fastest)
+  // 2) DB cache (cron-warmed; survives cold starts)
+  // 3) Live API fetch (last resort)
+  if (!refresh) {
+    const dbHit = await readOddsCache<OddsEvent[]>("odds:nrl");
+    if (dbHit) {
+      lastGoodOdds = { at: Date.now(), data: dbHit };
+      return { data: dbHit, error: null, stale: false };
+    }
+  }
   try {
     const data = await cached(`odds:nrl`, TTL.odds, () => fetchNrlOdds(), { bypass: refresh });
     lastGoodOdds = { at: Date.now(), data };
+    await writeOddsCache("odds:nrl", data, TTL.odds);
     return { data, error: null, stale: false };
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Odds unavailable";
     if (lastGoodOdds) return { data: lastGoodOdds.data, error: msg, stale: true };
+    const stale = await readOddsCacheStale<OddsEvent[]>("odds:nrl");
+    if (stale) return { data: stale, error: msg, stale: true };
     return { data: [], error: msg, stale: false };
   }
 }
 
 async function safeTryscorers(eventId: string, refresh?: boolean): Promise<{ data: TryscorerMarkets | null; error: string | null }> {
+  if (!refresh) {
+    const dbHit = await readOddsCache<TryscorerMarkets>(`tryscorers:${eventId}`);
+    if (dbHit) {
+      lastGoodTryscorers.set(eventId, { at: Date.now(), data: dbHit });
+      return { data: dbHit, error: null };
+    }
+  }
   try {
     const data = await cached(`tryscorers:${eventId}`, TTL.oddsTryscorer, () => fetchTryscorerOdds(eventId), { bypass: refresh });
     lastGoodTryscorers.set(eventId, { at: Date.now(), data });
+    await writeOddsCache(`tryscorers:${eventId}`, data, TTL.oddsTryscorer);
     return { data, error: null };
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Tryscorer odds unavailable";
     const prev = lastGoodTryscorers.get(eventId);
     if (prev) return { data: prev.data, error: msg };
+    const stale = await readOddsCacheStale<TryscorerMarkets>(`tryscorers:${eventId}`);
+    if (stale) return { data: stale, error: msg };
     return { data: null, error: msg };
   }
 }

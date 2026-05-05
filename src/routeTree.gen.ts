@@ -16,6 +16,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as MatchMatchIdRouteImport } from './routes/match.$matchId'
 import { Route as ApiPublicManifestRouteImport } from './routes/api/public/manifest'
 import { Route as ApiPublicAppIconRouteImport } from './routes/api/public/app-icon'
+import { Route as ApiPublicHooksRefreshOddsRouteImport } from './routes/api/public/hooks/refresh-odds'
 import { Route as ApiPublicHooksPrecomputeInsightsRouteImport } from './routes/api/public/hooks/precompute-insights'
 
 const ScoutRoute = ScoutRouteImport.update({
@@ -53,6 +54,12 @@ const ApiPublicAppIconRoute = ApiPublicAppIconRouteImport.update({
   path: '/api/public/app-icon',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicHooksRefreshOddsRoute =
+  ApiPublicHooksRefreshOddsRouteImport.update({
+    id: '/api/public/hooks/refresh-odds',
+    path: '/api/public/hooks/refresh-odds',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksPrecomputeInsightsRoute =
   ApiPublicHooksPrecomputeInsightsRouteImport.update({
     id: '/api/public/hooks/precompute-insights',
@@ -69,6 +76,7 @@ export interface FileRoutesByFullPath {
   '/api/public/app-icon': typeof ApiPublicAppIconRoute
   '/api/public/manifest': typeof ApiPublicManifestRoute
   '/api/public/hooks/precompute-insights': typeof ApiPublicHooksPrecomputeInsightsRoute
+  '/api/public/hooks/refresh-odds': typeof ApiPublicHooksRefreshOddsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -79,6 +87,7 @@ export interface FileRoutesByTo {
   '/api/public/app-icon': typeof ApiPublicAppIconRoute
   '/api/public/manifest': typeof ApiPublicManifestRoute
   '/api/public/hooks/precompute-insights': typeof ApiPublicHooksPrecomputeInsightsRoute
+  '/api/public/hooks/refresh-odds': typeof ApiPublicHooksRefreshOddsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -90,6 +99,7 @@ export interface FileRoutesById {
   '/api/public/app-icon': typeof ApiPublicAppIconRoute
   '/api/public/manifest': typeof ApiPublicManifestRoute
   '/api/public/hooks/precompute-insights': typeof ApiPublicHooksPrecomputeInsightsRoute
+  '/api/public/hooks/refresh-odds': typeof ApiPublicHooksRefreshOddsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -102,6 +112,7 @@ export interface FileRouteTypes {
     | '/api/public/app-icon'
     | '/api/public/manifest'
     | '/api/public/hooks/precompute-insights'
+    | '/api/public/hooks/refresh-odds'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -112,6 +123,7 @@ export interface FileRouteTypes {
     | '/api/public/app-icon'
     | '/api/public/manifest'
     | '/api/public/hooks/precompute-insights'
+    | '/api/public/hooks/refresh-odds'
   id:
     | '__root__'
     | '/'
@@ -122,6 +134,7 @@ export interface FileRouteTypes {
     | '/api/public/app-icon'
     | '/api/public/manifest'
     | '/api/public/hooks/precompute-insights'
+    | '/api/public/hooks/refresh-odds'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -133,6 +146,7 @@ export interface RootRouteChildren {
   ApiPublicAppIconRoute: typeof ApiPublicAppIconRoute
   ApiPublicManifestRoute: typeof ApiPublicManifestRoute
   ApiPublicHooksPrecomputeInsightsRoute: typeof ApiPublicHooksPrecomputeInsightsRoute
+  ApiPublicHooksRefreshOddsRoute: typeof ApiPublicHooksRefreshOddsRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -186,6 +200,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicAppIconRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/refresh-odds': {
+      id: '/api/public/hooks/refresh-odds'
+      path: '/api/public/hooks/refresh-odds'
+      fullPath: '/api/public/hooks/refresh-odds'
+      preLoaderRoute: typeof ApiPublicHooksRefreshOddsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/precompute-insights': {
       id: '/api/public/hooks/precompute-insights'
       path: '/api/public/hooks/precompute-insights'
@@ -205,6 +226,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicAppIconRoute: ApiPublicAppIconRoute,
   ApiPublicManifestRoute: ApiPublicManifestRoute,
   ApiPublicHooksPrecomputeInsightsRoute: ApiPublicHooksPrecomputeInsightsRoute,
+  ApiPublicHooksRefreshOddsRoute: ApiPublicHooksRefreshOddsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -71,6 +71,7 @@ function MatchInner() {
   const insightsQ = useQuery({
     ...insightsQO(matchId),
     initialData: (data as any).insights ? { insights: (data as any).insights, insightsError: null } : undefined,
+    staleTime: (data as any).insights?.script ? 60 * 60_000 : 0,
   });
   const insights = insightsQ.data?.insights ?? null;
   const insightsError = insightsQ.data?.insightsError ?? (insightsQ.error as Error | null)?.message ?? null;
@@ -1114,7 +1115,8 @@ type TeamWithPlayers = TeamLite & { players?: { firstName: string; lastName: str
 function GameScriptTab({ insights, insightsLoading, home, away }:
   { insights: any; insightsLoading?: boolean; home: TeamWithPlayers; away: TeamWithPlayers }) {
   if (insightsLoading && !insights) return <InsightsLoading />;
-  const script = insights?.script as
+  if (insights && !insights.script && insightsLoading) return <InsightsLoading />;
+  const script = (insights?.script ?? buildScriptFallback(insights?.deterministic, home, away)) as
     | { mode: string; confidence: string; summary: string;
         phases: { first20: string; twenty40: string; forty60: string; sixty80: string };
         edges: { left: string; right: string; middle: string };
@@ -1128,7 +1130,7 @@ function GameScriptTab({ insights, insightsLoading, home, away }:
   const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
     <div>
       <div className="text-[10px] uppercase tracking-wider font-bold text-accent mb-1">{title}</div>
-      <p className="text-sm leading-relaxed text-foreground/90">{children}</p>
+      <p className="font-chat text-sm leading-relaxed text-foreground/90">{children}</p>
     </div>
   );
 
@@ -1143,7 +1145,7 @@ function GameScriptTab({ insights, insightsLoading, home, away }:
             {script.mode} · {script.confidence}
           </span>
         </div>
-        <p className="text-sm leading-relaxed text-foreground/90">{script.summary}</p>
+        <p className="font-chat text-sm leading-relaxed text-foreground/90">{script.summary}</p>
         {script.earlyNote && (
           <p className="text-[11px] mt-3 italic text-muted-foreground border-l-2 border-accent/40 pl-2">{script.earlyNote}</p>
         )}
@@ -1188,6 +1190,37 @@ function GameScriptTab({ insights, insightsLoading, home, away }:
       </Card>
     </div>
   );
+}
+
+function buildScriptFallback(det: any, home: TeamWithPlayers, away: TeamWithPlayers) {
+  if (!det?.predictedScore || !det?.matchWinner || !det?.margin || !det?.totalPoints || !det?.htft) return null;
+  const winner = det.matchWinner.nickname ?? home.nickName;
+  const loser = winner === home.nickName ? away.nickName : home.nickName;
+  const total = (Number(det.predictedScore.home) || 0) + (Number(det.predictedScore.away) || 0);
+  const firstTry = det.firstTryscorer?.name && !/^awaiting/i.test(det.firstTryscorer.name) ? det.firstTryscorer.name : null;
+  const anytime = det.topAnytimeOverall?.[0]?.name ?? det.topAnytimeHome?.[0]?.name ?? det.topAnytimeAway?.[0]?.name ?? firstTry;
+  return {
+    mode: det.mode ?? "market",
+    confidence: det.confidence ?? "high",
+    summary: `${winner} project to control the main scoring script, with ${loser} needing transition tries to keep the margin tight. Projected score sits ${det.predictedScore.home}-${det.predictedScore.away}.`,
+    phases: {
+      first20: det.matchWinner.reasoning,
+      twenty40: det.htft.reasoning,
+      forty60: det.totalPoints.reasoning,
+      sixty80: det.margin.reasoning,
+    },
+    edges: {
+      left: det.rankedTryscorers?.first?.reasoning ?? det.firstTryscorer?.reasoning ?? "Primary edge read follows the ranked tryscorer board.",
+      right: det.rankedTryscorers?.second?.reasoning ?? det.playerDouble?.reasoning ?? "Secondary edge read follows the anytime and double-try board.",
+      middle: `Projected total lands at ${total}, so middle control backs ${winner} ${det.margin.bucket} rather than random forward tryscorer exposure.`,
+    },
+    betting: {
+      winnerLean: winner,
+      marginLean: `${winner} ${det.margin.bucket}`,
+      totalLean: `${String(det.totalPoints.lean).toUpperCase()} ${det.totalPoints.line}`,
+      tryscorerLean: firstTry ? `${firstTry} first / ${anytime ?? firstTry} anytime` : `${anytime ?? "Awaiting market"} anytime`,
+    },
+  };
 }
 
 function ScriptTab({ insights, insightsError, insightsLoading, home, away, homeRow, awayRow, tryscorers, odds }:
@@ -2004,14 +2037,14 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
             </span>
           ) : null}
         </div>
-        <p className="text-sm leading-relaxed text-foreground/90">{det.matchWinner?.reasoning}</p>
+        <p className="font-chat text-sm leading-relaxed text-foreground/90">{det.matchWinner?.reasoning}</p>
       </Card>
 
       {/* 2 — Winning Margin */}
       <Card title="Winning margin" icon={Gauge}>
         <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Projected margin band</div>
         <div className="text-2xl font-black mb-2 text-accent">{det.margin?.bucket}</div>
-        <p className="text-sm leading-relaxed text-foreground/90">{det.margin?.reasoning}</p>
+        <p className="font-chat text-sm leading-relaxed text-foreground/90">{det.margin?.reasoning}</p>
       </Card>
 
       {/* 3 — Predicted Score */}
@@ -2031,7 +2064,7 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
             <div className="text-[11px] font-bold truncate max-w-[100px]">{away.nickName}</div>
           </div>
         </div>
-        <p className="text-sm leading-relaxed text-foreground/90">{det.predictedScore?.reasoning}</p>
+        <p className="font-chat text-sm leading-relaxed text-foreground/90">{det.predictedScore?.reasoning}</p>
       </Card>
 
       {/* 4 — Total Points (Over/Under) */}
@@ -2040,13 +2073,13 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
           <span className="text-2xl font-black text-accent uppercase">{det.totalPoints?.lean}</span>
           <span className="text-2xl font-black tabular-nums">{det.totalPoints?.line}</span>
         </div>
-        <p className="text-sm leading-relaxed text-foreground/90">{det.totalPoints?.reasoning}</p>
+        <p className="font-chat text-sm leading-relaxed text-foreground/90">{det.totalPoints?.reasoning}</p>
       </Card>
 
       {/* 5 — HT/FT Double */}
       <Card title="Halftime / fulltime double" icon={Hourglass}>
         <div className="text-2xl font-black mb-2 text-accent">{det.htft?.pick}</div>
-        <p className="text-sm leading-relaxed text-foreground/90">{det.htft?.reasoning}</p>
+        <p className="font-chat text-sm leading-relaxed text-foreground/90">{det.htft?.reasoning}</p>
       </Card>
 
       {/* 6 — First Tryscorer */}
@@ -2060,7 +2093,7 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
             <div className="text-xl font-black truncate">{det.firstTryscorer?.name}</div>
             <div className="text-[11px] text-muted-foreground">{det.firstTryscorer?.team} · {det.firstTryscorer?.position}</div>
             {det.firstTryscorer?.reasoning && (
-              <p className="text-sm leading-relaxed text-foreground/90 mt-2">{det.firstTryscorer.reasoning}</p>
+              <p className="font-chat text-sm leading-relaxed text-foreground/90 mt-2">{det.firstTryscorer.reasoning}</p>
             )}
           </div>
           <div className="flex flex-col items-end gap-1.5 shrink-0">
@@ -2088,7 +2121,7 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
               <div className="text-xl font-black truncate">{det.playerDouble.name}</div>
               <div className="text-[11px] text-muted-foreground">{det.playerDouble.team} · {det.playerDouble.position}</div>
               {det.playerDouble.reasoning && (
-                <p className="text-sm leading-relaxed text-foreground/90 mt-2">{det.playerDouble.reasoning}</p>
+                <p className="font-chat text-sm leading-relaxed text-foreground/90 mt-2">{det.playerDouble.reasoning}</p>
               )}
             </div>
             <div className="flex flex-col items-end gap-1.5 shrink-0">
@@ -2126,7 +2159,7 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
       {/* 10 — Predicted Outcome (moved above Top 3 anytime) */}
       {det.predictedOutcome && (
         <Card title="Predicted outcome" icon={Trophy} className="accent-glow">
-          <p className="text-sm leading-relaxed text-foreground/90 mb-3">{det.predictedOutcome.summary}</p>
+          <p className="font-chat text-sm leading-relaxed text-foreground/90 mb-3">{det.predictedOutcome.summary}</p>
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Three anytime tryscorers backing this script</div>
           <ul className="space-y-2.5">
             {(det.predictedOutcome.picks ?? []).map((p: any, i: number) => (

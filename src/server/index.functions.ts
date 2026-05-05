@@ -49,7 +49,12 @@ async function readFreshInsights(
   const payload = stored.payload as unknown as {
     modelMode?: ModelMode;
     squadSig?: { home?: string; away?: string };
+    deterministic?: unknown;
+    script?: unknown;
   };
+  if (!payload.deterministic || !payload.script) {
+    return null; // old cache row missing the stats engine or script payload
+  }
   const homeSig = squadSignature(details.homeTeam.players);
   const awaySig = squadSignature(details.awayTeam.players);
   if (payload.squadSig?.home !== homeSig || payload.squadSig?.away !== awaySig) {

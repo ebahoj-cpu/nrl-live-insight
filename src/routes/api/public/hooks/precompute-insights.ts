@@ -57,6 +57,13 @@ export const Route = createFileRoute("/api/public/hooks/precompute-insights")({
               continue;
             }
 
+            const hasSquads = squadIsNamed(details.homeTeam.players) && squadIsNamed(details.awayTeam.players);
+            const resolved = resolveModelMode({
+              kickoffUtc: details.kickoffUtc,
+              hasSquads,
+              hasPlayerOdds: !!tryscorers?.hasAny,
+            });
+
             const deterministic = generateDeterministicInsights({
               homeNickname: details.homeTeam.nickName,
               awayNickname: details.awayTeam.nickName,
@@ -69,9 +76,15 @@ export const Route = createFileRoute("/api/public/hooks/precompute-insights")({
               weather,
               tryscorers,
               venue: details.venue,
+              mode: resolved.mode,
+              confidence: resolved.confidence,
             });
 
-            const payload = { deterministic } as unknown as Insights;
+            const payload = {
+              deterministic,
+              modelMode: resolved.mode,
+              modelConfidence: resolved.confidence,
+            } as unknown as Insights;
             await writeSharedInsights(f.matchId, payload, insightsTtlMs(details.kickoffUtc));
             results.push({ matchId: f.matchId, ok: true });
           } catch (e) {

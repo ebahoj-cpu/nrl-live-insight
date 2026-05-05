@@ -72,11 +72,19 @@ export function generateScript(inp: EngineInputs, engine: DeterministicInsights)
 
   // ---------- 6-8. Edge scripts ----------
   const lineupReady = mode !== "early";
-  const homeEdgeName = (side: "left" | "right") => lineupReady ? edgePlayerName(inp, "home", side) : null;
-  const awayEdgeName = (side: "left" | "right") => lineupReady ? edgePlayerName(inp, "away", side) : null;
+  const homeEdge = (side: "left" | "right") => lineupReady ? edgePlayer(inp, "home", side) : null;
+  const awayEdge = (side: "left" | "right") => lineupReady ? edgePlayer(inp, "away", side) : null;
 
-  const left = buildEdge("left", inp, winnerNick, winnerStats, loserStats, homeEdgeName("left"), awayEdgeName("left"), winnerHome, lineupReady);
-  const right = buildEdge("right", inp, winnerNick, winnerStats, loserStats, homeEdgeName("right"), awayEdgeName("right"), winnerHome, lineupReady);
+  const marketSupportsName = (name: string | null): boolean => {
+    if (!name) return false;
+    if (mode !== "market" && mode !== "final") return false;
+    const first = engine.firstTryscorer?.name;
+    const any = engine.topAnytimeOverall?.map((p) => p.name) ?? [];
+    return (first && first === name) || any.includes(name);
+  };
+
+  const left = buildEdge("left", inp, mode, winnerNick, winnerStats, loserStats, homeEdge("left"), awayEdge("left"), winnerHome, lineupReady, marketSupportsName);
+  const right = buildEdge("right", inp, mode, winnerNick, winnerStats, loserStats, homeEdge("right"), awayEdge("right"), winnerHome, lineupReady, marketSupportsName);
   const middle = buildMiddle(winnerNick, loserNick, winnerStats, loserStats, projectedMargin, projectedTotal);
 
   // ---------- 9. Betting translation ----------

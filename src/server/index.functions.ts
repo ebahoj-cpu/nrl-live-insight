@@ -419,7 +419,7 @@ export const getMatchInsights = createServerFn({ method: "GET" })
         }) ?? null;
         const weather = await safeWeather(data.matchId, details.venue, details.venueCity, details.kickoffUtc);
         let tryscorers: TryscorerMarkets | null = null;
-        if (odds) {
+        if (odds && tryscorerFetchAllowed(details.kickoffUtc)) {
           const r = await safeTryscorers(odds.id);
           tryscorers = r.data;
         }

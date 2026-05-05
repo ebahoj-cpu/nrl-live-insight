@@ -386,6 +386,57 @@ export function buildDeterministicAftermatch(args: {
   };
 }
 
+function buildFallbackSummary(p: AftermatchPayload): string {
+  const c = p.comparison;
+  const teamCorrect = [c.team.winner.correct, c.team.margin.correct, c.team.total.correct === true].filter(Boolean).length;
+  const scriptCorrect = [c.script.tempo.correct === true, c.script.flow.correct === true, c.script.dominantTeam.correct === true].filter(Boolean).length;
+  const playerHits = c.players.anytimeHits;
+  const allWrong = !c.team.winner.correct && !c.team.margin.correct && c.team.total.correct !== true && scriptCorrect === 0 && playerHits === 0;
+
+  const s1 = c.team.winner.correct
+    ? (c.team.margin.correct
+        ? `Strong team read — winner and ${c.team.margin.predicted} margin both landed.`
+        : `Winner call landed (${c.team.winner.actual}) but margin band missed (predicted ${c.team.margin.predicted}, actual ${c.team.margin.actual}).`)
+    : (c.team.margin.correct
+        ? `Winner call missed but the ${c.team.margin.predicted} margin band still came through.`
+        : `Winner and margin both missed — final ${p.finalScore.home}-${p.finalScore.away}.`);
+
+  let s2: string;
+  if (c.script.dominantTeam.correct && c.script.flow.correct === false) {
+    s2 = `Game script read was correct but execution differed — ${c.script.flow.actual === "blowout" ? "the contest opened up wider than projected" : "it stayed tighter than projected"}.`;
+  } else if (scriptCorrect >= 2) {
+    s2 = `Game script aligned on tempo, flow and dominant team.`;
+  } else if (c.script.tempo.correct === false) {
+    s2 = c.script.tempo.actual === "open" ? "Game opened up more than expected." : "Tempo stayed controlled against the projected flow.";
+  } else {
+    s2 = "Script read was mixed — flow and dominant team didn't fully line up.";
+  }
+
+  let s3: string;
+  if (c.players.firstTry.correct) {
+    s3 = `Player markets nailed first tryscorer (${c.players.firstTry.actual})${playerHits ? ` and returned ${playerHits} anytime hit${playerHits === 1 ? "" : "s"}` : ""}.`;
+  } else if (playerHits > 0) {
+    s3 = `Player markets returned ${playerHits} anytime hit${playerHits === 1 ? "" : "s"} (${c.players.namedHits.map((x) => x.name).join(", ")}) — first tryscorer missed.`;
+  } else if (c.players.anytimeChecked > 0) {
+    s3 = "Attacking reads were correct, execution missed — none of the named tryscorer picks crossed.";
+  } else {
+    s3 = "No player markets were locked pre-match.";
+  }
+
+  let s4: string;
+  if (allWrong) {
+    s4 = "Carry into this week: rebuild from live signals — the pre-match read missed across team, script and players.";
+  } else if (c.team.score.close) {
+    s4 = "Carry into this week: score projection stayed close to the final result — trust the structure where form and matchup align.";
+  } else if (teamCorrect >= 2) {
+    s4 = "Carry into this week: trust the team-level read but stay cautious on player markets.";
+  } else {
+    s4 = "Carry into this week: lean on the parts that worked and verify with live odds before locking picks.";
+  }
+
+  return `${s1} ${s2} ${s3} ${s4}`;
+}
+
 async function summariseWithAI(payload: AftermatchPayload): Promise<string> {
   const apiKey = process.env.LOVABLE_API_KEY;
   if (!apiKey) return "";

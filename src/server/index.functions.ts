@@ -385,7 +385,7 @@ export const getMatchInsights = createServerFn({ method: "GET" })
           const eh = e.homeNickname; const ea = e.awayNickname;
           return (eh === homeNickC && ea === awayNickC) || (eh === awayNickC && ea === homeNickC);
         }) ?? null;
-        const tryscorersC = oddsC ? (await safeTryscorers(oddsC.id)).data : null;
+        const tryscorersC = (oddsC && tryscorerFetchAllowed(detailsForCheck.kickoffUtc)) ? (await safeTryscorers(oddsC.id)).data : null;
         const stored = await readFreshInsights(data.matchId, detailsForCheck, tryscorersC);
         if (
           stored &&

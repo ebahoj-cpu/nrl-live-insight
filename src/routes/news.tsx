@@ -1,9 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useSuspenseQuery, useQuery, queryOptions } from "@tanstack/react-query";
+import { useSuspenseQuery, useQuery, useMutation, useQueryClient, queryOptions } from "@tanstack/react-query";
 import { Suspense, useState } from "react";
 import { getNews } from "@/server/news.functions";
 import { summariseArticle, type ArticleSummary } from "@/server/news-summary.functions";
-import { ExternalLink, Sparkles, TrendingUp, TrendingDown, Minus, Loader2, ClipboardList } from "lucide-react";
+import { injectNewsImpact, listInjectedArticles } from "@/server/news-impacts.functions";
+import { ExternalLink, Sparkles, TrendingUp, TrendingDown, Minus, Loader2, ClipboardList, Plus, Check } from "lucide-react";
 import { findTeam } from "@/lib/teams";
 import { TeamLogo } from "@/components/TeamLogo";
 

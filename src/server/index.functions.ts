@@ -499,6 +499,18 @@ export const getMatchInsights = createServerFn({ method: "GET" })
           squadSig: { home: homeSig, away: awaySig },
         } as unknown as Insights;
         if (deterministic) {
+          // Apply approved news impacts (confidence nudges + appended notes).
+          try {
+            const allImpacts = await listActiveImpacts();
+            const relevant = impactsForFixture({
+              impacts: allImpacts,
+              matchId: data.matchId,
+              homeNickname: details.homeTeam.nickName,
+              awayNickname: details.awayTeam.nickName,
+            });
+            applyImpacts(minimalPayload as unknown as Record<string, unknown>, relevant);
+          } catch (e) { console.warn("applyImpacts (minimal) failed:", e); }
+
           await writeSharedInsights(data.matchId, minimalPayload, insightsTtlMs(details.kickoffUtc));
           // Lock the prediction snapshot before kickoff (insert-only — never
           // overwrites an existing locked row).

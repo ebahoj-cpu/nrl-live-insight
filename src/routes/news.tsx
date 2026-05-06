@@ -213,7 +213,7 @@ function NewsCard({ item: n }: NewsItemProps) {
       </div>
 
       {mode && (
-        <ArticleSummaryPanel url={n.link} title={n.title} source={n.source} mode={mode} />
+        <ArticleSummaryPanel item={n} mode={mode} />
       )}
     </li>
   );

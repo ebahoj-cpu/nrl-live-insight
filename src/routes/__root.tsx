@@ -4,7 +4,7 @@ import {
 } from "@tanstack/react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import appCss from "../styles.css?url";
-import { Download, Menu, X, Swords, ListOrdered, Newspaper } from "lucide-react";
+import { Download, Menu, X, Swords, ListOrdered, Newspaper, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import scoutAvatar from "@/assets/scout-avatar.png";
 

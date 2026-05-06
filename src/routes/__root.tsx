@@ -155,11 +155,9 @@ function Header() {
         <div className="flex items-center gap-2">
           <button
             onClick={() => {
-              try {
-                const { queryClient } = Route.useRouteContext.call(undefined as never);
-                void queryClient;
-              } catch { /* noop */ }
-              // Hard reload bypasses HTTP cache; insights regen on next visit.
+              // Hard reload bypasses HTTP cache. The match-page loaders re-fetch
+              // and the insights cache freshness gate regenerates if squads/odds
+              // changed or if a news impact was injected.
               window.location.reload();
             }}
             aria-label="Refresh app"

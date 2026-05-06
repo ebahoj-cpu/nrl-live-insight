@@ -26,6 +26,7 @@ import { fetchZylaLadder, getZylaRequestCount } from "./zyla";
 import { generateScript, type ScriptPayload } from "./script-engine";
 import { readOddsCache, readOddsCacheStale, writeOddsCache } from "./odds-store";
 import { snapshotPrediction, buildSnapshotRow } from "./prediction-tracking";
+import { listActiveImpacts, impactsForFixture, applyImpacts } from "./news-impacts";
 
 // Source tracking — surfaced in server logs and (where harmless) on payloads.
 export type DataSource = "nrl_com" | "zyla" | "mixed" | "proxy";
@@ -498,6 +499,18 @@ export const getMatchInsights = createServerFn({ method: "GET" })
           squadSig: { home: homeSig, away: awaySig },
         } as unknown as Insights;
         if (deterministic) {
+          // Apply approved news impacts (confidence nudges + appended notes).
+          try {
+            const allImpacts = await listActiveImpacts();
+            const relevant = impactsForFixture({
+              impacts: allImpacts,
+              matchId: data.matchId,
+              homeNickname: details.homeTeam.nickName,
+              awayNickname: details.awayTeam.nickName,
+            });
+            applyImpacts(minimalPayload as unknown as Record<string, unknown>, relevant);
+          } catch (e) { console.warn("applyImpacts (minimal) failed:", e); }
+
           await writeSharedInsights(data.matchId, minimalPayload, insightsTtlMs(details.kickoffUtc));
           // Lock the prediction snapshot before kickoff (insert-only — never
           // overwrites an existing locked row).
@@ -570,6 +583,16 @@ export const getMatchInsights = createServerFn({ method: "GET" })
           generated.modelMode = resolved.mode;
           generated.modelConfidence = resolved.confidence;
           (generated as unknown as { squadSig: { home: string; away: string } }).squadSig = { home: homeSig, away: awaySig };
+          try {
+            const allImpacts = await listActiveImpacts();
+            const relevant = impactsForFixture({
+              impacts: allImpacts,
+              matchId: data.matchId,
+              homeNickname: details.homeTeam.nickName,
+              awayNickname: details.awayTeam.nickName,
+            });
+            applyImpacts(generated as unknown as Record<string, unknown>, relevant);
+          } catch (e) { console.warn("applyImpacts (enriched) failed:", e); }
           await writeSharedInsights(data.matchId, generated, insightsTtlMs(details.kickoffUtc));
           return generated;
         } catch (err) {

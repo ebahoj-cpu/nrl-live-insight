@@ -86,6 +86,69 @@ export type Database = {
         }
         Relationships: []
       }
+      news_model_impacts: {
+        Row: {
+          active: boolean
+          added_by_user: boolean
+          adjustment_summary: string | null
+          article_id: string
+          created_at: string
+          expires_at: string | null
+          fixtures_affected: Json
+          id: string
+          impact_area: string
+          impact_strength: string
+          impact_type: string
+          model_adjustment: string | null
+          players_affected: Json
+          published_at: string | null
+          source: string | null
+          teams_affected: Json
+          title: string
+          url: string
+        }
+        Insert: {
+          active?: boolean
+          added_by_user?: boolean
+          adjustment_summary?: string | null
+          article_id: string
+          created_at?: string
+          expires_at?: string | null
+          fixtures_affected?: Json
+          id?: string
+          impact_area: string
+          impact_strength?: string
+          impact_type: string
+          model_adjustment?: string | null
+          players_affected?: Json
+          published_at?: string | null
+          source?: string | null
+          teams_affected?: Json
+          title: string
+          url: string
+        }
+        Update: {
+          active?: boolean
+          added_by_user?: boolean
+          adjustment_summary?: string | null
+          article_id?: string
+          created_at?: string
+          expires_at?: string | null
+          fixtures_affected?: Json
+          id?: string
+          impact_area?: string
+          impact_strength?: string
+          impact_type?: string
+          model_adjustment?: string | null
+          players_affected?: Json
+          published_at?: string | null
+          source?: string | null
+          teams_affected?: Json
+          title?: string
+          url?: string
+        }
+        Relationships: []
+      }
       odds_cache: {
         Row: {
           cache_key: string

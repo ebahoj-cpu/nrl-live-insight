@@ -4,7 +4,7 @@ import {
 } from "@tanstack/react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import appCss from "../styles.css?url";
-import { Download, Menu, X, Swords, ListOrdered, Newspaper } from "lucide-react";
+import { Download, Menu, X, Swords, ListOrdered, Newspaper, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import scoutAvatar from "@/assets/scout-avatar.png";
 
@@ -153,6 +153,20 @@ function Header() {
           </span>
         </Link>
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              // Hard reload bypasses HTTP cache. The match-page loaders re-fetch
+              // and the insights cache freshness gate regenerates if squads/odds
+              // changed or if a news impact was injected.
+              window.location.reload();
+            }}
+            aria-label="Refresh app"
+            title="Refresh app — re-fetches insights, scripts and bets"
+            className="inline-flex items-center gap-2 rounded-full border border-accent/40 bg-accent/15 text-accent px-3 py-1.5 text-sm font-semibold hover:bg-accent/25 transition"
+          >
+            <RefreshCw className="h-4 w-4" />
+            <span className="hidden sm:inline">Refresh</span>
+          </button>
           {!installed && (
             <button
               onClick={installApp}

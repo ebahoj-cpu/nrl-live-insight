@@ -1,9 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useSuspenseQuery, useQuery, queryOptions } from "@tanstack/react-query";
+import { useSuspenseQuery, useQuery, useMutation, useQueryClient, queryOptions } from "@tanstack/react-query";
 import { Suspense, useState } from "react";
 import { getNews } from "@/server/news.functions";
 import { summariseArticle, type ArticleSummary } from "@/server/news-summary.functions";
-import { ExternalLink, Sparkles, TrendingUp, TrendingDown, Minus, Loader2, ClipboardList } from "lucide-react";
+import { injectNewsImpact, listInjectedArticles } from "@/server/news-impacts.functions";
+import { ExternalLink, Sparkles, TrendingUp, TrendingDown, Minus, Loader2, ClipboardList, Plus, Check } from "lucide-react";
 import { findTeam } from "@/lib/teams";
 import { TeamLogo } from "@/components/TeamLogo";
 
@@ -212,13 +213,14 @@ function NewsCard({ item: n }: NewsItemProps) {
       </div>
 
       {mode && (
-        <ArticleSummaryPanel url={n.link} title={n.title} source={n.source} mode={mode} />
+        <ArticleSummaryPanel item={n} mode={mode} />
       )}
     </li>
   );
 }
 
-function ArticleSummaryPanel({ url, title, source, mode }: { url: string; title: string; source: string; mode: PanelMode }) {
+function ArticleSummaryPanel({ item, mode }: { item: NewsItemProps["item"]; mode: PanelMode }) {
+  const { link: url, title, source } = item;
   const q = useQuery({
     queryKey: ["article-summary", url],
     queryFn: () => summariseArticle({ data: { url, title, source } }),
@@ -250,12 +252,60 @@ function ArticleSummaryPanel({ url, title, source, mode }: { url: string; title:
         </p>
       )}
 
-      {q.data && (mode === "impact" ? <ImpactBody data={q.data} /> : <SummaryBody data={q.data} />)}
+      {q.data && (mode === "impact" ? <ImpactBody item={item} data={q.data} /> : <SummaryBody item={item} data={q.data} />)}
     </div>
   );
 }
 
-function ImpactBody({ data }: { data: ArticleSummary }) {
+const injectedQO = () => queryOptions({
+  queryKey: ["news-injected"],
+  queryFn: () => listInjectedArticles(),
+  staleTime: 60_000,
+});
+
+function InjectButton({ item, data }: { item: NewsItemProps["item"]; data: ArticleSummary }) {
+  const qc = useQueryClient();
+  const injected = useQuery(injectedQO());
+  const already = injected.data?.includes(item.id) ?? false;
+  const m = useMutation({
+    mutationFn: () => injectNewsImpact({
+      data: {
+        article_id: item.id,
+        title: item.title,
+        url: item.link,
+        source: item.source,
+        published_at: item.publishedUtc,
+        summary: `${item.summary ?? ""} ${data.summary} ${data.bettingImpact.note}`.trim(),
+        impact_type: data.bettingImpact.direction,
+        impact_note: data.bettingImpact.note,
+      },
+    }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["news-injected"] });
+    },
+  });
+  if (already || m.isSuccess) {
+    return (
+      <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full bg-accent/20 text-accent border border-accent/40">
+        <Check className="h-3 w-3" /> Injected
+      </span>
+    );
+  }
+  return (
+    <button
+      type="button"
+      onClick={() => m.mutate()}
+      disabled={m.isPending}
+      title="Add to model — applies this impact to affected fixtures"
+      className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full bg-accent/15 text-accent border border-accent/30 hover:bg-accent/25 transition disabled:opacity-50"
+    >
+      {m.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
+      {m.isPending ? "Injecting…" : "Add to model"}
+    </button>
+  );
+}
+
+function ImpactBody({ item, data }: { item: NewsItemProps["item"]; data: ArticleSummary }) {
   const dir = data.bettingImpact.direction;
   const tone =
     dir === "positive"
@@ -266,16 +316,19 @@ function ImpactBody({ data }: { data: ArticleSummary }) {
   const Icon = tone.Icon;
   return (
     <div className={`rounded-xl border p-3 ${tone.className}`}>
-      <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-black mb-1">
-        <Icon className="h-3.5 w-3.5" />
-        {tone.label} on Insights bets
+      <div className="flex items-center justify-between gap-2 mb-1">
+        <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-black">
+          <Icon className="h-3.5 w-3.5" />
+          {tone.label} on Insights bets
+        </div>
+        <InjectButton item={item} data={data} />
       </div>
       <p className="text-xs leading-relaxed text-foreground/90">{data.bettingImpact.note}</p>
     </div>
   );
 }
 
-function SummaryBody({ data }: { data: ArticleSummary }) {
+function SummaryBody({ item, data }: { item: NewsItemProps["item"]; data: ArticleSummary }) {
   const dir = data.bettingImpact.direction;
   const tone =
     dir === "positive"
@@ -304,9 +357,12 @@ function SummaryBody({ data }: { data: ArticleSummary }) {
       )}
 
       <div className={`rounded-xl border p-3 ${tone.className}`}>
-        <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-black mb-1">
-          <Icon className="h-3.5 w-3.5" />
-          {tone.label} on Insights bets
+        <div className="flex items-center justify-between gap-2 mb-1">
+          <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-black">
+            <Icon className="h-3.5 w-3.5" />
+            {tone.label} on Insights bets
+          </div>
+          <InjectButton item={item} data={data} />
         </div>
         <p className="text-xs leading-relaxed text-foreground/90">{data.bettingImpact.note}</p>
       </div>

@@ -583,6 +583,16 @@ export const getMatchInsights = createServerFn({ method: "GET" })
           generated.modelMode = resolved.mode;
           generated.modelConfidence = resolved.confidence;
           (generated as unknown as { squadSig: { home: string; away: string } }).squadSig = { home: homeSig, away: awaySig };
+          try {
+            const allImpacts = await listActiveImpacts();
+            const relevant = impactsForFixture({
+              impacts: allImpacts,
+              matchId: data.matchId,
+              homeNickname: details.homeTeam.nickName,
+              awayNickname: details.awayTeam.nickName,
+            });
+            applyImpacts(generated as unknown as Record<string, unknown>, relevant);
+          } catch (e) { console.warn("applyImpacts (enriched) failed:", e); }
           await writeSharedInsights(data.matchId, generated, insightsTtlMs(details.kickoffUtc));
           return generated;
         } catch (err) {

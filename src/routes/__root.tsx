@@ -153,6 +153,22 @@ function Header() {
           </span>
         </Link>
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              try {
+                const { queryClient } = Route.useRouteContext.call(undefined as never);
+                void queryClient;
+              } catch { /* noop */ }
+              // Hard reload bypasses HTTP cache; insights regen on next visit.
+              window.location.reload();
+            }}
+            aria-label="Refresh app"
+            title="Refresh app — re-fetches insights, scripts and bets"
+            className="inline-flex items-center gap-2 rounded-full border border-accent/40 bg-accent/15 text-accent px-3 py-1.5 text-sm font-semibold hover:bg-accent/25 transition"
+          >
+            <RefreshCw className="h-4 w-4" />
+            <span className="hidden sm:inline">Refresh</span>
+          </button>
           {!installed && (
             <button
               onClick={installApp}

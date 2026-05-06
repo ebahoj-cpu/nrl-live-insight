@@ -219,7 +219,8 @@ function NewsCard({ item: n }: NewsItemProps) {
   );
 }
 
-function ArticleSummaryPanel({ url, title, source, mode }: { url: string; title: string; source: string; mode: PanelMode }) {
+function ArticleSummaryPanel({ item, mode }: { item: NewsItemProps["item"]; mode: PanelMode }) {
+  const { link: url, title, source } = item;
   const q = useQuery({
     queryKey: ["article-summary", url],
     queryFn: () => summariseArticle({ data: { url, title, source } }),
@@ -251,7 +252,7 @@ function ArticleSummaryPanel({ url, title, source, mode }: { url: string; title:
         </p>
       )}
 
-      {q.data && (mode === "impact" ? <ImpactBody data={q.data} /> : <SummaryBody data={q.data} />)}
+      {q.data && (mode === "impact" ? <ImpactBody item={item} data={q.data} /> : <SummaryBody item={item} data={q.data} />)}
     </div>
   );
 }

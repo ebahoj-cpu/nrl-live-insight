@@ -261,6 +261,47 @@ export const getLadder = createServerFn({ method: "GET" })
     }
   });
 
+// ---------- Projected end-of-season ladder ----------
+// Combines live ladder + remaining fixtures + locked prediction snapshots.
+// Cached 30min in-memory; bypass with refresh.
+export const getProjectedLadder = createServerFn({ method: "GET" })
+  .inputValidator((i: { refresh?: boolean } | undefined) => i ?? {})
+  .handler(async ({ data }) => {
+    const season = currentSeason();
+    return cached(`projected-ladder:${season}`, 30 * 60_000, async () => {
+      const { projectLadder } = await import("./projected-ladder");
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const live = await cached(`ladder:${season}`, TTL.ladder, () => fetchLadder(season));
+      // Sweep all rounds for remaining (non-finished) fixtures.
+      const rounds = Array.from({ length: SEASON_ROUNDS }, (_, i) => i + 1);
+      const allFixtures: NrlFixture[] = [];
+      const draws = await Promise.all(rounds.map((r) =>
+        cached(`fixtures:${season}:r${r}`, ROUNDS_TTL, () => fetchDraw(season, r)).catch(() => [] as NrlFixture[])
+      ));
+      for (const d of draws) allFixtures.push(...d);
+      const remaining = allFixtures.filter((f) => !/^(FullTime|Final|Completed)$/i.test(f.matchState));
+      const matchIds = remaining.map((f) => f.matchId);
+      const snapMap = new Map<string, {
+        match_id: string; predicted_winner: string | null; predicted_margin_band: string | null;
+        predicted_score_home: number | null; predicted_score_away: number | null;
+        home_team: string; away_team: string;
+      }>();
+      if (matchIds.length > 0) {
+        try {
+          const { data: rows } = await supabaseAdmin
+            .from("prediction_snapshots" as never)
+            .select("match_id, predicted_winner, predicted_margin_band, predicted_score_home, predicted_score_away, home_team, away_team")
+            .in("match_id" as never, matchIds as never);
+          for (const r of (rows ?? []) as unknown as Array<{ match_id: string; predicted_winner: string | null; predicted_margin_band: string | null; predicted_score_home: number | null; predicted_score_away: number | null; home_team: string; away_team: string }>) {
+            snapMap.set(r.match_id, r);
+          }
+        } catch (e) { console.warn("projected ladder snapshot fetch failed:", e); }
+      }
+      const projected = projectLadder(live, remaining, snapMap);
+      return { projected, remainingFixtures: remaining.length, snapshotCoverage: snapMap.size };
+    }, { bypass: data.refresh });
+  });
+
 // ---------- Live odds (NEVER throws — Tier 2) ----------
 export const getOdds = createServerFn({ method: "GET" })
   .inputValidator((i: { refresh?: boolean } | undefined) => i ?? {})

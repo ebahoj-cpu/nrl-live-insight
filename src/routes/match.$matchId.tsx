@@ -2271,18 +2271,24 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
         ) : (
           <>
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Two per team — forwards / next-best scorers if the top 6 anytimes don't convert</div>
-            <ul className="space-y-2.5">
-              {det.forwardPicks.map((r: any, i: number) => (
-                <li key={`${r.name}-${i}`} className="flex items-start gap-3 bg-surface-2 rounded-lg p-2.5">
-                  <span className="kbd h-6 w-6 rounded-full bg-background text-xs font-black flex items-center justify-center shrink-0 mt-0.5">{i + 1}</span>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-bold truncate">{r.name}</div>
-                    <div className="text-[10px] text-muted-foreground">{r.team} · {r.position}</div>
-                    {r.reasoning && <p className="text-[11px] text-muted-foreground leading-snug mt-1">{r.reasoning}</p>}
-                  </div>
-                  <AnytimeOddsTag price={getAnytime(r.name) ?? r.price ?? null} />
-                </li>
-              ))}
+            <ul className="space-y-3">
+              {det.forwardPicks.map((r: any, i: number) => {
+                const teamMatch = [home, away].find((t) => t?.nickName?.toLowerCase() === String(r.team ?? "").toLowerCase()) ?? null;
+                const themeKey = teamMatch?.themeKey ?? "";
+                return (
+                  <li key={`${r.name}-${i}`} className="flex items-start gap-3 bg-surface-2 rounded-lg p-3.5">
+                    <div className="shrink-0 mt-0.5">
+                      <TeamLogo themeKey={themeKey} name={r.team ?? ""} size={36} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-bold truncate">{r.name}</div>
+                      <div className="text-[10px] text-muted-foreground mt-1.5">{r.position}</div>
+                      {r.reasoning && <p className="text-[11px] text-muted-foreground leading-snug mt-2.5">{r.reasoning}</p>}
+                    </div>
+                    <AnytimeOddsTag price={getAnytime(r.name) ?? r.price ?? null} />
+                  </li>
+                );
+              })}
             </ul>
           </>
         )}

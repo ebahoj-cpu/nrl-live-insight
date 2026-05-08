@@ -1108,7 +1108,63 @@ type LadderRow = {
 
 type TeamLite = { nickName: string; themeKey: string };
 
-type TeamWithPlayers = TeamLite & { players?: { firstName: string; lastName: string; position: string }[] };
+type TeamWithPlayers = TeamLite & { players?: { firstName: string; lastName: string; position: string; headImage?: string }[] };
+
+/* ---------- Player avatar resolver: looks up headImage by player name across both teams ---------- */
+function findPlayerHeadshot(name: string | null | undefined, teams: (TeamWithPlayers | undefined | null)[]): { headImage?: string; themeKey?: string; nickName?: string } | null {
+  if (!name) return null;
+  const target = name.trim().toLowerCase();
+  for (const t of teams) {
+    if (!t?.players) continue;
+    for (const p of t.players) {
+      const full = `${p.firstName} ${p.lastName}`.trim().toLowerCase();
+      if (full === target || `${p.firstName.charAt(0)}. ${p.lastName}`.toLowerCase() === target) {
+        return { headImage: p.headImage, themeKey: t.themeKey, nickName: t.nickName };
+      }
+    }
+  }
+  // Loose last-name match as fallback
+  const lastWord = target.split(/\s+/).pop();
+  if (lastWord) {
+    for (const t of teams) {
+      if (!t?.players) continue;
+      for (const p of t.players) {
+        if (p.lastName.toLowerCase() === lastWord) {
+          return { headImage: p.headImage, themeKey: t.themeKey, nickName: t.nickName };
+        }
+      }
+    }
+  }
+  return null;
+}
+
+function PlayerHeadshot({ name, teams, size = 56 }: { name: string | null | undefined; teams: (TeamWithPlayers | undefined | null)[]; size?: number }) {
+  const found = findPlayerHeadshot(name, teams);
+  const initials = (name ?? "?").split(/\s+/).map((w) => w.charAt(0)).join("").slice(0, 2).toUpperCase();
+  if (found?.headImage) {
+    return (
+      <img
+        src={found.headImage}
+        alt={name ?? "Player"}
+        width={size}
+        height={size}
+        loading="lazy"
+        className="rounded-full object-cover bg-surface-2 border border-accent/30 shadow-[0_4px_14px_-4px_color-mix(in_oklab,var(--accent)_50%,transparent)]"
+        style={{ width: size, height: size }}
+        onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+      />
+    );
+  }
+  return (
+    <div
+      className="rounded-full bg-accent/15 text-accent flex items-center justify-center font-black border border-accent/30"
+      style={{ width: size, height: size, fontSize: Math.round(size * 0.32) }}
+      aria-label={name ?? "Player"}
+    >
+      {initials}
+    </div>
+  );
+}
 
 /* ================= GAME SCRIPT TAB ================= */
 
@@ -2047,18 +2103,18 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
       {/* 3 — Predicted Score */}
       <Card title="Predicted score" icon={BarChart3}>
         <div className="flex items-center justify-center gap-4 mb-3">
-          <div className="flex flex-col items-center gap-1">
-            <TeamLogo themeKey={home.themeKey} name={home.nickName} size={32} />
-            <div className="text-[11px] font-bold truncate max-w-[100px]">{home.nickName}</div>
+          <div className="flex flex-col items-center gap-2">
+            <TeamLogo themeKey={home.themeKey} name={home.nickName} size={64} />
+            <div className="text-xs font-bold truncate max-w-[110px]">{home.nickName}</div>
           </div>
           <div className="kbd flex items-center gap-2 px-4 py-2">
             <span className="text-3xl font-black tabular-nums">{det.predictedScore?.home}</span>
             <span className="text-muted-foreground">–</span>
             <span className="text-3xl font-black tabular-nums">{det.predictedScore?.away}</span>
           </div>
-          <div className="flex flex-col items-center gap-1">
-            <TeamLogo themeKey={away.themeKey} name={away.nickName} size={32} />
-            <div className="text-[11px] font-bold truncate max-w-[100px]">{away.nickName}</div>
+          <div className="flex flex-col items-center gap-2">
+            <TeamLogo themeKey={away.themeKey} name={away.nickName} size={64} />
+            <div className="text-xs font-bold truncate max-w-[110px]">{away.nickName}</div>
           </div>
         </div>
         <p className="font-chat text-sm leading-relaxed text-foreground/90">{det.predictedScore?.reasoning}</p>
@@ -2082,9 +2138,7 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
       {/* 6 — First Tryscorer */}
       <Card title="First tryscorer" icon={Flag} className="accent-glow">
         <div className="flex items-start gap-3">
-          <div className="h-12 w-12 rounded-full bg-accent/15 text-accent flex items-center justify-center shrink-0">
-            <Crown className="h-6 w-6" />
-          </div>
+          <PlayerHeadshot name={det.firstTryscorer?.name} teams={[home, away]} size={64} />
           <div className="min-w-0 flex-1">
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Top opening-set pick</div>
             <div className="text-xl font-black truncate">{det.firstTryscorer?.name}</div>
@@ -2110,9 +2164,7 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
           <p className="text-sm text-muted-foreground">{det.playerDouble?.reasoning ?? "Awaiting team list."}</p>
         ) : (
           <div className="flex items-start gap-3">
-            <div className="h-12 w-12 rounded-full bg-accent/15 text-accent flex items-center justify-center shrink-0">
-              <Crown className="h-6 w-6" />
-            </div>
+            <PlayerHeadshot name={det.playerDouble.name} teams={[home, away]} size={64} />
             <div className="min-w-0 flex-1">
               <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Double-try ceiling</div>
               <div className="text-xl font-black truncate">{det.playerDouble.name}</div>
@@ -2185,9 +2237,9 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
               { label: away?.nickName ?? "Away", themeKey: away?.themeKey ?? "", list: det.topAnytimeAway ?? [] },
             ].map((col) => (
               <div key={col.label}>
-                <div className="flex items-center gap-2 mb-2">
-                  <TeamLogo themeKey={col.themeKey} name={col.label} size={22} />
-                  <div className="text-sm font-black truncate">{col.label}</div>
+                <div className="flex items-center gap-3 mb-3">
+                  <TeamLogo themeKey={col.themeKey} name={col.label} size={40} />
+                  <div className="text-base font-black truncate">{col.label}</div>
                 </div>
                 {col.list.length === 0 ? (
                   <p className="text-xs text-muted-foreground">Pending squad.</p>
@@ -2219,18 +2271,24 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
         ) : (
           <>
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Two per team — forwards / next-best scorers if the top 6 anytimes don't convert</div>
-            <ul className="space-y-2.5">
-              {det.forwardPicks.map((r: any, i: number) => (
-                <li key={`${r.name}-${i}`} className="flex items-start gap-3 bg-surface-2 rounded-lg p-2.5">
-                  <span className="kbd h-6 w-6 rounded-full bg-background text-xs font-black flex items-center justify-center shrink-0 mt-0.5">{i + 1}</span>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-bold truncate">{r.name}</div>
-                    <div className="text-[10px] text-muted-foreground">{r.team} · {r.position}</div>
-                    {r.reasoning && <p className="text-[11px] text-muted-foreground leading-snug mt-1">{r.reasoning}</p>}
-                  </div>
-                  <AnytimeOddsTag price={getAnytime(r.name) ?? r.price ?? null} />
-                </li>
-              ))}
+            <ul className="space-y-3">
+              {det.forwardPicks.map((r: any, i: number) => {
+                const teamMatch = [home, away].find((t) => t?.nickName?.toLowerCase() === String(r.team ?? "").toLowerCase()) ?? null;
+                const themeKey = teamMatch?.themeKey ?? "";
+                return (
+                  <li key={`${r.name}-${i}`} className="flex items-start gap-3 bg-surface-2 rounded-lg p-3.5">
+                    <div className="shrink-0 mt-0.5">
+                      <TeamLogo themeKey={themeKey} name={r.team ?? ""} size={36} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-bold truncate">{r.name}</div>
+                      <div className="text-[10px] text-muted-foreground mt-1.5">{r.position}</div>
+                      {r.reasoning && <p className="text-[11px] text-muted-foreground leading-snug mt-2.5">{r.reasoning}</p>}
+                    </div>
+                    <AnytimeOddsTag price={getAnytime(r.name) ?? r.price ?? null} />
+                  </li>
+                );
+              })}
             </ul>
           </>
         )}
@@ -2247,9 +2305,9 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
               { label: away?.nickName ?? "Away", themeKey: away?.themeKey ?? "", list: det.tryAssistsAway ?? [] },
             ].map((col) => (
               <div key={col.label}>
-                <div className="flex items-center gap-2 mb-2">
-                  <TeamLogo themeKey={col.themeKey} name={col.label} size={22} />
-                  <div className="text-sm font-black truncate">{col.label}</div>
+                <div className="flex items-center gap-3 mb-3">
+                  <TeamLogo themeKey={col.themeKey} name={col.label} size={40} />
+                  <div className="text-base font-black truncate">{col.label}</div>
                 </div>
                 {col.list.length === 0 ? (
                   <p className="text-xs text-muted-foreground">Pending squad.</p>
@@ -2963,11 +3021,6 @@ function LessonColumn({ team, lesson }: { team: TeamWithPlayers; lesson: TeamLes
             <div className="text-[10px] text-muted-foreground">No prior comparison yet.</div>
           )}
         </div>
-        {lesson && (
-          <div className="ml-auto text-[10px] font-black tabular-nums text-accent">
-            {lesson.scoreLine.hits}/{lesson.scoreLine.total}
-          </div>
-        )}
       </div>
       {lesson ? (
         <>

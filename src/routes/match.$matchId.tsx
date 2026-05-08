@@ -1108,7 +1108,63 @@ type LadderRow = {
 
 type TeamLite = { nickName: string; themeKey: string };
 
-type TeamWithPlayers = TeamLite & { players?: { firstName: string; lastName: string; position: string }[] };
+type TeamWithPlayers = TeamLite & { players?: { firstName: string; lastName: string; position: string; headImage?: string }[] };
+
+/* ---------- Player avatar resolver: looks up headImage by player name across both teams ---------- */
+function findPlayerHeadshot(name: string | null | undefined, teams: (TeamWithPlayers | undefined | null)[]): { headImage?: string; themeKey?: string; nickName?: string } | null {
+  if (!name) return null;
+  const target = name.trim().toLowerCase();
+  for (const t of teams) {
+    if (!t?.players) continue;
+    for (const p of t.players) {
+      const full = `${p.firstName} ${p.lastName}`.trim().toLowerCase();
+      if (full === target || `${p.firstName.charAt(0)}. ${p.lastName}`.toLowerCase() === target) {
+        return { headImage: p.headImage, themeKey: t.themeKey, nickName: t.nickName };
+      }
+    }
+  }
+  // Loose last-name match as fallback
+  const lastWord = target.split(/\s+/).pop();
+  if (lastWord) {
+    for (const t of teams) {
+      if (!t?.players) continue;
+      for (const p of t.players) {
+        if (p.lastName.toLowerCase() === lastWord) {
+          return { headImage: p.headImage, themeKey: t.themeKey, nickName: t.nickName };
+        }
+      }
+    }
+  }
+  return null;
+}
+
+function PlayerHeadshot({ name, teams, size = 56 }: { name: string | null | undefined; teams: (TeamWithPlayers | undefined | null)[]; size?: number }) {
+  const found = findPlayerHeadshot(name, teams);
+  const initials = (name ?? "?").split(/\s+/).map((w) => w.charAt(0)).join("").slice(0, 2).toUpperCase();
+  if (found?.headImage) {
+    return (
+      <img
+        src={found.headImage}
+        alt={name ?? "Player"}
+        width={size}
+        height={size}
+        loading="lazy"
+        className="rounded-full object-cover bg-surface-2 border border-accent/30 shadow-[0_4px_14px_-4px_color-mix(in_oklab,var(--accent)_50%,transparent)]"
+        style={{ width: size, height: size }}
+        onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+      />
+    );
+  }
+  return (
+    <div
+      className="rounded-full bg-accent/15 text-accent flex items-center justify-center font-black border border-accent/30"
+      style={{ width: size, height: size, fontSize: Math.round(size * 0.32) }}
+      aria-label={name ?? "Player"}
+    >
+      {initials}
+    </div>
+  );
+}
 
 /* ================= GAME SCRIPT TAB ================= */
 

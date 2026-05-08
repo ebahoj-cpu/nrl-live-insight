@@ -3021,11 +3021,6 @@ function LessonColumn({ team, lesson }: { team: TeamWithPlayers; lesson: TeamLes
             <div className="text-[10px] text-muted-foreground">No prior comparison yet.</div>
           )}
         </div>
-        {lesson && (
-          <div className="ml-auto text-[10px] font-black tabular-nums text-accent">
-            {lesson.scoreLine.hits}/{lesson.scoreLine.total}
-          </div>
-        )}
       </div>
       {lesson ? (
         <>

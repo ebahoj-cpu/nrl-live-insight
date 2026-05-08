@@ -2237,9 +2237,9 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
               { label: away?.nickName ?? "Away", themeKey: away?.themeKey ?? "", list: det.topAnytimeAway ?? [] },
             ].map((col) => (
               <div key={col.label}>
-                <div className="flex items-center gap-2 mb-2">
-                  <TeamLogo themeKey={col.themeKey} name={col.label} size={22} />
-                  <div className="text-sm font-black truncate">{col.label}</div>
+                <div className="flex items-center gap-3 mb-3">
+                  <TeamLogo themeKey={col.themeKey} name={col.label} size={40} />
+                  <div className="text-base font-black truncate">{col.label}</div>
                 </div>
                 {col.list.length === 0 ? (
                   <p className="text-xs text-muted-foreground">Pending squad.</p>

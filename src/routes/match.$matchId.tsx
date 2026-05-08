@@ -1149,7 +1149,7 @@ function PlayerHeadshot({ name, teams, size = 56 }: { name: string | null | unde
         width={size}
         height={size}
         loading="lazy"
-        className="rounded-full object-cover bg-surface-2 border border-accent/30 shadow-[0_4px_14px_-4px_color-mix(in_oklab,var(--accent)_50%,transparent)]"
+        className="object-contain bg-transparent"
         style={{ width: size, height: size }}
         onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
       />

@@ -2103,18 +2103,18 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
       {/* 3 — Predicted Score */}
       <Card title="Predicted score" icon={BarChart3}>
         <div className="flex items-center justify-center gap-4 mb-3">
-          <div className="flex flex-col items-center gap-1">
-            <TeamLogo themeKey={home.themeKey} name={home.nickName} size={32} />
-            <div className="text-[11px] font-bold truncate max-w-[100px]">{home.nickName}</div>
+          <div className="flex flex-col items-center gap-2">
+            <TeamLogo themeKey={home.themeKey} name={home.nickName} size={64} />
+            <div className="text-xs font-bold truncate max-w-[110px]">{home.nickName}</div>
           </div>
           <div className="kbd flex items-center gap-2 px-4 py-2">
             <span className="text-3xl font-black tabular-nums">{det.predictedScore?.home}</span>
             <span className="text-muted-foreground">–</span>
             <span className="text-3xl font-black tabular-nums">{det.predictedScore?.away}</span>
           </div>
-          <div className="flex flex-col items-center gap-1">
-            <TeamLogo themeKey={away.themeKey} name={away.nickName} size={32} />
-            <div className="text-[11px] font-bold truncate max-w-[100px]">{away.nickName}</div>
+          <div className="flex flex-col items-center gap-2">
+            <TeamLogo themeKey={away.themeKey} name={away.nickName} size={64} />
+            <div className="text-xs font-bold truncate max-w-[110px]">{away.nickName}</div>
           </div>
         </div>
         <p className="font-chat text-sm leading-relaxed text-foreground/90">{det.predictedScore?.reasoning}</p>

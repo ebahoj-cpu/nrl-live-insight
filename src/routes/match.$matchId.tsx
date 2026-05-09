@@ -2153,7 +2153,7 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
           <div className="min-w-0 flex-1">
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Top opening-set pick</div>
             <div className="text-xl font-black truncate">{det.firstTryscorer?.name}</div>
-            <div className="text-[11px] text-muted-foreground">{det.firstTryscorer?.team} · {det.firstTryscorer?.position}</div>
+            <div className="text-[11px] text-muted-foreground">{det.firstTryscorer?.position}</div>
             {det.firstTryscorer?.reasoning && (
               <p className="font-chat text-sm leading-relaxed text-foreground/90 mt-2">{det.firstTryscorer.reasoning}</p>
             )}
@@ -2169,7 +2169,7 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
         </div>
       </Card>
 
-      {/* 8 — Player Double (2+ tries) — moved to sit below First tryscorer */}
+      {/* 8 — Player Double (2+ tries) */}
       <Card title="Player to score 2+ tries" icon={Crown}>
         {!det.playerDouble?.name || det.playerDouble.name === "Awaiting team list" ? (
           <p className="text-sm text-muted-foreground">{det.playerDouble?.reasoning ?? "Awaiting team list."}</p>
@@ -2179,7 +2179,7 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
             <div className="min-w-0 flex-1">
               <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Double-try ceiling</div>
               <div className="text-xl font-black truncate">{det.playerDouble.name}</div>
-              <div className="text-[11px] text-muted-foreground">{det.playerDouble.team} · {det.playerDouble.position}</div>
+              <div className="text-[11px] text-muted-foreground">{det.playerDouble.position}</div>
               {det.playerDouble.reasoning && (
                 <p className="font-chat text-sm leading-relaxed text-foreground/90 mt-2">{det.playerDouble.reasoning}</p>
               )}
@@ -2204,10 +2204,10 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
         <ul className="space-y-2.5">
           {[det.rankedTryscorers?.first, det.rankedTryscorers?.second, det.rankedTryscorers?.third].map((p: any, i: number) => (
             <li key={i} className="flex items-start gap-3 bg-surface-2 rounded-lg p-2.5">
-              <span className="kbd h-6 w-6 rounded-full bg-background text-xs font-black flex items-center justify-center shrink-0 mt-0.5">{i + 1}</span>
+              <PlayerHeadshot name={p?.name} teams={[home, away]} size={40} minSize={36} maxSize={48} />
               <div className="flex-1 min-w-0">
-                <div className="text-sm font-bold truncate">{p?.name ?? "—"}</div>
-                <div className="text-[10px] text-muted-foreground">{p?.team} · {p?.position}</div>
+                <div className="text-sm font-bold truncate">{p?.name ?? ""}</div>
+                <div className="text-[10px] text-muted-foreground">{p?.position}</div>
                 {p?.reasoning && <p className="text-[11px] text-muted-foreground leading-snug mt-1">{p.reasoning}</p>}
               </div>
               <AnytimeOddsTag price={getAnytime(p?.name) ?? p?.price ?? null} />

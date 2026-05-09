@@ -2106,21 +2106,28 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
 
       {/* 3 — Predicted Score */}
       <Card title="Predicted score" icon={BarChart3}>
-        <div className="flex items-center justify-center gap-4 mb-3">
-          <div className="flex flex-col items-center gap-2">
-            <TeamLogo themeKey={home.themeKey} name={home.nickName} size={64} />
-            <div className="text-xs font-bold truncate max-w-[110px]">{home.nickName}</div>
-          </div>
-          <div className="kbd flex items-center gap-2 px-4 py-2">
-            <span className="text-3xl font-black tabular-nums">{det.predictedScore?.home}</span>
-            <span className="text-muted-foreground">–</span>
-            <span className="text-3xl font-black tabular-nums">{det.predictedScore?.away}</span>
-          </div>
-          <div className="flex flex-col items-center gap-2">
-            <TeamLogo themeKey={away.themeKey} name={away.nickName} size={64} />
-            <div className="text-xs font-bold truncate max-w-[110px]">{away.nickName}</div>
-          </div>
-        </div>
+        {(() => {
+          const hs = Number(det.predictedScore?.home ?? 0);
+          const as = Number(det.predictedScore?.away ?? 0);
+          const homeWin = hs > as;
+          const awayWin = as > hs;
+          return (
+            <div className="flex items-center justify-center gap-4 mb-3">
+              <div className="flex flex-col items-center gap-2">
+                <TeamLogo themeKey={home.themeKey} name={home.nickName} size={64} />
+                <div className="text-xs font-bold truncate max-w-[110px]">{home.nickName}</div>
+              </div>
+              <div className="kbd flex items-center gap-3 px-4 py-2">
+                <span className={`text-3xl font-black tabular-nums ${homeWin ? "text-accent" : "text-foreground"}`}>{det.predictedScore?.home}</span>
+                <span className={`text-3xl font-black tabular-nums ${awayWin ? "text-accent" : "text-foreground"}`}>{det.predictedScore?.away}</span>
+              </div>
+              <div className="flex flex-col items-center gap-2">
+                <TeamLogo themeKey={away.themeKey} name={away.nickName} size={64} />
+                <div className="text-xs font-bold truncate max-w-[110px]">{away.nickName}</div>
+              </div>
+            </div>
+          );
+        })()}
         <p className="font-chat text-sm leading-relaxed text-foreground/90">{det.predictedScore?.reasoning}</p>
       </Card>
 

@@ -2224,10 +2224,10 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
           <ul className="space-y-2.5">
             {(det.predictedOutcome.picks ?? []).map((p: any, i: number) => (
               <li key={`${p.name}-${i}`} className="flex items-start gap-3 bg-surface-2 rounded-lg p-2.5">
-                <span className="kbd h-6 w-6 rounded-full bg-background text-xs font-black flex items-center justify-center shrink-0 mt-0.5">{i + 1}</span>
+                <PlayerHeadshot name={p?.name} teams={[home, away]} size={40} minSize={36} maxSize={48} />
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-bold truncate">{p?.name ?? "—"}</div>
-                  <div className="text-[10px] text-muted-foreground">{p?.team} · {p?.position}</div>
+                  <div className="text-sm font-bold truncate">{p?.name ?? ""}</div>
+                  <div className="text-[10px] text-muted-foreground">{p?.position}</div>
                   {p?.reasoning && <p className="text-[11px] text-muted-foreground leading-snug mt-1">{p.reasoning}</p>}
                 </div>
                 <AnytimeOddsTag price={getAnytime(p?.name) ?? p?.price ?? null} />

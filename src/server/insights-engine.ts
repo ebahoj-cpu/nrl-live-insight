@@ -229,11 +229,16 @@ export function generateDeterministicInsights(inp: EngineInputs): DeterministicI
     predictedScore,
     totalPoints,
     htft,
-    // First tryscorer requires market-grade signal (player odds released).
-    // In early/squad mode, surface a placeholder so the UI never invents a name.
-    firstTryscorer: (mode === "market" || mode === "final")
-      ? stripInternal(firstPick, "First-touch threat — opening-set carries and short-side strike role keep the early try in their lane.")
-      : stripInternal(undefined, "Awaiting market — first tryscorer locked until bookies release player odds."),
+    // First tryscorer: always surface our top-ranked early-strike candidate so
+    // the card never falls back to a placeholder. Reasoning is tier-aware.
+    firstTryscorer: stripInternal(
+      firstPick,
+      mode === "market" || mode === "final"
+        ? "First-touch threat — opening-set carries and short-side strike role keep the early try in their lane."
+        : mode === "squad"
+        ? "Model lean off named squad — opening-set role and edge usage point to an early involvement."
+        : "Pre-squad model lean from season-long attacking involvement and edge role.",
+    ),
     rankedTryscorers: {
       first: stripInternal(ranked123[0], "First scorer of the match — opening sets and edge usage favour an early involvement."),
       second: stripInternal(ranked123[1], "Second-try profile — secondary attacking lane in the opening half hour."),

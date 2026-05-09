@@ -1138,27 +1138,31 @@ function findPlayerHeadshot(name: string | null | undefined, teams: (TeamWithPla
   return null;
 }
 
-function PlayerHeadshot({ name, teams, size = 56 }: { name: string | null | undefined; teams: (TeamWithPlayers | undefined | null)[]; size?: number }) {
+function PlayerHeadshot({ name, teams, size = 56, minSize, maxSize }:
+  { name: string | null | undefined; teams: (TeamWithPlayers | undefined | null)[]; size?: number; minSize?: number; maxSize?: number }) {
   const found = findPlayerHeadshot(name, teams);
   const initials = (name ?? "?").split(/\s+/).map((w) => w.charAt(0)).join("").slice(0, 2).toUpperCase();
+  // Responsive: scales with viewport between min..max so the headshot stays
+  // proportionate on mobile, tablet, and desktop.
+  const min = minSize ?? Math.round(size * 0.85);
+  const max = maxSize ?? Math.round(size * 1.4);
+  const dim = `clamp(${min}px, 14vw, ${max}px)`;
   if (found?.headImage) {
     return (
       <img
         src={found.headImage}
         alt={name ?? "Player"}
-        width={size}
-        height={size}
         loading="lazy"
-        className="object-contain bg-transparent"
-        style={{ width: size, height: size }}
+        className="object-contain bg-transparent shrink-0"
+        style={{ width: dim, height: dim }}
         onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
       />
     );
   }
   return (
     <div
-      className="rounded-full bg-accent/15 text-accent flex items-center justify-center font-black border border-accent/30"
-      style={{ width: size, height: size, fontSize: Math.round(size * 0.32) }}
+      className="rounded-full bg-accent/15 text-accent flex items-center justify-center font-black border border-accent/30 shrink-0"
+      style={{ width: dim, height: dim, fontSize: `calc(${dim} * 0.32)` }}
       aria-label={name ?? "Player"}
     >
       {initials}

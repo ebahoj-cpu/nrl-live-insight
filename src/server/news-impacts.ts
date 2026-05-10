@@ -107,6 +107,7 @@ export async function insertImpact(row: Omit<NewsImpactRow, "id" | "created_at" 
       impact_type: row.impact_type,
       impact_area: row.impact_area,
       impact_strength: row.impact_strength,
+      timeframe: row.timeframe,
       model_adjustment: row.model_adjustment,
       adjustment_summary: row.adjustment_summary,
       active: row.active ?? true,

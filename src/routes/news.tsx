@@ -278,6 +278,8 @@ function InjectButton({ item, data }: { item: NewsItemProps["item"]; data: Artic
         summary: `${item.summary ?? ""} ${data.summary} ${data.bettingImpact.note}`.trim(),
         impact_type: data.bettingImpact.direction,
         impact_note: data.bettingImpact.note,
+        timeframe: data.bettingImpact.timeframe,
+        timeframe_note: data.bettingImpact.timeframeNote,
       },
     }),
     onSuccess: () => {

@@ -233,9 +233,12 @@ export function applyImpacts(payload: Record<string, unknown>, impacts: NewsImpa
     applied.push({
       article_id: imp.article_id,
       title: imp.title,
+      url: imp.url,
+      source: imp.source,
       impact_area: imp.impact_area,
       impact_strength: imp.impact_strength,
       impact_type: imp.impact_type,
+      timeframe: imp.timeframe ?? "short",
       adjustment_summary: summary,
     });
   }

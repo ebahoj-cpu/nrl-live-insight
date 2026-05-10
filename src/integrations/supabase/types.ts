@@ -104,6 +104,7 @@ export type Database = {
           published_at: string | null
           source: string | null
           teams_affected: Json
+          timeframe: string
           title: string
           url: string
         }
@@ -124,6 +125,7 @@ export type Database = {
           published_at?: string | null
           source?: string | null
           teams_affected?: Json
+          timeframe?: string
           title: string
           url: string
         }
@@ -144,6 +146,7 @@ export type Database = {
           published_at?: string | null
           source?: string | null
           teams_affected?: Json
+          timeframe?: string
           title?: string
           url?: string
         }

@@ -38,9 +38,12 @@ export type NewsImpactRow = {
 export type NewsImpactApplied = {
   article_id: string;
   title: string;
+  url?: string;
+  source?: string | null;
   impact_area: ImpactArea;
   impact_strength: ImpactStrength;
   impact_type: ImpactType;
+  timeframe: ImpactTimeframe;
   adjustment_summary: string;
 };
 

@@ -12,6 +12,8 @@ export type ImpactArea =
   | "lineup" | "fatigue" | "weather" | "scoring_trend"
   | "discipline" | "injury" | "form";
 
+export type ImpactTimeframe = "short" | "mid" | "long";
+
 export type NewsImpactRow = {
   id: string;
   article_id: string;
@@ -25,6 +27,7 @@ export type NewsImpactRow = {
   impact_type: ImpactType;
   impact_area: ImpactArea;
   impact_strength: ImpactStrength;
+  timeframe: ImpactTimeframe;
   model_adjustment: string | null;
   adjustment_summary: string | null;
   active: boolean;

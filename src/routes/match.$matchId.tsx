@@ -2369,10 +2369,7 @@ function InjectedNewsCard({ impacts }: { impacts: Array<{
       ? "border-danger/40 bg-danger/10 text-danger"
       : "border-border bg-surface-2 text-muted-foreground";
   return (
-    <Card>
-      <div className="flex items-center gap-2 mb-3">
-        <div className="text-[11px] uppercase tracking-[0.2em] font-black text-accent">Injected News Insights</div>
-      </div>
+    <Card title="Injected News Insights" icon={Sparkles}>
       <p className="text-xs text-muted-foreground mb-3">
         News articles that have been read and folded into the predicted outcomes (winner, margin, totals, anytime tryscorers).
       </p>

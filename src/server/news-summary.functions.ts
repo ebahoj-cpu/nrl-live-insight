@@ -14,6 +14,8 @@ export type ArticleSummary = {
   bettingImpact: {
     direction: "positive" | "negative" | "neutral";
     note: string;
+    timeframe: "short" | "mid" | "long";
+    timeframeNote?: string;
   };
 };
 

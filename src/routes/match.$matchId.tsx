@@ -2345,7 +2345,67 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
       {/* Last week's lessons (carry-forward from previous Aftermatch) — always render so empty states are visible */}
       <LessonsCard home={home} away={away} lessons={lessons ?? { home: null, away: null }} />
 
+      {/* Injected News Insights — articles that have been read & applied to this fixture's predictions */}
+      <InjectedNewsCard impacts={(insights as any)?.newsImpactsApplied ?? []} />
+
     </div>
+  );
+}
+
+function InjectedNewsCard({ impacts }: { impacts: Array<{
+  article_id: string; title: string; url?: string; source?: string | null;
+  impact_area: string; impact_strength: string; impact_type: string;
+  timeframe?: "short" | "mid" | "long"; adjustment_summary: string;
+}> }) {
+  if (!impacts || impacts.length === 0) return null;
+  const tfMeta = (tf?: string) => tf === "long"
+    ? { label: "Long term", sub: "Applies rest of season" }
+    : tf === "mid"
+      ? { label: "Mid term", sub: "Applies next 2-3 rounds" }
+      : { label: "Short term", sub: "Applies this round" };
+  const toneFor = (t: string) => t === "positive"
+    ? "border-accent/40 bg-accent/10 text-accent"
+    : t === "negative"
+      ? "border-danger/40 bg-danger/10 text-danger"
+      : "border-border bg-surface-2 text-muted-foreground";
+  return (
+    <Card>
+      <div className="flex items-center gap-2 mb-3">
+        <div className="text-[11px] uppercase tracking-[0.2em] font-black text-accent">Injected News Insights</div>
+      </div>
+      <p className="text-xs text-muted-foreground mb-3">
+        News articles that have been read and folded into the predicted outcomes (winner, margin, totals, anytime tryscorers).
+      </p>
+      <ul className="space-y-2">
+        {impacts.map((i) => {
+          const meta = tfMeta(i.timeframe);
+          return (
+            <li key={i.article_id} className={`rounded-xl border p-3 ${toneFor(i.impact_type)}`}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-[10px] uppercase tracking-wider font-bold opacity-90">
+                    {i.impact_area.replace(/_/g, " ")} · {i.impact_strength}
+                  </div>
+                  <div className="text-sm font-extrabold text-foreground mt-0.5 leading-snug">
+                    {i.url ? (
+                      <a href={i.url} target="_blank" rel="noopener noreferrer" className="hover:underline">{i.title}</a>
+                    ) : i.title}
+                  </div>
+                  {i.source && <div className="text-[10px] text-muted-foreground mt-0.5">{i.source}</div>}
+                </div>
+                <div className="shrink-0 text-right">
+                  <div className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-background/40 border border-current">
+                    {meta.label}
+                  </div>
+                  <div className="text-[9px] text-muted-foreground mt-1">{meta.sub}</div>
+                </div>
+              </div>
+              <p className="text-[12px] leading-relaxed text-foreground/90 mt-2">{i.adjustment_summary}</p>
+            </li>
+          );
+        })}
+      </ul>
+    </Card>
   );
 }
 

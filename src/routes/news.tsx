@@ -278,6 +278,8 @@ function InjectButton({ item, data }: { item: NewsItemProps["item"]; data: Artic
         summary: `${item.summary ?? ""} ${data.summary} ${data.bettingImpact.note}`.trim(),
         impact_type: data.bettingImpact.direction,
         impact_note: data.bettingImpact.note,
+        timeframe: data.bettingImpact.timeframe,
+        timeframe_note: data.bettingImpact.timeframeNote,
       },
     }),
     onSuccess: () => {
@@ -314,6 +316,8 @@ function ImpactBody({ item, data }: { item: NewsItemProps["item"]; data: Article
         ? { Icon: TrendingDown, label: "Negative impact", className: "text-danger border-danger/40 bg-danger/10" }
         : { Icon: Minus, label: "Neutral impact", className: "text-muted-foreground border-border bg-surface-2" };
   const Icon = tone.Icon;
+  const tf = data.bettingImpact.timeframe;
+  const tfLabel = tf === "long" ? "Long term · rest of season" : tf === "mid" ? "Mid term · next 2-3 rounds" : "Short term · this round";
   return (
     <div className={`rounded-xl border p-3 ${tone.className}`}>
       <div className="flex items-center justify-between gap-2 mb-1">
@@ -323,6 +327,10 @@ function ImpactBody({ item, data }: { item: NewsItemProps["item"]; data: Article
         </div>
         <InjectButton item={item} data={data} />
       </div>
+      <div className="text-[10px] uppercase tracking-wider font-bold text-accent/90 mb-1">{tfLabel}</div>
+      {data.bettingImpact.timeframeNote && (
+        <p className="text-[11px] text-muted-foreground italic mb-1">{data.bettingImpact.timeframeNote}</p>
+      )}
       <p className="text-xs leading-relaxed text-foreground/90">{data.bettingImpact.note}</p>
     </div>
   );

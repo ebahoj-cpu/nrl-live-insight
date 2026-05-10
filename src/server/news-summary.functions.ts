@@ -14,6 +14,8 @@ export type ArticleSummary = {
   bettingImpact: {
     direction: "positive" | "negative" | "neutral";
     note: string;
+    timeframe: "short" | "mid" | "long";
+    timeframeNote?: string;
   };
 };
 
@@ -94,8 +96,17 @@ async function callAI(prompt: string, system: string): Promise<ArticleSummary> {
                       description:
                         "1-3 sentences explaining how this news could positively or negatively impact suggested bets (tryscorers, head-to-head, totals). If no clear impact, say so plainly.",
                     },
+                    timeframe: {
+                      type: "string",
+                      enum: ["short", "mid", "long"],
+                      description: "How long the impact lasts. 'short' = this round only (e.g. one-game suspension, weekend weather, late team-list change). 'mid' = next 2-3 rounds (e.g. minor injury, short-term form swing, hooker reshuffle). 'long' = rest of season (e.g. season-ending injury, long-term suspension, coaching change, structural lineup shift).",
+                    },
+                    timeframeNote: {
+                      type: "string",
+                      description: "1 sentence explaining WHY you chose that timeframe (e.g. 'Hamstring injury — out 4-6 weeks per club statement').",
+                    },
                   },
-                  required: ["direction", "note"],
+                  required: ["direction", "note", "timeframe"],
                   additionalProperties: false,
                 },
               },

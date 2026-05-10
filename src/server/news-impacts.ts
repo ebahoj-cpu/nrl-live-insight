@@ -12,6 +12,8 @@ export type ImpactArea =
   | "lineup" | "fatigue" | "weather" | "scoring_trend"
   | "discipline" | "injury" | "form";
 
+export type ImpactTimeframe = "short" | "mid" | "long";
+
 export type NewsImpactRow = {
   id: string;
   article_id: string;
@@ -25,6 +27,7 @@ export type NewsImpactRow = {
   impact_type: ImpactType;
   impact_area: ImpactArea;
   impact_strength: ImpactStrength;
+  timeframe: ImpactTimeframe;
   model_adjustment: string | null;
   adjustment_summary: string | null;
   active: boolean;
@@ -35,9 +38,12 @@ export type NewsImpactRow = {
 export type NewsImpactApplied = {
   article_id: string;
   title: string;
+  url?: string;
+  source?: string | null;
   impact_area: ImpactArea;
   impact_strength: ImpactStrength;
   impact_type: ImpactType;
+  timeframe: ImpactTimeframe;
   adjustment_summary: string;
 };
 
@@ -101,6 +107,7 @@ export async function insertImpact(row: Omit<NewsImpactRow, "id" | "created_at" 
       impact_type: row.impact_type,
       impact_area: row.impact_area,
       impact_strength: row.impact_strength,
+      timeframe: row.timeframe,
       model_adjustment: row.model_adjustment,
       adjustment_summary: row.adjustment_summary,
       active: row.active ?? true,
@@ -227,9 +234,12 @@ export function applyImpacts(payload: Record<string, unknown>, impacts: NewsImpa
     applied.push({
       article_id: imp.article_id,
       title: imp.title,
+      url: imp.url,
+      source: imp.source,
       impact_area: imp.impact_area,
       impact_strength: imp.impact_strength,
       impact_type: imp.impact_type,
+      timeframe: imp.timeframe ?? "short",
       adjustment_summary: summary,
     });
   }

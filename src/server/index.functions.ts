@@ -512,6 +512,28 @@ export const getMatchInsights = createServerFn({ method: "GET" })
         // entirely to its legacy ladder-driven heuristic.
         let simulation: import("./simulation-types").SimulationSummary | null = null;
         if (isSimulationEnabled() && snap) {
+          // Phase 3: opportunistically warm enriched normalised data so the
+          // simulation can use real injuries / officials / team-stats. Never
+          // required — failures fall back to Phase 2 behaviour.
+          let enriched: Awaited<ReturnType<typeof import("./nrl-data-store").getEnrichedMatchBundle>> | null = null;
+          try {
+            const store = await import("./nrl-data-store");
+            enriched = await store.getEnrichedMatchBundle({
+              matchId: data.matchId,
+              season,
+              homeNickname: details.homeTeam.nickName,
+              awayNickname: details.awayTeam.nickName,
+              kickoffUtc: details.kickoffUtc,
+              forceRefresh: data.refresh,
+            });
+          } catch (e) {
+            if (process.env.NODE_ENV !== "production") {
+              console.warn("[insights] enriched bundle fetch failed (continuing):", e);
+            }
+          }
+          const hasNamedTeamLists = enriched?.teamLists
+            ? !!(enriched.teamLists.home.isNamed && enriched.teamLists.away.isNamed)
+            : hasSquads;
           simulation = await getOrGenerateSimulation({
             matchId: data.matchId,
             homeNickname: details.homeTeam.nickName,
@@ -526,6 +548,12 @@ export const getMatchInsights = createServerFn({ method: "GET" })
             round: details.roundNumber,
             season,
             forceRefresh: data.refresh,
+            normalisedHomeStats: enriched?.homeTeamStats ?? null,
+            normalisedAwayStats: enriched?.awayTeamStats ?? null,
+            injuries: enriched?.injuries ?? null,
+            officials: enriched?.officials ?? null,
+            hasOfficials: !!(enriched?.officials && enriched.officials.length > 0),
+            hasNamedTeamLists,
           });
         }
 

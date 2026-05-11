@@ -60,7 +60,21 @@ export function buildDeterministicBets(args: {
   // deterministic engine — never invents a player not in the named squads).
   simulation?: SimulationSummary | null;
 }): BetPlay[] {
-  const { engine, realOdds, homeNickname, awayNickname, mode, simulation } = args;
+  const { engine, realOdds, homeNickname, awayNickname, mode } = args;
+  // Reject malformed simulations early. Treat them as missing so deterministic
+  // output is unaffected. Also drop a malformed playerProbabilities array so
+  // we never re-order anytime picks from junk data.
+  const simulation = (() => {
+    const s = args.simulation ?? null;
+    if (!s) return null;
+    const ok = (n: unknown): n is number => typeof n === "number" && Number.isFinite(n) && n >= 0 && n <= 1;
+    if (!ok(s.homeWinProb) || !ok(s.awayWinProb) || !ok(s.drawProb)) return null;
+    if (s.confidence !== "low" && s.confidence !== "medium" && s.confidence !== "high") return null;
+    const pp = Array.isArray(s.playerProbabilities)
+      ? s.playerProbabilities.filter((p) => p && typeof p.name === "string" && ok(p.anytimeProb))
+      : [];
+    return { ...s, playerProbabilities: pp };
+  })();
   const winnerNick = engine.matchWinner.nickname;
   const winnerIsHome = winnerNick.toLowerCase() === homeNickname.toLowerCase();
   const winnerPrice = (winnerIsHome ? realOdds?.h2h.home?.price : realOdds?.h2h.away?.price) ?? 1.85;

@@ -136,7 +136,7 @@ export function generateDeterministicInsights(inp: EngineInputs): DeterministicI
   // confidence we trust its richer signal over the legacy logistic model.
   // Low confidence → blend (use sim only when it agrees with the legacy
   // engine on the winner). Missing → keep legacy outputs unchanged.
-  const ext = inp.simulation ?? null;
+  const ext = validateSimulationLight(inp.simulation ?? null);
   const useExt = !!ext && ext.confidence !== "low";
   let homeWinProb = sim.homeWinProb;
   let awayWinProb = sim.awayWinProb;

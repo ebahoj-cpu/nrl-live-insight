@@ -15,6 +15,7 @@ import { insightsTtlMs } from "@/server/cache";
 import { generateScript } from "@/server/script-engine";
 import { buildDeterministicBets } from "@/server/bets-engine";
 import { snapshotPrediction, buildSnapshotRow } from "@/server/prediction-tracking";
+import { getEnrichedMatchBundle, getTeamStats, getPlayerStats } from "@/server/nrl-data-store";
 import type { Insights } from "@/server/ai-insights";
 
 export const Route = createFileRoute("/api/public/hooks/precompute-insights")({

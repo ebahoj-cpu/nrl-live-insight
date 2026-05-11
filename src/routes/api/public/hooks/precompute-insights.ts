@@ -141,7 +141,7 @@ export const Route = createFileRoute("/api/public/hooks/precompute-insights")({
                 tryscorers,
               }));
             } catch (e) { console.warn("snapshotPrediction failed:", e); }
-            results.push({ matchId: f.matchId, ok: true });
+            results.push({ matchId: f.matchId, ok: true, warmed: matchWarm });
           } catch (e) {
             results.push({
               matchId: f.matchId,

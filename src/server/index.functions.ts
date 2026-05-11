@@ -641,6 +641,7 @@ export const getMatchInsights = createServerFn({ method: "GET" })
               homeNickname: details.homeTeam.nickName,
               awayNickname: details.awayTeam.nickName,
               mode: resolved.mode,
+              simulation,
             });
             // Scrub any AI-named tryscorer not in the named squads.
             const idx = indexSquads(details.homeTeam.players, details.awayTeam.players);

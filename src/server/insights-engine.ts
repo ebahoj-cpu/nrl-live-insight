@@ -380,6 +380,16 @@ function rankTryscorers(inp: EngineInputs, home: TeamSeasonStats, away: TeamSeas
       const winnerBoost = isWinner ? 1.05 : 0.97;
       const blowoutBoost = projectedMargin >= 16 ? 1.04 : 1.0;
 
+      // ---- Opponent edge-defence weakness ----
+      // Conventional NRL jersey numbering: 2/5 = wings, 3/4 = centres. We don't
+      // have left/right defensive splits in season data, so we approximate by
+      // boosting *all* edge backs against opponents who concede tries above
+      // the league baseline (~3.5 tries/game). Numbers > 1 favour the player.
+      const opponentTriesPerGame = oppSeason.played > 0 ? (oppSeason.triesAgainst / oppSeason.played) : 3.5;
+      const edgeSoftness = clamp(opponentTriesPerGame / 3.5, 0.85, 1.35);
+      const isEdgeBack = role === "wing" || role === "centre";
+      const edgeWeaknessBoost = isEdgeBack ? edgeSoftness : 1.0;
+
       // ---- Advanced metrics with fallbacks ----
       const lineBreaks       = s?.lineBreaks       ?? firstHalfTries * 0.5;
       const lineBreakAssists = s?.lineBreakAssists ?? (role === "halves" || role === "hooker" ? tpm * 1.2 : 0);
@@ -405,7 +415,7 @@ function rankTryscorers(inp: EngineInputs, home: TeamSeasonStats, away: TeamSeas
         + runMetresScore     * 0.20
         + recentFormBoost;
 
-      let baseScore = attackingInvolvement * posWeight * teamFactor * winnerBoost * blowoutBoost;
+      let baseScore = attackingInvolvement * posWeight * teamFactor * winnerBoost * blowoutBoost * edgeWeaknessBoost;
 
       const price = priceFor(c.name);
       const oddsFloor = price && price > 0 && price < 8 ? 0.6 : 0;

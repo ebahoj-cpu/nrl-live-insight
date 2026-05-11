@@ -504,6 +504,31 @@ export const getMatchInsights = createServerFn({ method: "GET" })
         let deterministic: DeterministicInsights | null = null;
         let scriptPayload: ScriptPayload | null = null;
         const snap = await getSeasonSnapshot(season).catch(() => null);
+
+        // ---- Phase 2 simulation (feature-flagged, fail-safe) ----
+        // Built BEFORE the deterministic engine so the override block in the
+        // engine can pick it up. Returns null when the flag is off, snapshot
+        // is missing, the cache+gen path errors, etc — engine then falls back
+        // entirely to its legacy ladder-driven heuristic.
+        let simulation: import("./simulation-types").SimulationSummary | null = null;
+        if (isSimulationEnabled() && snap) {
+          simulation = await getOrGenerateSimulation({
+            matchId: data.matchId,
+            homeNickname: details.homeTeam.nickName,
+            awayNickname: details.awayTeam.nickName,
+            homeSquad: details.homeTeam.players,
+            awaySquad: details.awayTeam.players,
+            snapshot: snap,
+            modelMode: resolved.mode,
+            matchState: details.matchState,
+            hasOdds: !!odds,
+            weather,
+            round: details.roundNumber,
+            season,
+            forceRefresh: data.refresh,
+          });
+        }
+
         const engineInputs = snap ? {
           homeNickname: details.homeTeam.nickName,
           awayNickname: details.awayTeam.nickName,
@@ -518,6 +543,7 @@ export const getMatchInsights = createServerFn({ method: "GET" })
           venue: details.venue,
           mode: resolved.mode,
           confidence: resolved.confidence,
+          simulation,
         } : null;
         if (engineInputs) {
           try {

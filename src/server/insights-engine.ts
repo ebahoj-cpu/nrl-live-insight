@@ -38,6 +38,10 @@ export type EngineInputs = {
   // haven't been updated yet, but new callers should always pass it.
   mode?: ModelMode;
   confidence?: ModelConfidence;
+  // Optional Phase 2 Monte Carlo simulation. When present and not "low"
+  // confidence, its winner / margin / total / score / htft / player ranking
+  // override the legacy ladder-only heuristics.
+  simulation?: SimulationSummary | null;
 };
 
 export type EnginePlayerPick = {

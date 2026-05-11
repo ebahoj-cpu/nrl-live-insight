@@ -76,15 +76,15 @@ export async function writeCache<T>(args: {
     const { error } = await supabaseAdmin
       .from("nrl_source_cache")
       .upsert(
-        {
+        [{
           kind: args.kind,
           cache_key: args.key,
-          payload: args.payload as unknown as object,
+          payload: args.payload as never,
           source: args.source,
-          source_coverage: args.coverage as unknown as object,
+          source_coverage: args.coverage as never,
           generated_at: generatedAt,
           expires_at: expiresAt,
-        },
+        }],
         { onConflict: "kind,cache_key" },
       );
     if (error) {

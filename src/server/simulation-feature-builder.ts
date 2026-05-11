@@ -142,11 +142,11 @@ function buildPlayerFeatures(squad: NrlPlayer[], teamNickname: string, byName: M
     const key = fullName.toLowerCase();
     const pid = (p as { playerId?: number }).playerId;
     const stats = byName.get(key) ?? (pid ? byId.get(pid) : undefined);
-    const apps = Math.max(1, stats?.appearances ?? 1);
+    const apps = Math.max(1, stats?.matches ?? 1);
     const tries = stats?.tries ?? 0;
     const lineBreaks = stats?.lineBreaks ?? 0;
     const tryAssists = stats?.tryAssists ?? 0;
-    const tackleBreaks = stats?.tackleBreaks ?? 0;
+    const tackleBreaks = stats?.tackleBusts ?? 0;
     return {
       playerId: pid ?? 0,
       name: fullName,
@@ -192,8 +192,8 @@ export function buildSimulationInput(args: {
   hasWeather?: boolean;
   weatherTempoModifier?: number;
 }): SimulationInput {
-  const home = getTeam(args.snapshot, args.homeNickname);
-  const away = getTeam(args.snapshot, args.awayNickname);
+  const home = getTeam(args.snapshot, args.homeNickname) ?? undefined;
+  const away = getTeam(args.snapshot, args.awayNickname) ?? undefined;
   const homeFeatures = applyNormalisedTeamStats(teamFromSeason(home, args.homeNickname), args.normalisedHomeStats);
   const awayFeatures = applyNormalisedTeamStats(teamFromSeason(away, args.awayNickname), args.normalisedAwayStats);
 
@@ -205,8 +205,8 @@ export function buildSimulationInput(args: {
   const awayById = new Map(awayPlayers.map((p) => [p.playerId, p]));
 
   const coverage = buildCoverage({
-    homeStats: home,
-    awayStats: away,
+    homeStats: home ?? undefined,
+    awayStats: away ?? undefined,
     homeSquadCount: args.homeSquad.length,
     awaySquadCount: args.awaySquad.length,
     hasOdds: !!args.hasOdds,

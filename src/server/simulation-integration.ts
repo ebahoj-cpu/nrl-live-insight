@@ -23,6 +23,7 @@ import type { OddsEvent, TryscorerMarkets } from "./odds";
 import type { WeatherSnapshot } from "./weather";
 import type { SimulationSummary } from "./simulation-types";
 import type { MarketPrices } from "./value-engine";
+import type { NormalisedTeamStats, NormalisedInjury, NormalisedMatchOfficial } from "./nrl-data-types";
 import { buildSimulationInput } from "./simulation-feature-builder";
 import { runSimulation } from "./simulation-engine";
 import { findTeam } from "@/lib/teams";

@@ -191,6 +191,10 @@ export function buildSimulationInput(args: {
   hasOdds?: boolean;
   hasWeather?: boolean;
   weatherTempoModifier?: number;
+  // Phase 3 enrichment
+  injuries?: { name: string; teamNickname: string; status: "out" | "doubtful" | "test" | "available" }[];
+  hasOfficials?: boolean;
+  hasNamedTeamLists?: boolean;
 }): SimulationInput {
   const home = getTeam(args.snapshot, args.homeNickname) ?? undefined;
   const away = getTeam(args.snapshot, args.awayNickname) ?? undefined;
@@ -204,6 +208,23 @@ export function buildSimulationInput(args: {
   const homeById = new Map(homePlayers.map((p) => [p.playerId, p]));
   const awayById = new Map(awayPlayers.map((p) => [p.playerId, p]));
 
+  let homeFeats = buildPlayerFeatures(args.homeSquad, args.homeNickname, homeByName, homeById);
+  let awayFeats = buildPlayerFeatures(args.awaySquad, args.awayNickname, awayByName, awayById);
+
+  // Phase 3: apply injuries → availabilityProb (out=0, doubtful=0.4, test=0.7).
+  if (args.injuries?.length) {
+    const adj = (feats: PlayerFeature[], nick: string) => feats.map((f) => {
+      const inj = args.injuries!.find(
+        (i) => i.teamNickname.toLowerCase() === nick.toLowerCase() && i.name.toLowerCase() === f.name.toLowerCase(),
+      );
+      if (!inj) return f;
+      const probMap = { out: 0, doubtful: 0.4, test: 0.7, available: 1 } as const;
+      return { ...f, availabilityProb: probMap[inj.status] };
+    });
+    homeFeats = adj(homeFeats, args.homeNickname);
+    awayFeats = adj(awayFeats, args.awayNickname);
+  }
+
   const coverage = buildCoverage({
     homeStats: home ?? undefined,
     awayStats: away ?? undefined,
@@ -212,13 +233,17 @@ export function buildSimulationInput(args: {
     hasOdds: !!args.hasOdds,
     hasWeather: !!args.hasWeather,
   });
+  // Note enrichment in coverage.
+  if (args.normalisedHomeStats || args.normalisedAwayStats) coverage.sourcesUsed.push("merged");
+  if (!args.hasOfficials) coverage.missingFields.push("officials");
+  if (args.hasNamedTeamLists === false) coverage.missingFields.push("named_team_lists");
 
   return {
     matchId: args.matchId,
     homeFeatures,
     awayFeatures,
-    homePlayers: buildPlayerFeatures(args.homeSquad, args.homeNickname, homeByName, homeById),
-    awayPlayers: buildPlayerFeatures(args.awaySquad, args.awayNickname, awayByName, awayById),
+    homePlayers: homeFeats,
+    awayPlayers: awayFeats,
     homeAdvantage: 3,
     weatherTempoModifier: args.weatherTempoModifier,
     seed: args.seed ?? hashSeed(args.matchId),

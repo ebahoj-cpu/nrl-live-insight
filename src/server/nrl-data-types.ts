@@ -20,6 +20,8 @@ export type SourceCoverage = {
   missingFields: string[];
   // ISO timestamp of when the underlying source was last fetched fresh.
   lastUpdated: string;
+  // Optional discrepancy / informational notes captured during merge.
+  notes?: string[];
 };
 
 // ---------- Fixtures ----------

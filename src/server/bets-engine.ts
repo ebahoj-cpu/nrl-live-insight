@@ -11,6 +11,7 @@ import type { DeterministicInsights } from "./insights-engine";
 import type { ModelMode } from "./model-mode";
 import type { RealOdds } from "./ai-insights";
 import type { BetPlay, BetLeg } from "./ai-insights";
+import type { SimulationSummary } from "./simulation-types";
 
 const MAX_BETS = 8;
 

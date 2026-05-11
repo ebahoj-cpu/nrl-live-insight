@@ -22,6 +22,19 @@ import { predictMatchOutcome, predictTotalPoints, recentFormFromResults, type Te
 import { runMonteCarlo, type SimulationResult } from "./model/simulation";
 import type { SimulationSummary } from "./simulation-types";
 
+// Lightweight inline validator — duplicates the strict guard in
+// simulation-integration.ts so the engine stays safe even if a caller
+// hands us a hand-built summary that bypassed getOrGenerateSimulation.
+function validateSimulationLight(s: SimulationSummary | null): SimulationSummary | null {
+  if (!s) return null;
+  const ok = (n: unknown): n is number => typeof n === "number" && Number.isFinite(n) && n >= 0 && n <= 1;
+  if (!ok(s.homeWinProb) || !ok(s.awayWinProb) || !ok(s.drawProb)) return null;
+  if (Math.abs(s.homeWinProb + s.awayWinProb + s.drawProb - 1) > 0.15) return null;
+  if (!s.marginBands || !ok(s.marginBands["1-12"]) || !ok(s.marginBands["13+"])) return null;
+  if (s.confidence !== "low" && s.confidence !== "medium" && s.confidence !== "high") return null;
+  return s;
+}
+
 export type EngineInputs = {
   homeNickname: string;
   awayNickname: string;
@@ -136,7 +149,7 @@ export function generateDeterministicInsights(inp: EngineInputs): DeterministicI
   // confidence we trust its richer signal over the legacy logistic model.
   // Low confidence → blend (use sim only when it agrees with the legacy
   // engine on the winner). Missing → keep legacy outputs unchanged.
-  const ext = inp.simulation ?? null;
+  const ext = validateSimulationLight(inp.simulation ?? null);
   const useExt = !!ext && ext.confidence !== "low";
   let homeWinProb = sim.homeWinProb;
   let awayWinProb = sim.awayWinProb;

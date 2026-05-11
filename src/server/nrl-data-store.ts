@@ -148,3 +148,280 @@ export async function readWithRefresh<T>(args: {
   }
   return refresh();
 }
+
+// ============================================================================
+// High-level per-kind getters. These are what nrl-data-refresh.ts and the
+// match-insights flow call. Each one:
+//   1. Tries Supabase cache (stale-while-revalidate) for the right TTL.
+//   2. Fetches NRL.com via nrlcom-client (primary).
+//   3. Optionally fetches Zyla (enrichment) and merges.
+//   4. Returns null on total failure — callers fall back to deterministic.
+// ============================================================================
+
+import * as nrlcom from "./nrlcom-client";
+import * as zyla from "./zyla-client";
+import * as M from "./nrl-data-merge";
+import { makeCoverage } from "./source-coverage";
+import type {
+  NormalisedFixture,
+  NormalisedLadder,
+  NormalisedTeamList,
+  NormalisedTeamStats,
+  NormalisedPlayerStats,
+  NormalisedMatchOfficial,
+  NormalisedInjury,
+  NormalisedHistoricalMatch,
+} from "./nrl-data-types";
+
+// ---------- TTL helpers ----------
+const MIN = 60_000;
+const HOUR = 60 * MIN;
+const DAY = 24 * HOUR;
+
+function fixtureTtl(f: NormalisedFixture | undefined, kickoffMs?: number): number {
+  if (!f) return 6 * HOUR;
+  if (f.status === "live") return MIN;
+  if (f.status === "completed") {
+    const ko = kickoffMs ?? Date.parse(f.kickoffUtc);
+    const ageH = (Date.now() - ko) / HOUR;
+    return ageH < 2 ? 5 * MIN : DAY;
+  }
+  // Scheduled — pre-match
+  const ko = kickoffMs ?? Date.parse(f.kickoffUtc);
+  const hoursUntil = (ko - Date.now()) / HOUR;
+  if (hoursUntil > 24) return 6 * HOUR;
+  return 15 * MIN;
+}
+
+function ladderTtl(): number {
+  const day = new Date().getUTCDay();
+  // Match days (Thu=4..Mon=1)
+  const matchDay = day === 0 || day === 1 || day === 4 || day === 5 || day === 6;
+  return matchDay ? 15 * MIN : 60 * MIN;
+}
+
+function teamListTtl(kickoffUtc?: string): number {
+  if (!kickoffUtc) return 30 * MIN;
+  const hoursUntil = (Date.parse(kickoffUtc) - Date.now()) / HOUR;
+  if (hoursUntil <= 1.5) return 2 * MIN;
+  if (hoursUntil <= 24) return 5 * MIN;
+  return 30 * MIN;
+}
+
+// ---------- Fixtures ----------
+export async function getFixtures(args: { season: number; round?: number; forceRefresh?: boolean }): Promise<NormalisedFixture[] | null> {
+  const key = `${args.season}:${args.round ?? "all"}`;
+  const entry = await readWithRefresh<NormalisedFixture[]>({
+    kind: "fixtures",
+    key,
+    ttlMs: 15 * MIN,
+    source: "merged",
+    forceRefresh: args.forceRefresh,
+    fetcher: async () => {
+      const primary = await nrlcom.getNrlDraw(args.season, args.round);
+      let enrichment: NormalisedFixture[] | null = null;
+      if (args.round != null) enrichment = await zyla.getZylaFixtures(args.season, args.round).catch(() => null);
+      const merged = M.mergeFixtures(primary, enrichment);
+      if (!merged.length) return null;
+      return {
+        payload: merged,
+        coverage: makeCoverage({
+          primary: primary?.length ? "nrl.com" : "zyla",
+          sourcesUsed: [primary?.length ? "nrl.com" : null, enrichment?.length ? "zyla" : null].filter(Boolean) as ("nrl.com" | "zyla")[],
+        }),
+      };
+    },
+  });
+  return entry?.payload ?? null;
+}
+
+export async function getFixtureByMatchId(args: { matchId: string; forceRefresh?: boolean }): Promise<NormalisedFixture | null> {
+  // Parse season/round from matchId (e.g. "2026/round-8/...").
+  const parts = args.matchId.split("/");
+  const season = Number(parts[0]);
+  const round = Number((parts[1] ?? "").replace(/\D/g, ""));
+  if (!Number.isFinite(season) || !Number.isFinite(round)) return null;
+  const list = await getFixtures({ season, round, forceRefresh: args.forceRefresh });
+  return list?.find((f) => f.matchId === args.matchId) ?? null;
+}
+
+// ---------- Ladder ----------
+export async function getLadder(args: { season: number; forceRefresh?: boolean }): Promise<NormalisedLadder | null> {
+  const entry = await readWithRefresh<NormalisedLadder>({
+    kind: "ladder",
+    key: String(args.season),
+    ttlMs: ladderTtl(),
+    source: "merged",
+    forceRefresh: args.forceRefresh,
+    fetcher: async () => {
+      const primary = await nrlcom.getNrlLadder(args.season);
+      const enrichment = await zyla.getZylaLadder(args.season).catch(() => null);
+      const merged = M.mergeLadder(primary, enrichment);
+      if (!merged) return null;
+      return { payload: merged, coverage: merged.coverage };
+    },
+  });
+  return entry?.payload ?? null;
+}
+
+// ---------- Match details (passthrough cached) ----------
+export async function getMatchDetails(args: { matchId: string; forceRefresh?: boolean }) {
+  const entry = await readWithRefresh<unknown>({
+    kind: "match_result",
+    key: args.matchId,
+    ttlMs: 5 * MIN,
+    source: "nrl.com",
+    forceRefresh: args.forceRefresh,
+    fetcher: async () => {
+      const d = await nrlcom.getNrlMatchDetails(args.matchId);
+      if (!d) return null;
+      return { payload: d, coverage: makeCoverage({ primary: "nrl.com" }) };
+    },
+  });
+  return entry?.payload ?? null;
+}
+
+// ---------- Team lists ----------
+export async function getTeamLists(args: { matchId: string; kickoffUtc?: string; forceRefresh?: boolean }): Promise<{ home: NormalisedTeamList; away: NormalisedTeamList } | null> {
+  const entry = await readWithRefresh<{ home: NormalisedTeamList; away: NormalisedTeamList }>({
+    kind: "team_list",
+    key: args.matchId,
+    ttlMs: teamListTtl(args.kickoffUtc),
+    source: "nrl.com",
+    forceRefresh: args.forceRefresh,
+    fetcher: async () => {
+      const tl = await nrlcom.getNrlTeamLists(args.matchId);
+      if (!tl) return null;
+      return { payload: tl, coverage: tl.home.coverage };
+    },
+  });
+  return entry?.payload ?? null;
+}
+
+// ---------- Injuries ----------
+export async function getInjuries(args: { matchId: string; forceRefresh?: boolean }): Promise<NormalisedInjury[] | null> {
+  const entry = await readWithRefresh<NormalisedInjury[]>({
+    kind: "officials",
+    key: `injuries:${args.matchId}`,
+    ttlMs: 2 * HOUR,
+    source: "nrl.com",
+    forceRefresh: args.forceRefresh,
+    fetcher: async () => {
+      const inj = await nrlcom.getNrlInjuries(args.matchId);
+      if (!inj) return null;
+      return { payload: inj, coverage: makeCoverage({ primary: "nrl.com" }) };
+    },
+  });
+  return entry?.payload ?? null;
+}
+
+// ---------- Match officials ----------
+export async function getMatchOfficials(args: { matchId: string; forceRefresh?: boolean }): Promise<NormalisedMatchOfficial[] | null> {
+  const entry = await readWithRefresh<NormalisedMatchOfficial[]>({
+    kind: "officials",
+    key: args.matchId,
+    ttlMs: DAY,
+    source: "nrl.com",
+    forceRefresh: args.forceRefresh,
+    fetcher: async () => {
+      const offs = await nrlcom.getNrlMatchOfficials(args.matchId);
+      if (!offs) return null;
+      return { payload: offs, coverage: makeCoverage({ primary: "nrl.com" }) };
+    },
+  });
+  return entry?.payload ?? null;
+}
+
+// ---------- Historical ----------
+export async function getHistoricalMatches(args: { season: number; rounds?: number[]; forceRefresh?: boolean }): Promise<NormalisedHistoricalMatch[] | null> {
+  const entry = await readWithRefresh<NormalisedHistoricalMatch[]>({
+    kind: "historical",
+    key: `${args.season}:${args.rounds?.join(",") ?? "all"}`,
+    ttlMs: 12 * HOUR,
+    source: "nrl.com",
+    forceRefresh: args.forceRefresh,
+    fetcher: async () => {
+      const hist = await nrlcom.getNrlHistoricalMatches(args.season, args.rounds);
+      if (!hist) return null;
+      return { payload: hist, coverage: makeCoverage({ primary: "nrl.com" }) };
+    },
+  });
+  return entry?.payload ?? null;
+}
+
+// ---------- Team / player season stats ----------
+export async function getTeamStats(args: { season: number; forceRefresh?: boolean }): Promise<NormalisedTeamStats[] | null> {
+  const entry = await readWithRefresh<NormalisedTeamStats[]>({
+    kind: "team_stats",
+    key: String(args.season),
+    ttlMs: 6 * HOUR,
+    source: "nrl.com",
+    forceRefresh: args.forceRefresh,
+    fetcher: async () => {
+      const stats = await nrlcom.getNrlTeamStats(args.season);
+      if (!stats || !stats.length) return null;
+      return { payload: stats, coverage: makeCoverage({ primary: "nrl.com" }) };
+    },
+  });
+  return entry?.payload ?? null;
+}
+
+export async function getPlayerStats(args: { season: number; forceRefresh?: boolean }): Promise<NormalisedPlayerStats[] | null> {
+  const entry = await readWithRefresh<NormalisedPlayerStats[]>({
+    kind: "player_stats",
+    key: String(args.season),
+    ttlMs: 6 * HOUR,
+    source: "merged",
+    forceRefresh: args.forceRefresh,
+    fetcher: async () => {
+      const primary = await nrlcom.getNrlPlayerStats(args.season);
+      // Zyla "all players" is fine at season level as enrichment for missing fields.
+      const merged = M.mergePlayerStats(primary, null);
+      if (!merged.length) return null;
+      return {
+        payload: merged,
+        coverage: makeCoverage({ primary: primary?.length ? "nrl.com" : "zyla" }),
+      };
+    },
+  });
+  return entry?.payload ?? null;
+}
+
+// ---------- Bundle for simulation feature builder ----------
+export type EnrichedMatchBundle = {
+  fixture: NormalisedFixture | null;
+  teamLists: { home: NormalisedTeamList; away: NormalisedTeamList } | null;
+  homeTeamStats: NormalisedTeamStats | null;
+  awayTeamStats: NormalisedTeamStats | null;
+  playerStats: NormalisedPlayerStats[];
+  injuries: NormalisedInjury[];
+  officials: NormalisedMatchOfficial[];
+};
+
+export async function getEnrichedMatchBundle(args: {
+  matchId: string;
+  season: number;
+  homeNickname: string;
+  awayNickname: string;
+  kickoffUtc?: string;
+  forceRefresh?: boolean;
+}): Promise<EnrichedMatchBundle> {
+  const [fixture, teamLists, teamStats, playerStats, injuries, officials] = await Promise.all([
+    getFixtureByMatchId({ matchId: args.matchId, forceRefresh: args.forceRefresh }).catch(() => null),
+    getTeamLists({ matchId: args.matchId, kickoffUtc: args.kickoffUtc, forceRefresh: args.forceRefresh }).catch(() => null),
+    getTeamStats({ season: args.season, forceRefresh: args.forceRefresh }).catch(() => null),
+    getPlayerStats({ season: args.season, forceRefresh: args.forceRefresh }).catch(() => null),
+    getInjuries({ matchId: args.matchId, forceRefresh: args.forceRefresh }).catch(() => null),
+    getMatchOfficials({ matchId: args.matchId, forceRefresh: args.forceRefresh }).catch(() => null),
+  ]);
+  const lc = (s: string) => s.toLowerCase();
+  return {
+    fixture,
+    teamLists,
+    homeTeamStats: teamStats?.find((t) => lc(t.nickname) === lc(args.homeNickname)) ?? null,
+    awayTeamStats: teamStats?.find((t) => lc(t.nickname) === lc(args.awayNickname)) ?? null,
+    playerStats: playerStats ?? [],
+    injuries: injuries ?? [],
+    officials: officials ?? [],
+  };
+}

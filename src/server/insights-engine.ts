@@ -18,6 +18,8 @@ import { getTeam, getTeamPlayers } from "./season-stats";
 import type { NrlLadderRow, NrlPlayer } from "./nrl";
 import type { TryscorerMarkets } from "./odds";
 import type { ModelMode, ModelConfidence } from "./model-mode";
+import { predictMatchOutcome, predictTotalPoints, recentFormFromResults, type TeamModelInputs } from "./model/predictor";
+import { runMonteCarlo, type SimulationResult } from "./model/simulation";
 
 export type EngineInputs = {
   homeNickname: string;

@@ -10,13 +10,28 @@ export function makeCoverage(args: {
   sourcesUsed?: DataSource[];
   missingFields?: string[];
   lastUpdated?: string;
+  notes?: string[];
 }): SourceCoverage {
-  return {
+  const c: SourceCoverage = {
     primary: args.primary,
     sourcesUsed: args.sourcesUsed?.length ? args.sourcesUsed : [args.primary],
     missingFields: args.missingFields ?? [],
     lastUpdated: args.lastUpdated ?? new Date().toISOString(),
   };
+  if (args.notes?.length) (c as SourceCoverage & { notes: string[] }).notes = args.notes;
+  return c;
+}
+
+// Append a note (e.g. a discrepancy) without throwing on missing array.
+export function addNote(c: SourceCoverage, note: string): SourceCoverage {
+  const x = c as SourceCoverage & { notes?: string[] };
+  const notes = x.notes ? [...x.notes, note] : [note];
+  return { ...c, ...({ notes } as { notes: string[] }) };
+}
+
+// Convenience: add a "conflict: ..." note when sources disagree on a field.
+export function withConflictNote(c: SourceCoverage, field: string, primaryVal: unknown, otherVal: unknown): SourceCoverage {
+  return addNote(c, `conflict:${field} primary=${String(primaryVal)} other=${String(otherVal)}`);
 }
 
 // Merge two coverage records, preferring the higher-priority source as primary

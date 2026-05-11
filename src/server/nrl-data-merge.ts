@@ -124,3 +124,131 @@ function stripZero<T extends object>(o: T): Partial<T> {
 // Re-export so callers can build a coverage record without two imports.
 export { makeCoverage };
 export type { SourceCoverage };
+
+import type {
+  NormalisedPlayerStats,
+  NormalisedMatchOfficial,
+  NormalisedInjury,
+  NormalisedHistoricalMatch,
+  NormalisedMatchResult,
+} from "./nrl-data-types";
+import { addNote } from "./source-coverage";
+
+// Merge a single fixture (NRL.com wins; Zyla fills missing scalars; conflict noted).
+export function mergeFixture(
+  primary: Maybe<NormalisedFixture>,
+  enrichment: Maybe<NormalisedFixture>,
+): NormalisedFixture | null {
+  if (!primary && !enrichment) return null;
+  if (!primary) return enrichment!;
+  if (!enrichment) return primary;
+  let coverage = mergeCoverage(primary.coverage, enrichment.coverage);
+  // Note any score conflict.
+  if (primary.homeScore != null && enrichment.homeScore != null && primary.homeScore !== enrichment.homeScore) {
+    coverage = addNote(coverage, `conflict:homeScore primary=${primary.homeScore} other=${enrichment.homeScore}`);
+  }
+  if (primary.awayScore != null && enrichment.awayScore != null && primary.awayScore !== enrichment.awayScore) {
+    coverage = addNote(coverage, `conflict:awayScore primary=${primary.awayScore} other=${enrichment.awayScore}`);
+  }
+  return {
+    ...enrichment,
+    ...stripUndefined(primary),
+    coverage,
+  } as NormalisedFixture;
+}
+
+// Merge match details — primary wins outright; enrichment ignored beyond coverage.
+export function mergeMatchDetails<T extends { coverage?: SourceCoverage }>(
+  primary: Maybe<T>,
+  enrichment: Maybe<T>,
+): T | null {
+  if (!primary && !enrichment) return null;
+  if (!primary) return enrichment!;
+  if (!enrichment) return primary;
+  // Primary always wins; just merge coverage if both exist.
+  const coverage = primary.coverage && enrichment.coverage
+    ? mergeCoverage(primary.coverage, enrichment.coverage)
+    : (primary.coverage ?? enrichment.coverage);
+  return { ...primary, coverage } as T;
+}
+
+// Merge two team-list dictionaries indexed by side.
+export function mergeTeamLists(
+  primary: Maybe<{ home: NormalisedTeamList; away: NormalisedTeamList }>,
+  enrichment: Maybe<{ home: NormalisedTeamList; away: NormalisedTeamList }>,
+): { home: NormalisedTeamList; away: NormalisedTeamList } | null {
+  if (!primary && !enrichment) return null;
+  if (!primary) return enrichment!;
+  if (!enrichment) return primary;
+  return {
+    home: mergeTeamList(primary.home, enrichment.home)!,
+    away: mergeTeamList(primary.away, enrichment.away)!,
+  };
+}
+
+export function mergePlayerStats(
+  primary: Maybe<NormalisedPlayerStats[]>,
+  enrichment: Maybe<NormalisedPlayerStats[]>,
+): NormalisedPlayerStats[] {
+  const out = new Map<string, NormalisedPlayerStats>();
+  for (const p of enrichment ?? []) {
+    if (!p || !p.name) continue; // reject malformed rows
+    out.set(p.playerId ? `id:${p.playerId}` : `n:${p.name.toLowerCase()}`, p);
+  }
+  for (const p of primary ?? []) {
+    if (!p || !p.name) continue;
+    const key = p.playerId ? `id:${p.playerId}` : `n:${p.name.toLowerCase()}`;
+    const existing = out.get(key);
+    if (!existing) out.set(key, p);
+    else out.set(key, { ...existing, ...stripZero(p) });
+  }
+  return Array.from(out.values());
+}
+
+export function mergeInjuries(
+  primary: Maybe<NormalisedInjury[]>,
+  enrichment: Maybe<NormalisedInjury[]>,
+): NormalisedInjury[] {
+  const out = new Map<string, NormalisedInjury>();
+  for (const i of enrichment ?? []) {
+    if (!i || !i.name) continue;
+    out.set(`${i.teamNickname}:${i.name.toLowerCase()}`, i);
+  }
+  for (const i of primary ?? []) {
+    if (!i || !i.name) continue;
+    out.set(`${i.teamNickname}:${i.name.toLowerCase()}`, i);
+  }
+  return Array.from(out.values());
+}
+
+export function mergeMatchOfficials(
+  primary: Maybe<NormalisedMatchOfficial[]>,
+  enrichment: Maybe<NormalisedMatchOfficial[]>,
+): NormalisedMatchOfficial[] {
+  // Prefer primary; only fall back to enrichment if primary is empty/missing.
+  if (primary && primary.length) return primary;
+  return enrichment ?? [];
+}
+
+export function mergeHistoricalMatches(
+  primary: Maybe<NormalisedHistoricalMatch[]>,
+  enrichment: Maybe<NormalisedHistoricalMatch[]>,
+): NormalisedHistoricalMatch[] {
+  const out = new Map<string, NormalisedHistoricalMatch>();
+  for (const h of enrichment ?? []) {
+    if (!h || !h.matchId) continue;
+    out.set(h.matchId, h);
+  }
+  for (const h of primary ?? []) {
+    if (!h || !h.matchId) continue;
+    out.set(h.matchId, h);
+  }
+  return Array.from(out.values());
+}
+
+export function mergeMatchResult(
+  primary: Maybe<NormalisedMatchResult>,
+  enrichment: Maybe<NormalisedMatchResult>,
+): NormalisedMatchResult | null {
+  return primary ?? enrichment ?? null;
+}

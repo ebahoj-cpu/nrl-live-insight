@@ -20,6 +20,8 @@ export type SourceCoverage = {
   missingFields: string[];
   // ISO timestamp of when the underlying source was last fetched fresh.
   lastUpdated: string;
+  // Optional discrepancy / informational notes captured during merge.
+  notes?: string[];
 };
 
 // ---------- Fixtures ----------
@@ -184,4 +186,20 @@ export type NormalisedOdds = {
   spreads?: NormalisedOddsLine[];
   anytimeTryscorer?: NormalisedOddsLine[];
   firstTryscorer?: NormalisedOddsLine[];
+};
+
+// ---------- Historical match (lightweight) ----------
+export type NormalisedHistoricalMatch = {
+  matchId: string;
+  season: number;
+  round: number;
+  kickoffUtc: string;
+  homeNickname: string;
+  awayNickname: string;
+  homeScore: number;
+  awayScore: number;
+  winner: "home" | "away" | "draw";
+  margin: number;
+  totalPoints: number;
+  coverage: SourceCoverage;
 };

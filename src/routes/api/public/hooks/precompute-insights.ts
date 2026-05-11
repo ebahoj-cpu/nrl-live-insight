@@ -156,6 +156,7 @@ export const Route = createFileRoute("/api/public/hooks/precompute-insights")({
             season,
             attempted: results.length,
             succeeded: results.filter((r) => r.ok).length,
+            warmed,
             results,
           }, null, 2),
           { headers: { "Content-Type": "application/json" } },

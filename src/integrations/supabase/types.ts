@@ -152,6 +152,39 @@ export type Database = {
         }
         Relationships: []
       }
+      nrl_source_cache: {
+        Row: {
+          cache_key: string
+          expires_at: string
+          generated_at: string
+          id: string
+          kind: string
+          payload: Json
+          source: string
+          source_coverage: Json
+        }
+        Insert: {
+          cache_key: string
+          expires_at: string
+          generated_at?: string
+          id?: string
+          kind: string
+          payload: Json
+          source: string
+          source_coverage?: Json
+        }
+        Update: {
+          cache_key?: string
+          expires_at?: string
+          generated_at?: string
+          id?: string
+          kind?: string
+          payload?: Json
+          source?: string
+          source_coverage?: Json
+        }
+        Relationships: []
+      }
       odds_cache: {
         Row: {
           cache_key: string
@@ -368,6 +401,84 @@ export type Database = {
           script_prediction?: Json | null
           season?: number | null
           secondary_tier_picks?: Json
+        }
+        Relationships: []
+      }
+      simulation_summaries: {
+        Row: {
+          away_team: string
+          away_win_prob: number
+          blowout_prob: number
+          confidence: string
+          draw_prob: number
+          expected_margin: number
+          expected_total: number
+          expires_at: string
+          generated_at: string
+          home_team: string
+          home_win_prob: number
+          id: string
+          iterations: number
+          margin_band_1_12: number
+          margin_band_13_plus: number
+          match_id: string
+          model_mode: string
+          payload: Json
+          round: number | null
+          season: number | null
+          seed: number
+          source_coverage: Json
+          upset_prob: number
+        }
+        Insert: {
+          away_team: string
+          away_win_prob: number
+          blowout_prob?: number
+          confidence: string
+          draw_prob: number
+          expected_margin: number
+          expected_total: number
+          expires_at: string
+          generated_at?: string
+          home_team: string
+          home_win_prob: number
+          id?: string
+          iterations?: number
+          margin_band_1_12: number
+          margin_band_13_plus: number
+          match_id: string
+          model_mode: string
+          payload: Json
+          round?: number | null
+          season?: number | null
+          seed: number
+          source_coverage?: Json
+          upset_prob?: number
+        }
+        Update: {
+          away_team?: string
+          away_win_prob?: number
+          blowout_prob?: number
+          confidence?: string
+          draw_prob?: number
+          expected_margin?: number
+          expected_total?: number
+          expires_at?: string
+          generated_at?: string
+          home_team?: string
+          home_win_prob?: number
+          id?: string
+          iterations?: number
+          margin_band_1_12?: number
+          margin_band_13_plus?: number
+          match_id?: string
+          model_mode?: string
+          payload?: Json
+          round?: number | null
+          season?: number | null
+          seed?: number
+          source_coverage?: Json
+          upset_prob?: number
         }
         Relationships: []
       }

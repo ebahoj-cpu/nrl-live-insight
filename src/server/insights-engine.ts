@@ -20,6 +20,7 @@ import type { TryscorerMarkets } from "./odds";
 import type { ModelMode, ModelConfidence } from "./model-mode";
 import { predictMatchOutcome, predictTotalPoints, recentFormFromResults, type TeamModelInputs } from "./model/predictor";
 import { runMonteCarlo, type SimulationResult } from "./model/simulation";
+import type { SimulationSummary } from "./simulation-types";
 
 export type EngineInputs = {
   homeNickname: string;
@@ -37,6 +38,10 @@ export type EngineInputs = {
   // haven't been updated yet, but new callers should always pass it.
   mode?: ModelMode;
   confidence?: ModelConfidence;
+  // Optional Phase 2 Monte Carlo simulation. When present and not "low"
+  // confidence, its winner / margin / total / score / htft / player ranking
+  // override the legacy ladder-only heuristics.
+  simulation?: SimulationSummary | null;
 };
 
 export type EnginePlayerPick = {
@@ -123,14 +128,48 @@ export function generateDeterministicInsights(inp: EngineInputs): DeterministicI
   const homeShare = 0.5 + (outcomePred.homeWinProb - 0.5) * 0.3;
   const expHome = totalPred.expectedTotal * homeShare;
   const expAway = totalPred.expectedTotal * (1 - homeShare);
-  const predHome = Math.max(6, Math.round(expHome));
-  const predAway = Math.max(6, Math.round(expAway));
+  let predHome = Math.max(6, Math.round(expHome));
+  let predAway = Math.max(6, Math.round(expAway));
+
+  // ---- Phase 2 simulation override -------------------------------------
+  // When the Monte Carlo SimulationSummary is available and not "low"
+  // confidence we trust its richer signal over the legacy logistic model.
+  // Low confidence → blend (use sim only when it agrees with the legacy
+  // engine on the winner). Missing → keep legacy outputs unchanged.
+  const ext = inp.simulation ?? null;
+  const useExt = !!ext && ext.confidence !== "low";
+  let homeWinProb = sim.homeWinProb;
+  let awayWinProb = sim.awayWinProb;
+  let marginBand112 = sim.marginBand["1-12"];
+  let marginBand13 = sim.marginBand["13+"];
+  let meanTotal = sim.meanTotal;
+  let overProbAtRef: number | null = null;
+  if (useExt && ext) {
+    homeWinProb = ext.homeWinProb;
+    awayWinProb = ext.awayWinProb;
+    marginBand112 = ext.marginBands["1-12"];
+    marginBand13 = ext.marginBands["13+"];
+    meanTotal = ext.expectedTotal;
+    overProbAtRef = ext.overProbAtLine;
+    // Honour sim's expected scores (rounded, floored at 6).
+    predHome = Math.max(6, Math.round(ext.expectedHomeScore));
+    predAway = Math.max(6, Math.round(ext.expectedAwayScore));
+  } else if (ext) {
+    // Low-confidence sim: blend if winners agree, otherwise keep legacy.
+    const extHomeWinner = ext.homeWinProb >= ext.awayWinProb;
+    const legacyHomeWinner = sim.homeWinProb >= sim.awayWinProb;
+    if (extHomeWinner === legacyHomeWinner) {
+      homeWinProb = (sim.homeWinProb + ext.homeWinProb) / 2;
+      awayWinProb = (sim.awayWinProb + ext.awayWinProb) / 2;
+      meanTotal = (sim.meanTotal + ext.expectedTotal) / 2;
+    }
+  }
   const projectedTotal = predHome + predAway;
   const projectedMargin = Math.abs(predHome - predAway);
 
   // Winner: simulation-driven so it reflects both probabilities and the
   // home-advantage intercept baked into the predictor.
-  const winnerSide: "home" | "away" = sim.homeWinProb >= sim.awayWinProb ? "home" : "away";
+  const winnerSide: "home" | "away" = homeWinProb >= awayWinProb ? "home" : "away";
   const winnerNick = winnerSide === "home" ? inp.homeNickname : inp.awayNickname;
   const loserNick = winnerSide === "home" ? inp.awayNickname : inp.homeNickname;
   const winnerStats = winnerSide === "home" ? home : away;
@@ -144,9 +183,7 @@ export function generateDeterministicInsights(inp: EngineInputs): DeterministicI
   };
 
   // ---- 2. Winning Margin ----
-  // Use the simulation's empirical band probabilities; fall back to predictor
-  // expectedMargin sign if the bands are tied.
-  const marginBucket: "1-12" | "13+" = sim.marginBand["13+"] > sim.marginBand["1-12"] ? "13+" : "1-12";
+  const marginBucket: "1-12" | "13+" = marginBand13 > marginBand112 ? "13+" : "1-12";
   const margin = {
     bucket: marginBucket,
     reasoning: buildMarginReason(winnerNick, loserNick, projectedMargin, winnerStats, loserStats),
@@ -160,19 +197,16 @@ export function generateDeterministicInsights(inp: EngineInputs): DeterministicI
   };
 
   // ---- 4. Total Points (Over/Under) ----
-  // Reference line: model line, snapped to nearest .5. Lean is taken from the
-  // simulation's empirical over% at that line so it accounts for variance,
-  // not just the point estimate.
-  const refLine = totalPred.line;
-  const ouAtLine = sim.overUnder(refLine);
-  let lean: "over" | "under" = ouAtLine.overProb >= 0.5 ? "over" : "under";
+  const refLine = useExt && ext ? ext.totalLine : totalPred.line;
+  const overProb = overProbAtRef ?? sim.overUnder(refLine).overProb;
+  let lean: "over" | "under" = overProb >= 0.5 ? "over" : "under";
   // Weather suppression: heavy rain pushes towards under.
   const heavyRain = (inp.weather?.precipMm ?? 0) > 4 || (inp.weather?.groundCondition ?? "").toLowerCase().includes("wet");
-  const finalLean: "over" | "under" = heavyRain && lean === "over" && (sim.meanTotal - refLine) < 4 ? "under" : lean;
+  const finalLean: "over" | "under" = heavyRain && lean === "over" && (meanTotal - refLine) < 4 ? "under" : lean;
   const totalPoints = {
     line: refLine,
     lean: finalLean,
-    reasoning: buildTotalReason(Math.round(sim.meanTotal), refLine, finalLean, home, away, heavyRain),
+    reasoning: buildTotalReason(Math.round(meanTotal), refLine, finalLean, home, away, heavyRain),
   };
 
   // ---- 5. Halftime / Fulltime ----

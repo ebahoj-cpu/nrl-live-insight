@@ -1,0 +1,216 @@
+// ============================================================================
+// Simulation integration — Phase 2 wiring.
+//
+// Single entry point used by the match-insights flow to:
+//   1. Check the ENABLE_SIMULATION_ENGINE feature flag.
+//   2. Read a fresh SimulationSummary from `simulation_summaries` if one
+//      exists and isn't expired (and forceRefresh isn't set).
+//   3. Otherwise build a SimulationInput from existing app data
+//      (SeasonSnapshot + named squads + weather + odds presence + modelMode),
+//      run the Monte Carlo engine, persist the summary and return it.
+//   4. NEVER throws — any failure (DB, sim crash, missing snapshot) returns
+//      null so the deterministic engine can carry on.
+//
+// Also provides helpers to extract MarketPrices from the existing OddsEvent /
+// TryscorerMarkets shapes so the bets engine can run buildValuePicks().
+// ============================================================================
+
+import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import type { SeasonSnapshot } from "./season-stats";
+import type { NrlPlayer } from "./nrl";
+import type { ModelMode } from "./model-mode";
+import type { OddsEvent, TryscorerMarkets } from "./odds";
+import type { WeatherSnapshot } from "./weather";
+import type { SimulationSummary } from "./simulation-types";
+import type { MarketPrices } from "./value-engine";
+import { buildSimulationInput } from "./simulation-feature-builder";
+import { runSimulation } from "./simulation-engine";
+import { findTeam } from "@/lib/teams";
+
+// Feature flag — default OFF. Server-only. NEVER expose to the client.
+export function isSimulationEnabled(): boolean {
+  const v = process.env.ENABLE_SIMULATION_ENGINE;
+  return v === "true" || v === "1";
+}
+
+// TTL by match state (ms).
+function ttlForState(matchState: string | undefined): number {
+  if (!matchState) return 30 * 60_000;
+  if (/^(FullTime|Final|Completed)$/i.test(matchState)) return 7 * 24 * 60 * 60_000;
+  if (/InProgress|Live|HalfTime|Post/i.test(matchState)) return 5 * 60_000;
+  return 30 * 60_000; // pre-match
+}
+
+function weatherTempoModifier(w: WeatherSnapshot | null | undefined): number | undefined {
+  if (!w) return undefined;
+  // Wet/heavy = negative tempo. Hot/dry calm = mildly positive.
+  const wet = (w.precipMm ?? 0) > 4 || /wet|heavy/i.test(w.groundCondition || "");
+  if (wet) return -0.6;
+  if ((w.windKph ?? 0) > 35) return -0.3;
+  return 0.1;
+}
+
+// ---------- Cache ----------
+async function readCachedSummary(matchId: string): Promise<SimulationSummary | null> {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("simulation_summaries" as never)
+      .select("payload, expires_at")
+      .eq("match_id" as never, matchId as never)
+      .order("generated_at" as never, { ascending: false } as never)
+      .limit(1)
+      .maybeSingle();
+    if (error || !data) return null;
+    const row = data as unknown as { payload: SimulationSummary; expires_at: string };
+    if (Date.parse(row.expires_at) <= Date.now()) return null;
+    return row.payload;
+  } catch (e) {
+    console.warn("[simulation] readCachedSummary failed:", e);
+    return null;
+  }
+}
+
+async function writeSummary(args: {
+  matchId: string;
+  summary: SimulationSummary;
+  homeNickname: string;
+  awayNickname: string;
+  modelMode: ModelMode;
+  ttlMs: number;
+  round?: number;
+  season?: number;
+}): Promise<void> {
+  try {
+    const s = args.summary;
+    const expiresAt = new Date(Date.now() + args.ttlMs).toISOString();
+    const { error } = await supabaseAdmin
+      .from("simulation_summaries" as never)
+      .insert([{
+        match_id: args.matchId,
+        home_team: args.homeNickname,
+        away_team: args.awayNickname,
+        round: args.round ?? null,
+        season: args.season ?? null,
+        model_mode: args.modelMode,
+        iterations: s.iterations,
+        seed: s.seed,
+        home_win_prob: s.homeWinProb,
+        away_win_prob: s.awayWinProb,
+        draw_prob: s.drawProb,
+        expected_total: s.expectedTotal,
+        expected_margin: s.expectedMargin,
+        margin_band_1_12: s.marginBands["1-12"],
+        margin_band_13_plus: s.marginBands["13+"],
+        upset_prob: s.upsetProb,
+        blowout_prob: s.blowoutProb,
+        confidence: s.confidence,
+        source_coverage: s.coverage as never,
+        payload: s as never,
+        expires_at: expiresAt,
+        generated_at: s.generatedAt,
+      }] as never);
+    if (error) console.warn("[simulation] writeSummary failed:", error.message);
+  } catch (e) {
+    console.warn("[simulation] writeSummary exception:", e);
+  }
+}
+
+// ---------- Public entry point ----------
+export async function getOrGenerateSimulation(args: {
+  matchId: string;
+  homeNickname: string;
+  awayNickname: string;
+  homeSquad: NrlPlayer[];
+  awaySquad: NrlPlayer[];
+  snapshot: SeasonSnapshot | null;
+  modelMode: ModelMode;
+  matchState?: string;
+  hasOdds?: boolean;
+  weather?: WeatherSnapshot | null;
+  round?: number;
+  season?: number;
+  forceRefresh?: boolean;
+}): Promise<SimulationSummary | null> {
+  if (!isSimulationEnabled()) return null;
+  if (!args.snapshot) return null;
+
+  // 1) Cache
+  if (!args.forceRefresh) {
+    const cached = await readCachedSummary(args.matchId);
+    if (cached) return cached;
+  }
+
+  // 2) Generate
+  try {
+    const input = buildSimulationInput({
+      matchId: args.matchId,
+      snapshot: args.snapshot,
+      homeNickname: args.homeNickname,
+      awayNickname: args.awayNickname,
+      homeSquad: args.homeSquad,
+      awaySquad: args.awaySquad,
+      modelMode: args.modelMode,
+      hasOdds: args.hasOdds,
+      hasWeather: !!args.weather,
+      weatherTempoModifier: weatherTempoModifier(args.weather),
+    });
+    const summary = runSimulation(input);
+    // Fire-and-forget persistence — don't block the page.
+    void writeSummary({
+      matchId: args.matchId,
+      summary,
+      homeNickname: args.homeNickname,
+      awayNickname: args.awayNickname,
+      modelMode: args.modelMode,
+      ttlMs: ttlForState(args.matchState),
+      round: args.round,
+      season: args.season,
+    });
+    return summary;
+  } catch (e) {
+    console.warn("[simulation] generation failed — falling back to deterministic only:", e);
+    return null;
+  }
+}
+
+// ---------- Market price extraction ----------
+// Pulls the best (highest decimal odds) per outcome out of the existing
+// OddsEvent / TryscorerMarkets shapes so the value engine can score them.
+export function buildMarketPrices(args: {
+  odds: OddsEvent | null;
+  tryscorers: TryscorerMarkets | null;
+  homeNickname: string;
+  awayNickname: string;
+  totalLine: number;
+}): MarketPrices {
+  const out: MarketPrices = {};
+  if (args.odds) {
+    for (const b of args.odds.bookmakers) {
+      const h2h = b.markets.find((m) => m.key === "h2h");
+      if (h2h) {
+        for (const o of h2h.outcomes) {
+          const isHome = findTeam(o.name)?.nickname === args.homeNickname;
+          if (isHome && (out.homeWin == null || o.price > out.homeWin)) out.homeWin = o.price;
+          else if (!isHome && (out.awayWin == null || o.price > out.awayWin)) out.awayWin = o.price;
+        }
+      }
+      const totals = b.markets.find((m) => m.key === "totals");
+      if (totals) {
+        for (const o of totals.outcomes) {
+          if (o.point !== args.totalLine) continue;
+          if (o.name?.toLowerCase() === "over" && (out.overAtLine == null || o.price > out.overAtLine)) out.overAtLine = o.price;
+          else if (o.name?.toLowerCase() === "under" && (out.underAtLine == null || o.price > out.underAtLine)) out.underAtLine = o.price;
+        }
+      }
+    }
+  }
+  if (args.tryscorers) {
+    out.anytime = {};
+    out.firstTry = {};
+    out.multiTry = {};
+    for (const t of args.tryscorers.anytime ?? []) out.anytime[t.player.toLowerCase()] = t.price;
+    for (const t of args.tryscorers.first ?? []) out.firstTry[t.player.toLowerCase()] = t.price;
+    for (const t of args.tryscorers.multi ?? []) out.multiTry[t.player.toLowerCase()] = t.price;
+  }
+  return out;
+}

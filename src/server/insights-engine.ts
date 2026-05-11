@@ -20,6 +20,7 @@ import type { TryscorerMarkets } from "./odds";
 import type { ModelMode, ModelConfidence } from "./model-mode";
 import { predictMatchOutcome, predictTotalPoints, recentFormFromResults, type TeamModelInputs } from "./model/predictor";
 import { runMonteCarlo, type SimulationResult } from "./model/simulation";
+import type { SimulationSummary } from "./simulation-types";
 
 export type EngineInputs = {
   homeNickname: string;

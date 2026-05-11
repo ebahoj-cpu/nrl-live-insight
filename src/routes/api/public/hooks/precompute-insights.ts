@@ -61,6 +61,24 @@ export const Route = createFileRoute("/api/public/hooks/precompute-insights")({
             const tryscorers = event ? await fetchTryscorerOdds(event.id).catch(() => null) : null;
             const weather = await fetchVenueWeather(details.venue, details.venueCity, details.kickoffUtc).catch(() => null);
 
+            // Phase 3: opportunistically warm per-match enriched bundle.
+            const matchWarm = { teamLists: false, injuries: false, officials: false, fixture: false };
+            try {
+              const bundle = await getEnrichedMatchBundle({
+                matchId: f.matchId,
+                season,
+                homeNickname: details.homeTeam.nickName,
+                awayNickname: details.awayTeam.nickName,
+                kickoffUtc: details.kickoffUtc,
+              });
+              matchWarm.teamLists = !!bundle.teamLists;
+              matchWarm.injuries = bundle.injuries.length > 0;
+              matchWarm.officials = bundle.officials.length > 0;
+              matchWarm.fixture = !!bundle.fixture;
+            } catch (e) {
+              console.warn("warm enriched bundle failed:", f.matchId, e);
+            }
+
             if (!snap) {
               results.push({ matchId: f.matchId, ok: false, reason: "no snapshot" });
               continue;

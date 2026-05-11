@@ -72,4 +72,41 @@ describe("bets-engine simulation integration", () => {
     expect(bets.find((b) => b.category === "low")).toBeDefined();
     expect(bets.find((b) => b.category === "medium")).toBeDefined();
   });
+  it("never invents players outside the engine's named anytime list", () => {
+    const eng = baseEngine();
+    const allowed = new Set(eng.topAnytime.map((p) => p.name.toLowerCase()));
+    const sneaky = sim({
+      playerProbabilities: [
+        { playerId: 99, name: "Some Random Player", teamNickname: "Storm", position: "Wing", firstTryProb: 0.9, anytimeProb: 0.99, multiTryProb: 0.5, expectedTries: 2 },
+      ],
+    });
+    const bets = buildDeterministicBets({ engine: eng, homeNickname: "Storm", awayNickname: "Eels", mode: "final", simulation: sneaky });
+    for (const b of bets.filter((x) => x.scriptAlignment === "anytime-tryscorer")) {
+      const ok = [...allowed].some((n) => b.title.toLowerCase().includes(n.split(" ").pop()!));
+      expect(ok).toBe(true);
+    }
+  });
+  it("ignores malformed playerProbabilities without crashing", () => {
+    const malformed = sim({
+      playerProbabilities: [{ name: "" } as never, { anytimeProb: 99 } as never],
+    });
+    expect(() => buildDeterministicBets({
+      engine: baseEngine(), homeNickname: "Storm", awayNickname: "Eels", mode: "final", simulation: malformed,
+    })).not.toThrow();
+  });
+  it("does not emit redundant duplicate winner-only legs in the multi", () => {
+    const bets = buildDeterministicBets({
+      engine: baseEngine(), homeNickname: "Storm", awayNickname: "Eels", mode: "final",
+    });
+    const ultra = bets.find((b) => b.category === "ultra");
+    if (ultra) {
+      const seen = new Set(ultra.legs.map((l) => l.pick));
+      expect(seen.size).toBe(ultra.legs.length);
+    }
+  });
+  it("handles missing realOdds gracefully (uses fallback prices)", () => {
+    expect(() => buildDeterministicBets({
+      engine: baseEngine(), homeNickname: "Storm", awayNickname: "Eels", mode: "final",
+    })).not.toThrow();
+  });
 });

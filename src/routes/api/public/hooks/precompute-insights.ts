@@ -43,7 +43,12 @@ export const Route = createFileRoute("/api/public/hooks/precompute-insights")({
         const snap = await getSeasonSnapshot(season).catch(() => null);
         const odds = await fetchNrlOdds().catch(() => []);
 
-        const results: Array<{ matchId: string; ok: boolean; reason?: string }> = [];
+        // Phase 3: warm season-level enriched caches once (best-effort).
+        const warmed = { teamStats: false, playerStats: false };
+        try { warmed.teamStats = !!(await getTeamStats({ season })); } catch (e) { console.warn("warm teamStats failed:", e); }
+        try { warmed.playerStats = !!(await getPlayerStats({ season })); } catch (e) { console.warn("warm playerStats failed:", e); }
+
+        const results: Array<{ matchId: string; ok: boolean; reason?: string; warmed?: Record<string, boolean> }> = [];
         for (const f of allFixtures) {
           try {
             const details = await fetchMatchDetails(f.matchId);

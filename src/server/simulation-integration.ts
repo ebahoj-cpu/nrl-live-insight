@@ -120,10 +120,13 @@ async function readCachedSummary(matchId: string): Promise<SimulationSummary | n
       .order("generated_at" as never, { ascending: false } as never)
       .limit(1)
       .maybeSingle();
-    if (error || !data) return null;
+    if (error || !data) { devLog("cache-miss", { matchId }); return null; }
     const row = data as unknown as { payload: SimulationSummary; expires_at: string };
-    if (Date.parse(row.expires_at) <= Date.now()) return null;
-    return row.payload;
+    if (Date.parse(row.expires_at) <= Date.now()) { devLog("cache-expired", { matchId }); return null; }
+    const valid = validateSimulation(row.payload);
+    if (!valid) { devLog("validation-failed", { matchId, where: "cache" }); return null; }
+    devLog("cache-hit", { matchId });
+    return valid;
   } catch (e) {
     console.warn("[simulation] readCachedSummary failed:", e);
     return null;

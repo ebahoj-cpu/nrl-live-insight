@@ -15,6 +15,7 @@ import { insightsTtlMs } from "@/server/cache";
 import { generateScript } from "@/server/script-engine";
 import { buildDeterministicBets } from "@/server/bets-engine";
 import { snapshotPrediction, buildSnapshotRow } from "@/server/prediction-tracking";
+import { getEnrichedMatchBundle, getTeamStats, getPlayerStats } from "@/server/nrl-data-store";
 import type { Insights } from "@/server/ai-insights";
 
 export const Route = createFileRoute("/api/public/hooks/precompute-insights")({
@@ -42,7 +43,12 @@ export const Route = createFileRoute("/api/public/hooks/precompute-insights")({
         const snap = await getSeasonSnapshot(season).catch(() => null);
         const odds = await fetchNrlOdds().catch(() => []);
 
-        const results: Array<{ matchId: string; ok: boolean; reason?: string }> = [];
+        // Phase 3: warm season-level enriched caches once (best-effort).
+        const warmed = { teamStats: false, playerStats: false };
+        try { warmed.teamStats = !!(await getTeamStats({ season })); } catch (e) { console.warn("warm teamStats failed:", e); }
+        try { warmed.playerStats = !!(await getPlayerStats({ season })); } catch (e) { console.warn("warm playerStats failed:", e); }
+
+        const results: Array<{ matchId: string; ok: boolean; reason?: string; warmed?: Record<string, boolean> }> = [];
         for (const f of allFixtures) {
           try {
             const details = await fetchMatchDetails(f.matchId);
@@ -54,6 +60,24 @@ export const Route = createFileRoute("/api/public/hooks/precompute-insights")({
             }) ?? null;
             const tryscorers = event ? await fetchTryscorerOdds(event.id).catch(() => null) : null;
             const weather = await fetchVenueWeather(details.venue, details.venueCity, details.kickoffUtc).catch(() => null);
+
+            // Phase 3: opportunistically warm per-match enriched bundle.
+            const matchWarm = { teamLists: false, injuries: false, officials: false, fixture: false };
+            try {
+              const bundle = await getEnrichedMatchBundle({
+                matchId: f.matchId,
+                season,
+                homeNickname: details.homeTeam.nickName,
+                awayNickname: details.awayTeam.nickName,
+                kickoffUtc: details.kickoffUtc,
+              });
+              matchWarm.teamLists = !!bundle.teamLists;
+              matchWarm.injuries = bundle.injuries.length > 0;
+              matchWarm.officials = bundle.officials.length > 0;
+              matchWarm.fixture = !!bundle.fixture;
+            } catch (e) {
+              console.warn("warm enriched bundle failed:", f.matchId, e);
+            }
 
             if (!snap) {
               results.push({ matchId: f.matchId, ok: false, reason: "no snapshot" });
@@ -117,7 +141,7 @@ export const Route = createFileRoute("/api/public/hooks/precompute-insights")({
                 tryscorers,
               }));
             } catch (e) { console.warn("snapshotPrediction failed:", e); }
-            results.push({ matchId: f.matchId, ok: true });
+            results.push({ matchId: f.matchId, ok: true, warmed: matchWarm });
           } catch (e) {
             results.push({
               matchId: f.matchId,
@@ -132,6 +156,7 @@ export const Route = createFileRoute("/api/public/hooks/precompute-insights")({
             season,
             attempted: results.length,
             succeeded: results.filter((r) => r.ok).length,
+            warmed,
             results,
           }, null, 2),
           { headers: { "Content-Type": "application/json" } },

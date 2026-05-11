@@ -168,9 +168,9 @@ export async function getNrlMatchOfficials(matchId: string): Promise<NormalisedM
 function mapOfficials(officials: NrlOfficial[]): NormalisedMatchOfficial[] {
   return officials.map((o): NormalisedMatchOfficial => {
     const role: NormalisedMatchOfficial["role"] =
-      /referee/i.test(o.position) ? "referee"
+      /video/i.test(o.position) ? "videoRef"
       : /touch/i.test(o.position) ? "touchJudge"
-      : /video/i.test(o.position) ? "videoRef"
+      : /referee/i.test(o.position) ? "referee"
       : "other";
     return { role, name: `${o.firstName} ${o.lastName}`.trim() };
   });

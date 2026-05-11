@@ -27,6 +27,7 @@ import { generateScript, type ScriptPayload } from "./script-engine";
 import { readOddsCache, readOddsCacheStale, writeOddsCache } from "./odds-store";
 import { snapshotPrediction, buildSnapshotRow } from "./prediction-tracking";
 import { listActiveImpacts, impactsForFixture, applyImpacts } from "./news-impacts";
+import { getOrGenerateSimulation, isSimulationEnabled } from "./simulation-integration";
 
 // Source tracking — surfaced in server logs and (where harmless) on payloads.
 export type DataSource = "nrl_com" | "zyla" | "mixed" | "proxy";

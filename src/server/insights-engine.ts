@@ -595,6 +595,36 @@ function roundToHalf(n: number): number {
   return Math.round(n * 2) / 2;
 }
 
+// Convert season stats into normalised inputs for the statistical predictor.
+// Metres-per-game is unavailable directly so we estimate from per-match
+// stats when present, falling back to a league-average proxy.
+function buildModelInputs(t: TeamSeasonStats): TeamModelInputs {
+  const last5Results = (t.last5 ?? []).map((r) => r.result);
+  const recentForm = recentFormFromResults(last5Results);
+  const matchStats = t.matchStats ?? [];
+  const sampled = matchStats.slice(-5);
+  const avg = (xs: number[]): number => xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0;
+  const metres = avg(sampled.map((m) => m.runMetres ?? 0).filter((v) => v > 0));
+  const completionRate = (() => {
+    const ratios = sampled
+      .map((m) => {
+        const sets = (m as { setsCompleted?: number }).setsCompleted;
+        const total = (m as { totalSets?: number }).totalSets;
+        if (typeof sets === "number" && typeof total === "number" && total > 0) return sets / total;
+        return null;
+      })
+      .filter((v): v is number => v !== null);
+    return ratios.length ? avg(ratios) : 0.78;
+  })();
+  return {
+    pointsForPerGame: t.ppgFor || 22,
+    pointsAgainstPerGame: t.ppgAgainst || 22,
+    metresPerGame: metres > 0 ? metres : 1500,
+    completionRate: clamp(completionRate, 0.5, 0.95),
+    recentForm,
+  };
+}
+
 function positionScoringWeight(pos: string): number {
   const p = (pos || "").toLowerCase();
   if (/wing/.test(p)) return 1.45;

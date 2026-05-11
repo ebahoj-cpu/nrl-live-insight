@@ -83,12 +83,12 @@ export function buildEdgeAttackProfile(args: {
   const best = candidates[0];
   // Weakest defensive channel: lowest rating on each side; pick the worst overall.
   const defs: Cand[] = [
-    { team: "home" as const, channel: "left", net: -home.left },
-    { team: "home" as const, channel: "right", net: -home.right },
-    { team: "home" as const, channel: "middle", net: -home.middle },
-    { team: "away" as const, channel: "left", net: -away.left },
-    { team: "away" as const, channel: "right", net: -away.right },
-    { team: "away" as const, channel: "middle", net: -away.middle },
+    { team: "home", channel: "left" as EdgeChannel, net: -home.left },
+    { team: "home", channel: "right" as EdgeChannel, net: -home.right },
+    { team: "home", channel: "middle" as EdgeChannel, net: -home.middle },
+    { team: "away", channel: "left" as EdgeChannel, net: -away.left },
+    { team: "away", channel: "right" as EdgeChannel, net: -away.right },
+    { team: "away", channel: "middle" as EdgeChannel, net: -away.middle },
   ].sort((a, b) => b.net - a.net);
   const weakest = defs[0];
 

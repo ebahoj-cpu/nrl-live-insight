@@ -187,3 +187,19 @@ export type NormalisedOdds = {
   anytimeTryscorer?: NormalisedOddsLine[];
   firstTryscorer?: NormalisedOddsLine[];
 };
+
+// ---------- Historical match (lightweight) ----------
+export type NormalisedHistoricalMatch = {
+  matchId: string;
+  season: number;
+  round: number;
+  kickoffUtc: string;
+  homeNickname: string;
+  awayNickname: string;
+  homeScore: number;
+  awayScore: number;
+  winner: "home" | "away" | "draw";
+  margin: number;
+  totalPoints: number;
+  coverage: SourceCoverage;
+};

@@ -194,13 +194,16 @@ export async function getOrGenerateSimulation(args: {
   season?: number;
   forceRefresh?: boolean;
 }): Promise<SimulationSummary | null> {
-  if (!isSimulationEnabled()) return null;
+  if (!isSimulationEnabled()) { devLog("flag-off"); return null; }
   if (!args.snapshot) return null;
+  devLog("flag-on", { matchId: args.matchId, mode: args.modelMode });
 
   // 1) Cache
   if (!args.forceRefresh) {
     const cached = await readCachedSummary(args.matchId);
     if (cached) return cached;
+  } else {
+    devLog("force-refresh", { matchId: args.matchId });
   }
 
   // 2) Generate
@@ -217,7 +220,10 @@ export async function getOrGenerateSimulation(args: {
       hasWeather: !!args.weather,
       weatherTempoModifier: weatherTempoModifier(args.weather),
     });
-    const summary = runSimulation(input);
+    const raw = runSimulation(input);
+    const summary = validateSimulation(raw);
+    if (!summary) { devLog("validation-failed", { matchId: args.matchId, where: "generate" }); return null; }
+    devLog("generated", { matchId: args.matchId, confidence: summary.confidence });
     // Fire-and-forget persistence — don't block the page.
     void writeSummary({
       matchId: args.matchId,
@@ -231,6 +237,7 @@ export async function getOrGenerateSimulation(args: {
     });
     return summary;
   } catch (e) {
+    devLog("fallback-used", { matchId: args.matchId });
     console.warn("[simulation] generation failed — falling back to deterministic only:", e);
     return null;
   }

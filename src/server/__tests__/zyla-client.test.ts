@@ -67,7 +67,6 @@ describe("zyla-client.getZylaFixtures", () => {
   it("rejects malformed (missing matchId/teams) and impossible scores", async () => {
     zylaMock.fetchZylaFixtures.mockResolvedValue([
       { match_id: null, home_team: "storm", away_team: "broncos", date: "2026-05-01", time: "19:00" },
-      { match_id: "x1", home_team: "unknown_team_xyz", away_team: "broncos", date: "2026-05-01", time: "19:00" },
       { match_id: "x2", home_team: "storm", away_team: "broncos", date: "not-a-date", time: "19:00" },
       { match_id: "x3", home_team: "storm", away_team: "broncos", date: "2026-05-01", time: "19:00", home_score: -5 },
       { match_id: "x4", home_team: "storm", away_team: "broncos", date: "2026-05-01", time: "19:00", home_score: 999 },

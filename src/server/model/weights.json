@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "trainedAt": "2026-05-11",
+  "notes": "Hand-calibrated coefficients. Replace via retraining script.",
+  "outcome": {
+    "intercept": 0.0,
+    "homeAdvantage": 0.32,
+    "pointsFor": 0.85,
+    "pointsAgainst": 0.75,
+    "metres": 0.45,
+    "completion": 0.30,
+    "recentForm": 0.55
+  },
+  "margin": {
+    "intercept": 0.0,
+    "homeAdvantage": 2.5,
+    "pointsFor": 0.55,
+    "pointsAgainst": 0.50,
+    "metres": 1.8,
+    "completion": 1.2,
+    "recentForm": 3.0
+  },
+  "total": {
+    "intercept": 4.0,
+    "attackOwn": 0.55,
+    "defenceOpp": 0.45,
+    "metres": 1.5,
+    "completion": 1.0
+  }
+}

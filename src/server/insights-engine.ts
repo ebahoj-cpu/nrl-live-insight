@@ -18,6 +18,8 @@ import { getTeam, getTeamPlayers } from "./season-stats";
 import type { NrlLadderRow, NrlPlayer } from "./nrl";
 import type { TryscorerMarkets } from "./odds";
 import type { ModelMode, ModelConfidence } from "./model-mode";
+import { predictMatchOutcome, predictTotalPoints, recentFormFromResults, type TeamModelInputs } from "./model/predictor";
+import { runMonteCarlo, type SimulationResult } from "./model/simulation";
 
 export type EngineInputs = {
   homeNickname: string;
@@ -99,22 +101,36 @@ export function generateDeterministicInsights(inp: EngineInputs): DeterministicI
   const homeLadder = inp.ladder.find((r) => r.nickname.toLowerCase() === inp.homeNickname.toLowerCase()) ?? null;
   const awayLadder = inp.ladder.find((r) => r.nickname.toLowerCase() === inp.awayNickname.toLowerCase()) ?? null;
 
-  // ---- Net team rating ----
+  // ---- Net team rating (legacy heuristic, retained for downstream copy) ----
   const ratingHome = teamRating(home, homeLadder, true);
   const ratingAway = teamRating(away, awayLadder, false);
   const netRating = ratingHome - ratingAway; // >0 favours home
 
-  // ---- Predicted score ----
-  // Each team's expected = avg(own PPG-for, opponent PPG-against), shifted by
-  // ±2 for home advantage and net rating.
-  const expHome = blendPoints(home.ppgFor, away.ppgAgainst) + 2 + clamp(netRating * 0.5, -3, 3);
-  const expAway = blendPoints(away.ppgFor, home.ppgAgainst) - 2 + clamp(-netRating * 0.5, -3, 3);
+  // ---- Statistical model: logistic regression + Monte Carlo ----
+  // Replaces the old ladder-only fallback for winner / margin / total.
+  const homeInputs = buildModelInputs(home);
+  const awayInputs = buildModelInputs(away);
+  const outcomePred = predictMatchOutcome(homeInputs, awayInputs);
+  const totalPred = predictTotalPoints(homeInputs, awayInputs);
+  // Monte Carlo over 10k iterations gives us empirical confidence + total
+  // distributions that we use for the over/under line and risk band.
+  const sim: SimulationResult = runMonteCarlo(outcomePred, totalPred, homeInputs, awayInputs, 10_000, {
+    homeConversionRate: clamp(home.scoringEfficiency > 0 ? 0.7 : 0.7, 0.5, 0.85),
+    awayConversionRate: clamp(away.scoringEfficiency > 0 ? 0.7 : 0.7, 0.5, 0.85),
+  });
+
+  // ---- Predicted score (model-driven, with home advantage already in expectedTotal split) ----
+  const homeShare = 0.5 + (outcomePred.homeWinProb - 0.5) * 0.3;
+  const expHome = totalPred.expectedTotal * homeShare;
+  const expAway = totalPred.expectedTotal * (1 - homeShare);
   const predHome = Math.max(6, Math.round(expHome));
   const predAway = Math.max(6, Math.round(expAway));
   const projectedTotal = predHome + predAway;
   const projectedMargin = Math.abs(predHome - predAway);
 
-  const winnerSide: "home" | "away" = predHome >= predAway ? "home" : "away";
+  // Winner: simulation-driven so it reflects both probabilities and the
+  // home-advantage intercept baked into the predictor.
+  const winnerSide: "home" | "away" = sim.homeWinProb >= sim.awayWinProb ? "home" : "away";
   const winnerNick = winnerSide === "home" ? inp.homeNickname : inp.awayNickname;
   const loserNick = winnerSide === "home" ? inp.awayNickname : inp.homeNickname;
   const winnerStats = winnerSide === "home" ? home : away;
@@ -128,7 +144,9 @@ export function generateDeterministicInsights(inp: EngineInputs): DeterministicI
   };
 
   // ---- 2. Winning Margin ----
-  const marginBucket: "1-12" | "13+" = projectedMargin >= 13 ? "13+" : "1-12";
+  // Use the simulation's empirical band probabilities; fall back to predictor
+  // expectedMargin sign if the bands are tied.
+  const marginBucket: "1-12" | "13+" = sim.marginBand["13+"] > sim.marginBand["1-12"] ? "13+" : "1-12";
   const margin = {
     bucket: marginBucket,
     reasoning: buildMarginReason(winnerNick, loserNick, projectedMargin, winnerStats, loserStats),
@@ -142,17 +160,19 @@ export function generateDeterministicInsights(inp: EngineInputs): DeterministicI
   };
 
   // ---- 4. Total Points (Over/Under) ----
-  // Reference line: nearest .5 to combined match averages
-  const combinedAvg = (home.ppgFor + home.ppgAgainst + away.ppgFor + away.ppgAgainst) / 2;
-  const refLine = roundToHalf(combinedAvg || projectedTotal);
-  const lean: "over" | "under" = projectedTotal > refLine ? "over" : "under";
-  // Weather suppression: heavy rain pushes towards under
+  // Reference line: model line, snapped to nearest .5. Lean is taken from the
+  // simulation's empirical over% at that line so it accounts for variance,
+  // not just the point estimate.
+  const refLine = totalPred.line;
+  const ouAtLine = sim.overUnder(refLine);
+  let lean: "over" | "under" = ouAtLine.overProb >= 0.5 ? "over" : "under";
+  // Weather suppression: heavy rain pushes towards under.
   const heavyRain = (inp.weather?.precipMm ?? 0) > 4 || (inp.weather?.groundCondition ?? "").toLowerCase().includes("wet");
-  const finalLean: "over" | "under" = heavyRain && lean === "over" && projectedTotal - refLine < 4 ? "under" : lean;
+  const finalLean: "over" | "under" = heavyRain && lean === "over" && (sim.meanTotal - refLine) < 4 ? "under" : lean;
   const totalPoints = {
     line: refLine,
     lean: finalLean,
-    reasoning: buildTotalReason(projectedTotal, refLine, finalLean, home, away, heavyRain),
+    reasoning: buildTotalReason(Math.round(sim.meanTotal), refLine, finalLean, home, away, heavyRain),
   };
 
   // ---- 5. Halftime / Fulltime ----
@@ -360,6 +380,16 @@ function rankTryscorers(inp: EngineInputs, home: TeamSeasonStats, away: TeamSeas
       const winnerBoost = isWinner ? 1.05 : 0.97;
       const blowoutBoost = projectedMargin >= 16 ? 1.04 : 1.0;
 
+      // ---- Opponent edge-defence weakness ----
+      // Conventional NRL jersey numbering: 2/5 = wings, 3/4 = centres. We don't
+      // have left/right defensive splits in season data, so we approximate by
+      // boosting *all* edge backs against opponents who concede tries above
+      // the league baseline (~3.5 tries/game). Numbers > 1 favour the player.
+      const opponentTriesPerGame = oppSeason.played > 0 ? (oppSeason.triesAgainst / oppSeason.played) : 3.5;
+      const edgeSoftness = clamp(opponentTriesPerGame / 3.5, 0.85, 1.35);
+      const isEdgeBack = role === "wing" || role === "centre";
+      const edgeWeaknessBoost = isEdgeBack ? edgeSoftness : 1.0;
+
       // ---- Advanced metrics with fallbacks ----
       const lineBreaks       = s?.lineBreaks       ?? firstHalfTries * 0.5;
       const lineBreakAssists = s?.lineBreakAssists ?? (role === "halves" || role === "hooker" ? tpm * 1.2 : 0);
@@ -385,7 +415,7 @@ function rankTryscorers(inp: EngineInputs, home: TeamSeasonStats, away: TeamSeas
         + runMetresScore     * 0.20
         + recentFormBoost;
 
-      let baseScore = attackingInvolvement * posWeight * teamFactor * winnerBoost * blowoutBoost;
+      let baseScore = attackingInvolvement * posWeight * teamFactor * winnerBoost * blowoutBoost * edgeWeaknessBoost;
 
       const price = priceFor(c.name);
       const oddsFloor = price && price > 0 && price < 8 ? 0.6 : 0;
@@ -573,6 +603,36 @@ function clamp(n: number, lo: number, hi: number): number {
 
 function roundToHalf(n: number): number {
   return Math.round(n * 2) / 2;
+}
+
+// Convert season stats into normalised inputs for the statistical predictor.
+// Metres-per-game is unavailable directly so we estimate from per-match
+// stats when present, falling back to a league-average proxy.
+function buildModelInputs(t: TeamSeasonStats): TeamModelInputs {
+  const last5Results = (t.last5 ?? []).map((r) => r.result);
+  const recentForm = recentFormFromResults(last5Results);
+  const matchStats = t.matchStats ?? [];
+  const sampled = matchStats.slice(-5);
+  const avg = (xs: number[]): number => xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0;
+  const metres = avg(sampled.map((m) => m.runMetres ?? 0).filter((v) => v > 0));
+  const completionRate = (() => {
+    const ratios = sampled
+      .map((m) => {
+        const sets = (m as { setsCompleted?: number }).setsCompleted;
+        const total = (m as { totalSets?: number }).totalSets;
+        if (typeof sets === "number" && typeof total === "number" && total > 0) return sets / total;
+        return null;
+      })
+      .filter((v): v is number => v !== null);
+    return ratios.length ? avg(ratios) : 0.78;
+  })();
+  return {
+    pointsForPerGame: t.ppgFor || 22,
+    pointsAgainstPerGame: t.ppgAgainst || 22,
+    metresPerGame: metres > 0 ? metres : 1500,
+    completionRate: clamp(completionRate, 0.5, 0.95),
+    recentForm,
+  };
 }
 
 function positionScoringWeight(pos: string): number {

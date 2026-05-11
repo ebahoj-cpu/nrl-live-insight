@@ -54,8 +54,13 @@ export function buildDeterministicBets(args: {
   homeNickname: string;
   awayNickname: string;
   mode: ModelMode;
+  // Optional Phase 2 simulation. When confidence is "low" we suppress the
+  // first-tryscorer leg. When "high" we re-order anytime picks by simulated
+  // anytime probability (only among players already deemed eligible by the
+  // deterministic engine — never invents a player not in the named squads).
+  simulation?: SimulationSummary | null;
 }): BetPlay[] {
-  const { engine, realOdds, homeNickname, awayNickname, mode } = args;
+  const { engine, realOdds, homeNickname, awayNickname, mode, simulation } = args;
   const winnerNick = engine.matchWinner.nickname;
   const winnerIsHome = winnerNick.toLowerCase() === homeNickname.toLowerCase();
   const winnerPrice = (winnerIsHome ? realOdds?.h2h.home?.price : realOdds?.h2h.away?.price) ?? 1.85;

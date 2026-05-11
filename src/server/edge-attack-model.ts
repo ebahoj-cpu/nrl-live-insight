@@ -75,10 +75,10 @@ export function buildEdgeAttackProfile(args: {
   // matched against the OPPOSING channel weakness.
   type Cand = { team: "home" | "away"; channel: EdgeChannel; net: number };
   const candidates: Cand[] = [];
-  (["left", "right", "middle"] as EdgeChannel[]).forEach((ch) => {
-    candidates.push({ team: "home", channel: ch, net: home[ch] - away[oppositeFor("home", ch)] });
-    candidates.push({ team: "away", channel: ch, net: away[ch] - home[oppositeFor("away", ch)] });
-  });
+  for (const ch of ["left", "right", "middle"] as EdgeChannel[]) {
+    candidates.push({ team: "home" as const, channel: ch, net: home[ch] - away[oppositeFor("home", ch)] });
+    candidates.push({ team: "away" as const, channel: ch, net: away[ch] - home[oppositeFor("away", ch)] });
+  }
   candidates.sort((a, b) => b.net - a.net);
   const best = candidates[0];
   // Weakest defensive channel: lowest rating on each side; pick the worst overall.

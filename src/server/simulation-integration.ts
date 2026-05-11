@@ -207,8 +207,10 @@ export function buildMarketPrices(args: {
   if (args.tryscorers) {
     out.anytime = {};
     out.firstTry = {};
+    out.multiTry = {};
     for (const t of args.tryscorers.anytime ?? []) out.anytime[t.player.toLowerCase()] = t.price;
-    for (const t of args.tryscorers.firstTry ?? []) out.firstTry[t.player.toLowerCase()] = t.price;
+    for (const t of args.tryscorers.first ?? []) out.firstTry[t.player.toLowerCase()] = t.price;
+    for (const t of args.tryscorers.multi ?? []) out.multiTry[t.player.toLowerCase()] = t.price;
   }
   return out;
 }

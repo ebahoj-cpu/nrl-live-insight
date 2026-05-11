@@ -28,9 +28,69 @@ import { runSimulation } from "./simulation-engine";
 import { findTeam } from "@/lib/teams";
 
 // Feature flag — default OFF. Server-only. NEVER expose to the client.
+// Accepted truthy values: "true" | "1" | "yes" (case-insensitive).
 export function isSimulationEnabled(): boolean {
-  const v = process.env.ENABLE_SIMULATION_ENGINE;
-  return v === "true" || v === "1";
+  const v = (process.env.ENABLE_SIMULATION_ENGINE ?? "").toLowerCase().trim();
+  return v === "true" || v === "1" || v === "yes";
+}
+
+// Dev-only debug log. No-op in production. Never logs raw payloads.
+function devLog(event: string, info?: Record<string, unknown>): void {
+  if (process.env.NODE_ENV === "production") return;
+  // eslint-disable-next-line no-console
+  console.log(`[simulation:${event}]`, info ?? "");
+}
+
+// Defensive runtime validation. Treats malformed summaries as null so the
+// deterministic engine carries on. We deliberately accept summaries that are
+// internally close-to-valid (probabilities a few % off) by normalising them.
+export function validateSimulation(s: SimulationSummary | null | undefined): SimulationSummary | null {
+  if (!s || typeof s !== "object") return null;
+  const required = [
+    "matchId", "iterations", "seed",
+    "homeWinProb", "awayWinProb", "drawProb",
+    "expectedHomeScore", "expectedAwayScore", "expectedTotal",
+    "totalLine", "overProbAtLine",
+    "expectedMargin", "marginBands", "confidence",
+  ] as const;
+  for (const k of required) if ((s as Record<string, unknown>)[k] === undefined) return null;
+  const isProb = (n: unknown): n is number => typeof n === "number" && Number.isFinite(n) && n >= 0 && n <= 1;
+  const clamp01 = (n: number) => Math.max(0, Math.min(1, n));
+
+  // Match probabilities — normalise to sum 1 if drift is small, else reject.
+  let h = typeof s.homeWinProb === "number" ? s.homeWinProb : NaN;
+  let a = typeof s.awayWinProb === "number" ? s.awayWinProb : NaN;
+  let d = typeof s.drawProb === "number" ? s.drawProb : NaN;
+  if (![h, a, d].every((n) => Number.isFinite(n) && n >= -0.05 && n <= 1.05)) return null;
+  h = clamp01(h); a = clamp01(a); d = clamp01(d);
+  const sum = h + a + d;
+  if (sum <= 0) return null;
+  if (Math.abs(sum - 1) > 0.15) return null;
+  h /= sum; a /= sum; d /= sum;
+
+  const mb = s.marginBands ?? ({} as Record<string, number>);
+  if (!isProb(mb.draw) || !isProb(mb["1-12"]) || !isProb(mb["13+"])) return null;
+
+  if (!isProb(s.overProbAtLine)) return null;
+  if (typeof s.expectedTotal !== "number" || !Number.isFinite(s.expectedTotal) || s.expectedTotal < 0) return null;
+  if (typeof s.totalLine !== "number" || !Number.isFinite(s.totalLine)) return null;
+  if (s.confidence !== "low" && s.confidence !== "medium" && s.confidence !== "high") return null;
+
+  // playerProbabilities: drop entries that are malformed; if the whole array
+  // is malformed treat as empty (still a usable summary for match-level).
+  let pp = Array.isArray(s.playerProbabilities) ? s.playerProbabilities : [];
+  pp = pp.filter((p) =>
+    p && typeof p.name === "string" && p.name.trim().length > 0 &&
+    isProb(p.firstTryProb) && isProb(p.anytimeProb) && isProb(p.multiTryProb),
+  );
+
+  return {
+    ...s,
+    homeWinProb: h,
+    awayWinProb: a,
+    drawProb: d,
+    playerProbabilities: pp,
+  };
 }
 
 // TTL by match state (ms).

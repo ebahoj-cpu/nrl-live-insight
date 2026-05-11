@@ -101,22 +101,36 @@ export function generateDeterministicInsights(inp: EngineInputs): DeterministicI
   const homeLadder = inp.ladder.find((r) => r.nickname.toLowerCase() === inp.homeNickname.toLowerCase()) ?? null;
   const awayLadder = inp.ladder.find((r) => r.nickname.toLowerCase() === inp.awayNickname.toLowerCase()) ?? null;
 
-  // ---- Net team rating ----
+  // ---- Net team rating (legacy heuristic, retained for downstream copy) ----
   const ratingHome = teamRating(home, homeLadder, true);
   const ratingAway = teamRating(away, awayLadder, false);
   const netRating = ratingHome - ratingAway; // >0 favours home
 
-  // ---- Predicted score ----
-  // Each team's expected = avg(own PPG-for, opponent PPG-against), shifted by
-  // ±2 for home advantage and net rating.
-  const expHome = blendPoints(home.ppgFor, away.ppgAgainst) + 2 + clamp(netRating * 0.5, -3, 3);
-  const expAway = blendPoints(away.ppgFor, home.ppgAgainst) - 2 + clamp(-netRating * 0.5, -3, 3);
+  // ---- Statistical model: logistic regression + Monte Carlo ----
+  // Replaces the old ladder-only fallback for winner / margin / total.
+  const homeInputs = buildModelInputs(home);
+  const awayInputs = buildModelInputs(away);
+  const outcomePred = predictMatchOutcome(homeInputs, awayInputs);
+  const totalPred = predictTotalPoints(homeInputs, awayInputs);
+  // Monte Carlo over 10k iterations gives us empirical confidence + total
+  // distributions that we use for the over/under line and risk band.
+  const sim: SimulationResult = runMonteCarlo(outcomePred, totalPred, homeInputs, awayInputs, 10_000, {
+    homeConversionRate: clamp(home.scoringEfficiency > 0 ? 0.7 : 0.7, 0.5, 0.85),
+    awayConversionRate: clamp(away.scoringEfficiency > 0 ? 0.7 : 0.7, 0.5, 0.85),
+  });
+
+  // ---- Predicted score (model-driven, with home advantage already in expectedTotal split) ----
+  const homeShare = 0.5 + (outcomePred.homeWinProb - 0.5) * 0.3;
+  const expHome = totalPred.expectedTotal * homeShare;
+  const expAway = totalPred.expectedTotal * (1 - homeShare);
   const predHome = Math.max(6, Math.round(expHome));
   const predAway = Math.max(6, Math.round(expAway));
   const projectedTotal = predHome + predAway;
   const projectedMargin = Math.abs(predHome - predAway);
 
-  const winnerSide: "home" | "away" = predHome >= predAway ? "home" : "away";
+  // Winner: simulation-driven so it reflects both probabilities and the
+  // home-advantage intercept baked into the predictor.
+  const winnerSide: "home" | "away" = sim.homeWinProb >= sim.awayWinProb ? "home" : "away";
   const winnerNick = winnerSide === "home" ? inp.homeNickname : inp.awayNickname;
   const loserNick = winnerSide === "home" ? inp.awayNickname : inp.homeNickname;
   const winnerStats = winnerSide === "home" ? home : away;
@@ -130,7 +144,9 @@ export function generateDeterministicInsights(inp: EngineInputs): DeterministicI
   };
 
   // ---- 2. Winning Margin ----
-  const marginBucket: "1-12" | "13+" = projectedMargin >= 13 ? "13+" : "1-12";
+  // Use the simulation's empirical band probabilities; fall back to predictor
+  // expectedMargin sign if the bands are tied.
+  const marginBucket: "1-12" | "13+" = sim.marginBand["13+"] > sim.marginBand["1-12"] ? "13+" : "1-12";
   const margin = {
     bucket: marginBucket,
     reasoning: buildMarginReason(winnerNick, loserNick, projectedMargin, winnerStats, loserStats),
@@ -144,17 +160,19 @@ export function generateDeterministicInsights(inp: EngineInputs): DeterministicI
   };
 
   // ---- 4. Total Points (Over/Under) ----
-  // Reference line: nearest .5 to combined match averages
-  const combinedAvg = (home.ppgFor + home.ppgAgainst + away.ppgFor + away.ppgAgainst) / 2;
-  const refLine = roundToHalf(combinedAvg || projectedTotal);
-  const lean: "over" | "under" = projectedTotal > refLine ? "over" : "under";
-  // Weather suppression: heavy rain pushes towards under
+  // Reference line: model line, snapped to nearest .5. Lean is taken from the
+  // simulation's empirical over% at that line so it accounts for variance,
+  // not just the point estimate.
+  const refLine = totalPred.line;
+  const ouAtLine = sim.overUnder(refLine);
+  let lean: "over" | "under" = ouAtLine.overProb >= 0.5 ? "over" : "under";
+  // Weather suppression: heavy rain pushes towards under.
   const heavyRain = (inp.weather?.precipMm ?? 0) > 4 || (inp.weather?.groundCondition ?? "").toLowerCase().includes("wet");
-  const finalLean: "over" | "under" = heavyRain && lean === "over" && projectedTotal - refLine < 4 ? "under" : lean;
+  const finalLean: "over" | "under" = heavyRain && lean === "over" && (sim.meanTotal - refLine) < 4 ? "under" : lean;
   const totalPoints = {
     line: refLine,
     lean: finalLean,
-    reasoning: buildTotalReason(projectedTotal, refLine, finalLean, home, away, heavyRain),
+    reasoning: buildTotalReason(Math.round(sim.meanTotal), refLine, finalLean, home, away, heavyRain),
   };
 
   // ---- 5. Halftime / Fulltime ----

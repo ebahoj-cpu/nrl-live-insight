@@ -194,6 +194,13 @@ export async function getOrGenerateSimulation(args: {
   round?: number;
   season?: number;
   forceRefresh?: boolean;
+  // Phase 3 — optional enrichment from normalised data layer.
+  normalisedHomeStats?: NormalisedTeamStats | null;
+  normalisedAwayStats?: NormalisedTeamStats | null;
+  injuries?: NormalisedInjury[] | null;
+  officials?: NormalisedMatchOfficial[] | null;
+  hasOfficials?: boolean;
+  hasNamedTeamLists?: boolean;
 }): Promise<SimulationSummary | null> {
   if (!isSimulationEnabled()) { devLog("flag-off"); return null; }
   if (!args.snapshot) return null;
@@ -209,6 +216,16 @@ export async function getOrGenerateSimulation(args: {
 
   // 2) Generate
   try {
+    // Map normalised injuries → simple shape consumed by the feature builder.
+    const injuries = (args.injuries ?? [])
+      .filter((i) => i && typeof i.name === "string" && i.name.length > 0)
+      .map((i) => ({
+        name: i.name,
+        teamNickname: i.teamNickname,
+        status: i.status,
+      }));
+    const hasOfficials = args.hasOfficials ?? !!(args.officials && args.officials.length > 0);
+
     const input = buildSimulationInput({
       matchId: args.matchId,
       snapshot: args.snapshot,
@@ -220,6 +237,11 @@ export async function getOrGenerateSimulation(args: {
       hasOdds: args.hasOdds,
       hasWeather: !!args.weather,
       weatherTempoModifier: weatherTempoModifier(args.weather),
+      normalisedHomeStats: args.normalisedHomeStats ?? null,
+      normalisedAwayStats: args.normalisedAwayStats ?? null,
+      injuries: injuries.length ? injuries : undefined,
+      hasOfficials,
+      hasNamedTeamLists: args.hasNamedTeamLists,
     });
     const raw = runSimulation(input);
     const summary = validateSimulation(raw);

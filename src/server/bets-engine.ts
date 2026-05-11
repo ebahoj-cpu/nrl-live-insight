@@ -110,7 +110,17 @@ export function buildDeterministicBets(args: {
 
   // ---- HIGH: tryscorer-driven (squad+) ----
   if (mode !== "early") {
-    const anytime = (engine.topAnytime || []).filter((p) => p.name && p.name !== "Awaiting team list");
+    let anytime = (engine.topAnytime || []).filter((p) => p.name && p.name !== "Awaiting team list");
+
+    // If we have a high-confidence simulation, re-order anytime picks by the
+    // simulator's per-player anytime probability. Players the deterministic
+    // engine never surfaced are NEVER added — keeps named-squad invariant.
+    if (simulation && simulation.confidence === "high") {
+      const probByName = new Map<string, number>();
+      for (const p of simulation.playerProbabilities) probByName.set(p.name.toLowerCase(), p.anytimeProb);
+      anytime = [...anytime].sort((a, b) => (probByName.get(b.name.toLowerCase()) ?? 0) - (probByName.get(a.name.toLowerCase()) ?? 0));
+    }
+
     const limit = mode === "squad" ? 2 : 3;
     for (const pick of anytime.slice(0, limit)) {
       const price = pick.price ?? 3.5;
@@ -127,8 +137,9 @@ export function buildDeterministicBets(args: {
       if (bets.length >= MAX_BETS) return bets;
     }
 
-    // First tryscorer only once odds exist
-    if ((mode === "market" || mode === "final") && engine.firstTryscorer?.name && engine.firstTryscorer.name !== "Awaiting team list") {
+    // First tryscorer only once odds exist AND simulation isn't low-confidence.
+    const simBlocksFirstTry = simulation && simulation.confidence === "low";
+    if (!simBlocksFirstTry && (mode === "market" || mode === "final") && engine.firstTryscorer?.name && engine.firstTryscorer.name !== "Awaiting team list") {
       const fp = engine.firstTryscorer;
       const price = fp.price ?? 9;
       bets.push(

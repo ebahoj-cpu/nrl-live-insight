@@ -21,6 +21,7 @@ import type { ModelMode, ModelConfidence } from "./model-mode";
 import { predictMatchOutcome, predictTotalPoints, recentFormFromResults, type TeamModelInputs } from "./model/predictor";
 import { runMonteCarlo, type SimulationResult } from "./model/simulation";
 import type { SimulationSummary } from "./simulation-types";
+import { appendDriverHint } from "./driver-surfacing";
 
 // Lightweight inline validator — duplicates the strict guard in
 // simulation-integration.ts so the engine stays safe even if a caller

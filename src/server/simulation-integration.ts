@@ -28,11 +28,17 @@ import { buildSimulationInput } from "./simulation-feature-builder";
 import { runSimulation } from "./simulation-engine";
 import { findTeam } from "@/lib/teams";
 
-// Feature flag — default OFF. Server-only. NEVER expose to the client.
-// Accepted truthy values: "true" | "1" | "yes" (case-insensitive).
+// Feature flag. Server-only — NEVER expose to the client.
+// Explicit truthy ("true"|"1"|"yes") or falsy ("false"|"0"|"no"|"off") values
+// always win. When unset, the simulation engine defaults to ON in production
+// and OFF in non-production (keeps tests deterministic). All advanced model
+// failures still fall back through validateSimulation → deterministic engine,
+// so enabling by default is safe.
 export function isSimulationEnabled(): boolean {
   const v = (process.env.ENABLE_SIMULATION_ENGINE ?? "").toLowerCase().trim();
-  return v === "true" || v === "1" || v === "yes";
+  if (v === "true" || v === "1" || v === "yes") return true;
+  if (v === "false" || v === "0" || v === "no" || v === "off") return false;
+  return process.env.NODE_ENV === "production";
 }
 
 // Dev-only debug log. No-op in production. Never logs raw payloads.

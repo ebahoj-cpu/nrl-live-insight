@@ -147,32 +147,48 @@ async function writeSummary(args: {
   try {
     const s = args.summary;
     const expiresAt = new Date(Date.now() + args.ttlMs).toISOString();
+    // TODO: regenerate Supabase types after Phase 5 migration so these
+    // advanced columns become first-class in the typed client.
+    const row = {
+      match_id: args.matchId,
+      home_team: args.homeNickname,
+      away_team: args.awayNickname,
+      round: args.round ?? null,
+      season: args.season ?? null,
+      model_mode: args.modelMode,
+      iterations: s.iterations,
+      seed: s.seed,
+      home_win_prob: s.homeWinProb,
+      away_win_prob: s.awayWinProb,
+      draw_prob: s.drawProb,
+      expected_total: s.expectedTotal,
+      expected_margin: s.expectedMargin,
+      margin_band_1_12: s.marginBands["1-12"],
+      margin_band_13_plus: s.marginBands["13+"],
+      upset_prob: s.upsetProb,
+      blowout_prob: s.blowoutProb,
+      confidence: s.confidence,
+      source_coverage: s.coverage,
+      payload: s,
+      expires_at: expiresAt,
+      generated_at: s.generatedAt,
+      // Phase 5 advanced fields (nullable columns added by migration).
+      model_drivers: s.modelDrivers ?? null,
+      calibration: s.calibration ?? null,
+      head_to_head: s.headToHead ?? null,
+      referee_impact: s.refereeImpact ?? null,
+      fatigue_profile: s.fatigueProfile ?? null,
+      ruck_tempo_profile: s.ruckTempoProfile ?? null,
+      edge_attack_profile: s.edgeAttackProfile ?? null,
+      momentum_profile: s.momentumProfile ?? null,
+      advanced_model_version: s.advancedModelVersion != null ? String(s.advancedModelVersion) : null,
+      data_quality: s.coverage ?? null,
+      value_edges: (s as unknown as { valueEdges?: unknown }).valueEdges ?? null,
+      market_snapshot: (s as unknown as { marketSnapshot?: unknown }).marketSnapshot ?? null,
+    };
     const { error } = await supabaseAdmin
       .from("simulation_summaries" as never)
-      .insert([{
-        match_id: args.matchId,
-        home_team: args.homeNickname,
-        away_team: args.awayNickname,
-        round: args.round ?? null,
-        season: args.season ?? null,
-        model_mode: args.modelMode,
-        iterations: s.iterations,
-        seed: s.seed,
-        home_win_prob: s.homeWinProb,
-        away_win_prob: s.awayWinProb,
-        draw_prob: s.drawProb,
-        expected_total: s.expectedTotal,
-        expected_margin: s.expectedMargin,
-        margin_band_1_12: s.marginBands["1-12"],
-        margin_band_13_plus: s.marginBands["13+"],
-        upset_prob: s.upsetProb,
-        blowout_prob: s.blowoutProb,
-        confidence: s.confidence,
-        source_coverage: s.coverage as never,
-        payload: s as never,
-        expires_at: expiresAt,
-        generated_at: s.generatedAt,
-      }] as never);
+      .insert([row] as never);
     if (error) console.warn("[simulation] writeSummary failed:", error.message);
   } catch (e) {
     console.warn("[simulation] writeSummary exception:", e);

@@ -79,6 +79,15 @@ function pickName(p: { name?: string } | undefined | null): string | null {
   return normName(p?.name);
 }
 
+export type AdvancedSnapshotExtras = {
+  rawSimulationProb?: { home: number; away: number; draw: number } | null;
+  calibratedProb?: { home: number; away: number; draw: number } | null;
+  modelDrivers?: unknown[] | null;
+  advancedModelVersion?: string | null;
+  valueEdges?: unknown | null;
+  marketSnapshot?: unknown | null;
+};
+
 export function buildSnapshotRow(args: {
   matchId: string;
   details: NrlMatchDetails;
@@ -88,6 +97,7 @@ export function buildSnapshotRow(args: {
   tryscorers: TryscorerMarkets | null;
   round?: number | null;
   season?: number | null;
+  advanced?: AdvancedSnapshotExtras;
 }): PredictionSnapshotRow {
   const { details, insights, script } = args;
   const ko = details.kickoffUtc ? new Date(details.kickoffUtc) : null;
@@ -97,7 +107,8 @@ export function buildSnapshotRow(args: {
     ? "open" : insights.totalPoints?.lean === "under" ? "slow" : "controlled";
   const flow: "tight" | "blowout" | null = insights.margin?.bucket === "13+" ? "blowout" : "tight";
 
-  return {
+  const adv = args.advanced ?? {};
+  const base: PredictionSnapshotRow = {
     match_id: args.matchId,
     round: args.round ?? (details as { roundNumber?: number }).roundNumber ?? null,
     season: args.season ?? (ko ? ko.getUTCFullYear() : null),
@@ -140,6 +151,15 @@ export function buildSnapshotRow(args: {
     },
     locked_before_kickoff: !kickoffPassed,
   };
+  return {
+    ...base,
+    ...(adv.rawSimulationProb != null ? { raw_simulation_prob: adv.rawSimulationProb } : {}),
+    ...(adv.calibratedProb != null ? { calibrated_prob: adv.calibratedProb } : {}),
+    ...(adv.modelDrivers != null ? { model_drivers: adv.modelDrivers } : {}),
+    ...(adv.advancedModelVersion != null ? { advanced_model_version: adv.advancedModelVersion } : {}),
+    ...(adv.valueEdges != null ? { value_edges: adv.valueEdges } : {}),
+    ...(adv.marketSnapshot != null ? { market_snapshot: adv.marketSnapshot } : {}),
+  } as PredictionSnapshotRow;
 }
 
 // Insert-only. If a row already exists for this match_id we DO NOT overwrite —
@@ -298,6 +318,29 @@ export async function recordResultAndScore(args: {
   const riskTier = snap.model_mode === "early" ? "high"
     : snap.model_mode === "squad" ? "medium" : "low";
 
+  // Phase 5 — calibration & error fields. All optional / null-safe.
+  const snapAny = snap as unknown as Record<string, unknown>;
+  const calibrated = snapAny.calibrated_prob as { home?: number; away?: number; draw?: number } | null | undefined;
+  let calibrationAccuracy: number | null = null;
+  if (calibrated && typeof calibrated.home === "number" && typeof calibrated.away === "number") {
+    const winnerProb = actualWinner === args.details.homeTeam.nickName
+      ? (calibrated.home ?? 0)
+      : actualWinner === args.details.awayTeam.nickName
+        ? (calibrated.away ?? 0)
+        : (calibrated.draw ?? 0);
+    calibrationAccuracy = Math.round(winnerProb * 1000) / 1000;
+  }
+  const confidenceBucket = snap.confidence_scores?.overall != null
+    ? snap.confidence_scores.overall >= 0.7 ? "high"
+      : snap.confidence_scores.overall >= 0.5 ? "medium" : "low"
+    : null;
+  const expectedTotalError = snap.predicted_total_line != null
+    ? Math.abs(snap.predicted_total_line - actualTotal) : null;
+  const predictedMarginErr = snap.predicted_score_home != null && snap.predicted_score_away != null
+    ? Math.abs((snap.predicted_score_home - snap.predicted_score_away) - (homeScore - awayScore)) : null;
+  const scoreErr = snap.predicted_score_home != null && snap.predicted_score_away != null
+    ? Math.abs(snap.predicted_score_home - homeScore) + Math.abs(snap.predicted_score_away - awayScore) : null;
+
   await supabaseAdmin
     .from("prediction_scores" as never)
     .insert({
@@ -317,6 +360,11 @@ export async function recordResultAndScore(args: {
       player_market_score: playerScore,
       total_model_score: totalModelScore,
       risk_tier: riskTier,
+      calibration_accuracy: calibrationAccuracy,
+      confidence_bucket: confidenceBucket,
+      expected_total_error: expectedTotalError,
+      predicted_margin_error: predictedMarginErr,
+      score_error: scoreErr,
     } as never)
     .then(() => undefined, (e: { message?: string }) => {
       if (!/duplicate key|unique/i.test(e?.message ?? "")) console.warn("insert score:", e?.message);

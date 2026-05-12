@@ -151,13 +151,26 @@ export const Route = createFileRoute("/api/public/hooks/precompute-insights")({
           }
         }
 
+        const succeeded = results.filter((r) => r.ok).length;
+        const failed = results.length - succeeded;
+        const skippedReasons: Record<string, number> = {};
+        for (const r of results) {
+          if (!r.ok && r.reason) {
+            skippedReasons[r.reason] = (skippedReasons[r.reason] ?? 0) + 1;
+          }
+        }
+        const matchWarmedCount = results.filter((r) => r.ok && r.warmed && Object.values(r.warmed).some(Boolean)).length;
         return new Response(
           JSON.stringify({
             season,
             attempted: results.length,
-            succeeded: results.filter((r) => r.ok).length,
+            succeeded,
+            failed,
             warmed,
-            results,
+            matchWarmedCount,
+            skippedReasons,
+            // Per-fixture status only — no raw payloads.
+            results: results.map((r) => ({ matchId: r.matchId, ok: r.ok, reason: r.reason })),
           }, null, 2),
           { headers: { "Content-Type": "application/json" } },
         );

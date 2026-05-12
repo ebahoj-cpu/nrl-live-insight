@@ -265,14 +265,19 @@ export type Database = {
           anytime_checked: number
           anytime_hit_rate: number | null
           anytime_hits: number
+          calibration_accuracy: number | null
+          confidence_bucket: string | null
           created_at: string
+          expected_total_error: number | null
           first_try_correct: boolean | null
           htft_correct: boolean | null
           id: string
           margin_correct: boolean | null
           match_id: string
           player_market_score: number | null
+          predicted_margin_error: number | null
           risk_tier: string | null
+          score_error: number | null
           script_accuracy: number | null
           secondary_checked: number
           secondary_hits: number
@@ -285,14 +290,19 @@ export type Database = {
           anytime_checked?: number
           anytime_hit_rate?: number | null
           anytime_hits?: number
+          calibration_accuracy?: number | null
+          confidence_bucket?: string | null
           created_at?: string
+          expected_total_error?: number | null
           first_try_correct?: boolean | null
           htft_correct?: boolean | null
           id?: string
           margin_correct?: boolean | null
           match_id: string
           player_market_score?: number | null
+          predicted_margin_error?: number | null
           risk_tier?: string | null
+          score_error?: number | null
           script_accuracy?: number | null
           secondary_checked?: number
           secondary_hits?: number
@@ -305,14 +315,19 @@ export type Database = {
           anytime_checked?: number
           anytime_hit_rate?: number | null
           anytime_hits?: number
+          calibration_accuracy?: number | null
+          confidence_bucket?: string | null
           created_at?: string
+          expected_total_error?: number | null
           first_try_correct?: boolean | null
           htft_correct?: boolean | null
           id?: string
           margin_correct?: boolean | null
           match_id?: string
           player_market_score?: number | null
+          predicted_margin_error?: number | null
           risk_tier?: string | null
+          score_error?: number | null
           script_accuracy?: number | null
           secondary_checked?: number
           secondary_hits?: number
@@ -325,8 +340,10 @@ export type Database = {
       }
       prediction_snapshots: {
         Row: {
+          advanced_model_version: string | null
           anytime_try_picks: Json
           away_team: string
+          calibrated_prob: Json | null
           confidence_scores: Json | null
           created_at: string
           data_sources: Json | null
@@ -335,7 +352,9 @@ export type Database = {
           id: string
           kickoff_utc: string | null
           locked_before_kickoff: boolean
+          market_snapshot: Json | null
           match_id: string
+          model_drivers: Json | null
           model_mode: string
           odds_snapshot: Json | null
           predicted_htft: string | null
@@ -345,14 +364,18 @@ export type Database = {
           predicted_total_lean: string | null
           predicted_total_line: number | null
           predicted_winner: string | null
+          raw_simulation_prob: Json | null
           round: number | null
           script_prediction: Json | null
           season: number | null
           secondary_tier_picks: Json
+          value_edges: Json | null
         }
         Insert: {
+          advanced_model_version?: string | null
           anytime_try_picks?: Json
           away_team: string
+          calibrated_prob?: Json | null
           confidence_scores?: Json | null
           created_at?: string
           data_sources?: Json | null
@@ -361,7 +384,9 @@ export type Database = {
           id?: string
           kickoff_utc?: string | null
           locked_before_kickoff?: boolean
+          market_snapshot?: Json | null
           match_id: string
+          model_drivers?: Json | null
           model_mode: string
           odds_snapshot?: Json | null
           predicted_htft?: string | null
@@ -371,14 +396,18 @@ export type Database = {
           predicted_total_lean?: string | null
           predicted_total_line?: number | null
           predicted_winner?: string | null
+          raw_simulation_prob?: Json | null
           round?: number | null
           script_prediction?: Json | null
           season?: number | null
           secondary_tier_picks?: Json
+          value_edges?: Json | null
         }
         Update: {
+          advanced_model_version?: string | null
           anytime_try_picks?: Json
           away_team?: string
+          calibrated_prob?: Json | null
           confidence_scores?: Json | null
           created_at?: string
           data_sources?: Json | null
@@ -387,7 +416,9 @@ export type Database = {
           id?: string
           kickoff_utc?: string | null
           locked_before_kickoff?: boolean
+          market_snapshot?: Json | null
           match_id?: string
+          model_drivers?: Json | null
           model_mode?: string
           odds_snapshot?: Json | null
           predicted_htft?: string | null
@@ -397,88 +428,126 @@ export type Database = {
           predicted_total_lean?: string | null
           predicted_total_line?: number | null
           predicted_winner?: string | null
+          raw_simulation_prob?: Json | null
           round?: number | null
           script_prediction?: Json | null
           season?: number | null
           secondary_tier_picks?: Json
+          value_edges?: Json | null
         }
         Relationships: []
       }
       simulation_summaries: {
         Row: {
+          advanced_model_version: string | null
           away_team: string
           away_win_prob: number
           blowout_prob: number
+          calibration: Json | null
           confidence: string
+          data_quality: Json | null
           draw_prob: number
+          edge_attack_profile: Json | null
           expected_margin: number
           expected_total: number
           expires_at: string
+          fatigue_profile: Json | null
           generated_at: string
+          head_to_head: Json | null
           home_team: string
           home_win_prob: number
           id: string
           iterations: number
           margin_band_1_12: number
           margin_band_13_plus: number
+          market_snapshot: Json | null
           match_id: string
+          model_drivers: Json | null
           model_mode: string
+          momentum_profile: Json | null
           payload: Json
+          referee_impact: Json | null
           round: number | null
+          ruck_tempo_profile: Json | null
           season: number | null
           seed: number
           source_coverage: Json
           upset_prob: number
+          value_edges: Json | null
         }
         Insert: {
+          advanced_model_version?: string | null
           away_team: string
           away_win_prob: number
           blowout_prob?: number
+          calibration?: Json | null
           confidence: string
+          data_quality?: Json | null
           draw_prob: number
+          edge_attack_profile?: Json | null
           expected_margin: number
           expected_total: number
           expires_at: string
+          fatigue_profile?: Json | null
           generated_at?: string
+          head_to_head?: Json | null
           home_team: string
           home_win_prob: number
           id?: string
           iterations?: number
           margin_band_1_12: number
           margin_band_13_plus: number
+          market_snapshot?: Json | null
           match_id: string
+          model_drivers?: Json | null
           model_mode: string
+          momentum_profile?: Json | null
           payload: Json
+          referee_impact?: Json | null
           round?: number | null
+          ruck_tempo_profile?: Json | null
           season?: number | null
           seed: number
           source_coverage?: Json
           upset_prob?: number
+          value_edges?: Json | null
         }
         Update: {
+          advanced_model_version?: string | null
           away_team?: string
           away_win_prob?: number
           blowout_prob?: number
+          calibration?: Json | null
           confidence?: string
+          data_quality?: Json | null
           draw_prob?: number
+          edge_attack_profile?: Json | null
           expected_margin?: number
           expected_total?: number
           expires_at?: string
+          fatigue_profile?: Json | null
           generated_at?: string
+          head_to_head?: Json | null
           home_team?: string
           home_win_prob?: number
           id?: string
           iterations?: number
           margin_band_1_12?: number
           margin_band_13_plus?: number
+          market_snapshot?: Json | null
           match_id?: string
+          model_drivers?: Json | null
           model_mode?: string
+          momentum_profile?: Json | null
           payload?: Json
+          referee_impact?: Json | null
           round?: number | null
+          ruck_tempo_profile?: Json | null
           season?: number | null
           seed?: number
           source_coverage?: Json
           upset_prob?: number
+          value_edges?: Json | null
         }
         Relationships: []
       }

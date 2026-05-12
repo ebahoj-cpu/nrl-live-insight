@@ -283,7 +283,7 @@ export function buildSimulationInput(args: {
     awayFeatures,
     homePlayers: homeFeats,
     awayPlayers: awayFeats,
-    homeAdvantage: 3,
+    homeAdvantage: magicRoundHomeAdvantage(args.homeNickname, args.awayNickname, args.venue) ?? 3,
     weatherTempoModifier: args.weatherTempoModifier,
     seed: args.seed ?? hashSeed(args.matchId),
     iterations: args.iterations ?? 10_000,

@@ -554,6 +554,7 @@ export const getMatchInsights = createServerFn({ method: "GET" })
             officials: enriched?.officials ?? null,
             hasOfficials: !!(enriched?.officials && enriched.officials.length > 0),
             hasNamedTeamLists,
+            venue: details.venue,
           });
         }
 

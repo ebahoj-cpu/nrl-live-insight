@@ -79,6 +79,15 @@ export type SimulationInput = {
   // Provenance
   coverage: SourceCoverage;
   modelMode: "early" | "squad" | "market" | "final";
+  // Phase 4 advanced model inputs (all optional, backward compatible).
+  headToHead?: HeadToHeadProfile;
+  refereeProfile?: RefereeProfile;
+  fatigueProfile?: FatigueProfile;
+  ruckTempoProfile?: RuckTempoProfile;
+  edgeAttackProfile?: EdgeAttackProfile;
+  momentumProfile?: MomentumProfile;
+  marketOdds?: { home?: number | null; away?: number | null; draw?: number | null } | null;
+  deterministicProb?: { home: number; away: number; draw: number } | null;
 };
 
 // ---------- Outputs ----------

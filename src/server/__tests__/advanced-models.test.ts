@@ -35,10 +35,9 @@ describe("head-to-head model", () => {
   });
   it("recent games weighted heavier than old games", () => {
     const now = Date.now();
-    const recent = histMatch({ kickoffUtc: new Date(now).toISOString(), margin: 20, totalPoints: 50 });
-    const old1 = histMatch({ kickoffUtc: new Date(now - 1e10).toISOString(), margin: -20, totalPoints: 30 });
-    const r = buildHeadToHead({ homeNickname: "Storm", awayNickname: "Broncos", history: [recent, old1, old1, old1] });
-    // Recent positive margin should dominate due to weighting.
+    const recent = (offset: number, margin: number) => histMatch({ kickoffUtc: new Date(now - offset).toISOString(), margin, totalPoints: 40 + margin });
+    // 3 recent positive (full weight) vs 2 old negative (half weight)
+    const r = buildHeadToHead({ homeNickname: "Storm", awayNickname: "Broncos", history: [recent(0, 20), recent(1e8, 18), recent(2e8, 16), recent(1e10, -20), recent(1.1e10, -20)] });
     expect(r.avgMargin).toBeGreaterThan(0);
   });
 });

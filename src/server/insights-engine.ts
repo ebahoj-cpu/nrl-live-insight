@@ -22,6 +22,7 @@ import { predictMatchOutcome, predictTotalPoints, recentFormFromResults, type Te
 import { runMonteCarlo, type SimulationResult } from "./model/simulation";
 import type { SimulationSummary } from "./simulation-types";
 import { appendDriverHint } from "./driver-surfacing";
+import { isMagicRoundVenue, qldBoost } from "./magic-round";
 
 // Lightweight inline validator — duplicates the strict guard in
 // simulation-integration.ts so the engine stays safe even if a caller
@@ -121,8 +122,14 @@ export function generateDeterministicInsights(inp: EngineInputs): DeterministicI
   const awayLadder = inp.ladder.find((r) => r.nickname.toLowerCase() === inp.awayNickname.toLowerCase()) ?? null;
 
   // ---- Net team rating (legacy heuristic, retained for downstream copy) ----
-  const ratingHome = teamRating(home, homeLadder, true);
-  const ratingAway = teamRating(away, awayLadder, false);
+  // Magic Round at Suncorp: nominal home advantage is muted, but Brisbane
+  // teams (Broncos, Dolphins) and other QLD sides (Titans, Cowboys) get a
+  // crowd/travel/climate edge layered on top of their normal rating.
+  const magicRound = isMagicRoundVenue(inp.venue);
+  const homeQld = qldBoost(inp.homeNickname);
+  const awayQld = qldBoost(inp.awayNickname);
+  const ratingHome = teamRating(home, homeLadder, true, magicRound, homeQld);
+  const ratingAway = teamRating(away, awayLadder, false, magicRound, awayQld);
   const netRating = ratingHome - ratingAway; // >0 favours home
 
   // ---- Statistical model: logistic regression + Monte Carlo ----
@@ -130,6 +137,19 @@ export function generateDeterministicInsights(inp: EngineInputs): DeterministicI
   const homeInputs = buildModelInputs(home);
   const awayInputs = buildModelInputs(away);
   const outcomePred = predictMatchOutcome(homeInputs, awayInputs);
+  // Magic Round venue overlay: shift win prob + margin by the QLD differential.
+  if (magicRound) {
+    const qldDiff = homeQld - awayQld; // points of expected edge
+    if (qldDiff !== 0) {
+      const z = qldDiff * 0.18; // ~0.18 logit per point of venue edge
+      const p = 1 / (1 + Math.exp(-(Math.log(outcomePred.homeWinProb / (1 - outcomePred.homeWinProb)) + z)));
+      outcomePred.homeWinProb = clamp(p, 0.02, 0.98);
+      outcomePred.awayWinProb = 1 - outcomePred.homeWinProb;
+      outcomePred.expectedMargin = outcomePred.expectedMargin + qldDiff;
+      outcomePred.marginBand = Math.abs(outcomePred.expectedMargin) >= 13 ? "13+" : "1-12";
+      outcomePred.confidence = Math.abs(outcomePred.homeWinProb - 0.5) * 2;
+    }
+  }
   const totalPred = predictTotalPoints(homeInputs, awayInputs);
   // Monte Carlo over 10k iterations gives us empirical confidence + total
   // distributions that we use for the over/under line and risk band.
@@ -628,15 +648,23 @@ function getTeamOrSynthetic(snap: SeasonSnapshot, nick: string): TeamSeasonStats
   };
 }
 
-function teamRating(t: TeamSeasonStats, ladder: NrlLadderRow | null, isHome: boolean): number {
+function teamRating(
+  t: TeamSeasonStats,
+  ladder: NrlLadderRow | null,
+  isHome: boolean,
+  magicRound: boolean = false,
+  qldVenueBoost: number = 0,
+): number {
   // Net points-per-game differential (≈ -10..+10 across the comp)
   const diff = t.ppgFor - t.ppgAgainst;
   // Ladder positional weight: top sides get small bump (position 1 → +1.5, 17 → -1.5)
   const ladderShift = ladder ? (9 - ladder.position) * 0.18 : 0;
   // Recent form shift (last 5)
   const formShift = t.last5.reduce((s, r) => s + (r.result === "W" ? 0.4 : r.result === "L" ? -0.4 : 0), 0);
-  const homeAdv = isHome ? 1.5 : 0;
-  return diff + ladderShift + formShift + homeAdv;
+  // Standard home advantage is muted at Magic Round (neutral venue);
+  // QLD-team boost is applied either way when the fixture is at Suncorp.
+  const homeAdv = isHome ? (magicRound ? 0.5 : 1.5) : 0;
+  return diff + ladderShift + formShift + homeAdv + qldVenueBoost;
 }
 
 function blendPoints(ownFor: number, oppAgainst: number): number {

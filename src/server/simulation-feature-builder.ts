@@ -21,6 +21,7 @@ import { buildFatigueProfile } from "./fatigue-model";
 import { buildRuckTempoProfile } from "./ruck-tempo-model";
 import { buildEdgeAttackProfile } from "./edge-attack-model";
 import { buildMomentumProfile } from "./momentum-wave-model";
+import { magicRoundHomeAdvantage } from "./magic-round";
 
 const LEAGUE_AVG = {
   pointsForPerGame: 22,
@@ -282,7 +283,7 @@ export function buildSimulationInput(args: {
     awayFeatures,
     homePlayers: homeFeats,
     awayPlayers: awayFeats,
-    homeAdvantage: 3,
+    homeAdvantage: magicRoundHomeAdvantage(args.homeNickname, args.awayNickname, args.venue) ?? 3,
     weatherTempoModifier: args.weatherTempoModifier,
     seed: args.seed ?? hashSeed(args.matchId),
     iterations: args.iterations ?? 10_000,

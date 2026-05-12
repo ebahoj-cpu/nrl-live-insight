@@ -223,6 +223,7 @@ export async function getOrGenerateSimulation(args: {
   officials?: NormalisedMatchOfficial[] | null;
   hasOfficials?: boolean;
   hasNamedTeamLists?: boolean;
+  venue?: string | null;
 }): Promise<SimulationSummary | null> {
   if (!isSimulationEnabled()) { devLog("flag-off"); return null; }
   if (!args.snapshot) return null;
@@ -264,6 +265,7 @@ export async function getOrGenerateSimulation(args: {
       injuries: injuries.length ? injuries : undefined,
       hasOfficials,
       hasNamedTeamLists: args.hasNamedTeamLists,
+      venue: args.venue ?? null,
     });
     const raw = runSimulation(input);
     const summary = validateSimulation(raw);

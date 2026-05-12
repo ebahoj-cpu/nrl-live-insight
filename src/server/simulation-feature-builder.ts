@@ -1,12 +1,6 @@
 // ============================================================================
-// Simulation feature builder.
-//
-// Turns whatever data we have (existing SeasonSnapshot, normalised stats,
-// named squads, weather, odds) into the shape the Monte Carlo engine consumes.
-//
-// Defensive against missing fields: every metric has a sensible neutral
-// default so the simulator always produces output. The downstream confidence
-// system penalises missing fields rather than refusing to run.
+// Simulation feature builder. Defensive — every metric has a sensible neutral
+// default; missing fields lower confidence rather than refusing to run.
 // ============================================================================
 
 import type {
@@ -15,7 +9,18 @@ import type {
   SimulationInput,
   EdgeChannel,
 } from "./simulation-types";
-import type { SourceCoverage, NormalisedTeamStats } from "./nrl-data-types";
+import type { SourceCoverage, NormalisedTeamStats, NormalisedHistoricalMatch, NormalisedMatchOfficial } from "./nrl-data-types";
+import { makeCoverage } from "./source-coverage";
+import type { TeamSeasonStats, PlayerSeasonStats, SeasonSnapshot } from "./season-stats";
+import { getTeam, getTeamPlayers } from "./season-stats";
+import type { NrlPlayer } from "./nrl";
+import type { ModelMode } from "./model-mode";
+import { buildHeadToHead } from "./head-to-head-model";
+import { buildRefereeProfile } from "./referee-model";
+import { buildFatigueProfile } from "./fatigue-model";
+import { buildRuckTempoProfile } from "./ruck-tempo-model";
+import { buildEdgeAttackProfile } from "./edge-attack-model";
+import { buildMomentumProfile } from "./momentum-wave-model";
 import { makeCoverage } from "./source-coverage";
 import type { TeamSeasonStats, PlayerSeasonStats, SeasonSnapshot } from "./season-stats";
 import { getTeam, getTeamPlayers } from "./season-stats";

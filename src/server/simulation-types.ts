@@ -5,6 +5,14 @@
 
 import type { ConfidenceTier } from "./confidence";
 import type { SourceCoverage } from "./nrl-data-types";
+import type { HeadToHeadProfile } from "./head-to-head-model";
+import type { RefereeProfile } from "./referee-model";
+import type { FatigueProfile } from "./fatigue-model";
+import type { RuckTempoProfile } from "./ruck-tempo-model";
+import type { EdgeAttackProfile } from "./edge-attack-model";
+import type { MomentumProfile } from "./momentum-wave-model";
+import type { CalibrationResult } from "./probability-calibration";
+import type { ModelDriver } from "./model-driver-explainer";
 
 export type TeamFeatures = {
   nickname: string;

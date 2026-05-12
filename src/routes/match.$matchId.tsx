@@ -2849,7 +2849,7 @@ function BetTab({ insights, insightsError, insightsLoading, home, away, tryscore
               {availableTryscorers.length === 0
                 ? marketsLive
                   ? "No more tryscorer markets"
-                  : "Tryscorer odds open ~24h pre-game"
+                  : "Tryscorer odds drop weekly · 6pm NZT / 4pm Sydney"
                 : "+ Add another anytime tryscorer"}
             </button>
           )}

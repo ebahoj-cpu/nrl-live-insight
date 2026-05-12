@@ -68,25 +68,17 @@ function binomial(n: number, p: number, rng: () => number): number {
 
 // ---------- Lambda calculations ----------
 // Convert team features into expected try count for THIS match.
-function expectedTries(attack: TeamFeatures, defence: TeamFeatures, isHome: boolean, ref?: RefereeFeatures, weatherTempo?: number): number {
-  // Base = attacker tries vs defender concession, blended.
+function expectedTries(attack: TeamFeatures, defence: TeamFeatures, isHome: boolean, ref?: RefereeFeatures, weatherTempo?: number, extraTotalLift = 0): number {
   const base = (attack.triesPerGame * 0.6) + (defence.triesAgainstPerGame * 0.4);
-  // Form delta (-1..+1) → ±10%
   const formDelta = (attack.recentForm - defence.recentForm) * 0.1;
-  // Tempo / metres delta
   const tempoDelta = ((attack.metresPerGame - defence.metresPerGame) / 1500) * 0.08;
-  // Ruck pressure
   const rprDelta = ((attack.ruckPressureRating - 50) / 100) * 0.12;
-  // Fatigue (applies to defender's late-game leak)
   const fatigueDelta = ((defence.fatigueIndex - 50) / 100) * 0.08;
-  // Home advantage
   const homeDelta = isHome ? 0.05 : -0.02;
-  // Weather slows the game
   const weatherDelta = weatherTempo ? -Math.max(0, -weatherTempo) * 0.1 : 0;
-  // Referee tendencies
   const refDelta = ref ? (ref.totalsTendency * 0.05) : 0;
-
-  return Math.max(0.3, base * (1 + formDelta + tempoDelta + rprDelta + fatigueDelta + homeDelta + weatherDelta + refDelta));
+  const extraLift = Math.max(-0.08, Math.min(0.08, extraTotalLift));
+  return Math.max(0.3, base * (1 + formDelta + tempoDelta + rprDelta + fatigueDelta + homeDelta + weatherDelta + refDelta + extraLift));
 }
 
 // ---------- Player attacking weights ----------

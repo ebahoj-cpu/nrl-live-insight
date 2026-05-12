@@ -318,6 +318,29 @@ export async function recordResultAndScore(args: {
   const riskTier = snap.model_mode === "early" ? "high"
     : snap.model_mode === "squad" ? "medium" : "low";
 
+  // Phase 5 — calibration & error fields. All optional / null-safe.
+  const snapAny = snap as unknown as Record<string, unknown>;
+  const calibrated = snapAny.calibrated_prob as { home?: number; away?: number; draw?: number } | null | undefined;
+  let calibrationAccuracy: number | null = null;
+  if (calibrated && typeof calibrated.home === "number" && typeof calibrated.away === "number") {
+    const winnerProb = actualWinner === args.details.homeTeam.nickName
+      ? (calibrated.home ?? 0)
+      : actualWinner === args.details.awayTeam.nickName
+        ? (calibrated.away ?? 0)
+        : (calibrated.draw ?? 0);
+    calibrationAccuracy = Math.round(winnerProb * 1000) / 1000;
+  }
+  const confidenceBucket = snap.confidence_scores?.overall != null
+    ? snap.confidence_scores.overall >= 0.7 ? "high"
+      : snap.confidence_scores.overall >= 0.5 ? "medium" : "low"
+    : null;
+  const expectedTotalError = snap.predicted_total_line != null
+    ? Math.abs(snap.predicted_total_line - actualTotal) : null;
+  const predictedMarginErr = snap.predicted_score_home != null && snap.predicted_score_away != null
+    ? Math.abs((snap.predicted_score_home - snap.predicted_score_away) - (homeScore - awayScore)) : null;
+  const scoreErr = snap.predicted_score_home != null && snap.predicted_score_away != null
+    ? Math.abs(snap.predicted_score_home - homeScore) + Math.abs(snap.predicted_score_away - awayScore) : null;
+
   await supabaseAdmin
     .from("prediction_scores" as never)
     .insert({
@@ -337,6 +360,11 @@ export async function recordResultAndScore(args: {
       player_market_score: playerScore,
       total_model_score: totalModelScore,
       risk_tier: riskTier,
+      calibration_accuracy: calibrationAccuracy,
+      confidence_bucket: confidenceBucket,
+      expected_total_error: expectedTotalError,
+      predicted_margin_error: predictedMarginErr,
+      score_error: scoreErr,
     } as never)
     .then(() => undefined, (e: { message?: string }) => {
       if (!/duplicate key|unique/i.test(e?.message ?? "")) console.warn("insert score:", e?.message);

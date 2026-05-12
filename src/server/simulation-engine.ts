@@ -127,8 +127,18 @@ export function runSimulation(input: SimulationInput): SimulationSummary {
   const rng = makeRng(input.seed);
   const { homeFeatures, awayFeatures, homePlayers, awayPlayers, referee, weatherTempoModifier, iterations } = input;
 
-  const lambdaHome = expectedTries(homeFeatures, awayFeatures, true, referee, weatherTempoModifier);
-  const lambdaAway = expectedTries(awayFeatures, homeFeatures, false, referee, weatherTempoModifier);
+  // Phase 4: aggregate bounded total lift from advanced models. Each input is
+  // already capped at its source; here we re-clamp the combined value.
+  const refTotalPts = input.refereeProfile?.totalPointsModifier ?? 0;
+  const ruckTotalPts = input.ruckTempoProfile?.totalPointsModifier ?? 0;
+  const fatigueTotalPts = input.fatigueProfile?.totalPointsModifier ?? 0;
+  const h2hTotalPts = input.headToHead?.totalModifier ?? 0;
+  // Convert points-per-game into a multiplicative lift on lambda (very small).
+  const totalPtsCombined = Math.max(-6, Math.min(6, refTotalPts + ruckTotalPts + fatigueTotalPts + h2hTotalPts));
+  const extraLift = totalPtsCombined / 100; // ±0.06 max
+
+  const lambdaHome = expectedTries(homeFeatures, awayFeatures, true, referee, weatherTempoModifier, extraLift);
+  const lambdaAway = expectedTries(awayFeatures, homeFeatures, false, referee, weatherTempoModifier, extraLift);
 
   const homeWeights = buildWeights(homePlayers);
   const awayWeights = buildWeights(awayPlayers);

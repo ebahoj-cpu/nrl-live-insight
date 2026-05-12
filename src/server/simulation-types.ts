@@ -5,6 +5,14 @@
 
 import type { ConfidenceTier } from "./confidence";
 import type { SourceCoverage } from "./nrl-data-types";
+import type { HeadToHeadProfile } from "./head-to-head-model";
+import type { RefereeProfile } from "./referee-model";
+import type { FatigueProfile } from "./fatigue-model";
+import type { RuckTempoProfile } from "./ruck-tempo-model";
+import type { EdgeAttackProfile } from "./edge-attack-model";
+import type { MomentumProfile } from "./momentum-wave-model";
+import type { CalibrationResult } from "./probability-calibration";
+import type { ModelDriver } from "./model-driver-explainer";
 
 export type TeamFeatures = {
   nickname: string;
@@ -71,6 +79,15 @@ export type SimulationInput = {
   // Provenance
   coverage: SourceCoverage;
   modelMode: "early" | "squad" | "market" | "final";
+  // Phase 4 advanced model inputs (all optional, backward compatible).
+  headToHead?: HeadToHeadProfile;
+  refereeProfile?: RefereeProfile;
+  fatigueProfile?: FatigueProfile;
+  ruckTempoProfile?: RuckTempoProfile;
+  edgeAttackProfile?: EdgeAttackProfile;
+  momentumProfile?: MomentumProfile;
+  marketOdds?: { home?: number | null; away?: number | null; draw?: number | null } | null;
+  deterministicProb?: { home: number; away: number; draw: number } | null;
 };
 
 // ---------- Outputs ----------
@@ -118,4 +135,14 @@ export type SimulationSummary = {
   confidence: ConfidenceTier;
   coverage: SourceCoverage;
   generatedAt: string;
+  // Phase 4 advanced profiles (optional — back-compat with Phase 1-3 callers).
+  headToHead?: HeadToHeadProfile;
+  refereeImpact?: RefereeProfile;
+  fatigueProfile?: FatigueProfile;
+  ruckTempoProfile?: RuckTempoProfile;
+  edgeAttackProfile?: EdgeAttackProfile;
+  momentumProfile?: MomentumProfile;
+  calibration?: CalibrationResult;
+  modelDrivers?: ModelDriver[];
+  advancedModelVersion?: number;
 };

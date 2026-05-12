@@ -1,12 +1,6 @@
 // ============================================================================
-// Simulation feature builder.
-//
-// Turns whatever data we have (existing SeasonSnapshot, normalised stats,
-// named squads, weather, odds) into the shape the Monte Carlo engine consumes.
-//
-// Defensive against missing fields: every metric has a sensible neutral
-// default so the simulator always produces output. The downstream confidence
-// system penalises missing fields rather than refusing to run.
+// Simulation feature builder. Defensive — every metric has a sensible neutral
+// default; missing fields lower confidence rather than refusing to run.
 // ============================================================================
 
 import type {
@@ -15,12 +9,18 @@ import type {
   SimulationInput,
   EdgeChannel,
 } from "./simulation-types";
-import type { SourceCoverage, NormalisedTeamStats } from "./nrl-data-types";
+import type { SourceCoverage, NormalisedTeamStats, NormalisedHistoricalMatch, NormalisedMatchOfficial } from "./nrl-data-types";
 import { makeCoverage } from "./source-coverage";
 import type { TeamSeasonStats, PlayerSeasonStats, SeasonSnapshot } from "./season-stats";
 import { getTeam, getTeamPlayers } from "./season-stats";
 import type { NrlPlayer } from "./nrl";
 import type { ModelMode } from "./model-mode";
+import { buildHeadToHead } from "./head-to-head-model";
+import { buildRefereeProfile } from "./referee-model";
+import { buildFatigueProfile } from "./fatigue-model";
+import { buildRuckTempoProfile } from "./ruck-tempo-model";
+import { buildEdgeAttackProfile } from "./edge-attack-model";
+import { buildMomentumProfile } from "./momentum-wave-model";
 
 const LEAGUE_AVG = {
   pointsForPerGame: 22,
@@ -195,6 +195,15 @@ export function buildSimulationInput(args: {
   injuries?: { name: string; teamNickname: string; status: "out" | "doubtful" | "test" | "available" }[];
   hasOfficials?: boolean;
   hasNamedTeamLists?: boolean;
+  // Phase 4 advanced inputs (all optional).
+  history?: NormalisedHistoricalMatch[] | null;
+  officials?: NormalisedMatchOfficial[] | null;
+  kickoffUtc?: string;
+  homeLastMatchUtc?: string | null;
+  awayLastMatchUtc?: string | null;
+  marketOdds?: { home?: number | null; away?: number | null; draw?: number | null } | null;
+  deterministicProb?: { home: number; away: number; draw: number } | null;
+  venue?: string | null;
 }): SimulationInput {
   const home = getTeam(args.snapshot, args.homeNickname) ?? undefined;
   const away = getTeam(args.snapshot, args.awayNickname) ?? undefined;
@@ -238,6 +247,35 @@ export function buildSimulationInput(args: {
   if (!args.hasOfficials) coverage.missingFields.push("officials");
   if (args.hasNamedTeamLists === false) coverage.missingFields.push("named_team_lists");
 
+  // Phase 4 advanced profiles.
+  const headToHead = buildHeadToHead({
+    homeNickname: args.homeNickname, awayNickname: args.awayNickname,
+    history: args.history, venue: args.venue ?? null,
+  });
+  const refereeProfile = buildRefereeProfile(args.officials ?? null);
+  const injuriesOutHome = (args.injuries ?? []).filter((i) => i.status === "out" && i.teamNickname.toLowerCase() === args.homeNickname.toLowerCase()).length;
+  const injuriesOutAway = (args.injuries ?? []).filter((i) => i.status === "out" && i.teamNickname.toLowerCase() === args.awayNickname.toLowerCase()).length;
+  const fatigueProfile = buildFatigueProfile({
+    home: { nickname: args.homeNickname, lastMatchUtc: args.homeLastMatchUtc, errorsPerGame: homeFeatures.errorsPerGame, penaltiesPerGame: homeFeatures.penaltiesPerGame, injuriesOut: injuriesOutHome },
+    away: { nickname: args.awayNickname, lastMatchUtc: args.awayLastMatchUtc, errorsPerGame: awayFeatures.errorsPerGame, penaltiesPerGame: awayFeatures.penaltiesPerGame, injuriesOut: injuriesOutAway },
+    kickoffUtc: args.kickoffUtc,
+  });
+  const ruckTempoProfile = buildRuckTempoProfile({
+    home: { nickname: args.homeNickname, runMetresPerGame: homeFeatures.metresPerGame, postContactMetresPerGame: homeFeatures.postContactMetresPerGame, tackleBreaksPerGame: homeFeatures.tackleBreaksPerGame, completionRate: homeFeatures.completionRate, errorsPerGame: homeFeatures.errorsPerGame, penaltiesPerGame: homeFeatures.penaltiesPerGame, lineBreaksPerGame: homeFeatures.lineBreaksPerGame },
+    away: { nickname: args.awayNickname, runMetresPerGame: awayFeatures.metresPerGame, postContactMetresPerGame: awayFeatures.postContactMetresPerGame, tackleBreaksPerGame: awayFeatures.tackleBreaksPerGame, completionRate: awayFeatures.completionRate, errorsPerGame: awayFeatures.errorsPerGame, penaltiesPerGame: awayFeatures.penaltiesPerGame, lineBreaksPerGame: awayFeatures.lineBreaksPerGame },
+    weatherTempoModifier: args.weatherTempoModifier,
+  });
+  const edgeAttackProfile = buildEdgeAttackProfile({
+    homePlayers: homeFeats, awayPlayers: awayFeats,
+    hasNamedTeamLists: args.hasNamedTeamLists,
+  });
+  const momentumProfile = buildMomentumProfile({
+    homeHtLeadRate: home?.htLeadRate, awayHtLeadRate: away?.htLeadRate,
+    homeHtConversionRate: home?.htConversionRate, awayHtConversionRate: away?.htConversionRate,
+    homeRecentForm: homeFeatures.recentForm, awayRecentForm: awayFeatures.recentForm,
+    fatigue: fatigueProfile, ruckTempo: ruckTempoProfile,
+  });
+
   return {
     matchId: args.matchId,
     homeFeatures,
@@ -250,6 +288,14 @@ export function buildSimulationInput(args: {
     iterations: args.iterations ?? 10_000,
     coverage,
     modelMode: args.modelMode,
+    headToHead,
+    refereeProfile,
+    fatigueProfile,
+    ruckTempoProfile,
+    edgeAttackProfile,
+    momentumProfile,
+    marketOdds: args.marketOdds ?? null,
+    deterministicProb: args.deterministicProb ?? null,
   };
 }
 

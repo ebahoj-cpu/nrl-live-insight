@@ -94,3 +94,101 @@ export function calibrateProbabilities(inp: CalibrationInputs): CalibrationResul
     calibrationNote: note,
   };
 }
+
+// ----------------------------------------------------------------------------
+// Phase 5 — single-market calibration helpers.
+// Each accepts a model probability, an optional market price and confidence,
+// and returns a blended probability plus a value signal. Invalid odds are
+// ignored (returns the model probability as-is).
+// ----------------------------------------------------------------------------
+
+export type SingleMarketCalibration = {
+  modelProb: number;
+  marketProb: number | null;
+  calibratedProb: number;
+  hasValue: boolean;
+  edge: number;                 // signed: model - market
+};
+
+const SINGLE_WEIGHT_BY_CONFIDENCE: Record<ConfidenceTier, { sim: number; market: number }> = {
+  low: { sim: 0.35, market: 0.65 },
+  medium: { sim: 0.55, market: 0.45 },
+  high: { sim: 0.7, market: 0.3 },
+};
+
+function impliedFromSinglePrice(price: number | null | undefined): number | null {
+  if (typeof price !== "number" || !Number.isFinite(price) || price <= 1.01) return null;
+  return 1 / price;
+}
+
+export function calibrateSingleMarket(args: {
+  modelProb: number;
+  marketPrice?: number | null;
+  confidence: ConfidenceTier;
+  // Suppress value claims for tryscorer markets when confidence is low.
+  suppressLowConfidenceValue?: boolean;
+}): SingleMarketCalibration {
+  const m = args.modelProb;
+  if (!Number.isFinite(m) || m < 0 || m > 1) {
+    return { modelProb: m, marketProb: null, calibratedProb: m, hasValue: false, edge: 0 };
+  }
+  const marketImplied = impliedFromSinglePrice(args.marketPrice);
+  if (marketImplied == null) {
+    return { modelProb: m, marketProb: null, calibratedProb: m, hasValue: false, edge: 0 };
+  }
+  const w = SINGLE_WEIGHT_BY_CONFIDENCE[args.confidence];
+  const calibrated = w.sim * m + w.market * marketImplied;
+  const edge = m - marketImplied;
+  let hasValue = edge > 0.04;
+  if (hasValue && args.suppressLowConfidenceValue && args.confidence === "low") {
+    hasValue = false;
+  }
+  return {
+    modelProb: m,
+    marketProb: marketImplied,
+    calibratedProb: Math.max(0, Math.min(1, calibrated)),
+    hasValue,
+    edge: Math.round(edge * 1000) / 1000,
+  };
+}
+
+// Margin market — split into 1-12 / 13+ per side.
+export function calibrateMarginMarket(args: {
+  modelProb: number;
+  price?: number | null;
+  confidence: ConfidenceTier;
+}): SingleMarketCalibration {
+  return calibrateSingleMarket({
+    modelProb: args.modelProb,
+    marketPrice: args.price,
+    confidence: args.confidence,
+  });
+}
+
+// Totals market — over/under at the projected line.
+export function calibrateTotalsMarket(args: {
+  modelProb: number;
+  price?: number | null;
+  confidence: ConfidenceTier;
+}): SingleMarketCalibration {
+  return calibrateSingleMarket({
+    modelProb: args.modelProb,
+    marketPrice: args.price,
+    confidence: args.confidence,
+  });
+}
+
+// Tryscorer markets (anytime / first / multi). Suppresses value claims at
+// low confidence to avoid noisy player picks.
+export function calibrateTryscorerMarket(args: {
+  modelProb: number;
+  price?: number | null;
+  confidence: ConfidenceTier;
+}): SingleMarketCalibration {
+  return calibrateSingleMarket({
+    modelProb: args.modelProb,
+    marketPrice: args.price,
+    confidence: args.confidence,
+    suppressLowConfidenceValue: true,
+  });
+}

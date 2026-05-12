@@ -287,8 +287,24 @@ export function runSimulation(input: SimulationInput): SimulationSummary {
     })),
   ];
 
+  // Phase 4: apply bounded edge-attack anytime boost per player.
+  if (input.edgeAttackProfile?.playerAnytimeBoost) {
+    const boosts = input.edgeAttackProfile.playerAnytimeBoost;
+    for (const p of playerProbabilities) {
+      const b = boosts[p.name.toLowerCase()];
+      if (typeof b === "number") p.anytimeProb = Math.max(0, Math.min(1, p.anytimeProb + b));
+    }
+  }
+
   const htftProbabilities: Record<string, number> = {};
   for (const [k, v] of htft.entries()) htftProbabilities[k] = v / N;
+  // Phase 4: bounded HT/FT boosts from momentum.
+  if (input.momentumProfile) {
+    const hh = (htftProbabilities["home/home"] ?? 0) + input.momentumProfile.htftHomeHomeBoost;
+    const aa = (htftProbabilities["away/away"] ?? 0) + input.momentumProfile.htftAwayAwayBoost;
+    htftProbabilities["home/home"] = Math.max(0, Math.min(1, hh));
+    htftProbabilities["away/away"] = Math.max(0, Math.min(1, aa));
+  }
 
   // Confidence
   const conf = computeConfidence({
@@ -297,26 +313,68 @@ export function runSimulation(input: SimulationInput): SimulationSummary {
     iterations,
     squadsNamed: input.modelMode !== "early",
     marketAvailable: input.modelMode === "market" || input.modelMode === "final",
-    hasOfficials: !!input.referee,
+    hasOfficials: !!input.referee || (input.refereeProfile?.confidence !== "low" && !!input.refereeProfile),
   });
+
+  // Phase 4: calibration vs market.
+  const calibration = calibrateProbabilities({
+    simulationProb: { home: homeWinProb, away: awayWinProb, draw: drawProb },
+    deterministicProb: input.deterministicProb ?? null,
+    marketOdds: input.marketOdds ?? null,
+    modelConfidence: conf.tier,
+  });
+
+  // Apply small bounded shift to win probabilities from calibration. We do
+  // NOT replace the simulator output; we blend it with calibrated values so
+  // probabilities still sum to 1 and the engine remains deterministic.
+  const calibrationWeight = conf.tier === "high" ? 0.25 : conf.tier === "medium" ? 0.45 : 0.6;
+  const blended = {
+    home: homeWinProb * (1 - calibrationWeight) + calibration.calibratedHomeWinProb * calibrationWeight,
+    away: awayWinProb * (1 - calibrationWeight) + calibration.calibratedAwayWinProb * calibrationWeight,
+    draw: drawProb * (1 - calibrationWeight) + calibration.calibratedDrawProb * calibrationWeight,
+  };
+  const blendSum = blended.home + blended.away + blended.draw || 1;
+  const finalHome = blended.home / blendSum;
+  const finalAway = blended.away / blendSum;
+  const finalDraw = blended.draw / blendSum;
+
+  // Phase 4: model drivers.
+  const modelDrivers = buildModelDrivers({
+    homeNickname: input.homeFeatures.nickname,
+    awayNickname: input.awayFeatures.nickname,
+    h2h: input.headToHead ?? { recentHeadToHeadGames: 0, homeWins: 0, awayWins: 0, draws: 0, avgTotal: 0, avgMargin: 0, closeGameRate: 0, blowoutRate: 0, homeVenueEdge: null, stylisticNote: "", marginModifier: 0, totalModifier: 0, closeGameLift: 0, blowoutLift: 0, confidence: "low" },
+    referee: input.refereeProfile ?? { name: null, penaltyTendency: 0, totalsTendency: 0, sinBinTendency: 0, homeBias: 0, ruckSpeedTolerance: 0, totalPointsModifier: 0, volatilityModifier: 0, homeBiasModifier: 0, confidence: "low", note: "" },
+    fatigue: input.fatigueProfile ?? { homeFatigueIndex: 50, awayFatigueIndex: 50, fatigueEdge: 0, lateCollapseRisk: { home: 0.1, away: 0.1 }, secondHalfSwing: 0, benchStressNote: "", totalPointsModifier: 0, blowoutLift: 0, comebackLift: 0, confidence: "low" },
+    ruckTempo: input.ruckTempoProfile ?? { homeRuckPressureRating: 50, awayRuckPressureRating: 50, tempoLean: "average", territoryLean: "neutral", middleDominance: "neutral", edgeExposureRisk: "neutral", totalPointsModifier: 0, outsideBackTryModifier: 0, weatherSlowdown: 0, confidence: "low", note: "" },
+    edgeAttack: input.edgeAttackProfile ?? { homeLeftEdgeRating: 50, homeRightEdgeRating: 50, homeMiddleRating: 50, awayLeftEdgeRating: 50, awayRightEdgeRating: 50, awayMiddleRating: 50, bestAttackChannel: null, weakestDefensiveChannel: null, playerChannelMap: {}, likelyEdgeTryScorers: [], playerAnytimeBoost: {}, confidence: "low", note: "" },
+    calibration,
+    teamStrengthDelta: homeWinProb - awayWinProb,
+    weatherWet: (weatherTempoModifier ?? 0) < -0.4,
+  });
+
+  // Apply small bounded margin nudge from H2H + ref home bias.
+  const marginNudge = Math.max(-3, Math.min(3,
+    (input.headToHead?.marginModifier ?? 0)
+    + (input.refereeProfile?.homeBiasModifier ?? 0)
+  ));
 
   return {
     matchId: input.matchId,
     iterations,
     seed: input.seed,
-    homeWinProb,
-    awayWinProb,
-    drawProb,
+    homeWinProb: finalHome,
+    awayWinProb: finalAway,
+    drawProb: finalDraw,
     expectedHomeScore,
     expectedAwayScore,
     expectedTotal,
     totalLine,
     overProbAtLine: overCount / N,
-    expectedMargin,
+    expectedMargin: expectedMargin + marginNudge,
     marginBands: {
-      draw: drawProb,
+      draw: finalDraw,
       "1-12": band112 / decided,
-      "13+": band13 / decided,
+      "13+": Math.max(0, Math.min(1, band13 / decided + (input.fatigueProfile?.blowoutLift ?? 0) + (input.headToHead?.blowoutLift ?? 0))),
     },
     upsetProb: upsets / N,
     blowoutProb: blowouts / N,
@@ -325,5 +383,14 @@ export function runSimulation(input: SimulationInput): SimulationSummary {
     confidence: conf.tier,
     coverage: input.coverage,
     generatedAt: new Date().toISOString(),
+    headToHead: input.headToHead,
+    refereeImpact: input.refereeProfile,
+    fatigueProfile: input.fatigueProfile,
+    ruckTempoProfile: input.ruckTempoProfile,
+    edgeAttackProfile: input.edgeAttackProfile,
+    momentumProfile: input.momentumProfile,
+    calibration,
+    modelDrivers,
+    advancedModelVersion: ADVANCED_MODEL_VERSION,
   };
 }

@@ -635,15 +635,23 @@ function getTeamOrSynthetic(snap: SeasonSnapshot, nick: string): TeamSeasonStats
   };
 }
 
-function teamRating(t: TeamSeasonStats, ladder: NrlLadderRow | null, isHome: boolean): number {
+function teamRating(
+  t: TeamSeasonStats,
+  ladder: NrlLadderRow | null,
+  isHome: boolean,
+  magicRound: boolean = false,
+  qldVenueBoost: number = 0,
+): number {
   // Net points-per-game differential (≈ -10..+10 across the comp)
   const diff = t.ppgFor - t.ppgAgainst;
   // Ladder positional weight: top sides get small bump (position 1 → +1.5, 17 → -1.5)
   const ladderShift = ladder ? (9 - ladder.position) * 0.18 : 0;
   // Recent form shift (last 5)
   const formShift = t.last5.reduce((s, r) => s + (r.result === "W" ? 0.4 : r.result === "L" ? -0.4 : 0), 0);
-  const homeAdv = isHome ? 1.5 : 0;
-  return diff + ladderShift + formShift + homeAdv;
+  // Standard home advantage is muted at Magic Round (neutral venue);
+  // QLD-team boost is applied either way when the fixture is at Suncorp.
+  const homeAdv = isHome ? (magicRound ? 0.5 : 1.5) : 0;
+  return diff + ladderShift + formShift + homeAdv + qldVenueBoost;
 }
 
 function blendPoints(ownFor: number, oppAgainst: number): number {

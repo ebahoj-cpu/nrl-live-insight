@@ -19,6 +19,7 @@ import { Route as ApiPublicAppIconRouteImport } from './routes/api/public/app-ic
 import { Route as ApiPublicHooksRefreshOddsRouteImport } from './routes/api/public/hooks/refresh-odds'
 import { Route as ApiPublicHooksRefreshNrlDataRouteImport } from './routes/api/public/hooks/refresh-nrl-data'
 import { Route as ApiPublicHooksPrecomputeInsightsRouteImport } from './routes/api/public/hooks/precompute-insights'
+import { Route as ApiPublicHooksModelHealthRouteImport } from './routes/api/public/hooks/model-health'
 
 const ScoutRoute = ScoutRouteImport.update({
   id: '/scout',
@@ -73,6 +74,12 @@ const ApiPublicHooksPrecomputeInsightsRoute =
     path: '/api/public/hooks/precompute-insights',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksModelHealthRoute =
+  ApiPublicHooksModelHealthRouteImport.update({
+    id: '/api/public/hooks/model-health',
+    path: '/api/public/hooks/model-health',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -82,6 +89,7 @@ export interface FileRoutesByFullPath {
   '/match/$matchId': typeof MatchMatchIdRoute
   '/api/public/app-icon': typeof ApiPublicAppIconRoute
   '/api/public/manifest': typeof ApiPublicManifestRoute
+  '/api/public/hooks/model-health': typeof ApiPublicHooksModelHealthRoute
   '/api/public/hooks/precompute-insights': typeof ApiPublicHooksPrecomputeInsightsRoute
   '/api/public/hooks/refresh-nrl-data': typeof ApiPublicHooksRefreshNrlDataRoute
   '/api/public/hooks/refresh-odds': typeof ApiPublicHooksRefreshOddsRoute
@@ -94,6 +102,7 @@ export interface FileRoutesByTo {
   '/match/$matchId': typeof MatchMatchIdRoute
   '/api/public/app-icon': typeof ApiPublicAppIconRoute
   '/api/public/manifest': typeof ApiPublicManifestRoute
+  '/api/public/hooks/model-health': typeof ApiPublicHooksModelHealthRoute
   '/api/public/hooks/precompute-insights': typeof ApiPublicHooksPrecomputeInsightsRoute
   '/api/public/hooks/refresh-nrl-data': typeof ApiPublicHooksRefreshNrlDataRoute
   '/api/public/hooks/refresh-odds': typeof ApiPublicHooksRefreshOddsRoute
@@ -107,6 +116,7 @@ export interface FileRoutesById {
   '/match/$matchId': typeof MatchMatchIdRoute
   '/api/public/app-icon': typeof ApiPublicAppIconRoute
   '/api/public/manifest': typeof ApiPublicManifestRoute
+  '/api/public/hooks/model-health': typeof ApiPublicHooksModelHealthRoute
   '/api/public/hooks/precompute-insights': typeof ApiPublicHooksPrecomputeInsightsRoute
   '/api/public/hooks/refresh-nrl-data': typeof ApiPublicHooksRefreshNrlDataRoute
   '/api/public/hooks/refresh-odds': typeof ApiPublicHooksRefreshOddsRoute
@@ -121,6 +131,7 @@ export interface FileRouteTypes {
     | '/match/$matchId'
     | '/api/public/app-icon'
     | '/api/public/manifest'
+    | '/api/public/hooks/model-health'
     | '/api/public/hooks/precompute-insights'
     | '/api/public/hooks/refresh-nrl-data'
     | '/api/public/hooks/refresh-odds'
@@ -133,6 +144,7 @@ export interface FileRouteTypes {
     | '/match/$matchId'
     | '/api/public/app-icon'
     | '/api/public/manifest'
+    | '/api/public/hooks/model-health'
     | '/api/public/hooks/precompute-insights'
     | '/api/public/hooks/refresh-nrl-data'
     | '/api/public/hooks/refresh-odds'
@@ -145,6 +157,7 @@ export interface FileRouteTypes {
     | '/match/$matchId'
     | '/api/public/app-icon'
     | '/api/public/manifest'
+    | '/api/public/hooks/model-health'
     | '/api/public/hooks/precompute-insights'
     | '/api/public/hooks/refresh-nrl-data'
     | '/api/public/hooks/refresh-odds'
@@ -158,6 +171,7 @@ export interface RootRouteChildren {
   MatchMatchIdRoute: typeof MatchMatchIdRoute
   ApiPublicAppIconRoute: typeof ApiPublicAppIconRoute
   ApiPublicManifestRoute: typeof ApiPublicManifestRoute
+  ApiPublicHooksModelHealthRoute: typeof ApiPublicHooksModelHealthRoute
   ApiPublicHooksPrecomputeInsightsRoute: typeof ApiPublicHooksPrecomputeInsightsRoute
   ApiPublicHooksRefreshNrlDataRoute: typeof ApiPublicHooksRefreshNrlDataRoute
   ApiPublicHooksRefreshOddsRoute: typeof ApiPublicHooksRefreshOddsRoute
@@ -235,6 +249,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksPrecomputeInsightsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/model-health': {
+      id: '/api/public/hooks/model-health'
+      path: '/api/public/hooks/model-health'
+      fullPath: '/api/public/hooks/model-health'
+      preLoaderRoute: typeof ApiPublicHooksModelHealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -246,6 +267,7 @@ const rootRouteChildren: RootRouteChildren = {
   MatchMatchIdRoute: MatchMatchIdRoute,
   ApiPublicAppIconRoute: ApiPublicAppIconRoute,
   ApiPublicManifestRoute: ApiPublicManifestRoute,
+  ApiPublicHooksModelHealthRoute: ApiPublicHooksModelHealthRoute,
   ApiPublicHooksPrecomputeInsightsRoute: ApiPublicHooksPrecomputeInsightsRoute,
   ApiPublicHooksRefreshNrlDataRoute: ApiPublicHooksRefreshNrlDataRoute,
   ApiPublicHooksRefreshOddsRoute: ApiPublicHooksRefreshOddsRoute,
@@ -253,3 +275,12 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+  }
+}

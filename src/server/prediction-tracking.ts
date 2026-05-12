@@ -79,6 +79,15 @@ function pickName(p: { name?: string } | undefined | null): string | null {
   return normName(p?.name);
 }
 
+export type AdvancedSnapshotExtras = {
+  rawSimulationProb?: { home: number; away: number; draw: number } | null;
+  calibratedProb?: { home: number; away: number; draw: number } | null;
+  modelDrivers?: unknown[] | null;
+  advancedModelVersion?: string | null;
+  valueEdges?: unknown | null;
+  marketSnapshot?: unknown | null;
+};
+
 export function buildSnapshotRow(args: {
   matchId: string;
   details: NrlMatchDetails;
@@ -88,6 +97,7 @@ export function buildSnapshotRow(args: {
   tryscorers: TryscorerMarkets | null;
   round?: number | null;
   season?: number | null;
+  advanced?: AdvancedSnapshotExtras;
 }): PredictionSnapshotRow {
   const { details, insights, script } = args;
   const ko = details.kickoffUtc ? new Date(details.kickoffUtc) : null;
@@ -97,7 +107,8 @@ export function buildSnapshotRow(args: {
     ? "open" : insights.totalPoints?.lean === "under" ? "slow" : "controlled";
   const flow: "tight" | "blowout" | null = insights.margin?.bucket === "13+" ? "blowout" : "tight";
 
-  return {
+  const adv = args.advanced ?? {};
+  const base: PredictionSnapshotRow = {
     match_id: args.matchId,
     round: args.round ?? (details as { roundNumber?: number }).roundNumber ?? null,
     season: args.season ?? (ko ? ko.getUTCFullYear() : null),
@@ -140,6 +151,15 @@ export function buildSnapshotRow(args: {
     },
     locked_before_kickoff: !kickoffPassed,
   };
+  return {
+    ...base,
+    ...(adv.rawSimulationProb != null ? { raw_simulation_prob: adv.rawSimulationProb } : {}),
+    ...(adv.calibratedProb != null ? { calibrated_prob: adv.calibratedProb } : {}),
+    ...(adv.modelDrivers != null ? { model_drivers: adv.modelDrivers } : {}),
+    ...(adv.advancedModelVersion != null ? { advanced_model_version: adv.advancedModelVersion } : {}),
+    ...(adv.valueEdges != null ? { value_edges: adv.valueEdges } : {}),
+    ...(adv.marketSnapshot != null ? { market_snapshot: adv.marketSnapshot } : {}),
+  } as PredictionSnapshotRow;
 }
 
 // Insert-only. If a row already exists for this match_id we DO NOT overwrite —

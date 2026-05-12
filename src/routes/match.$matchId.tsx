@@ -2723,10 +2723,14 @@ function BetTab({ insights, insightsError, insightsLoading, home, away, tryscore
               return `${counted} ${counted === 1 ? "leg" : "legs"} · Multi`;
             })()}
           </div>
-          <div className="flex items-center gap-1.5">
-            <TeamLogo themeKey={home.themeKey} name={home.nickName} size={22} />
-            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">v</span>
-            <TeamLogo themeKey={away.themeKey} name={away.nickName} size={22} />
+          <div className="flex items-center gap-2.5">
+            <div className="h-11 w-11 rounded-full bg-surface-2 border border-border/60 ring-1 ring-accent/20 shadow-[0_2px_10px_-2px_color-mix(in_oklab,var(--accent)_35%,transparent)] flex items-center justify-center">
+              <TeamLogo themeKey={home.themeKey} name={home.nickName} size={34} />
+            </div>
+            <span className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground font-bold">v</span>
+            <div className="h-11 w-11 rounded-full bg-surface-2 border border-border/60 ring-1 ring-accent/20 shadow-[0_2px_10px_-2px_color-mix(in_oklab,var(--accent)_35%,transparent)] flex items-center justify-center">
+              <TeamLogo themeKey={away.themeKey} name={away.nickName} size={34} />
+            </div>
           </div>
         </div>
 

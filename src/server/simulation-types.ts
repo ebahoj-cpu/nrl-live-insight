@@ -135,4 +135,14 @@ export type SimulationSummary = {
   confidence: ConfidenceTier;
   coverage: SourceCoverage;
   generatedAt: string;
+  // Phase 4 advanced profiles (optional — back-compat with Phase 1-3 callers).
+  headToHead?: HeadToHeadProfile;
+  refereeImpact?: RefereeProfile;
+  fatigueProfile?: FatigueProfile;
+  ruckTempoProfile?: RuckTempoProfile;
+  edgeAttackProfile?: EdgeAttackProfile;
+  momentumProfile?: MomentumProfile;
+  calibration?: CalibrationResult;
+  modelDrivers?: ModelDriver[];
+  advancedModelVersion?: number;
 };

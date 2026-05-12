@@ -122,8 +122,14 @@ export function generateDeterministicInsights(inp: EngineInputs): DeterministicI
   const awayLadder = inp.ladder.find((r) => r.nickname.toLowerCase() === inp.awayNickname.toLowerCase()) ?? null;
 
   // ---- Net team rating (legacy heuristic, retained for downstream copy) ----
-  const ratingHome = teamRating(home, homeLadder, true);
-  const ratingAway = teamRating(away, awayLadder, false);
+  // Magic Round at Suncorp: nominal home advantage is muted, but Brisbane
+  // teams (Broncos, Dolphins) and other QLD sides (Titans, Cowboys) get a
+  // crowd/travel/climate edge layered on top of their normal rating.
+  const magicRound = isMagicRoundVenue(inp.venue);
+  const homeQld = qldBoost(inp.homeNickname);
+  const awayQld = qldBoost(inp.awayNickname);
+  const ratingHome = teamRating(home, homeLadder, true, magicRound, homeQld);
+  const ratingAway = teamRating(away, awayLadder, false, magicRound, awayQld);
   const netRating = ratingHome - ratingAway; // >0 favours home
 
   // ---- Statistical model: logistic regression + Monte Carlo ----

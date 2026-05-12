@@ -247,6 +247,35 @@ export function buildSimulationInput(args: {
   if (!args.hasOfficials) coverage.missingFields.push("officials");
   if (args.hasNamedTeamLists === false) coverage.missingFields.push("named_team_lists");
 
+  // Phase 4 advanced profiles.
+  const headToHead = buildHeadToHead({
+    homeNickname: args.homeNickname, awayNickname: args.awayNickname,
+    history: args.history, venue: args.venue ?? null,
+  });
+  const refereeProfile = buildRefereeProfile(args.officials ?? null);
+  const injuriesOutHome = (args.injuries ?? []).filter((i) => i.status === "out" && i.teamNickname.toLowerCase() === args.homeNickname.toLowerCase()).length;
+  const injuriesOutAway = (args.injuries ?? []).filter((i) => i.status === "out" && i.teamNickname.toLowerCase() === args.awayNickname.toLowerCase()).length;
+  const fatigueProfile = buildFatigueProfile({
+    home: { nickname: args.homeNickname, lastMatchUtc: args.homeLastMatchUtc, errorsPerGame: homeFeatures.errorsPerGame, penaltiesPerGame: homeFeatures.penaltiesPerGame, injuriesOut: injuriesOutHome },
+    away: { nickname: args.awayNickname, lastMatchUtc: args.awayLastMatchUtc, errorsPerGame: awayFeatures.errorsPerGame, penaltiesPerGame: awayFeatures.penaltiesPerGame, injuriesOut: injuriesOutAway },
+    kickoffUtc: args.kickoffUtc,
+  });
+  const ruckTempoProfile = buildRuckTempoProfile({
+    home: { nickname: args.homeNickname, runMetresPerGame: homeFeatures.metresPerGame, postContactMetresPerGame: homeFeatures.postContactMetresPerGame, tackleBreaksPerGame: homeFeatures.tackleBreaksPerGame, completionRate: homeFeatures.completionRate, errorsPerGame: homeFeatures.errorsPerGame, penaltiesPerGame: homeFeatures.penaltiesPerGame, lineBreaksPerGame: homeFeatures.lineBreaksPerGame },
+    away: { nickname: args.awayNickname, runMetresPerGame: awayFeatures.metresPerGame, postContactMetresPerGame: awayFeatures.postContactMetresPerGame, tackleBreaksPerGame: awayFeatures.tackleBreaksPerGame, completionRate: awayFeatures.completionRate, errorsPerGame: awayFeatures.errorsPerGame, penaltiesPerGame: awayFeatures.penaltiesPerGame, lineBreaksPerGame: awayFeatures.lineBreaksPerGame },
+    weatherTempoModifier: args.weatherTempoModifier,
+  });
+  const edgeAttackProfile = buildEdgeAttackProfile({
+    homePlayers: homeFeats, awayPlayers: awayFeats,
+    hasNamedTeamLists: args.hasNamedTeamLists,
+  });
+  const momentumProfile = buildMomentumProfile({
+    homeHtLeadRate: home?.htLeadRate, awayHtLeadRate: away?.htLeadRate,
+    homeHtConversionRate: home?.htConversionRate, awayHtConversionRate: away?.htConversionRate,
+    homeRecentForm: homeFeatures.recentForm, awayRecentForm: awayFeatures.recentForm,
+    fatigue: fatigueProfile, ruckTempo: ruckTempoProfile,
+  });
+
   return {
     matchId: args.matchId,
     homeFeatures,
@@ -259,6 +288,14 @@ export function buildSimulationInput(args: {
     iterations: args.iterations ?? 10_000,
     coverage,
     modelMode: args.modelMode,
+    headToHead,
+    refereeProfile,
+    fatigueProfile,
+    ruckTempoProfile,
+    edgeAttackProfile,
+    momentumProfile,
+    marketOdds: args.marketOdds ?? null,
+    deterministicProb: args.deterministicProb ?? null,
   };
 }
 

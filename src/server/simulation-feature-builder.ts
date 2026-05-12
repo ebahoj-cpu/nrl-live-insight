@@ -195,6 +195,15 @@ export function buildSimulationInput(args: {
   injuries?: { name: string; teamNickname: string; status: "out" | "doubtful" | "test" | "available" }[];
   hasOfficials?: boolean;
   hasNamedTeamLists?: boolean;
+  // Phase 4 advanced inputs (all optional).
+  history?: NormalisedHistoricalMatch[] | null;
+  officials?: NormalisedMatchOfficial[] | null;
+  kickoffUtc?: string;
+  homeLastMatchUtc?: string | null;
+  awayLastMatchUtc?: string | null;
+  marketOdds?: { home?: number | null; away?: number | null; draw?: number | null } | null;
+  deterministicProb?: { home: number; away: number; draw: number } | null;
+  venue?: string | null;
 }): SimulationInput {
   const home = getTeam(args.snapshot, args.homeNickname) ?? undefined;
   const away = getTeam(args.snapshot, args.awayNickname) ?? undefined;

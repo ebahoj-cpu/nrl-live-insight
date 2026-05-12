@@ -265,6 +265,7 @@ export async function getOrGenerateSimulation(args: {
       injuries: injuries.length ? injuries : undefined,
       hasOfficials,
       hasNamedTeamLists: args.hasNamedTeamLists,
+      venue: args.venue ?? null,
     });
     const raw = runSimulation(input);
     const summary = validateSimulation(raw);

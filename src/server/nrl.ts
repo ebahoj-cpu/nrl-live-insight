@@ -21,10 +21,19 @@ function extractHeadshotUrl(raw: unknown): string | undefined {
   if (/\/fallback\/head-shot/i.test(raw)) return undefined;
   // Pattern: "/remote.axd?http://..." or "/remote.axd?https://..."
   const m = raw.match(/^\/remote\.axd\?(https?:\/\/.+)$/i);
-  if (m) return m[1].replace(/^http:\/\//i, "https://");
-  if (/^https?:\/\//i.test(raw)) return raw.replace(/^http:\/\//i, "https://");
-  if (raw.startsWith("/")) return `https://www.nrl.com${raw}`;
-  return undefined;
+  let url: string | undefined;
+  if (m) url = m[1].replace(/^http:\/\//i, "https://");
+  else if (/^https?:\/\//i.test(raw)) url = raw.replace(/^http:\/\//i, "https://");
+  else if (raw.startsWith("/")) url = `https://www.nrl.com${raw}`;
+  if (!url) return undefined;
+  // Club-hosted CMS images (contentassets, SysSiteAssets, sitecore media library)
+  // require a `preset=` query param to render — without it the CDN returns 400.
+  // statsperform.com URLs serve raw files and must NOT have preset appended.
+  const isClubCms = /(contentassets|syssiteassets|-\/media\/)/i.test(url);
+  if (isClubCms && !/[?&]preset=/i.test(url)) {
+    url += (url.includes("?") ? "&" : "?") + "preset=player-profile-large";
+  }
+  return url;
 }
 
 export type NrlFixture = {

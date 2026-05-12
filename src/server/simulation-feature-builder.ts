@@ -21,6 +21,7 @@ import { buildFatigueProfile } from "./fatigue-model";
 import { buildRuckTempoProfile } from "./ruck-tempo-model";
 import { buildEdgeAttackProfile } from "./edge-attack-model";
 import { buildMomentumProfile } from "./momentum-wave-model";
+import { magicRoundHomeAdvantage } from "./magic-round";
 
 const LEAGUE_AVG = {
   pointsForPerGame: 22,

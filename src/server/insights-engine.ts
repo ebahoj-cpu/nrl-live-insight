@@ -189,10 +189,11 @@ export function generateDeterministicInsights(inp: EngineInputs): DeterministicI
   const loserStats = winnerSide === "home" ? away : home;
 
   // ---- 1. Match Winner ----
+  const baseWinnerReason = buildWinnerReason(winnerNick, loserNick, winnerStats, loserStats, netRating, winnerSide === "home");
   const matchWinner = {
     team: winnerSide,
     nickname: winnerNick,
-    reasoning: buildWinnerReason(winnerNick, loserNick, winnerStats, loserStats, netRating, winnerSide === "home"),
+    reasoning: appendDriverHint(baseWinnerReason, ext?.modelDrivers, 2),
   };
 
   // ---- 2. Winning Margin ----

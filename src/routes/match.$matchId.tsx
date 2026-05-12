@@ -3100,9 +3100,9 @@ function LessonColumn({ team, lesson }: { team: TeamWithPlayers; lesson: TeamLes
             <p className="text-xs leading-relaxed text-foreground/90 mb-2">{lesson.summary}</p>
           )}
           {lesson.topConsistencies.length > 0 && (
-            <div className="mb-1.5">
-              <div className="text-[10px] font-bold uppercase tracking-wider text-accent mb-0.5">What worked</div>
-              <ul className="space-y-0.5">
+            <div className="mt-3 mb-3">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-accent mb-1.5">What worked</div>
+              <ul className="space-y-1">
                 {lesson.topConsistencies.slice(0, 2).map((c, i) => (
                   <li key={i} className="text-[11px] leading-snug text-foreground/85">• {c}</li>
                 ))}
@@ -3110,15 +3110,26 @@ function LessonColumn({ team, lesson }: { team: TeamWithPlayers; lesson: TeamLes
             </div>
           )}
           {lesson.topInconsistencies.length > 0 && (
-            <div>
-              <div className="text-[10px] font-bold uppercase tracking-wider text-danger mb-0.5">What missed</div>
-              <ul className="space-y-0.5">
+            <div className="mb-3">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-danger mb-1.5">What missed</div>
+              <ul className="space-y-1">
                 {lesson.topInconsistencies.slice(0, 2).map((c, i) => (
                   <li key={i} className="text-[11px] leading-snug text-foreground/85">• {c}</li>
                 ))}
               </ul>
             </div>
           )}
+          {(() => {
+            const carry = (lesson.summary.match(/Carry into this week:\s*([^]*?)$/i)?.[1] ?? "").trim();
+            const next = carry || lesson.summary;
+            if (!next) return null;
+            return (
+              <div>
+                <div className="text-[10px] font-bold uppercase tracking-wider text-primary mb-1.5">Lessons for next week</div>
+                <p className="text-[11px] leading-snug text-foreground/85">{next}</p>
+              </div>
+            );
+          })()}
         </>
       ) : (
         <p className="text-[11px] text-muted-foreground">Lessons will appear here after this team plays a finished round.</p>

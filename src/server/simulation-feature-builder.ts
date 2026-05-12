@@ -21,11 +21,6 @@ import { buildFatigueProfile } from "./fatigue-model";
 import { buildRuckTempoProfile } from "./ruck-tempo-model";
 import { buildEdgeAttackProfile } from "./edge-attack-model";
 import { buildMomentumProfile } from "./momentum-wave-model";
-import { makeCoverage } from "./source-coverage";
-import type { TeamSeasonStats, PlayerSeasonStats, SeasonSnapshot } from "./season-stats";
-import { getTeam, getTeamPlayers } from "./season-stats";
-import type { NrlPlayer } from "./nrl";
-import type { ModelMode } from "./model-mode";
 
 const LEAGUE_AVG = {
   pointsForPerGame: 22,

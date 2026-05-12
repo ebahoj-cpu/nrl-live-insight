@@ -223,6 +223,7 @@ export async function getOrGenerateSimulation(args: {
   officials?: NormalisedMatchOfficial[] | null;
   hasOfficials?: boolean;
   hasNamedTeamLists?: boolean;
+  venue?: string | null;
 }): Promise<SimulationSummary | null> {
   if (!isSimulationEnabled()) { devLog("flag-off"); return null; }
   if (!args.snapshot) return null;

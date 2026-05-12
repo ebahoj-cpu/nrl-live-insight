@@ -25,6 +25,10 @@ import type {
   RefereeFeatures,
 } from "./simulation-types";
 import { computeConfidence } from "./confidence";
+import { calibrateProbabilities } from "./probability-calibration";
+import { buildModelDrivers } from "./model-driver-explainer";
+
+const ADVANCED_MODEL_VERSION = 4;
 
 // ---------- Seeded RNG (Mulberry32) ----------
 function makeRng(seed: number): () => number {

@@ -137,6 +137,19 @@ export function generateDeterministicInsights(inp: EngineInputs): DeterministicI
   const homeInputs = buildModelInputs(home);
   const awayInputs = buildModelInputs(away);
   const outcomePred = predictMatchOutcome(homeInputs, awayInputs);
+  // Magic Round venue overlay: shift win prob + margin by the QLD differential.
+  if (magicRound) {
+    const qldDiff = homeQld - awayQld; // points of expected edge
+    if (qldDiff !== 0) {
+      const z = qldDiff * 0.18; // ~0.18 logit per point of venue edge
+      const p = 1 / (1 + Math.exp(-(Math.log(outcomePred.homeWinProb / (1 - outcomePred.homeWinProb)) + z)));
+      outcomePred.homeWinProb = clamp(p, 0.02, 0.98);
+      outcomePred.awayWinProb = 1 - outcomePred.homeWinProb;
+      outcomePred.expectedMargin = outcomePred.expectedMargin + qldDiff;
+      outcomePred.marginBand = Math.abs(outcomePred.expectedMargin) >= 13 ? "13+" : "1-12";
+      outcomePred.confidence = Math.abs(outcomePred.homeWinProb - 0.5) * 2;
+    }
+  }
   const totalPred = predictTotalPoints(homeInputs, awayInputs);
   // Monte Carlo over 10k iterations gives us empirical confidence + total
   // distributions that we use for the over/under line and risk band.

@@ -102,7 +102,7 @@ function ScoutPage() {
             <>
               {/* Header */}
               <div className="shrink-0 px-4 sm:px-8 pt-8 sm:pt-10 pb-3">
-                <div className="text-[10px] uppercase tracking-[0.25em] text-accent font-bold">AI Assistant</div>
+                <div className="text-[10px] uppercase tracking-[0.25em] text-accent font-bold">Scout — Your Assistant</div>
                 <h1 className="mt-1.5 font-display font-extrabold tracking-tight text-foreground text-2xl sm:text-3xl lg:text-4xl leading-[1.05]">
                   Scout
                 </h1>
@@ -156,7 +156,7 @@ function ScoutPage() {
               {/* Mobile: header at top, composer at bottom (preserve current mobile layout) */}
               <div className="sm:hidden flex flex-col h-full">
                 <div className="shrink-0 px-4 pt-16 pb-3">
-                  <div className="text-[10px] uppercase tracking-[0.25em] text-accent font-bold">AI Assistant</div>
+                  <div className="text-[10px] uppercase tracking-[0.25em] text-accent font-bold">Scout — Your Assistant</div>
                   <h1 className="mt-1.5 font-display font-extrabold tracking-tight text-foreground text-2xl leading-[1.05]">
                     How can I <span className="text-accent">assist?</span>
                   </h1>
@@ -176,7 +176,7 @@ function ScoutPage() {
               {/* Desktop/tablet: heading + composer stacked, vertically centered */}
               <div className="hidden sm:flex flex-1 flex-col justify-center items-center px-8 gap-6">
                 <div className="w-full max-w-md text-center">
-                  <div className="text-[10px] uppercase tracking-[0.25em] text-accent font-bold">AI Assistant</div>
+                  <div className="text-[10px] uppercase tracking-[0.25em] text-accent font-bold">Scout — Your Assistant</div>
                   <h1 className="mt-1.5 font-display font-extrabold tracking-tight text-foreground text-3xl lg:text-4xl leading-[1.05]">
                     How can I <span className="text-accent">assist?</span>
                   </h1>

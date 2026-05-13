@@ -6,6 +6,7 @@ import ReactMarkdown from "react-markdown";
 import { z } from "zod";
 import { scoutChat } from "@/server/scout.functions";
 import scoutAvatar from "@/assets/scout-avatar.png";
+import scoutHead from "@/assets/scout-head.png";
 
 const searchSchema = z.object({
   q: z.string().max(2000).optional(),
@@ -19,8 +20,6 @@ export const Route = createFileRoute("/scout")({
     meta: [
       { title: "Scout — Your NRL Betting AI · LINEBREAK" },
       { name: "description", content: "Chat with Scout, the AI assistant that knows every NRL fixture, player, stat and market price." },
-      { property: "og:title", content: "Scout — Your NRL Betting AI" },
-      { property: "og:description", content: "Ask Scout about teams, players, fixtures and odds to find the smartest bets." },
     ],
   }),
   component: ScoutPage,
@@ -65,12 +64,6 @@ function ScoutPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialQuery]);
 
-  const reset = () => {
-    setMessages([]);
-    mutation.reset();
-    inputRef.current?.focus();
-  };
-
   const hasMessages = messages.length > 0;
 
   return (
@@ -79,40 +72,55 @@ function ScoutPage() {
       style={{ bottom: "calc(92px + env(safe-area-inset-bottom))" }}
     >
       <div className="relative h-full w-full flex">
-        {/* Scout — full-height on the right, behind everything */}
-        <div className="pointer-events-none absolute inset-y-0 right-0 w-[58%] sm:w-1/2 flex items-end justify-end">
-          <div className="pointer-events-none absolute -right-20 top-1/4 h-72 w-72 rounded-full bg-accent/15 blur-3xl" />
+        {/* Scout — responsive sizing: smaller/lower on mobile, dominant on desktop */}
+        <div className="pointer-events-none absolute inset-y-0 right-0 w-[52%] sm:w-[55%] lg:w-[58%] flex items-end justify-end">
+          <div className="pointer-events-none absolute right-0 top-1/3 h-[55%] w-[80%] rounded-full bg-accent/20 blur-3xl" />
           <img
             src={scoutAvatar}
             alt="Scout"
             draggable={false}
             aria-hidden="true"
             style={{ pointerEvents: "none" }}
-            className="relative h-full w-auto object-contain object-bottom drop-shadow-[0_0_30px_var(--accent)] select-none"
+            className="relative h-[78%] sm:h-[88%] lg:h-[94%] w-auto object-contain object-bottom drop-shadow-[0_0_40px_var(--accent)] select-none"
           />
         </div>
 
         {/* Left: conversation column */}
-        <div className="relative z-10 flex h-full w-[64%] sm:w-[58%] flex-col">
-          {/* Header */}
-          <div className="shrink-0 px-4 sm:px-6 pt-5 pb-2">
+        <div className="relative z-10 flex h-full w-[68%] sm:w-[55%] lg:w-[50%] flex-col">
+          {/* Header — centered vertically on desktop when no messages, top-padded on mobile */}
+          <div
+            className={
+              hasMessages
+                ? "shrink-0 px-4 sm:px-8 pt-8 sm:pt-10 pb-3"
+                : "shrink-0 px-4 sm:px-8 pt-16 sm:pt-24 lg:pt-32 pb-3"
+            }
+          >
             <div className="text-[10px] uppercase tracking-[0.25em] text-accent font-bold">AI Assistant</div>
-            <h1 className="mt-1 font-display font-extrabold tracking-tight text-foreground text-2xl sm:text-3xl leading-[1.05]">
+            <h1 className="mt-1.5 font-display font-extrabold tracking-tight text-foreground text-2xl sm:text-3xl lg:text-4xl leading-[1.05]">
               {hasMessages ? "Scout" : (<>How can I <span className="text-accent">assist?</span></>)}
             </h1>
           </div>
 
           {/* Conversation */}
           <div ref={scrollRef} className="flex-1 overflow-y-auto no-scrollbar">
-            <div className="px-4 sm:px-6 py-4 space-y-3">
+            <div className="px-3 sm:px-6 py-3 space-y-3">
               {messages.map((m, i) => (
                 <Bubble key={i} msg={m} />
               ))}
 
               {mutation.isPending && (
-                <div className="flex items-center gap-2 text-xs text-muted-foreground pl-1">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin text-accent" />
-                  Scout is thinking…
+                <div className="flex items-center gap-2 pl-1">
+                  <img
+                    src={scoutHead}
+                    alt=""
+                    aria-hidden="true"
+                    className="h-7 w-7 rounded-full object-cover border border-accent/40 shadow-md shadow-accent/30"
+                    draggable={false}
+                  />
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-accent" />
+                    Scout is thinking…
+                  </div>
                 </div>
               )}
 
@@ -126,7 +134,7 @@ function ScoutPage() {
           </div>
 
           {/* Composer */}
-          <div className="shrink-0 px-3 sm:px-5 pb-3 pt-2">
+          <div className="shrink-0 px-3 sm:px-6 pb-4 sm:pb-6 pt-2">
             <form
               onSubmit={(e) => { e.preventDefault(); send(input); }}
               className="flex items-end gap-2 rounded-2xl border border-border bg-surface/95 backdrop-blur-xl focus-within:border-accent transition px-3 py-2 shadow-lg"
@@ -173,11 +181,13 @@ function ScoutPage() {
 
 function Bubble({ msg }: { msg: Msg }) {
   const isUser = msg.role === "user";
+
   if (isUser) {
+    // No bubble — plain right-aligned text in accent color
     return (
       <div className="flex justify-end animate-fade-in">
         <div
-          className="font-chat max-w-[85%] rounded-2xl rounded-br-md bg-accent text-accent-foreground px-3.5 py-2 text-[15px] leading-snug font-semibold shadow-md shadow-accent/30 whitespace-pre-wrap tracking-tight"
+          className="font-chat max-w-[85%] text-right text-[15px] leading-snug font-semibold text-foreground whitespace-pre-wrap tracking-tight px-2"
           style={{ fontFeatureSettings: '"tnum" 1, "ss01" 1' }}
         >
           {msg.content}
@@ -185,10 +195,19 @@ function Bubble({ msg }: { msg: Msg }) {
       </div>
     );
   }
+
+  // Assistant — Scout owl avatar + bubble
   return (
-    <div className="flex justify-start animate-fade-in">
+    <div className="flex justify-start items-start gap-2 animate-fade-in">
+      <img
+        src={scoutHead}
+        alt=""
+        aria-hidden="true"
+        draggable={false}
+        className="h-8 w-8 shrink-0 rounded-full object-cover border border-accent/40 shadow-md shadow-accent/30 mt-0.5"
+      />
       <div
-        className="font-chat max-w-[88%] rounded-2xl rounded-bl-md bg-surface-2/95 backdrop-blur text-foreground px-3.5 py-2.5 text-[15px] font-medium shadow-md border border-border"
+        className="font-chat max-w-[82%] rounded-2xl rounded-tl-md bg-surface-2/95 backdrop-blur text-foreground px-3.5 py-2.5 text-[15px] font-medium shadow-md border border-border"
         style={{ fontFeatureSettings: '"tnum" 1, "ss01" 1, "cv11" 1' }}
       >
         <ReactMarkdown

@@ -7,7 +7,6 @@ import appCss from "../styles.css?url";
 import { Download, Menu, X, Swords, ListOrdered, Newspaper, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import scoutAvatar from "@/assets/scout-avatar.png";
-import scoutHead from "@/assets/scout-head.png";
 
 interface RouterContext { queryClient: QueryClient }
 
@@ -249,7 +248,7 @@ function NavMenu({ onClose }: { onClose: () => void }) {
               className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition"
             >
               {to === "/scout" ? (
-                <img src={scoutHead} alt="" width={28} height={28} className="h-7 w-7 object-contain" />
+                <img src={scoutAvatar} alt="" width={36} height={36} className="h-9 w-9 object-contain -my-1" />
               ) : (
                 <Icon className="h-4 w-4" />
               )}
@@ -287,7 +286,7 @@ function BottomNav() {
                     {to === "/scout" ? (
                       <span className="inline-flex h-11 w-11 items-center justify-center">
                         <img
-                          src={scoutHead}
+                          src={scoutAvatar}
                           alt=""
                           width={44}
                           height={44}

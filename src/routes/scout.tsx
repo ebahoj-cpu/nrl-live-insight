@@ -85,7 +85,10 @@ function ScoutPage() {
           <img
             src={scoutAvatar}
             alt="Scout"
-            className="relative h-full w-auto object-contain object-bottom drop-shadow-[0_0_30px_var(--accent)]"
+            draggable={false}
+            aria-hidden="true"
+            style={{ pointerEvents: "none" }}
+            className="relative h-full w-auto object-contain object-bottom drop-shadow-[0_0_30px_var(--accent)] select-none"
           />
         </div>
 

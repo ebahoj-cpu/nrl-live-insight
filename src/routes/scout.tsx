@@ -174,20 +174,22 @@ function ScoutPage() {
               </div>
 
               {/* Desktop/tablet: heading + composer stacked, vertically centered */}
-              <div className="hidden sm:flex flex-1 flex-col justify-center px-8 gap-6">
-                <div>
+              <div className="hidden sm:flex flex-1 flex-col justify-center items-center px-8 gap-6">
+                <div className="w-full max-w-md text-center">
                   <div className="text-[10px] uppercase tracking-[0.25em] text-accent font-bold">AI Assistant</div>
                   <h1 className="mt-1.5 font-display font-extrabold tracking-tight text-foreground text-3xl lg:text-4xl leading-[1.05]">
                     How can I <span className="text-accent">assist?</span>
                   </h1>
                 </div>
-                <Composer
-                  input={input}
-                  setInput={setInput}
-                  inputRef={inputRef}
-                  onSend={() => send(input)}
-                  isPending={mutation.isPending}
-                />
+                <div className="w-full max-w-md">
+                  <Composer
+                    input={input}
+                    setInput={setInput}
+                    inputRef={inputRef}
+                    onSend={() => send(input)}
+                    isPending={mutation.isPending}
+                  />
+                </div>
               </div>
             </>
           )}

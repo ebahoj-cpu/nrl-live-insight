@@ -93,25 +93,13 @@ function ScoutPage() {
         </div>
 
         {/* Left: conversation column */}
-        <div className="relative z-10 flex h-full w-full sm:w-[58%] flex-col">
+        <div className="relative z-10 flex h-full w-[64%] sm:w-[58%] flex-col">
           {/* Header */}
           <div className="shrink-0 px-4 sm:px-6 pt-5 pb-2">
             <div className="text-[10px] uppercase tracking-[0.25em] text-accent font-bold">AI Assistant</div>
-            <div className="mt-1 flex items-end justify-between gap-2">
-              <h1 className="font-display font-extrabold tracking-tight text-foreground text-2xl sm:text-3xl leading-[1.05]">
-                {hasMessages ? "Scout" : (<>How can I <span className="text-accent">assist?</span></>)}
-              </h1>
-              {hasMessages && (
-                <button
-                  onClick={reset}
-                  aria-label="New chat"
-                  className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-accent transition font-semibold"
-                >
-                  <RotateCw className="h-3 w-3" />
-                  New
-                </button>
-              )}
-            </div>
+            <h1 className="mt-1 font-display font-extrabold tracking-tight text-foreground text-2xl sm:text-3xl leading-[1.05]">
+              {hasMessages ? "Scout" : (<>How can I <span className="text-accent">assist?</span></>)}
+            </h1>
           </div>
 
           {/* Conversation */}

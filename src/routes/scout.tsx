@@ -193,6 +193,9 @@ function ScoutPage() {
                   />
                 </div>
               </div>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

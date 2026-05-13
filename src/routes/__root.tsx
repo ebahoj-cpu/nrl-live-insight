@@ -4,9 +4,8 @@ import {
 } from "@tanstack/react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import appCss from "../styles.css?url";
-import { Download, Menu, X, Swords, ListOrdered, Newspaper, RefreshCw } from "lucide-react";
+import { Download, Menu, X, Swords, ListOrdered, Newspaper, Bird, Settings, UserCircle2, LogOut } from "lucide-react";
 import { useEffect, useState } from "react";
-import scoutAvatar from "@/assets/scout-avatar.png";
 
 interface RouterContext { queryClient: QueryClient }
 
@@ -14,7 +13,7 @@ const NAV_ITEMS = [
   { to: "/", label: "Fixtures", icon: Swords, exact: true },
   { to: "/ladder", label: "Ladder", icon: ListOrdered, exact: false },
   { to: "/news", label: "News", icon: Newspaper, exact: false },
-  { to: "/scout", label: "Scout", icon: Swords /* unused — rendered as avatar image */, exact: false },
+  { to: "/scout", label: "Scout", icon: Bird, exact: false },
 ] as const;
 
 function NotFoundComponent() {

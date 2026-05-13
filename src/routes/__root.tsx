@@ -248,7 +248,7 @@ function NavMenu({ onClose }: { onClose: () => void }) {
               className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition"
             >
               {to === "/scout" ? (
-                <img src={scoutAvatar} alt="" width={20} height={20} className="h-5 w-5 object-contain" />
+                <img src={scoutAvatar} alt="" width={32} height={32} className="h-8 w-8 object-contain" />
               ) : (
                 <Icon className="h-4 w-4" />
               )}
@@ -284,13 +284,13 @@ function BottomNav() {
                       <span className="absolute top-0 left-1/2 -translate-x-1/2 h-1 w-12 rounded-b-full bg-accent" />
                     )}
                     {to === "/scout" ? (
-                      <span className="inline-flex h-11 w-14 items-center justify-center">
+                      <span className="inline-flex h-14 w-20 items-center justify-center -my-2">
                         <img
                           src={scoutAvatar}
                           alt=""
-                          width={56}
-                          height={56}
-                          className={`h-14 w-14 object-contain transition ${isActive ? "drop-shadow-[0_0_10px_var(--accent)] scale-110" : "opacity-90 group-hover:opacity-100 group-hover:scale-105"}`}
+                          width={88}
+                          height={88}
+                          className={`h-20 w-20 object-contain transition ${isActive ? "drop-shadow-[0_0_14px_var(--accent)] scale-110" : "opacity-95 group-hover:opacity-100 group-hover:scale-105"}`}
                         />
                       </span>
                     ) : (

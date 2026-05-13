@@ -100,9 +100,9 @@ function ScoutPage() {
             <img
               src={scoutAvatar}
               alt="Scout"
-              width={64}
-              height={64}
-              className="h-16 w-16 object-contain drop-shadow-[0_0_10px_var(--accent)]"
+              width={112}
+              height={112}
+              className="h-28 w-28 object-contain drop-shadow-[0_0_14px_var(--accent)] -my-4"
             />
             <div>
               <div className="text-[10px] uppercase tracking-[0.2em] text-accent font-bold">AI Assistant</div>
@@ -215,8 +215,8 @@ function Bubble({ msg }: { msg: Msg }) {
   }
   return (
     <div className="flex gap-2 items-start">
-      <span className="shrink-0 inline-flex h-8 w-8 items-center justify-center rounded-full bg-surface-2 ring-2 ring-accent/40 overflow-hidden mt-0.5">
-        <img src={scoutAvatar} alt="Scout" width={32} height={32} className="h-full w-full object-cover" />
+      <span className="shrink-0 inline-flex h-14 w-14 items-center justify-center mt-0.5">
+        <img src={scoutAvatar} alt="Scout" width={56} height={56} className="h-full w-full object-contain drop-shadow-[0_0_8px_var(--accent)]" />
       </span>
       <div
         className="scout-bubble font-chat max-w-[82%] rounded-2xl rounded-bl-md bg-accent text-accent-foreground px-3.5 py-2.5 text-[15px] font-medium shadow-md shadow-accent/30"

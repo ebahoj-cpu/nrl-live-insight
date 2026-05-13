@@ -1180,7 +1180,7 @@ function GameScriptTab({ insights, insightsLoading, home, away }:
     | { mode: string; confidence: string; summary: string;
         phases: { first20: string; twenty40: string; forty60: string; sixty80: string };
         edges: { left: string; right: string; middle: string };
-        betting: { winnerLean: string; marginLean: string; totalLean: string; tryscorerLean: string };
+        betting: { winnerLean: string; marginLean: string; totalLean: string; htftDouble?: string; firstTryscorer?: string; scoresDouble?: string; anytime?: string; tryscorerLean: string };
         earlyNote?: string }
     | undefined;
   if (!script || !script.phases || !script.edges || !script.betting) {

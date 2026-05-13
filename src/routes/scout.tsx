@@ -72,21 +72,21 @@ function ScoutPage() {
       style={{ bottom: "calc(92px + env(safe-area-inset-bottom))" }}
     >
       <div className="relative h-full w-full flex">
-        {/* Scout — responsive sizing: smaller/lower on mobile, dominant on desktop */}
-        <div className="pointer-events-none absolute inset-y-0 right-0 w-[52%] sm:w-[55%] lg:w-[58%] flex items-end justify-end">
-          <div className="pointer-events-none absolute right-0 top-1/3 h-[55%] w-[80%] rounded-full bg-accent/20 blur-3xl" />
+        {/* Scout — bigger and pushed right on mobile, dominant on desktop */}
+        <div className="pointer-events-none absolute inset-y-0 -right-[8%] sm:right-0 w-[80%] sm:w-[55%] lg:w-[58%] flex items-end justify-end">
+          <div className="pointer-events-none absolute right-0 top-1/4 h-[60%] w-[80%] rounded-full bg-accent/20 blur-3xl" />
           <img
             src={scoutAvatar}
             alt="Scout"
             draggable={false}
             aria-hidden="true"
             style={{ pointerEvents: "none" }}
-            className="relative h-[78%] sm:h-[88%] lg:h-[94%] w-auto object-contain object-bottom drop-shadow-[0_0_40px_var(--accent)] select-none"
+            className="relative h-[96%] sm:h-[88%] lg:h-[94%] w-auto object-contain object-bottom drop-shadow-[0_0_40px_var(--accent)] select-none"
           />
         </div>
 
-        {/* Left: conversation column */}
-        <div className="relative z-10 flex h-full w-[68%] sm:w-[55%] lg:w-[50%] flex-col">
+        {/* Left: conversation column — full width on mobile so it overlays Scout */}
+        <div className="relative z-10 flex h-full w-full sm:w-[55%] lg:w-[50%] flex-col">
           {/* Header — centered vertically on desktop when no messages, top-padded on mobile */}
           <div
             className={
@@ -137,7 +137,7 @@ function ScoutPage() {
           <div className="shrink-0 px-3 sm:px-6 pb-4 sm:pb-6 pt-2">
             <form
               onSubmit={(e) => { e.preventDefault(); send(input); }}
-              className="flex items-end gap-2 rounded-2xl border border-border bg-surface/95 backdrop-blur-xl focus-within:border-accent transition px-3 py-2 shadow-lg"
+              className="flex items-end gap-2 rounded-2xl border border-border bg-surface backdrop-blur-xl focus-within:border-accent transition px-3 py-2 shadow-2xl shadow-black/70 ring-1 ring-black/40"
             >
               <textarea
                 ref={inputRef}
@@ -183,12 +183,15 @@ function Bubble({ msg }: { msg: Msg }) {
   const isUser = msg.role === "user";
 
   if (isUser) {
-    // No bubble — plain right-aligned text in accent color
+    // No bubble — plain right-aligned text with strong shadow for legibility over Scout
     return (
       <div className="flex justify-end animate-fade-in">
         <div
           className="font-chat max-w-[85%] text-right text-[15px] leading-snug font-semibold text-foreground whitespace-pre-wrap tracking-tight px-2"
-          style={{ fontFeatureSettings: '"tnum" 1, "ss01" 1' }}
+          style={{
+            fontFeatureSettings: '"tnum" 1, "ss01" 1',
+            textShadow: "0 1px 8px rgba(0,0,0,0.85), 0 0 2px rgba(0,0,0,0.9)",
+          }}
         >
           {msg.content}
         </div>
@@ -207,7 +210,7 @@ function Bubble({ msg }: { msg: Msg }) {
         className="h-8 w-8 shrink-0 rounded-full object-cover border border-accent/40 shadow-md shadow-accent/30 mt-0.5"
       />
       <div
-        className="font-chat max-w-[82%] rounded-2xl rounded-tl-md bg-surface-2/95 backdrop-blur text-foreground px-3.5 py-2.5 text-[15px] font-medium shadow-md border border-border"
+        className="font-chat max-w-[82%] rounded-2xl rounded-tl-md bg-surface-2 backdrop-blur-md text-foreground px-3.5 py-2.5 text-[15px] font-medium shadow-xl shadow-black/60 border border-border ring-1 ring-black/40"
         style={{ fontFeatureSettings: '"tnum" 1, "ss01" 1, "cv11" 1' }}
       >
         <ReactMarkdown

@@ -102,7 +102,7 @@ function ScoutPage() {
             <>
               {/* Header */}
               <div className="shrink-0 px-4 sm:px-8 pt-8 sm:pt-10 pb-3">
-                <div className="text-[10px] uppercase tracking-[0.25em] text-accent font-bold">Scout — Your Assistant</div>
+                <div className="text-[10px] uppercase tracking-[0.25em] text-accent font-bold">Your Assistant</div>
                 <h1 className="mt-1.5 font-display font-extrabold tracking-tight text-foreground text-2xl sm:text-3xl lg:text-4xl leading-[1.05]">
                   Scout
                 </h1>

@@ -6,7 +6,7 @@ import ReactMarkdown from "react-markdown";
 import { z } from "zod";
 import { scoutChat } from "@/server/scout.functions";
 import scoutAvatar from "@/assets/scout-avatar.png";
-import scoutHead from "@/assets/scout-head.png";
+import scoutHead from "@/assets/scout-bubble.png";
 
 const searchSchema = z.object({
   q: z.string().max(2000).optional(),

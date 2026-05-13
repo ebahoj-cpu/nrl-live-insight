@@ -235,7 +235,7 @@ function Composer({
             onSend();
           }
         }}
-        placeholder="Message Scout…"
+        placeholder="Ask for the inside info..."
         rows={1}
         className="font-chat flex-1 resize-none bg-transparent outline-none text-[15px] font-medium placeholder:text-muted-foreground placeholder:font-normal py-1 overflow-y-auto no-scrollbar"
         style={{ minHeight: "28px" }}

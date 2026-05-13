@@ -180,8 +180,8 @@ function Header() {
 
 function IosInstallHint({ onClose }: { onClose: () => void }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-background/60 backdrop-blur-sm">
-      <div className="w-full max-w-sm rounded-2xl border border-border bg-surface p-5 shadow-2xl">
+    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-4 bg-background/60 backdrop-blur-sm overflow-y-auto">
+      <div className="w-full max-w-sm my-auto rounded-2xl border border-border bg-surface p-5 shadow-2xl max-h-[calc(100vh-2rem)] overflow-y-auto">
         <div className="text-[10px] uppercase tracking-[0.2em] text-accent font-bold mb-2">Install LINEBREAK</div>
         <h2 className="font-display font-extrabold text-lg mb-2">Add to Home Screen</h2>
         <p className="text-sm text-muted-foreground">
@@ -206,7 +206,11 @@ function NavMenu({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", handler);
+      document.body.style.overflow = "";
+    };
   }, [onClose]);
 
   return (
@@ -215,33 +219,81 @@ function NavMenu({ onClose }: { onClose: () => void }) {
         type="button"
         aria-label="Close menu"
         onClick={onClose}
-        className="fixed inset-0 top-16 bg-background/40 backdrop-blur-sm z-20"
+        className="fixed inset-0 bg-background/70 backdrop-blur-md z-40 animate-in fade-in duration-200"
       />
-      <div className="absolute right-0 sm:right-4 top-full mt-2 w-[min(92vw,300px)] rounded-2xl border border-border bg-surface shadow-2xl z-30 overflow-hidden">
-        <div className="px-4 py-3 border-b border-border">
-          <div className="text-[10px] uppercase tracking-[0.2em] text-accent font-bold">Navigation</div>
+      <aside
+        className="fixed inset-y-0 right-0 z-50 w-[min(88vw,340px)] bg-surface border-l border-border shadow-2xl flex flex-col animate-in slide-in-from-right duration-300"
+      >
+        {/* Profile header */}
+        <div className="px-5 pt-6 pb-5 border-b border-border flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-accent/20 text-accent border border-accent/30">
+              <UserCircle2 className="h-7 w-7" />
+            </span>
+            <div className="min-w-0">
+              <div className="font-display font-extrabold text-base leading-tight truncate">Guest</div>
+              <div className="text-xs text-muted-foreground truncate">Sign in to sync picks</div>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close menu"
+            className="inline-flex items-center justify-center h-8 w-8 rounded-full border border-border hover:bg-surface-2 transition"
+          >
+            <X className="h-4 w-4" />
+          </button>
         </div>
-        <nav className="p-2">
-          {NAV_ITEMS.map(({ to, label, icon: Icon, exact }) => (
-            <Link
-              key={to}
-              to={to}
-              onClick={onClose}
-              activeOptions={{ exact }}
-              activeProps={{ className: "bg-accent/15 text-accent" }}
-              inactiveProps={{ className: "text-foreground hover:bg-surface-2" }}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition"
-            >
-              {to === "/scout" ? (
-                <img src={scoutAvatar} alt="" width={36} height={36} className="h-9 w-9 object-contain -my-1" />
-              ) : (
-                <Icon className="h-4 w-4" />
-              )}
-              <span className="font-semibold text-sm">{label}</span>
-            </Link>
-          ))}
+
+        {/* Primary nav */}
+        <nav className="flex-1 overflow-y-auto px-3 py-4">
+          <ul className="space-y-1">
+            {NAV_ITEMS.map(({ to, label, icon: Icon, exact }) => (
+              <li key={to}>
+                <Link
+                  to={to}
+                  onClick={onClose}
+                  activeOptions={{ exact }}
+                  activeProps={{ className: "bg-accent/15 text-accent" }}
+                  inactiveProps={{ className: "text-foreground hover:bg-surface-2" }}
+                  className="flex items-center gap-3 px-3 py-3 rounded-xl transition"
+                >
+                  <Icon className="h-5 w-5" />
+                  <span className="font-semibold text-sm uppercase tracking-wider">{label}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
         </nav>
-      </div>
+
+        {/* Footer / account */}
+        <div className="border-t border-border px-3 py-3 space-y-1">
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-foreground hover:bg-surface-2 transition"
+          >
+            <Settings className="h-5 w-5" />
+            <span className="font-semibold text-sm uppercase tracking-wider">Settings</span>
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-foreground hover:bg-surface-2 transition"
+          >
+            <UserCircle2 className="h-5 w-5" />
+            <span className="font-semibold text-sm uppercase tracking-wider">Account</span>
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-muted-foreground hover:bg-surface-2 hover:text-foreground transition"
+          >
+            <LogOut className="h-5 w-5" />
+            <span className="font-semibold text-sm uppercase tracking-wider">Sign in</span>
+          </button>
+        </div>
+      </aside>
     </>
   );
 }
@@ -249,7 +301,6 @@ function NavMenu({ onClose }: { onClose: () => void }) {
 function BottomNav() {
   return (
     <div className="fixed bottom-0 inset-x-0 z-40 pointer-events-none pb-[env(safe-area-inset-bottom)]">
-      {/* fade behind the bar to lift it off page content */}
       <div className="h-6 bg-gradient-to-t from-background to-transparent" />
       <nav
         aria-label="Primary"
@@ -268,21 +319,9 @@ function BottomNav() {
                     {isActive && (
                       <span className="absolute top-0 left-1/2 -translate-x-1/2 h-1 w-12 rounded-b-full bg-accent" />
                     )}
-                    {to === "/scout" ? (
-                      <span className="inline-flex h-11 w-11 items-center justify-center">
-                        <img
-                          src={scoutAvatar}
-                          alt=""
-                          width={44}
-                          height={44}
-                          className={`h-11 w-11 object-contain transition ${isActive ? "drop-shadow-[0_0_10px_var(--accent)] scale-110" : "opacity-95 group-hover:opacity-100 group-hover:scale-105"}`}
-                        />
-                      </span>
-                    ) : (
-                      <span className={`inline-flex h-11 w-14 items-center justify-center rounded-full transition ${isActive ? "bg-accent text-accent-foreground shadow-lg shadow-accent/30 scale-105" : "text-muted-foreground group-hover:text-foreground group-hover:bg-surface-2"}`}>
-                        <Icon className="h-6 w-6" strokeWidth={isActive ? 2.5 : 2} />
-                      </span>
-                    )}
+                    <span className={`inline-flex h-11 w-14 items-center justify-center rounded-full transition ${isActive ? "bg-accent text-accent-foreground shadow-lg shadow-accent/30 scale-105" : "text-muted-foreground group-hover:text-foreground group-hover:bg-surface-2"}`}>
+                      <Icon className="h-6 w-6" strokeWidth={isActive ? 2.5 : 2} />
+                    </span>
                     <span className={`text-[10px] font-extrabold uppercase tracking-wider transition ${isActive ? "text-accent" : "text-muted-foreground group-hover:text-foreground"}`}>
                       {label}
                     </span>

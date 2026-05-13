@@ -1187,6 +1187,23 @@ function GameScriptTab({ insights, insightsLoading, home, away }:
     return <Empty msg="Script unavailable — refresh in a moment." />;
   }
 
+  // Backfill detailed betting rows when the cached script payload predates them.
+  const det = insights?.deterministic;
+  const validName = (n?: string | null) => !!n && !/^awaiting/i.test(n) && n !== "Awaiting team list";
+  if (det && (!script.betting.htftDouble || !script.betting.anytime)) {
+    const firstName = det.firstTryscorer?.name as string | undefined;
+    const anytimeNames = (det.topAnytimeOverall ?? [])
+      .map((p: any) => p?.name as string)
+      .filter((n: string) => validName(n));
+    script.betting = {
+      ...script.betting,
+      htftDouble: script.betting.htftDouble ?? det.htft?.pick ?? "—",
+      firstTryscorer: script.betting.firstTryscorer ?? (validName(firstName) ? firstName! : "Locked until player markets open"),
+      scoresDouble: script.betting.scoresDouble ?? (anytimeNames[0] ?? "Locked until player markets open"),
+      anytime: script.betting.anytime ?? (anytimeNames.length ? anytimeNames.slice(0, 3).join(", ") : "Locked until player markets open"),
+    };
+  }
+
   const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
     <div>
       <div className="text-[10px] uppercase tracking-wider font-bold text-accent mb-1">{title}</div>

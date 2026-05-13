@@ -117,7 +117,12 @@ async function parseFeed(source: string, url: string, team?: string): Promise<Ne
       const link = pick(block, "link") || pickAttr(block, "link", "href");
       const pubDate = pick(block, "pubDate") || pick(block, "published") || pick(block, "dc:date");
       if (!rawTitle || !link) continue;
-      const dateIso = pubDate ? new Date(pubDate).toISOString() : new Date().toISOString();
+      // Require a real publish date — without one we cannot guarantee freshness,
+      // and falling back to "now" caused years-old articles to surface as new.
+      if (!pubDate) continue;
+      const parsed = new Date(pubDate);
+      if (Number.isNaN(parsed.getTime())) continue;
+      const dateIso = parsed.toISOString();
 
       // Google News items embed the real publisher in <source> and append
       // " - Publisher" to the title. Prefer <source> when present so each

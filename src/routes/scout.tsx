@@ -72,18 +72,29 @@ function ScoutPage() {
       style={{ bottom: "calc(92px + env(safe-area-inset-bottom))" }}
     >
       <div className="relative h-full w-full flex">
-        {/* Scout — bigger and pushed right on mobile, dominant on desktop */}
-        <div className="pointer-events-none absolute inset-y-0 -right-[8%] sm:right-0 w-[80%] sm:w-[55%] lg:w-[58%] flex items-end justify-end">
-          <div className="pointer-events-none absolute right-0 top-1/4 h-[60%] w-[80%] rounded-full bg-accent/20 blur-3xl" />
-          <img
-            src={scoutAvatar}
-            alt="Scout"
-            draggable={false}
-            aria-hidden="true"
-            style={{ pointerEvents: "none" }}
-            className="relative h-[96%] sm:h-[88%] lg:h-[94%] w-auto object-contain object-bottom drop-shadow-[0_0_40px_var(--accent)] select-none"
-          />
-        </div>
+        {/* Scout — bigger and pushed right on mobile, dominant on desktop.
+            Mobile only: hide once Scout has replied to keep chat clean. */}
+        {(() => {
+          const hasAssistantReply = messages.some((m) => m.role === "assistant");
+          return (
+            <div
+              className={
+                "pointer-events-none absolute inset-y-0 -right-[8%] sm:right-0 w-[80%] sm:w-[55%] lg:w-[58%] items-end justify-end " +
+                (hasAssistantReply ? "hidden sm:flex" : "flex")
+              }
+            >
+              <div className="pointer-events-none absolute right-0 top-1/4 h-[60%] w-[80%] rounded-full bg-accent/20 blur-3xl" />
+              <img
+                src={scoutAvatar}
+                alt="Scout"
+                draggable={false}
+                aria-hidden="true"
+                style={{ pointerEvents: "none" }}
+                className="relative h-[96%] sm:h-[88%] lg:h-[94%] w-auto object-contain object-bottom drop-shadow-[0_0_40px_var(--accent)] select-none"
+              />
+            </div>
+          );
+        })()}
 
         {/* Left: conversation column — full width on mobile so it overlays Scout */}
         <div className="relative z-10 flex h-full w-full sm:w-[55%] lg:w-[50%] flex-col">
@@ -114,7 +125,7 @@ function ScoutPage() {
                     src={scoutHead}
                     alt=""
                     aria-hidden="true"
-                    className="h-7 w-7 rounded-full object-cover border border-accent/40 shadow-md shadow-accent/30"
+                    className="h-8 w-8 object-contain drop-shadow-[0_0_8px_var(--accent)]"
                     draggable={false}
                   />
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -207,7 +218,7 @@ function Bubble({ msg }: { msg: Msg }) {
         alt=""
         aria-hidden="true"
         draggable={false}
-        className="h-8 w-8 shrink-0 rounded-full object-cover border border-accent/40 shadow-md shadow-accent/30 mt-0.5"
+        className="h-9 w-9 shrink-0 object-contain mt-0.5 drop-shadow-[0_0_8px_var(--accent)]"
       />
       <div
         className="font-chat max-w-[82%] rounded-2xl rounded-tl-md bg-surface-2 backdrop-blur-md text-foreground px-3.5 py-2.5 text-[15px] font-medium shadow-xl shadow-black/60 border border-border ring-1 ring-black/40"

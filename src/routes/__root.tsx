@@ -248,7 +248,7 @@ function NavMenu({ onClose }: { onClose: () => void }) {
               className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition"
             >
               {to === "/scout" ? (
-                <img src={scoutHead} alt="" width={28} height={28} className="h-7 w-7 object-contain" />
+                <img src={scoutAvatar} alt="" width={36} height={36} className="h-9 w-9 object-contain -my-1" />
               ) : (
                 <Icon className="h-4 w-4" />
               )}
@@ -286,7 +286,7 @@ function BottomNav() {
                     {to === "/scout" ? (
                       <span className="inline-flex h-11 w-11 items-center justify-center">
                         <img
-                          src={scoutHead}
+                          src={scoutAvatar}
                           alt=""
                           width={44}
                           height={44}

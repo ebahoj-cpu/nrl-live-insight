@@ -7,6 +7,7 @@ import appCss from "../styles.css?url";
 import { Download, Menu, X, Swords, ListOrdered, Newspaper, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import scoutAvatar from "@/assets/scout-avatar.png";
+import scoutHead from "@/assets/scout-head.png";
 
 interface RouterContext { queryClient: QueryClient }
 
@@ -248,7 +249,7 @@ function NavMenu({ onClose }: { onClose: () => void }) {
               className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition"
             >
               {to === "/scout" ? (
-                <img src={scoutAvatar} alt="" width={32} height={32} className="h-8 w-8 object-contain" />
+                <img src={scoutHead} alt="" width={28} height={28} className="h-7 w-7 object-contain" />
               ) : (
                 <Icon className="h-4 w-4" />
               )}
@@ -284,13 +285,13 @@ function BottomNav() {
                       <span className="absolute top-0 left-1/2 -translate-x-1/2 h-1 w-12 rounded-b-full bg-accent" />
                     )}
                     {to === "/scout" ? (
-                      <span className="inline-flex h-14 w-20 items-center justify-center -my-2">
+                      <span className="inline-flex h-11 w-11 items-center justify-center">
                         <img
-                          src={scoutAvatar}
+                          src={scoutHead}
                           alt=""
-                          width={88}
-                          height={88}
-                          className={`h-20 w-20 object-contain transition ${isActive ? "drop-shadow-[0_0_14px_var(--accent)] scale-110" : "opacity-95 group-hover:opacity-100 group-hover:scale-105"}`}
+                          width={44}
+                          height={44}
+                          className={`h-11 w-11 object-contain transition ${isActive ? "drop-shadow-[0_0_10px_var(--accent)] scale-110" : "opacity-95 group-hover:opacity-100 group-hover:scale-105"}`}
                         />
                       </span>
                     ) : (

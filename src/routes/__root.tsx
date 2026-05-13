@@ -226,25 +226,25 @@ function NavMenu({ onClose }: { onClose: () => void }) {
       <aside
         className="fixed inset-y-0 right-0 z-50 w-[min(88vw,340px)] bg-surface border-l border-border shadow-2xl flex flex-col animate-in slide-in-from-right duration-300"
       >
-        {/* Profile header */}
-        <div className="px-5 pt-6 pb-5 border-b border-border flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-accent/20 text-accent border border-accent/30">
-              <UserCircle2 className="h-7 w-7" />
-            </span>
-            <div className="min-w-0">
-              <div className="font-display font-extrabold text-base leading-tight truncate">Guest</div>
-              <div className="text-xs text-muted-foreground truncate">Sign in to sync picks</div>
-            </div>
-          </div>
+        {/* Close button */}
+        <div className="flex justify-end px-4 pt-4">
           <button
             type="button"
             onClick={onClose}
             aria-label="Close menu"
-            className="inline-flex items-center justify-center h-8 w-8 rounded-full border border-border hover:bg-surface-2 transition"
+            className="inline-flex items-center justify-center h-9 w-9 rounded-full border border-border hover:bg-surface-2 transition"
           >
             <X className="h-4 w-4" />
           </button>
+        </div>
+
+        {/* Profile header */}
+        <div className="px-5 pt-2 pb-5 flex flex-col items-center text-center border-b border-border">
+          <span className="inline-flex h-20 w-20 items-center justify-center rounded-full bg-accent/15 text-accent border border-accent/30 mb-3">
+            <UserCircle2 className="h-12 w-12" />
+          </span>
+          <div className="font-display font-extrabold text-lg leading-tight">Guest</div>
+          <div className="text-xs text-muted-foreground mt-0.5">Sign in to sync picks</div>
         </div>
 
         {/* Primary nav */}

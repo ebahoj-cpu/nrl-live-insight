@@ -1300,6 +1300,10 @@ function buildScriptFallback(det: any, home: TeamWithPlayers, away: TeamWithPlay
       winnerLean: winner,
       marginLean: `${winner} ${det.margin.bucket}`,
       totalLean: `${String(det.totalPoints.lean).toUpperCase()} ${det.totalPoints.line}`,
+      htftDouble: det.htft?.pick ?? "—",
+      firstTryscorer: firstTry ?? "Locked until player markets open",
+      scoresDouble: anytime ?? "Locked until player markets open",
+      anytime: (det.topAnytimeOverall ?? []).map((p: any) => p?.name).filter((n: string) => n && !/^awaiting/i.test(n)).slice(0, 3).join(", ") || (anytime ?? "Locked until player markets open"),
       tryscorerLean: firstTry ? `${firstTry} first / ${anytime ?? firstTry} anytime` : `${anytime ?? "Awaiting market"} anytime`,
     },
   };

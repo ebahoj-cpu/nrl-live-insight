@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { Send, Loader2, RotateCw, AlertTriangle } from "lucide-react";
+import { Send, Loader2, AlertTriangle } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { z } from "zod";
 import { scoutChat } from "@/server/scout.functions";

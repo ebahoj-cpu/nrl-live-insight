@@ -250,51 +250,6 @@ function Composer({
     </form>
   );
 }
-          {/* Composer */}
-          <div className="shrink-0 px-3 sm:px-6 pb-4 sm:pb-6 pt-2">
-            <form
-              onSubmit={(e) => { e.preventDefault(); send(input); }}
-              className="flex items-end gap-2 rounded-2xl border border-border bg-surface backdrop-blur-xl focus-within:border-accent transition px-3 py-2 shadow-2xl shadow-black/70 ring-1 ring-black/40"
-            >
-              <textarea
-                ref={inputRef}
-                value={input}
-                onChange={(e) => {
-                  setInput(e.target.value);
-                  const el = e.currentTarget;
-                  el.style.height = "auto";
-                  const cap = Math.round(window.innerHeight * 0.4);
-                  el.style.height = Math.min(el.scrollHeight, cap) + "px";
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    send(input);
-                  }
-                }}
-                placeholder="Message Scout…"
-                rows={1}
-                className="font-chat flex-1 resize-none bg-transparent outline-none text-[15px] font-medium placeholder:text-muted-foreground placeholder:font-normal py-1 overflow-y-auto no-scrollbar"
-                style={{ minHeight: "28px" }}
-              />
-              <button
-                type="submit"
-                onClick={(e) => { e.preventDefault(); send(input); }}
-                disabled={!input.trim() || mutation.isPending}
-                aria-label="Send"
-                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground disabled:opacity-40 disabled:cursor-not-allowed hover:scale-105 transition shadow-md shadow-accent/30"
-              >
-                {mutation.isPending
-                  ? <Loader2 className="h-4 w-4 animate-spin" />
-                  : <Send className="h-4 w-4" />}
-              </button>
-            </form>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function Bubble({ msg }: { msg: Msg }) {
   const isUser = msg.role === "user";

@@ -125,7 +125,7 @@ function ScoutPage() {
                     src={scoutHead}
                     alt=""
                     aria-hidden="true"
-                    className="h-7 w-7 rounded-full object-cover border border-accent/40 shadow-md shadow-accent/30"
+                    className="h-8 w-8 object-contain drop-shadow-[0_0_8px_var(--accent)]"
                     draggable={false}
                   />
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">

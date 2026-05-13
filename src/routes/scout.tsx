@@ -175,15 +175,15 @@ function ScoutPage() {
                 </div>
               </div>
 
-              {/* Desktop/tablet: heading + composer stacked, vertically centered. Constrained to left column so it doesn't overlay Scout. */}
-              <div className="hidden sm:flex flex-1 flex-col justify-center items-start px-8 lg:px-12 gap-8">
-                <div className="w-full max-w-xl">
+              {/* Desktop/tablet: heading + composer stacked, centered within left column */}
+              <div className="hidden sm:flex flex-1 flex-col justify-center items-center px-8 gap-8">
+                <div className="w-full max-w-lg text-center">
                   <div className="text-xs uppercase tracking-[0.3em] text-accent font-bold">Scout — Your Assistant</div>
-                  <h1 className="mt-3 font-display font-extrabold tracking-tight text-foreground text-5xl lg:text-6xl xl:text-7xl leading-[1.02]">
+                  <h1 className="mt-3 font-display font-extrabold tracking-tight text-foreground text-3xl lg:text-4xl xl:text-5xl leading-[1.02] whitespace-nowrap">
                     How can I <span className="text-accent">assist?</span>
                   </h1>
                 </div>
-                <div className="w-full max-w-xl text-[17px]">
+                <div className="w-full max-w-lg text-[17px]">
                   <Composer
                     input={input}
                     setInput={setInput}
@@ -193,9 +193,6 @@ function ScoutPage() {
                   />
                 </div>
               </div>
-            </>
-          )}
-        </div>
       </div>
     </div>
   );

@@ -1180,7 +1180,7 @@ function GameScriptTab({ insights, insightsLoading, home, away }:
     | { mode: string; confidence: string; summary: string;
         phases: { first20: string; twenty40: string; forty60: string; sixty80: string };
         edges: { left: string; right: string; middle: string };
-        betting: { winnerLean: string; marginLean: string; totalLean: string; tryscorerLean: string };
+        betting: { winnerLean: string; marginLean: string; totalLean: string; htftDouble?: string; firstTryscorer?: string; scoresDouble?: string; anytime?: string; tryscorerLean: string };
         earlyNote?: string }
     | undefined;
   if (!script || !script.phases || !script.edges || !script.betting) {
@@ -1239,10 +1239,35 @@ function GameScriptTab({ insights, insightsLoading, home, away }:
             <span className="text-muted-foreground">Total lean</span>
             <span className="font-bold">{script.betting.totalLean}</span>
           </li>
-          <li className="flex items-center justify-between gap-3">
-            <span className="text-muted-foreground">Tryscorer lean</span>
-            <span className="font-bold text-right">{script.betting.tryscorerLean}</span>
-          </li>
+          {script.betting.htftDouble && (
+            <li className="flex items-center justify-between gap-3 border-b border-border/50 pb-2">
+              <span className="text-muted-foreground">Half/Fulltime double</span>
+              <span className="font-bold text-right">{script.betting.htftDouble}</span>
+            </li>
+          )}
+          {script.betting.firstTryscorer && (
+            <li className="flex items-center justify-between gap-3 border-b border-border/50 pb-2">
+              <span className="text-muted-foreground">First tryscorer</span>
+              <span className="font-bold text-right">{script.betting.firstTryscorer}</span>
+            </li>
+          )}
+          {script.betting.scoresDouble && (
+            <li className="flex items-center justify-between gap-3 border-b border-border/50 pb-2">
+              <span className="text-muted-foreground">Scores a double</span>
+              <span className="font-bold text-right">{script.betting.scoresDouble}</span>
+            </li>
+          )}
+          {script.betting.anytime ? (
+            <li className="flex items-center justify-between gap-3">
+              <span className="text-muted-foreground">Anytime tryscorer</span>
+              <span className="font-bold text-right">{script.betting.anytime}</span>
+            </li>
+          ) : (
+            <li className="flex items-center justify-between gap-3">
+              <span className="text-muted-foreground">Tryscorer lean</span>
+              <span className="font-bold text-right">{script.betting.tryscorerLean}</span>
+            </li>
+          )}
         </ul>
       </Card>
     </div>
@@ -1275,6 +1300,10 @@ function buildScriptFallback(det: any, home: TeamWithPlayers, away: TeamWithPlay
       winnerLean: winner,
       marginLean: `${winner} ${det.margin.bucket}`,
       totalLean: `${String(det.totalPoints.lean).toUpperCase()} ${det.totalPoints.line}`,
+      htftDouble: det.htft?.pick ?? "—",
+      firstTryscorer: firstTry ?? "Locked until player markets open",
+      scoresDouble: anytime ?? "Locked until player markets open",
+      anytime: (det.topAnytimeOverall ?? []).map((p: any) => p?.name).filter((n: string) => n && !/^awaiting/i.test(n)).slice(0, 3).join(", ") || (anytime ?? "Locked until player markets open"),
       tryscorerLean: firstTry ? `${firstTry} first / ${anytime ?? firstTry} anytime` : `${anytime ?? "Awaiting market"} anytime`,
     },
   };

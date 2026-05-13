@@ -39,7 +39,11 @@ export type ScriptPayload = {
     winnerLean: string;
     marginLean: string;
     totalLean: string;
-    tryscorerLean: string;
+    htftDouble: string;
+    firstTryscorer: string;
+    scoresDouble: string;
+    anytime: string;
+    tryscorerLean: string; // legacy fallback
   };
   earlyNote?: string;
 };
@@ -109,6 +113,20 @@ export function generateScript(inp: EngineInputs, engine: DeterministicInsights)
     }
   }
 
+  // Detailed market-mode breakdown rows.
+  const isLive = mode === "market" || mode === "final";
+  const awaiting = (label: string) => mode === "early" ? "Update after Tuesday team lists" : `Locked until player markets open`;
+  const validName = (n?: string | null) => !!n && !/^awaiting/i.test(n) && n !== "Awaiting team list";
+
+  const htftDouble = engine.htft?.pick && engine.htft.pick.trim() ? engine.htft.pick : "—";
+
+  const firstName = engine.firstTryscorer?.name;
+  const firstTryscorer = isLive && validName(firstName) ? firstName! : awaiting("first");
+
+  const anytimeList = (engine.topAnytimeOverall ?? []).map((p) => p.name).filter(validName);
+  const anytime = isLive && anytimeList.length ? anytimeList.slice(0, 3).join(", ") : awaiting("anytime");
+  const scoresDouble = isLive && anytimeList.length ? anytimeList[0] : awaiting("double");
+
   return {
     mode,
     confidence,
@@ -121,7 +139,7 @@ export function generateScript(inp: EngineInputs, engine: DeterministicInsights)
       leftConfidence: left.confidence,
       rightConfidence: right.confidence,
     },
-    betting: { winnerLean, marginLean, totalLean, tryscorerLean },
+    betting: { winnerLean, marginLean, totalLean, htftDouble, firstTryscorer, scoresDouble, anytime, tryscorerLean },
     earlyNote: mode === "early"
       ? "Early model — player-specific script updates after Tuesday 7pm team lists."
       : undefined,

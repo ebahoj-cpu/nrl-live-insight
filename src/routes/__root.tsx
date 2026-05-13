@@ -7,7 +7,6 @@ import appCss from "../styles.css?url";
 import { Download, Menu, X, Swords, ListOrdered, Newspaper, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import scoutAvatar from "@/assets/scout-avatar.png";
-import scoutHead from "@/assets/scout-head.png";
 
 interface RouterContext { queryClient: QueryClient }
 

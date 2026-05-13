@@ -72,15 +72,14 @@ function ScoutPage() {
       style={{ bottom: "calc(92px + env(safe-area-inset-bottom))" }}
     >
       <div className="relative h-full w-full flex">
-        {/* Scout — bigger and pushed right on mobile, dominant on desktop.
-            Mobile only: hide once Scout has replied to keep chat clean. */}
+        {/* Scout — desktop/tablet only (dominant right side). Mobile renders inline below. */}
         {(() => {
           const hasAssistantReply = messages.some((m) => m.role === "assistant");
           return (
             <div
               className={
-                "pointer-events-none absolute inset-y-0 -right-[8%] sm:right-0 w-[80%] sm:w-[55%] lg:w-[58%] items-end justify-end " +
-                (hasAssistantReply ? "hidden sm:flex" : "flex")
+                "pointer-events-none absolute inset-y-0 right-0 w-[55%] lg:w-[58%] items-end justify-end " +
+                (hasAssistantReply ? "hidden" : "hidden sm:flex")
               }
             >
               <div className="pointer-events-none absolute right-0 top-1/4 h-[60%] w-[80%] rounded-full bg-accent/20 blur-3xl" />
@@ -90,7 +89,7 @@ function ScoutPage() {
                 draggable={false}
                 aria-hidden="true"
                 style={{ pointerEvents: "none" }}
-                className="relative h-[96%] sm:h-[88%] lg:h-[94%] w-auto object-contain object-bottom drop-shadow-[0_0_40px_var(--accent)] select-none"
+                className="relative h-[88%] lg:h-[94%] w-auto object-contain object-bottom drop-shadow-[0_0_40px_var(--accent)] select-none"
               />
             </div>
           );
@@ -153,17 +152,16 @@ function ScoutPage() {
             </>
           ) : (
             <>
-              {/* Mobile: header at top, composer at bottom (preserve current mobile layout) */}
-              <div className="sm:hidden flex flex-col h-full">
-                <div className="shrink-0 px-5 pt-16 pb-3">
-                  <div className="text-xs uppercase tracking-[0.25em] text-accent font-bold">Scout — Your Assistant</div>
-                  <h1 className="mt-2 font-display font-extrabold tracking-tight text-foreground text-4xl leading-[1.02]">
+              {/* Mobile: header → composer → Scout image, full black bg, no scroll */}
+              <div className="sm:hidden flex flex-col h-full bg-background overflow-hidden">
+                <div className="shrink-0 px-5 pt-8 pb-3 text-center">
+                  <div className="text-[11px] uppercase tracking-[0.3em] text-accent font-bold">Scout — Your Assistant</div>
+                  <h1 className="mt-2 font-display font-extrabold tracking-tight text-foreground text-[2rem] leading-[1.05]">
                     How can I <span className="text-accent">assist?</span>
                   </h1>
                 </div>
-                <div className="flex-1" />
-                <div className="shrink-0 px-3 pb-4 pt-2">
-                  <div className="text-[17px]">
+                <div className="shrink-0 px-3 pt-1 pb-3">
+                  <div className="text-[16px]">
                     <Composer
                       input={input}
                       setInput={setInput}
@@ -172,6 +170,16 @@ function ScoutPage() {
                       isPending={mutation.isPending}
                     />
                   </div>
+                </div>
+                <div className="relative flex-1 min-h-0 flex items-end justify-center">
+                  <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[70%] mx-auto w-[80%] rounded-full bg-accent/20 blur-3xl" />
+                  <img
+                    src={scoutAvatar}
+                    alt="Scout"
+                    draggable={false}
+                    aria-hidden="true"
+                    className="relative h-full w-auto max-w-full object-contain object-bottom drop-shadow-[0_0_40px_var(--accent)] select-none"
+                  />
                 </div>
               </div>
 

@@ -155,33 +155,35 @@ function ScoutPage() {
             <>
               {/* Mobile: header at top, composer at bottom (preserve current mobile layout) */}
               <div className="sm:hidden flex flex-col h-full">
-                <div className="shrink-0 px-4 pt-16 pb-3">
-                  <div className="text-[10px] uppercase tracking-[0.25em] text-accent font-bold">Scout — Your Assistant</div>
-                  <h1 className="mt-1.5 font-display font-extrabold tracking-tight text-foreground text-2xl leading-[1.05]">
+                <div className="shrink-0 px-5 pt-16 pb-3">
+                  <div className="text-xs uppercase tracking-[0.25em] text-accent font-bold">Scout — Your Assistant</div>
+                  <h1 className="mt-2 font-display font-extrabold tracking-tight text-foreground text-4xl leading-[1.02]">
                     How can I <span className="text-accent">assist?</span>
                   </h1>
                 </div>
                 <div className="flex-1" />
                 <div className="shrink-0 px-3 pb-4 pt-2">
-                  <Composer
-                    input={input}
-                    setInput={setInput}
-                    inputRef={inputRef}
-                    onSend={() => send(input)}
-                    isPending={mutation.isPending}
-                  />
+                  <div className="text-[17px]">
+                    <Composer
+                      input={input}
+                      setInput={setInput}
+                      inputRef={inputRef}
+                      onSend={() => send(input)}
+                      isPending={mutation.isPending}
+                    />
+                  </div>
                 </div>
               </div>
 
-              {/* Desktop/tablet: heading + composer stacked, vertically centered */}
-              <div className="hidden sm:flex flex-1 flex-col justify-center items-center px-8 gap-6">
-                <div className="w-full max-w-md text-center">
-                  <div className="text-[10px] uppercase tracking-[0.25em] text-accent font-bold">Scout — Your Assistant</div>
-                  <h1 className="mt-1.5 font-display font-extrabold tracking-tight text-foreground text-3xl lg:text-4xl leading-[1.05]">
+              {/* Desktop/tablet: heading + composer stacked, vertically centered. Constrained to left column so it doesn't overlay Scout. */}
+              <div className="hidden sm:flex flex-1 flex-col justify-center items-start px-8 lg:px-12 gap-8">
+                <div className="w-full max-w-xl">
+                  <div className="text-xs uppercase tracking-[0.3em] text-accent font-bold">Scout — Your Assistant</div>
+                  <h1 className="mt-3 font-display font-extrabold tracking-tight text-foreground text-5xl lg:text-6xl xl:text-7xl leading-[1.02]">
                     How can I <span className="text-accent">assist?</span>
                   </h1>
                 </div>
-                <div className="w-full max-w-md">
+                <div className="w-full max-w-xl text-[17px]">
                   <Composer
                     input={input}
                     setInput={setInput}

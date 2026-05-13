@@ -137,7 +137,7 @@ function ScoutPage() {
           <div className="shrink-0 px-3 sm:px-6 pb-4 sm:pb-6 pt-2">
             <form
               onSubmit={(e) => { e.preventDefault(); send(input); }}
-              className="flex items-end gap-2 rounded-2xl border border-border bg-surface/95 backdrop-blur-xl focus-within:border-accent transition px-3 py-2 shadow-lg"
+              className="flex items-end gap-2 rounded-2xl border border-border bg-surface backdrop-blur-xl focus-within:border-accent transition px-3 py-2 shadow-2xl shadow-black/70 ring-1 ring-black/40"
             >
               <textarea
                 ref={inputRef}

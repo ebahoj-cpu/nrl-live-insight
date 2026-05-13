@@ -39,7 +39,11 @@ export type ScriptPayload = {
     winnerLean: string;
     marginLean: string;
     totalLean: string;
-    tryscorerLean: string;
+    htftDouble: string;
+    firstTryscorer: string;
+    scoresDouble: string;
+    anytime: string;
+    tryscorerLean: string; // legacy fallback
   };
   earlyNote?: string;
 };

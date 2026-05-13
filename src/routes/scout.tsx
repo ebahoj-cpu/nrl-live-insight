@@ -218,7 +218,7 @@ function Bubble({ msg }: { msg: Msg }) {
         alt=""
         aria-hidden="true"
         draggable={false}
-        className="h-8 w-8 shrink-0 rounded-full object-cover border border-accent/40 shadow-md shadow-accent/30 mt-0.5"
+        className="h-9 w-9 shrink-0 object-contain mt-0.5 drop-shadow-[0_0_8px_var(--accent)]"
       />
       <div
         className="font-chat max-w-[82%] rounded-2xl rounded-tl-md bg-surface-2 backdrop-blur-md text-foreground px-3.5 py-2.5 text-[15px] font-medium shadow-xl shadow-black/60 border border-border ring-1 ring-black/40"

@@ -210,7 +210,7 @@ function Bubble({ msg }: { msg: Msg }) {
         className="h-8 w-8 shrink-0 rounded-full object-cover border border-accent/40 shadow-md shadow-accent/30 mt-0.5"
       />
       <div
-        className="font-chat max-w-[82%] rounded-2xl rounded-tl-md bg-surface-2/95 backdrop-blur text-foreground px-3.5 py-2.5 text-[15px] font-medium shadow-md border border-border"
+        className="font-chat max-w-[82%] rounded-2xl rounded-tl-md bg-surface-2 backdrop-blur-md text-foreground px-3.5 py-2.5 text-[15px] font-medium shadow-xl shadow-black/60 border border-border ring-1 ring-black/40"
         style={{ fontFeatureSettings: '"tnum" 1, "ss01" 1, "cv11" 1' }}
       >
         <ReactMarkdown

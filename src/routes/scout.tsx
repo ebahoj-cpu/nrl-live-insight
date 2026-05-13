@@ -183,12 +183,15 @@ function Bubble({ msg }: { msg: Msg }) {
   const isUser = msg.role === "user";
 
   if (isUser) {
-    // No bubble — plain right-aligned text in accent color
+    // No bubble — plain right-aligned text with strong shadow for legibility over Scout
     return (
       <div className="flex justify-end animate-fade-in">
         <div
           className="font-chat max-w-[85%] text-right text-[15px] leading-snug font-semibold text-foreground whitespace-pre-wrap tracking-tight px-2"
-          style={{ fontFeatureSettings: '"tnum" 1, "ss01" 1' }}
+          style={{
+            fontFeatureSettings: '"tnum" 1, "ss01" 1',
+            textShadow: "0 1px 8px rgba(0,0,0,0.85), 0 0 2px rgba(0,0,0,0.9)",
+          }}
         >
           {msg.content}
         </div>

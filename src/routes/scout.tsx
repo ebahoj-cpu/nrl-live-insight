@@ -72,21 +72,21 @@ function ScoutPage() {
       style={{ bottom: "calc(92px + env(safe-area-inset-bottom))" }}
     >
       <div className="relative h-full w-full flex">
-        {/* Scout — responsive sizing: smaller/lower on mobile, dominant on desktop */}
-        <div className="pointer-events-none absolute inset-y-0 right-0 w-[52%] sm:w-[55%] lg:w-[58%] flex items-end justify-end">
-          <div className="pointer-events-none absolute right-0 top-1/3 h-[55%] w-[80%] rounded-full bg-accent/20 blur-3xl" />
+        {/* Scout — bigger and pushed right on mobile, dominant on desktop */}
+        <div className="pointer-events-none absolute inset-y-0 -right-[8%] sm:right-0 w-[80%] sm:w-[55%] lg:w-[58%] flex items-end justify-end">
+          <div className="pointer-events-none absolute right-0 top-1/4 h-[60%] w-[80%] rounded-full bg-accent/20 blur-3xl" />
           <img
             src={scoutAvatar}
             alt="Scout"
             draggable={false}
             aria-hidden="true"
             style={{ pointerEvents: "none" }}
-            className="relative h-[78%] sm:h-[88%] lg:h-[94%] w-auto object-contain object-bottom drop-shadow-[0_0_40px_var(--accent)] select-none"
+            className="relative h-[96%] sm:h-[88%] lg:h-[94%] w-auto object-contain object-bottom drop-shadow-[0_0_40px_var(--accent)] select-none"
           />
         </div>
 
-        {/* Left: conversation column */}
-        <div className="relative z-10 flex h-full w-[68%] sm:w-[55%] lg:w-[50%] flex-col">
+        {/* Left: conversation column — full width on mobile so it overlays Scout */}
+        <div className="relative z-10 flex h-full w-full sm:w-[55%] lg:w-[50%] flex-col">
           {/* Header — centered vertically on desktop when no messages, top-padded on mobile */}
           <div
             className={

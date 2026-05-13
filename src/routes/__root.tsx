@@ -173,9 +173,10 @@ function Header() {
           </button>
         </div>
       </div>
-      {menuOpen && <NavMenu onClose={() => setMenuOpen(false)} />}
-      {showIosHint && <IosInstallHint onClose={() => setShowIosHint(false)} />}
     </header>
+    {menuOpen && <NavMenu onClose={() => setMenuOpen(false)} />}
+    {showIosHint && <IosInstallHint onClose={() => setShowIosHint(false)} />}
+    </>
   );
 }
 

@@ -72,18 +72,29 @@ function ScoutPage() {
       style={{ bottom: "calc(92px + env(safe-area-inset-bottom))" }}
     >
       <div className="relative h-full w-full flex">
-        {/* Scout — bigger and pushed right on mobile, dominant on desktop */}
-        <div className="pointer-events-none absolute inset-y-0 -right-[8%] sm:right-0 w-[80%] sm:w-[55%] lg:w-[58%] flex items-end justify-end">
-          <div className="pointer-events-none absolute right-0 top-1/4 h-[60%] w-[80%] rounded-full bg-accent/20 blur-3xl" />
-          <img
-            src={scoutAvatar}
-            alt="Scout"
-            draggable={false}
-            aria-hidden="true"
-            style={{ pointerEvents: "none" }}
-            className="relative h-[96%] sm:h-[88%] lg:h-[94%] w-auto object-contain object-bottom drop-shadow-[0_0_40px_var(--accent)] select-none"
-          />
-        </div>
+        {/* Scout — bigger and pushed right on mobile, dominant on desktop.
+            Mobile only: hide once Scout has replied to keep chat clean. */}
+        {(() => {
+          const hasAssistantReply = messages.some((m) => m.role === "assistant");
+          return (
+            <div
+              className={
+                "pointer-events-none absolute inset-y-0 -right-[8%] sm:right-0 w-[80%] sm:w-[55%] lg:w-[58%] items-end justify-end " +
+                (hasAssistantReply ? "hidden sm:flex" : "flex")
+              }
+            >
+              <div className="pointer-events-none absolute right-0 top-1/4 h-[60%] w-[80%] rounded-full bg-accent/20 blur-3xl" />
+              <img
+                src={scoutAvatar}
+                alt="Scout"
+                draggable={false}
+                aria-hidden="true"
+                style={{ pointerEvents: "none" }}
+                className="relative h-[96%] sm:h-[88%] lg:h-[94%] w-auto object-contain object-bottom drop-shadow-[0_0_40px_var(--accent)] select-none"
+              />
+            </div>
+          );
+        })()}
 
         {/* Left: conversation column — full width on mobile so it overlays Scout */}
         <div className="relative z-10 flex h-full w-full sm:w-[55%] lg:w-[50%] flex-col">

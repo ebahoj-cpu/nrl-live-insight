@@ -166,9 +166,10 @@ function ScoutPage() {
               />
               <button
                 type="submit"
+                onClick={(e) => { e.preventDefault(); send(input); }}
                 disabled={!input.trim() || mutation.isPending}
                 aria-label="Send"
-                className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-accent text-accent-foreground disabled:opacity-40 disabled:cursor-not-allowed hover:scale-105 transition shadow-md shadow-accent/30"
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground disabled:opacity-40 disabled:cursor-not-allowed hover:scale-105 transition shadow-md shadow-accent/30"
               >
                 {mutation.isPending
                   ? <Loader2 className="h-4 w-4 animate-spin" />

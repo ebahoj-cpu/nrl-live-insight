@@ -1239,10 +1239,35 @@ function GameScriptTab({ insights, insightsLoading, home, away }:
             <span className="text-muted-foreground">Total lean</span>
             <span className="font-bold">{script.betting.totalLean}</span>
           </li>
-          <li className="flex items-center justify-between gap-3">
-            <span className="text-muted-foreground">Tryscorer lean</span>
-            <span className="font-bold text-right">{script.betting.tryscorerLean}</span>
-          </li>
+          {script.betting.htftDouble && (
+            <li className="flex items-center justify-between gap-3 border-b border-border/50 pb-2">
+              <span className="text-muted-foreground">Half/Fulltime double</span>
+              <span className="font-bold text-right">{script.betting.htftDouble}</span>
+            </li>
+          )}
+          {script.betting.firstTryscorer && (
+            <li className="flex items-center justify-between gap-3 border-b border-border/50 pb-2">
+              <span className="text-muted-foreground">First tryscorer</span>
+              <span className="font-bold text-right">{script.betting.firstTryscorer}</span>
+            </li>
+          )}
+          {script.betting.scoresDouble && (
+            <li className="flex items-center justify-between gap-3 border-b border-border/50 pb-2">
+              <span className="text-muted-foreground">Scores a double</span>
+              <span className="font-bold text-right">{script.betting.scoresDouble}</span>
+            </li>
+          )}
+          {script.betting.anytime ? (
+            <li className="flex items-center justify-between gap-3">
+              <span className="text-muted-foreground">Anytime tryscorer</span>
+              <span className="font-bold text-right">{script.betting.anytime}</span>
+            </li>
+          ) : (
+            <li className="flex items-center justify-between gap-3">
+              <span className="text-muted-foreground">Tryscorer lean</span>
+              <span className="font-bold text-right">{script.betting.tryscorerLean}</span>
+            </li>
+          )}
         </ul>
       </Card>
     </div>

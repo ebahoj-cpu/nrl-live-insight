@@ -2766,8 +2766,115 @@ function buildSlips(args: {
   const winnerIsHome = String(winnerNick).toLowerCase() === homeNickLc;
   const underdogNick = winnerIsHome ? away.nickName : home.nickName;
   const underdogNickLc = underdogNick.toLowerCase();
+  const favouriteNickLc = winnerIsHome ? homeNickLc : awayNickLc;
   const underdogAnyAll: AnyCand[] = cands.filter((c) => c.team.toLowerCase() === underdogNickLc);
-  const underdogTopAny = underdogAnyAll.slice(0, 3);
+  const favouriteAnyAll: AnyCand[] = cands.filter((c) => c.team.toLowerCase() === favouriteNickLc);
+
+  // ---- Dynamic anytime tryscorer selection for the Underdog Bet Slip ----
+  // Rank candidates from BOTH teams and apply game-script weighting so the
+  // favourite can still earn a slot when their projections genuinely warrant it.
+  const POS_PRIORITY: Record<string, number> = {
+    wing: 1.18, winger: 1.18,
+    fullback: 1.12, fb: 1.12,
+    centre: 1.10, center: 1.10,
+    "second row": 1.05, "2nd row": 1.05, lock: 1.03,
+    backrow: 1.05, "back row": 1.05, edge: 1.06,
+  };
+  const posWeight = (pos?: string) => {
+    const k = String(pos ?? "").toLowerCase().trim();
+    if (!k) return 1;
+    for (const key of Object.keys(POS_PRIORITY)) {
+      if (k.includes(key)) return POS_PRIORITY[key];
+    }
+    return 0.95; // de-prioritise non-edge forwards / halves
+  };
+  type RankedCand = AnyCand & { score: number; reason: string; isUnderdog: boolean };
+  const underdogProbForScript = winnerIsHome ? Number(sim?.awayWinProb ?? 0) : Number(sim?.homeWinProb ?? 0);
+  // Game-script lift: in an upset slip we tilt toward the underdog, but lighter
+  // when the simulation says the underdog is genuinely live (their players
+  // already carry strong individual probabilities, so they don't need the boost).
+  const underdogLift = underdogProbForScript >= 0.40 ? 1.06 : underdogProbForScript >= 0.30 ? 1.10 : 1.15;
+  const rankAll = (list: AnyCand[], isUd: boolean): RankedCand[] => list.map((c) => {
+    const pw = posWeight(c.position);
+    const teamW = isUd ? underdogLift : 1.0;
+    const score = c.prob * pw * teamW;
+    const reason = `prob=${(c.prob*100).toFixed(0)}% · pos×${pw.toFixed(2)} · ${isUd ? `udLift×${teamW.toFixed(2)}` : "fav (no lift)"}`;
+    return { ...c, score, reason, isUnderdog: isUd };
+  });
+  const ranked: RankedCand[] = [...rankAll(underdogAnyAll, true), ...rankAll(favouriteAnyAll, false)]
+    .sort((a, b) => b.score - a.score);
+
+  // Decide split (2/1 default; 3/0 if underdog dominates; 1/2 if favourite still scores well)
+  const udTop = underdogAnyAll[0]?.prob ?? 0;
+  const udSecond = underdogAnyAll[1]?.prob ?? 0;
+  const udThird = underdogAnyAll[2]?.prob ?? 0;
+  const favTop = favouriteAnyAll[0]?.prob ?? 0;
+  const favSecond = favouriteAnyAll[1]?.prob ?? 0;
+  let udSlots = 2, favSlots = 1;
+  let splitReason = "default 2/1 upset split";
+  // 3/0: underdog dominates the top of the board
+  if (udTop >= 0.45 && udSecond >= 0.38 && udThird >= 0.32 && udThird > favTop) {
+    udSlots = 3; favSlots = 0;
+    splitReason = "underdog dominates top-of-board (3/0)";
+  } else if (favTop >= 0.42 && favSecond >= 0.34 && favTop > udTop) {
+    // 1/2: favourite still projected to score well despite losing
+    udSlots = 1; favSlots = 2;
+    splitReason = "favourite still scoring well despite losing (1/2)";
+  } else if (favouriteAnyAll.length === 0) {
+    udSlots = 3; favSlots = 0;
+    splitReason = "no usable favourite candidates → 3/0";
+  } else if (underdogAnyAll.length === 0) {
+    udSlots = 0; favSlots = 3;
+    splitReason = "no usable underdog candidates → 0/3";
+  }
+
+  // Pick respecting split + position diversity (avoid duplicate positions unless score gap is large)
+  const picked: RankedCand[] = [];
+  const usedPositions = new Set<string>();
+  const tryPick = (pool: RankedCand[], slots: number) => {
+    let taken = 0;
+    for (const c of pool) {
+      if (taken >= slots) break;
+      if (picked.some((p) => p.name.toLowerCase() === c.name.toLowerCase())) continue;
+      const pos = String(c.position ?? "").toLowerCase().trim();
+      const dup = pos && usedPositions.has(pos);
+      if (dup) {
+        // allow duplicate only if this candidate's score is materially higher than next non-dup option
+        const nextNonDup = pool.find((x) => x !== c && !usedPositions.has(String(x.position ?? "").toLowerCase().trim()) && !picked.some((p) => p.name.toLowerCase() === x.name.toLowerCase()));
+        if (nextNonDup && c.score < nextNonDup.score * 1.15) continue;
+      }
+      picked.push(c);
+      if (pos) usedPositions.add(pos);
+      taken++;
+    }
+    return taken;
+  };
+  const udPool = ranked.filter((r) => r.isUnderdog);
+  const favPool = ranked.filter((r) => !r.isUnderdog);
+  tryPick(udPool, udSlots);
+  tryPick(favPool, favSlots);
+  // Backfill from the global ranking if we couldn't satisfy slots (e.g. dup-position rejections)
+  if (picked.length < udSlots + favSlots) {
+    for (const c of ranked) {
+      if (picked.length >= udSlots + favSlots) break;
+      if (picked.some((p) => p.name.toLowerCase() === c.name.toLowerCase())) continue;
+      picked.push(c);
+    }
+  }
+  const underdogTopAny: AnyCand[] = picked.slice(0, 3).map((p) => ({ name: p.name, team: p.team, position: p.position, prob: p.prob }));
+
+  if (typeof window !== "undefined" && (window as any).__SCOUT_DEBUG_ANYTIME) {
+    // eslint-disable-next-line no-console
+    console.debug("[underdog-anytime]", {
+      fixture: `${home.nickName} v ${away.nickName}`,
+      underdog: underdogNick,
+      split: `${udSlots}/${favSlots}`,
+      splitReason,
+      underdogProb: underdogProbForScript,
+      ranked: ranked.slice(0, 8).map((r) => ({ name: r.name, team: r.team, pos: r.position, prob: r.prob, score: Number(r.score.toFixed(3)), reason: r.reason })),
+      selected: picked.map((p) => ({ name: p.name, team: p.team, pos: p.position, score: Number(p.score.toFixed(3)), reason: p.reason })),
+    });
+  }
   const underdogForwards = forwardPicks
     .filter((p) => p?.name && !/^awaiting/i.test(p.name) && String(p.team ?? "").toLowerCase() === underdogNickLc)
     .slice(0, 1);

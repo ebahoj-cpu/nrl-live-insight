@@ -2745,6 +2745,7 @@ function buildSlips(args: {
       market: "Secondary Anytime Tryscorer",
       selection: p.name,
       detail: formatLegDetail(p),
+      playerName: p.name,
     }));
   const secondaries: Slip = {
     id: "secondaries",

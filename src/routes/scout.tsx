@@ -1,12 +1,33 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
-import { Send, Loader2, AlertTriangle } from "lucide-react";
+import { useEffect, useRef, useState, useCallback } from "react";
+import { Send, Loader2, AlertTriangle, Mic, MicOff, Volume2, Square, User as UserIcon } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { z } from "zod";
 import { scoutChat } from "@/server/scout.functions";
+import { supabase } from "@/integrations/supabase/client";
 import scoutAvatar from "@/assets/scout-avatar.png";
 import scoutHead from "@/assets/scout-bubble.png";
+
+// ---- Web Speech API helpers ----
+type SpeechRecognitionLike = {
+  lang: string;
+  interimResults: boolean;
+  continuous: boolean;
+  onresult: ((e: any) => void) | null;
+  onerror: ((e: any) => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+  abort: () => void;
+};
+function getSpeechRecognitionCtor(): (new () => SpeechRecognitionLike) | null {
+  if (typeof window === "undefined") return null;
+  return (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition || null;
+}
+function speechSynthAvailable(): boolean {
+  return typeof window !== "undefined" && "speechSynthesis" in window;
+}
 
 const searchSchema = z.object({
   q: z.string().max(2000).optional(),

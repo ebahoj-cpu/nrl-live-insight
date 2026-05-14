@@ -2201,7 +2201,7 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
       <Card title="First / second / third tryscorer" icon={Target}>
         <ul className="space-y-2.5">
           {[det.rankedTryscorers?.first, det.rankedTryscorers?.second, det.rankedTryscorers?.third].map((p: any, i: number) => (
-            <li key={i} className="flex items-start gap-3 bg-surface-2 rounded-lg p-2.5">
+            <li key={i} className="flex items-start gap-3 bg-surface-2 rounded-lg p-2.5 pt-10 sm:pt-14">
               <PlayerHeadshot name={p?.name} teams={[home, away]} size={72} minSize={56} maxSize={96} />
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-bold truncate">{p?.name ?? ""}</div>
@@ -2221,7 +2221,7 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Three anytime tryscorers backing this script</div>
           <ul className="space-y-2.5">
             {(det.predictedOutcome.picks ?? []).map((p: any, i: number) => (
-              <li key={`${p.name}-${i}`} className="flex items-start gap-3 bg-surface-2 rounded-lg p-2.5">
+              <li key={`${p.name}-${i}`} className="flex items-start gap-3 bg-surface-2 rounded-lg p-2.5 pt-10 sm:pt-14">
                 <PlayerHeadshot name={p?.name} teams={[home, away]} size={72} minSize={56} maxSize={96} />
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-bold truncate">{p?.name ?? ""}</div>
@@ -2255,7 +2255,7 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
                 ) : (
                   <ul className="space-y-2.5">
                     {col.list.slice(0, 3).map((r: any, i: number) => (
-                      <li key={`${r.name}-${i}`} className="flex items-start gap-3 bg-surface-2 rounded-lg p-2.5">
+                      <li key={`${r.name}-${i}`} className="flex items-start gap-3 bg-surface-2 rounded-lg p-2.5 pt-10 sm:pt-14">
                         <PlayerHeadshot name={r.name} teams={[home, away]} size={72} minSize={56} maxSize={96} />
                         <div className="flex-1 min-w-0">
                           <div className="text-sm font-bold truncate">{r.name}</div>
@@ -2323,7 +2323,7 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
                 ) : (
                   <ul className="space-y-2.5">
                     {col.list.slice(0, 3).map((r: any, i: number) => (
-                      <li key={`${r.name}-${i}`} className="flex items-start gap-3 bg-surface-2 rounded-lg p-2.5">
+                      <li key={`${r.name}-${i}`} className="flex items-start gap-3 bg-surface-2 rounded-lg p-2.5 pt-10 sm:pt-14">
                         <PlayerHeadshot name={r.name} teams={[home, away]} size={72} minSize={56} maxSize={96} />
                         <div className="flex-1 min-w-0">
                           <div className="text-sm font-bold truncate">{r.name}</div>

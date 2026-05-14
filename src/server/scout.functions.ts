@@ -766,7 +766,40 @@ async function buildTargetBriefsContext(messages: ChatMessage[]): Promise<string
   ].join("\n\n");
 }
 
-export const scoutChat = createServerFn({ method: "POST" })
+// Render a ScoutMatchContext bundle into a compact text block for the LLM.
+function formatIntelligenceBundle(ctx: ScoutMatchContext): string {
+  const out: string[] = [];
+  out.push(`### ${ctx.match.homeNickname} v ${ctx.match.awayNickname} — intelligence`);
+  if (ctx.simulation.method !== "absent") {
+    const s = ctx.simulation;
+    out.push(`Sim (${s.method}, ${s.iterations} iters): expected ${ctx.match.homeNickname} ${s.expectedHomeScore.toFixed(1)}–${s.expectedAwayScore.toFixed(1)} ${ctx.match.awayNickname} (total ${s.expectedTotal.toFixed(1)})`);
+    out.push(`Win probs: ${ctx.match.homeNickname} ${(s.homeWinProb*100).toFixed(0)}% / draw ${(s.drawProb*100).toFixed(0)}% / ${ctx.match.awayNickname} ${(s.awayWinProb*100).toFixed(0)}%`);
+    out.push(`Margin bands: draw ${(s.marginBands.draw*100).toFixed(0)}%, 1-12 ${(s.marginBands["1-12"]*100).toFixed(0)}%, 13+ ${(s.marginBands["13+"]*100).toFixed(0)}% · O/U ${s.totalLine}: over ${(s.overProbAtLine*100).toFixed(0)}%`);
+  } else {
+    out.push(`Sim: absent (${ctx.simulation.reason}) — Scout falls back to deterministic heuristics for this match.`);
+  }
+  if (ctx.calibration.applied) {
+    out.push(`Calibration: ${ctx.calibration.method ?? "blended"}${ctx.calibration.blendWeight != null ? ` (w=${ctx.calibration.blendWeight.toFixed(2)})` : ""}`);
+  }
+  out.push(formatConfidence(ctx.confidence.tier, ctx.confidence.reasons));
+  const drivers = pickTopDrivers(ctx.drivers, 3);
+  if (drivers.length) out.push(`Top drivers: ${drivers.map((d) => d.label).join("; ")}`);
+  if (ctx.bets.length) {
+    out.push("Value bets (EV>0, sorted):");
+    for (const b of ctx.bets.slice(0, 6)) out.push(`  • ${formatValueLine(b)}`);
+  } else {
+    out.push("Value bets: none above threshold this run.");
+  }
+  const risk = formatRiskWarning(ctx.correlationWarnings);
+  if (risk) out.push(risk);
+  if (ctx.modifiersApplied.length) {
+    out.push(`Active news modifiers: ${ctx.modifiersApplied.map((m) => `${m.kind}:${m.description.slice(0, 60)}`).join(" | ")}`);
+  }
+  if (ctx.dataGaps.length) {
+    out.push(`Data gaps: ${ctx.dataGaps.slice(0, 4).join("; ")}`);
+  }
+  return out.join("\n");
+}
   .inputValidator((i: unknown) => Input.parse(i))
   .handler(async ({ data }): Promise<{ reply: string }> => {
     try {

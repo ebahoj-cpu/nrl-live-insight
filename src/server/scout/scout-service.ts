@@ -196,8 +196,8 @@ function gapsFor(prices: ReturnType<typeof buildMarketPrices>, sumExists: boolea
 function bundleConfidenceReasons(s: SimulationSummary | null, gaps: string[], modifiersCount: number): { tier: SimulationSummary["confidence"]; reasons: string[] } {
   if (!s) return { tier: "low", reasons: ["Simulation output unavailable; falling back to heuristics"] };
   const reasons: string[] = [];
-  if (s.calibration?.method) reasons.push(`Calibration: ${s.calibration.method}`);
-  if (s.coverage) reasons.push(`Data coverage tier: ${s.coverage.tier ?? "unknown"}`);
+  if (s.calibration?.calibrationNote) reasons.push(`Calibration: ${s.calibration.calibrationNote}`);
+  if (s.coverage) reasons.push(`Data coverage primary: ${s.coverage.primary ?? "unknown"}`);
   if (gaps.length) reasons.push(`${gaps.length} data gap(s) flagged`);
   if (modifiersCount > 0) reasons.push(`${modifiersCount} session news modifier(s) applied`);
   // News injection drops confidence one tier (max).

@@ -1214,11 +1214,6 @@ function GameScriptTab({ insights, insightsLoading, home, away }:
   return (
     <div className="space-y-4">
       <Card title="Game Script" icon={ScrollText} className="accent-glow">
-        <div className="flex items-center gap-2 mb-3">
-          <span className="ml-auto text-[10px] uppercase tracking-wider font-bold text-muted-foreground">
-            {script.mode} · {script.confidence}
-          </span>
-        </div>
         <p className="font-chat text-sm leading-relaxed text-foreground/90">{script.summary}</p>
         {script.earlyNote && (
           <p className="text-[11px] mt-3 italic text-muted-foreground border-l-2 border-accent/40 pl-2">{script.earlyNote}</p>
@@ -1227,10 +1222,10 @@ function GameScriptTab({ insights, insightsLoading, home, away }:
 
       <Card title="Phase by phase" icon={Clock}>
         <div className="space-y-4">
-          <Section title="First 20">{script.phases.first20}</Section>
-          <Section title="20–40">{script.phases.twenty40}</Section>
-          <Section title="40–60">{script.phases.forty60}</Section>
-          <Section title="60–80">{script.phases.sixty80}</Section>
+          <Section title="First 20 min">{script.phases.first20}</Section>
+          <Section title="20–40 min">{script.phases.twenty40}</Section>
+          <Section title="40–60 min">{script.phases.forty60}</Section>
+          <Section title="60–80 min">{script.phases.sixty80}</Section>
         </div>
       </Card>
 
@@ -1240,52 +1235,6 @@ function GameScriptTab({ insights, insightsLoading, home, away }:
           <Section title="Right edge">{script.edges.right}</Section>
           <Section title="Middle">{script.edges.middle}</Section>
         </div>
-      </Card>
-
-      <Card title="Betting translation" icon={Receipt} className="accent-glow">
-        <ul className="space-y-2 text-sm">
-          <li className="flex items-center justify-between gap-3 border-b border-border/50 pb-2">
-            <span className="text-muted-foreground">Winner lean</span>
-            <span className="font-bold">{script.betting.winnerLean}</span>
-          </li>
-          <li className="flex items-center justify-between gap-3 border-b border-border/50 pb-2">
-            <span className="text-muted-foreground">Margin lean</span>
-            <span className="font-bold">{script.betting.marginLean}</span>
-          </li>
-          <li className="flex items-center justify-between gap-3 border-b border-border/50 pb-2">
-            <span className="text-muted-foreground">Total lean</span>
-            <span className="font-bold">{script.betting.totalLean}</span>
-          </li>
-          {script.betting.htftDouble && (
-            <li className="flex items-center justify-between gap-3 border-b border-border/50 pb-2">
-              <span className="text-muted-foreground">Half/Fulltime double</span>
-              <span className="font-bold text-right">{script.betting.htftDouble}</span>
-            </li>
-          )}
-          {script.betting.firstTryscorer && (
-            <li className="flex items-center justify-between gap-3 border-b border-border/50 pb-2">
-              <span className="text-muted-foreground">First tryscorer</span>
-              <span className="font-bold text-right">{script.betting.firstTryscorer}</span>
-            </li>
-          )}
-          {script.betting.scoresDouble && (
-            <li className="flex items-center justify-between gap-3 border-b border-border/50 pb-2">
-              <span className="text-muted-foreground">Scores a double</span>
-              <span className="font-bold text-right">{script.betting.scoresDouble}</span>
-            </li>
-          )}
-          {script.betting.anytime ? (
-            <li className="flex items-center justify-between gap-3">
-              <span className="text-muted-foreground">Anytime tryscorer</span>
-              <span className="font-bold text-right">{script.betting.anytime}</span>
-            </li>
-          ) : (
-            <li className="flex items-center justify-between gap-3">
-              <span className="text-muted-foreground">Tryscorer lean</span>
-              <span className="font-bold text-right">{script.betting.tryscorerLean}</span>
-            </li>
-          )}
-        </ul>
       </Card>
     </div>
   );

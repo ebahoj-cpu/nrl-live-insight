@@ -15,6 +15,7 @@ import { Route as NewsRouteImport } from './routes/news'
 import { Route as LadderRouteImport } from './routes/ladder'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as MatchMatchIdRouteImport } from './routes/match.$matchId'
+import { Route as ApiScoutVoiceRouteImport } from './routes/api/scout-voice'
 import { Route as ApiPublicManifestRouteImport } from './routes/api/public/manifest'
 import { Route as ApiPublicAppIconRouteImport } from './routes/api/public/app-icon'
 import { Route as ApiPublicHooksRefreshOddsRouteImport } from './routes/api/public/hooks/refresh-odds'
@@ -50,6 +51,11 @@ const IndexRoute = IndexRouteImport.update({
 const MatchMatchIdRoute = MatchMatchIdRouteImport.update({
   id: '/match/$matchId',
   path: '/match/$matchId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiScoutVoiceRoute = ApiScoutVoiceRouteImport.update({
+  id: '/api/scout-voice',
+  path: '/api/scout-voice',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPublicManifestRoute = ApiPublicManifestRouteImport.update({
@@ -93,6 +99,7 @@ export interface FileRoutesByFullPath {
   '/news': typeof NewsRoute
   '/scout': typeof ScoutRoute
   '/settings': typeof SettingsRoute
+  '/api/scout-voice': typeof ApiScoutVoiceRoute
   '/match/$matchId': typeof MatchMatchIdRoute
   '/api/public/app-icon': typeof ApiPublicAppIconRoute
   '/api/public/manifest': typeof ApiPublicManifestRoute
@@ -107,6 +114,7 @@ export interface FileRoutesByTo {
   '/news': typeof NewsRoute
   '/scout': typeof ScoutRoute
   '/settings': typeof SettingsRoute
+  '/api/scout-voice': typeof ApiScoutVoiceRoute
   '/match/$matchId': typeof MatchMatchIdRoute
   '/api/public/app-icon': typeof ApiPublicAppIconRoute
   '/api/public/manifest': typeof ApiPublicManifestRoute
@@ -122,6 +130,7 @@ export interface FileRoutesById {
   '/news': typeof NewsRoute
   '/scout': typeof ScoutRoute
   '/settings': typeof SettingsRoute
+  '/api/scout-voice': typeof ApiScoutVoiceRoute
   '/match/$matchId': typeof MatchMatchIdRoute
   '/api/public/app-icon': typeof ApiPublicAppIconRoute
   '/api/public/manifest': typeof ApiPublicManifestRoute
@@ -138,6 +147,7 @@ export interface FileRouteTypes {
     | '/news'
     | '/scout'
     | '/settings'
+    | '/api/scout-voice'
     | '/match/$matchId'
     | '/api/public/app-icon'
     | '/api/public/manifest'
@@ -152,6 +162,7 @@ export interface FileRouteTypes {
     | '/news'
     | '/scout'
     | '/settings'
+    | '/api/scout-voice'
     | '/match/$matchId'
     | '/api/public/app-icon'
     | '/api/public/manifest'
@@ -166,6 +177,7 @@ export interface FileRouteTypes {
     | '/news'
     | '/scout'
     | '/settings'
+    | '/api/scout-voice'
     | '/match/$matchId'
     | '/api/public/app-icon'
     | '/api/public/manifest'
@@ -181,6 +193,7 @@ export interface RootRouteChildren {
   NewsRoute: typeof NewsRoute
   ScoutRoute: typeof ScoutRoute
   SettingsRoute: typeof SettingsRoute
+  ApiScoutVoiceRoute: typeof ApiScoutVoiceRoute
   MatchMatchIdRoute: typeof MatchMatchIdRoute
   ApiPublicAppIconRoute: typeof ApiPublicAppIconRoute
   ApiPublicManifestRoute: typeof ApiPublicManifestRoute
@@ -234,6 +247,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MatchMatchIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/scout-voice': {
+      id: '/api/scout-voice'
+      path: '/api/scout-voice'
+      fullPath: '/api/scout-voice'
+      preLoaderRoute: typeof ApiScoutVoiceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/manifest': {
       id: '/api/public/manifest'
       path: '/api/public/manifest'
@@ -285,6 +305,7 @@ const rootRouteChildren: RootRouteChildren = {
   NewsRoute: NewsRoute,
   ScoutRoute: ScoutRoute,
   SettingsRoute: SettingsRoute,
+  ApiScoutVoiceRoute: ApiScoutVoiceRoute,
   MatchMatchIdRoute: MatchMatchIdRoute,
   ApiPublicAppIconRoute: ApiPublicAppIconRoute,
   ApiPublicManifestRoute: ApiPublicManifestRoute,
@@ -296,3 +317,12 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+  }
+}

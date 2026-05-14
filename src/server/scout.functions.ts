@@ -800,6 +800,8 @@ function formatIntelligenceBundle(ctx: ScoutMatchContext): string {
   }
   return out.join("\n");
 }
+
+export const scoutChat = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => Input.parse(i))
   .handler(async ({ data }): Promise<{ reply: string }> => {
     try {

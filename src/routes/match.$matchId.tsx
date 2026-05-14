@@ -2782,12 +2782,14 @@ function buildSlips(args: {
       market: `${underdogNick} Anytime Tryscorer ${i + 1}`,
       selection: c.name,
       detail: c.team || c.position ? [c.team, c.position].filter(Boolean).join(" · ") : undefined,
+      playerName: c.name,
     })),
     ...underdogForwards.map((p, i) => ({
       id: `ud-sec-${i}`,
       market: `${underdogNick} Secondary Pick`,
       selection: p.name,
       detail: formatLegDetail(p),
+      playerName: p.name,
     })),
   ];
   // Confidence: lower than predicted, but lifted if the model's win-margin is tight

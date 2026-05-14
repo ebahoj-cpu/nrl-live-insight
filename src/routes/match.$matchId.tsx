@@ -2909,10 +2909,10 @@ function BetTab({ insights, insightsError, insightsLoading, home, away }:
                     </li>
                   )}
                   <li
-                    className="bg-surface-2 rounded-lg px-2.5 py-2 grid grid-cols-[auto_1fr_auto] items-center gap-2.5 border border-border/40"
+                    className="bg-surface-2 rounded-lg px-2.5 py-2 grid grid-cols-[auto_1fr_auto] items-center gap-3 border border-border/40 min-h-[80px]"
                   >
                     {leg.playerName ? (
-                      <PlayerHeadshot name={leg.playerName} teams={[home, away]} size={52} />
+                      <PlayerHeadshot name={leg.playerName} teams={[home, away]} size={72} minSize={64} maxSize={80} />
                     ) : (
                       <div className="w-0" />
                     )}

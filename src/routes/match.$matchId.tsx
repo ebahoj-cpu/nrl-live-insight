@@ -1138,34 +1138,37 @@ function findPlayerHeadshot(name: string | null | undefined, teams: (TeamWithPla
   return null;
 }
 
-function PlayerHeadshot({ name, teams, size = 56, minSize, maxSize }:
+function PlayerHeadshot({ name, teams }:
   { name: string | null | undefined; teams: (TeamWithPlayers | undefined | null)[]; size?: number; minSize?: number; maxSize?: number }) {
   const found = findPlayerHeadshot(name, teams);
   const initials = (name ?? "?").split(/\s+/).map((w) => w.charAt(0)).join("").slice(0, 2).toUpperCase();
-  // Responsive: scales with viewport between min..max so the headshot stays
-  // proportionate on mobile, tablet, and desktop.
-  const min = minSize ?? Math.round(size * 0.85);
-  const max = maxSize ?? Math.round(size * 1.4);
-  const dim = `clamp(${min}px, 14vw, ${max}px)`;
-  if (found?.headImage) {
-    return (
-      <img
-        src={found.headImage}
-        alt={name ?? "Player"}
-        loading="lazy"
-        className="object-contain bg-transparent shrink-0"
-        style={{ width: dim, height: dim }}
-        onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-      />
-    );
-  }
+  // Mirror the lineup headshot: a fixed box (w-[72px] h-20 mobile, w-28 h-28 sm+)
+  // with the image anchored to the bottom and overflowing upward by 50% so the
+  // head/hair sits proudly above the row. Callers must provide enough top
+  // padding so this overflow doesn't collide with what's above.
   return (
-    <div
-      className="rounded-full bg-accent/15 text-accent flex items-center justify-center font-black border border-accent/30 shrink-0"
-      style={{ width: dim, height: dim, fontSize: `calc(${dim} * 0.32)` }}
-      aria-label={name ?? "Player"}
-    >
-      {initials}
+    <div className="relative shrink-0 w-[72px] h-20 sm:w-28 sm:h-28 overflow-visible">
+      {found?.headImage ? (
+        <img
+          src={found.headImage}
+          alt={name ?? "Player"}
+          loading="lazy"
+          className="pointer-events-none absolute bottom-0 left-1/2 -translate-x-1/2 h-[150%] w-auto max-w-none object-contain object-bottom drop-shadow-[0_4px_10px_rgba(0,0,0,0.5)]"
+          onError={(e) => {
+            const img = e.currentTarget as HTMLImageElement;
+            img.style.display = "none";
+            const sib = img.nextElementSibling as HTMLElement | null;
+            if (sib) sib.style.display = "flex";
+          }}
+        />
+      ) : null}
+      <div
+        className={`absolute inset-0 ${found?.headImage ? "hidden" : "flex"} rounded-full bg-accent/15 text-accent items-center justify-center font-black border border-accent/30`}
+        style={{ fontSize: "1.25rem" }}
+        aria-label={name ?? "Player"}
+      >
+        {initials}
+      </div>
     </div>
   );
 }
@@ -2143,7 +2146,7 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
 
       {/* 6 — First Tryscorer */}
       <Card title="First tryscorer" icon={Flag} className="accent-glow">
-        <div className="flex items-start gap-3">
+        <div className="flex items-start gap-3 pt-10 sm:pt-14">
           <PlayerHeadshot name={det.firstTryscorer?.name} teams={[home, away]} size={64} />
           <div className="min-w-0 flex-1">
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Top opening-set pick</div>
@@ -2169,7 +2172,7 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
         {!det.playerDouble?.name || det.playerDouble.name === "Awaiting team list" ? (
           <p className="text-sm text-muted-foreground">{det.playerDouble?.reasoning ?? "Awaiting team list."}</p>
         ) : (
-          <div className="flex items-start gap-3">
+          <div className="flex items-start gap-3 pt-10 sm:pt-14">
             <PlayerHeadshot name={det.playerDouble.name} teams={[home, away]} size={64} />
             <div className="min-w-0 flex-1">
               <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Double-try ceiling</div>
@@ -2198,7 +2201,7 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
       <Card title="First / second / third tryscorer" icon={Target}>
         <ul className="space-y-2.5">
           {[det.rankedTryscorers?.first, det.rankedTryscorers?.second, det.rankedTryscorers?.third].map((p: any, i: number) => (
-            <li key={i} className="flex items-start gap-3 bg-surface-2 rounded-lg p-2.5">
+            <li key={i} className="flex items-start gap-3 bg-surface-2 rounded-lg p-2.5 pt-10 sm:pt-14">
               <PlayerHeadshot name={p?.name} teams={[home, away]} size={72} minSize={56} maxSize={96} />
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-bold truncate">{p?.name ?? ""}</div>
@@ -2218,7 +2221,7 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Three anytime tryscorers backing this script</div>
           <ul className="space-y-2.5">
             {(det.predictedOutcome.picks ?? []).map((p: any, i: number) => (
-              <li key={`${p.name}-${i}`} className="flex items-start gap-3 bg-surface-2 rounded-lg p-2.5">
+              <li key={`${p.name}-${i}`} className="flex items-start gap-3 bg-surface-2 rounded-lg p-2.5 pt-10 sm:pt-14">
                 <PlayerHeadshot name={p?.name} teams={[home, away]} size={72} minSize={56} maxSize={96} />
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-bold truncate">{p?.name ?? ""}</div>
@@ -2252,7 +2255,7 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
                 ) : (
                   <ul className="space-y-2.5">
                     {col.list.slice(0, 3).map((r: any, i: number) => (
-                      <li key={`${r.name}-${i}`} className="flex items-start gap-3 bg-surface-2 rounded-lg p-2.5">
+                      <li key={`${r.name}-${i}`} className="flex items-start gap-3 bg-surface-2 rounded-lg p-2.5 pt-10 sm:pt-14">
                         <PlayerHeadshot name={r.name} teams={[home, away]} size={72} minSize={56} maxSize={96} />
                         <div className="flex-1 min-w-0">
                           <div className="text-sm font-bold truncate">{r.name}</div>
@@ -2320,7 +2323,7 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
                 ) : (
                   <ul className="space-y-2.5">
                     {col.list.slice(0, 3).map((r: any, i: number) => (
-                      <li key={`${r.name}-${i}`} className="flex items-start gap-3 bg-surface-2 rounded-lg p-2.5">
+                      <li key={`${r.name}-${i}`} className="flex items-start gap-3 bg-surface-2 rounded-lg p-2.5 pt-10 sm:pt-14">
                         <PlayerHeadshot name={r.name} teams={[home, away]} size={72} minSize={56} maxSize={96} />
                         <div className="flex-1 min-w-0">
                           <div className="text-sm font-bold truncate">{r.name}</div>
@@ -3031,9 +3034,9 @@ function BetTab({ insights, insightsError, insightsLoading, home, away }:
                       <div className="text-sm font-bold mt-0.5 leading-tight">
                         Projected Tryscorers
                       </div>
-                      <div className="mt-2 space-y-2">
+                      <div className="mt-2 space-y-4">
                         {anytimeLegs.map((al) => (
-                          <div key={al.id} className="grid grid-cols-[1fr_auto] items-center gap-3">
+                          <div key={al.id} className="grid grid-cols-[1fr_auto] items-center gap-3 pt-10 sm:pt-14">
                             <div className="flex items-center gap-3 min-w-0">
                               {al.playerName ? (
                                 <PlayerHeadshot name={al.playerName} teams={[home, away]} size={56} minSize={48} maxSize={64} />
@@ -3097,7 +3100,7 @@ function BetTab({ insights, insightsError, insightsLoading, home, away }:
                       </button>
                     </div>
                     {isPlayerMarket && leg.playerName ? (
-                      <div className="mt-2 flex items-center gap-3">
+                      <div className="mt-2 flex items-center gap-3 pt-10 sm:pt-14">
                         <PlayerHeadshot name={leg.playerName} teams={[home, away]} size={72} minSize={64} maxSize={80} />
                         <div className="min-w-0">
                           <div className="text-sm font-bold leading-tight break-words">{leg.playerName}</div>

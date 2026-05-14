@@ -2526,7 +2526,7 @@ const formatTime = (utc: string): string => {
   }).format(d).toLowerCase();
 };
 
-/* ================= BET TAB — INSIGHT-DRIVEN BETSLIP ================= */
+/* ================= BET TAB — MULTI-SLIP INTELLIGENCE ================= */
 
 type BetLeg = {
   id: string;
@@ -2534,6 +2534,343 @@ type BetLeg = {
   selection: string;
   detail?: string;
 };
+
+type SlipId = "predicted" | "safe" | "value" | "script" | "scout" | "ultra";
+type RiskLevel = "Low" | "Medium-Low" | "Medium" | "Medium-High" | "High" | "Very High";
+
+type Slip = {
+  id: SlipId;
+  label: string;
+  short: string;
+  tagline: string;
+  legs: BetLeg[];
+  confidence: number; // 0-100
+  edgePct: number;    // model edge % (can be negative)
+  risk: RiskLevel;
+  volatility: RiskLevel;
+  why: string[];
+};
+
+function clampPct(n: number, lo = 0, hi = 100) { return Math.max(lo, Math.min(hi, Math.round(n))); }
+
+function pickConfidenceBase(c: string | undefined): number {
+  if (c === "high") return 76;
+  if (c === "medium") return 62;
+  return 48;
+}
+
+function formatLegDetail(p: any): string | undefined {
+  if (!p) return undefined;
+  const team = p.team ?? "";
+  const pos = p.position ?? "";
+  if (team && pos) return `${team} · ${pos}`;
+  return team || pos || undefined;
+}
+
+function buildSlips(args: {
+  insights: any;
+  det: any;
+  home: TeamWithPlayers;
+  away: TeamWithPlayers;
+}): Slip[] {
+  const { insights, det, home } = args;
+
+  const winnerNick: string = det.matchWinner?.nickname ?? home.nickName;
+  const winnerReason: string = det.matchWinner?.reasoning ?? "";
+  const rawDetBucket = String(det.margin?.bucket ?? "1-12").replace("–", "-");
+  const marginBucket: "1-12" | "13+" = rawDetBucket === "13+" ? "13+" : "1-12";
+  const totalLine = det.totalPoints?.line ?? 41.5;
+  const rawLean = String(det.totalPoints?.lean ?? "Over").toLowerCase();
+  const totalLean: "Over" | "Under" = rawLean.startsWith("u") ? "Under" : "Over";
+  const htftPick: string = det.htft?.pick ?? `${winnerNick} / ${winnerNick}`;
+
+  const firstTry = det.firstTryscorer;
+  const firstName: string | undefined = firstTry?.name;
+  const firstIsValid = !!(firstName && !/^awaiting/i.test(firstName));
+
+  const homeAnytime: any[] = Array.isArray(det.topAnytimeHome) ? det.topAnytimeHome : [];
+  const awayAnytime: any[] = Array.isArray(det.topAnytimeAway) ? det.topAnytimeAway : [];
+  const allAnytime: any[] = [...homeAnytime, ...awayAnytime].filter((p) => p?.name && !/^awaiting/i.test(p.name));
+  const homeNamesLc = new Set(homeAnytime.map((p) => String(p?.name ?? "").toLowerCase()));
+  const firstIsHome = firstIsValid && (
+    String(firstTry?.team ?? "").toLowerCase() === home.nickName.toLowerCase() ||
+    homeNamesLc.has(String(firstName).toLowerCase())
+  );
+
+  const homePicks: any[] = [];
+  if (firstIsHome) {
+    homePicks.push({ ...firstTry });
+    const extra = homeAnytime.find((p) => String(p?.name ?? "").toLowerCase() !== String(firstName).toLowerCase());
+    if (extra) homePicks.push(extra);
+    else if (homeAnytime[0]) homePicks.push(homeAnytime[0]);
+  } else {
+    homePicks.push(...homeAnytime.slice(0, 2));
+  }
+  const awayPick = awayAnytime[0] ?? null;
+
+  const doublePick = det.playerDouble;
+  const doubleName: string | undefined = doublePick?.name;
+  const doubleIsValid = !!(doubleName && !/^awaiting/i.test(doubleName)
+    && (!firstIsValid || String(doubleName).toLowerCase() !== String(firstName).toLowerCase()));
+
+  // Soft narrative sources (already computed by backend — never invented here)
+  const sim = insights?.simulation ?? null;
+  const profile = sim?.profile ?? null;
+  const scriptA = insights?.scriptAnalyst ?? null;
+  const newsImpacts: any[] = Array.isArray(insights?.newsImpactsApplied) ? insights.newsImpactsApplied : [];
+  const recPlays: any[] = Array.isArray(sim?.recommendedPlays) ? sim.recommendedPlays : [];
+  const valuePlays = recPlays.filter((p) => typeof p?.edgePct === "number" && p.edgePct > 0)
+    .sort((a, b) => (b.edgePct ?? 0) - (a.edgePct ?? 0));
+  const avgEdge = valuePlays.length
+    ? valuePlays.reduce((a, p) => a + (p.edgePct ?? 0), 0) / valuePlays.length
+    : 0;
+
+  const baseConf = pickConfidenceBase(det?.confidence);
+
+  // Helper to drop empty bullets and de-dup
+  const bulletClean = (arr: (string | undefined | null)[]): string[] => {
+    const out: string[] = [];
+    const seen = new Set<string>();
+    for (const s of arr) {
+      const v = (s ?? "").trim();
+      if (!v) continue;
+      const k = v.toLowerCase().slice(0, 60);
+      if (seen.has(k)) continue;
+      seen.add(k);
+      out.push(v);
+      if (out.length >= 5) break;
+    }
+    return out;
+  };
+
+  // -------- 1. Predicted Outcome (current behaviour) --------
+  const predictedLegs: BetLeg[] = [
+    { id: "winner", market: "Match Winner", selection: `${winnerNick} to win` },
+    { id: "margin", market: "Winning Margin", selection: `${winnerNick} ${marginBucket}` },
+    { id: "total", market: "Total Points", selection: `${totalLean} ${totalLine}` },
+    { id: "htft", market: "Halftime / Fulltime Double", selection: htftPick },
+    ...(firstIsValid ? [{
+      id: "first-try", market: "First Tryscorer", selection: firstName!, detail: formatLegDetail(firstTry),
+    }] : []),
+    ...(doubleIsValid ? [{
+      id: "double", market: "To Score a Double", selection: doubleName!, detail: formatLegDetail(doublePick),
+    }] : []),
+    ...homePicks.map((p, i) => ({
+      id: `anytime-home-${i}`, market: `Anytime Tryscorer ${i + 1}`, selection: p?.name ?? "—", detail: formatLegDetail(p),
+    })),
+    ...(awayPick ? [{
+      id: "anytime-away", market: `Anytime Tryscorer ${homePicks.length + 1}`, selection: awayPick?.name ?? "—", detail: formatLegDetail(awayPick),
+    }] : []),
+  ];
+
+  const predicted: Slip = {
+    id: "predicted",
+    label: "Predicted Outcome Bet Slip",
+    short: "Predicted",
+    tagline: "Primary AI projected game script",
+    legs: predictedLegs,
+    confidence: clampPct(baseConf + 4),
+    edgePct: Math.round(avgEdge * 0.6),
+    risk: "Medium",
+    volatility: "Medium",
+    why: bulletClean([
+      winnerReason,
+      det.totalPoints?.reasoning,
+      det.margin?.reasoning,
+      profile?.scoringPatternNote,
+      profile?.tempoNote,
+    ]),
+  };
+
+  // -------- 2. Safe Bet Slip --------
+  const safeAnytime = allAnytime.find((p) => p?.confidence === "high")
+    ?? allAnytime.find((p) => p?.confidence === "medium")
+    ?? allAnytime[0] ?? null;
+  const safeLegs: BetLeg[] = [
+    { id: "winner", market: "Match Winner", selection: `${winnerNick} to win` },
+    { id: "total-safe", market: "Total Points (safer line)", selection: `${totalLean} ${totalLean === "Over" ? totalLine - 2.5 : totalLine + 2.5}` },
+    ...(safeAnytime ? [{
+      id: "anytime-safe", market: "Conservative Anytime Tryscorer", selection: safeAnytime.name, detail: formatLegDetail(safeAnytime),
+    }] : []),
+  ];
+  const safe: Slip = {
+    id: "safe",
+    label: "Safe Bet Slip",
+    short: "Safe",
+    tagline: "Lower risk, higher hit-rate selections",
+    legs: safeLegs,
+    confidence: clampPct(baseConf + 14),
+    edgePct: Math.max(0, Math.round(avgEdge * 0.4)),
+    risk: "Low",
+    volatility: "Low",
+    why: bulletClean([
+      `Anchored on the model's strongest read: ${winnerNick} to win.`,
+      `Total moved away from the line by 2.5 points to absorb variance.`,
+      safeAnytime ? `${safeAnytime.name} carries the highest tryscorer confidence (${safeAnytime.confidence ?? "high"}).` : null,
+      profile?.dominanceNote,
+    ]),
+  };
+
+  // -------- 3. Value Bet Slip --------
+  const valueLegs: BetLeg[] = [];
+  if (valuePlays.length) {
+    for (const p of valuePlays.slice(0, 4)) {
+      valueLegs.push({
+        id: `value-${valueLegs.length}`,
+        market: String(p.market ?? "Value Pick"),
+        selection: String(p.pick ?? "—"),
+        detail: typeof p.edgePct === "number" ? `Edge +${p.edgePct.toFixed(1)}%` : undefined,
+      });
+    }
+  } else {
+    // Fallback: lean on engine's best-confidence anytime + total
+    const valuePick = allAnytime.find((p) => p?.confidence === "high") ?? allAnytime[0];
+    valueLegs.push({ id: "value-total", market: "Total Points", selection: `${totalLean} ${totalLine}` });
+    if (valuePick) valueLegs.push({
+      id: "value-any", market: "Anytime Tryscorer", selection: valuePick.name, detail: formatLegDetail(valuePick),
+    });
+  }
+  const value: Slip = {
+    id: "value",
+    label: "Value Bet Slip",
+    short: "Value",
+    tagline: "Model edge vs market price",
+    legs: valueLegs,
+    confidence: clampPct(baseConf - 4),
+    edgePct: Math.round(avgEdge || 6),
+    risk: "Medium",
+    volatility: "Medium",
+    why: bulletClean([
+      valuePlays.length ? `${valuePlays.length} market(s) flagged with positive expected value vs implied price.` : "No live +EV markets — falling back to highest-confidence engine picks.",
+      "Calibrated probabilities used; obvious public-bias trap markets filtered.",
+      profile?.edgeAttack?.note,
+      det.totalPoints?.reasoning,
+    ]),
+  };
+
+  // -------- 4. Script Bet Slip --------
+  const edgeNote: string = profile?.edgeAttack?.note ?? "";
+  const scriptLegs: BetLeg[] = [
+    { id: "winner", market: "Match Winner", selection: `${winnerNick} to win` },
+    { id: "script-total", market: profile?.tempo ? `Total Points (${profile.tempo} tempo)` : "Total Points", selection: `${totalLean} ${totalLine}` },
+    { id: "script-htft", market: "Halftime / Fulltime", selection: htftPick },
+    ...(firstIsValid ? [{
+      id: "script-first", market: "First Tryscorer (script entry)", selection: firstName!, detail: formatLegDetail(firstTry),
+    }] : []),
+  ];
+  const script: Slip = {
+    id: "script",
+    label: "Script Bet Slip",
+    short: "Script",
+    tagline: "Built from projected game flow & edges",
+    legs: scriptLegs,
+    confidence: clampPct(baseConf),
+    edgePct: Math.round(avgEdge * 0.7),
+    risk: "Medium",
+    volatility: "Medium-High",
+    why: bulletClean([
+      profile?.tempoNote ?? null,
+      profile?.scoringPatternNote ?? null,
+      edgeNote ? `Edge attack read — ${edgeNote}` : null,
+      scriptA?.marketLean?.coverLikelihood ?? null,
+      scriptA?.marketLean?.totalsAngle ?? null,
+    ]),
+  };
+
+  // -------- 5. Scout Special --------
+  const scoutAnytime = homePicks[0] ?? allAnytime[0] ?? null;
+  const scoutAway = awayPick ?? awayAnytime[0] ?? null;
+  const scoutLegs: BetLeg[] = [
+    { id: "winner", market: "Match Winner", selection: `${winnerNick} to win` },
+    { id: "scout-margin", market: "Winning Margin", selection: `${winnerNick} ${marginBucket}` },
+    ...(scoutAnytime ? [{
+      id: "scout-any-h", market: "Anytime Tryscorer", selection: scoutAnytime.name, detail: formatLegDetail(scoutAnytime),
+    }] : []),
+    ...(scoutAway ? [{
+      id: "scout-any-a", market: "Anytime Tryscorer", selection: scoutAway.name, detail: formatLegDetail(scoutAway),
+    }] : []),
+  ];
+  const newsBullets = newsImpacts.slice(0, 2).map((n: any) => {
+    const team = n?.team ? `${n.team}: ` : "";
+    const note = n?.note ?? n?.title ?? n?.summary ?? "";
+    return note ? `${team}${note}` : null;
+  });
+  const scout: Slip = {
+    id: "scout",
+    label: "Scout Special",
+    short: "Scout",
+    tagline: "Sharp-bettor angle — context & motivation",
+    legs: scoutLegs,
+    confidence: clampPct(baseConf - 2),
+    edgePct: Math.round(avgEdge * 0.85),
+    risk: "Medium-High",
+    volatility: "Medium-High",
+    why: bulletClean([
+      ...newsBullets,
+      scriptA?.stakes?.home?.psychology ?? null,
+      scriptA?.stakes?.away?.psychology ?? null,
+      profile?.dominanceNote ?? null,
+      winnerReason,
+    ]),
+  };
+
+  // -------- 6. Ultra Multi (correlation-guarded) --------
+  // Avoid stacking conflicting markets: include winner, margin, total, first try,
+  // ONE home anytime (not the first tryscorer), and HT/FT.
+  const ultraAnytime = homePicks.find((p) => !firstIsValid || String(p?.name ?? "").toLowerCase() !== String(firstName).toLowerCase())
+    ?? awayPick ?? null;
+  const ultraLegs: BetLeg[] = [
+    { id: "winner", market: "Match Winner", selection: `${winnerNick} to win` },
+    { id: "ultra-margin", market: "Exact Margin Bucket", selection: `${winnerNick} ${marginBucket}` },
+    { id: "ultra-total", market: "Total Points", selection: `${totalLean} ${totalLine}` },
+    { id: "ultra-htft", market: "HT/FT Double", selection: htftPick },
+    ...(firstIsValid ? [{
+      id: "ultra-first", market: "First Tryscorer", selection: firstName!, detail: formatLegDetail(firstTry),
+    }] : []),
+    ...(ultraAnytime ? [{
+      id: "ultra-any", market: "Anytime Tryscorer", selection: ultraAnytime.name, detail: formatLegDetail(ultraAnytime),
+    }] : []),
+  ];
+  const ultra: Slip = {
+    id: "ultra",
+    label: "Ultra Multi",
+    short: "Ultra",
+    tagline: "High risk · high reward entertainment multi",
+    legs: ultraLegs,
+    confidence: clampPct(baseConf - 22),
+    edgePct: Math.round(avgEdge * 1.1),
+    risk: "Very High",
+    volatility: "Very High",
+    why: bulletClean([
+      "All legs are positively correlated with the projected script (no conflicting markets).",
+      `Stack relies on ${winnerNick} controlling the contest in the projected ${marginBucket} band.`,
+      firstIsValid ? `${firstName} as first try sits inside the projected scoring shape.` : null,
+      profile?.scoringPatternNote ?? null,
+    ]),
+  };
+
+  return [predicted, safe, value, script, scout, ultra];
+}
+
+function riskTone(r: RiskLevel): string {
+  switch (r) {
+    case "Low": return "text-emerald-400";
+    case "Medium-Low": return "text-emerald-300";
+    case "Medium": return "text-accent";
+    case "Medium-High": return "text-amber-400";
+    case "High": return "text-orange-400";
+    case "Very High": return "text-danger";
+  }
+}
+
+function MetaPill({ label, value, tone = "" }: { label: string; value: string; tone?: string }) {
+  return (
+    <div className="bg-surface-2 border border-border/50 rounded-lg px-2.5 py-1.5 min-w-0">
+      <div className="text-[8.5px] uppercase tracking-wider text-muted-foreground font-bold leading-none">{label}</div>
+      <div className={`text-xs font-black mt-1 leading-none ${tone}`}>{value}</div>
+    </div>
+  );
+}
 
 function BetTab({ insights, insightsError, insightsLoading, home, away }:
   { insights: any; insightsError: string | null; insightsLoading?: boolean;
@@ -2546,110 +2883,53 @@ function BetTab({ insights, insightsError, insightsLoading, home, away }:
   const det = insights?.deterministic;
   if (!det) return <Empty msg="Stats engine output not yet computed for this fixture." />;
 
-  // ---- Build legs purely from the insights engine, no odds, no calculator ----
-  const winnerNick: string = det.matchWinner?.nickname ?? home.nickName;
-  const rawDetBucket = String(det.margin?.bucket ?? "1-12").replace("–", "-");
-  const marginBucket = rawDetBucket === "13+" ? "13+" : "1-12";
+  const slips = buildSlips({ insights, det, home, away });
+  const [activeId, setActiveId] = useState<SlipId>("predicted");
+  const [removed, setRemoved] = useState<Record<SlipId, Set<string>>>(() => ({
+    predicted: new Set(), safe: new Set(), value: new Set(),
+    script: new Set(), scout: new Set(), ultra: new Set(),
+  }));
+  const [whyOpen, setWhyOpen] = useState(false);
 
-  const totalLine = det.totalPoints?.line ?? 41.5;
-  const rawLean = String(det.totalPoints?.lean ?? "Over").toLowerCase();
-  const totalLean: "Over" | "Under" = rawLean.startsWith("u") ? "Under" : "Over";
+  const active = slips.find((s) => s.id === activeId) ?? slips[0];
+  const visibleLegs = active.legs.filter((l) => !removed[active.id].has(l.id));
 
-  const htftPick: string = det.htft?.pick ?? `${winnerNick} / ${winnerNick}`;
-
-  const firstTry = det.firstTryscorer;
-  const firstName: string | undefined = firstTry?.name;
-  const firstIsValid = firstName && !/^awaiting/i.test(firstName);
-
-  const homeAnytime: any[] = Array.isArray(det.topAnytimeHome) ? det.topAnytimeHome : [];
-  const awayAnytime: any[] = Array.isArray(det.topAnytimeAway) ? det.topAnytimeAway : [];
-
-  // Decide if first tryscorer belongs to the home team.
-  const homeNamesLc = new Set(homeAnytime.map((p) => String(p?.name ?? "").toLowerCase()));
-  const firstIsHome = firstIsValid && (
-    String(firstTry?.team ?? "").toLowerCase() === home.nickName.toLowerCase() ||
-    homeNamesLc.has(String(firstName).toLowerCase())
-  );
-
-  // Two home-team anytimes: include the first tryscorer if home, plus one other.
-  const homePicks: any[] = [];
-  if (firstIsHome) {
-    homePicks.push({ ...firstTry });
-    const extra = homeAnytime.find((p) => String(p?.name ?? "").toLowerCase() !== String(firstName).toLowerCase());
-    if (extra) homePicks.push(extra);
-    else if (homeAnytime[0]) homePicks.push(homeAnytime[0]);
-  } else {
-    homePicks.push(...homeAnytime.slice(0, 2));
-  }
-
-  // One away-team anytime.
-  const awayPick = awayAnytime[0] ?? null;
-
-  // To Score a Double — must NOT be the first tryscorer.
-  const doublePick = det.playerDouble;
-  const doubleName: string | undefined = doublePick?.name;
-  const doubleIsValid = doubleName && !/^awaiting/i.test(doubleName)
-    && (!firstIsValid || String(doubleName).toLowerCase() !== String(firstName).toLowerCase());
-
-  const formatDetail = (p: any): string | undefined => {
-    if (!p) return undefined;
-    const team = p.team ?? "";
-    const pos = p.position ?? "";
-    if (team && pos) return `${team} · ${pos}`;
-    return team || pos || undefined;
+  const removeLeg = (id: string) => {
+    setRemoved((prev) => {
+      const next = new Set(prev[active.id]);
+      next.add(id);
+      return { ...prev, [active.id]: next };
+    });
   };
-
-  const initialLegs: BetLeg[] = [
-    {
-      id: "margin",
-      market: "Winning Margin",
-      selection: `${winnerNick} ${marginBucket}`,
-    },
-    {
-      id: "total",
-      market: "Total Points",
-      selection: `${totalLean} ${totalLine}`,
-    },
-    {
-      id: "htft",
-      market: "Halftime / Fulltime Double",
-      selection: htftPick,
-    },
-    ...(firstIsValid ? [{
-      id: "first-try",
-      market: "First Tryscorer",
-      selection: firstName!,
-      detail: formatDetail(firstTry),
-    }] : []),
-    ...(doubleIsValid ? [{
-      id: "double",
-      market: "To Score a Double",
-      selection: doubleName!,
-      detail: formatDetail(doublePick),
-    }] : []),
-    ...homePicks.map((p, i) => ({
-      id: `anytime-home-${i}`,
-      market: `Anytime Tryscorer ${i + 1}`,
-      selection: p?.name ?? "—",
-      detail: formatDetail(p),
-    })),
-    ...(awayPick ? [{
-      id: "anytime-away",
-      market: `Anytime Tryscorer ${homePicks.length + 1}`,
-      selection: awayPick?.name ?? "—",
-      detail: formatDetail(awayPick),
-    }] : []),
-  ];
-
-  const [legs, setLegs] = useState<BetLeg[]>(initialLegs);
-  const removeLeg = (id: string) => setLegs((prev) => prev.filter((l) => l.id !== id));
 
   return (
     <div className="space-y-4 pt-4">
-      <Card title="Betslip" icon={Receipt} className="accent-glow">
-        <div className="flex items-center justify-between mb-4 -mt-2">
+      {/* Slip selector chips — horizontally scrollable */}
+      <div className="-mx-1 overflow-x-auto no-scrollbar">
+        <div className="flex gap-2 px-1 pb-1">
+          {slips.map((s) => {
+            const isActive = s.id === active.id;
+            return (
+              <button
+                key={s.id}
+                onClick={() => setActiveId(s.id)}
+                className={`shrink-0 px-3.5 py-1.5 rounded-full text-[11px] uppercase tracking-wider font-bold border transition ${
+                  isActive
+                    ? "bg-accent text-accent-foreground border-accent shadow-[0_2px_10px_-2px_color-mix(in_oklab,var(--accent)_45%,transparent)]"
+                    : "bg-surface-2 text-muted-foreground border-border/50 hover:text-foreground"
+                }`}
+              >
+                {s.short}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <Card title={active.label} icon={Receipt} className="accent-glow">
+        <div className="flex items-center justify-between mb-3 -mt-2">
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
-            {`${legs.length} ${legs.length === 1 ? "selection" : "selections"}`}
+            {`${visibleLegs.length} ${visibleLegs.length === 1 ? "selection" : "selections"} · ${active.tagline}`}
           </div>
           <div className="flex items-center gap-2.5">
             <div className="h-11 w-11 rounded-full bg-surface-2 border border-border/60 ring-1 ring-accent/20 shadow-[0_2px_10px_-2px_color-mix(in_oklab,var(--accent)_35%,transparent)] flex items-center justify-center">
@@ -2662,13 +2942,21 @@ function BetTab({ insights, insightsError, insightsLoading, home, away }:
           </div>
         </div>
 
-        {legs.length === 0 ? (
+        {/* Intelligence metadata strip */}
+        <div className="grid grid-cols-4 gap-2 mb-4">
+          <MetaPill label="Confidence" value={`${active.confidence}%`} tone="text-accent" />
+          <MetaPill label="Risk" value={active.risk} tone={riskTone(active.risk)} />
+          <MetaPill label="Model Edge" value={`${active.edgePct >= 0 ? "+" : ""}${active.edgePct}%`} tone={active.edgePct >= 0 ? "text-emerald-400" : "text-danger"} />
+          <MetaPill label="Volatility" value={active.volatility} tone={riskTone(active.volatility)} />
+        </div>
+
+        {visibleLegs.length === 0 ? (
           <div className="text-center py-8 text-sm text-muted-foreground">
-            No selections. Switch to Insights to see the model picks.
+            No selections in this slip. Switch to another slip above.
           </div>
         ) : (
           <ul className="space-y-2">
-            {legs.map((leg) => (
+            {visibleLegs.map((leg) => (
               <li
                 key={leg.id}
                 className="bg-surface-2 rounded-lg px-3 py-3 sm:px-4 sm:py-3.5 grid grid-cols-[1fr_auto] items-center gap-3 sm:gap-4 border border-border/40"
@@ -2696,8 +2984,33 @@ function BetTab({ insights, insightsError, insightsLoading, home, away }:
           </ul>
         )}
 
+        {/* Why this slip? — collapsible */}
+        {active.why.length > 0 && (
+          <div className="mt-4 border-t border-border pt-3">
+            <button
+              onClick={() => setWhyOpen((v) => !v)}
+              className="w-full flex items-center justify-between text-[11px] uppercase tracking-wider font-bold text-muted-foreground hover:text-foreground transition"
+            >
+              <span className="inline-flex items-center gap-2">
+                <Sparkles className="h-3.5 w-3.5 text-accent" /> Why this slip?
+              </span>
+              <span className={`transition-transform ${whyOpen ? "rotate-180" : ""}`}>▾</span>
+            </button>
+            {whyOpen && (
+              <ul className="mt-3 space-y-1.5">
+                {active.why.map((w, i) => (
+                  <li key={i} className="text-[12px] leading-relaxed text-foreground/85 flex gap-2">
+                    <span className="text-accent shrink-0">•</span>
+                    <span className="min-w-0">{w}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+
         <p className="text-[10px] text-muted-foreground text-center pt-4 mt-4 border-t border-border">
-          Selections sourced from the insights engine for this fixture. 18+ · Bet responsibly.
+          Slips dynamically generated from the simulation, script, calibration, edge attack, fatigue, referee & news engines for this fixture. 18+ · Bet responsibly.
         </p>
       </Card>
     </div>

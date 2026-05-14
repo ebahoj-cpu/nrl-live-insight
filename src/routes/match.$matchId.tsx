@@ -3100,7 +3100,7 @@ function BetTab({ insights, insightsError, insightsLoading, home, away }:
                       </button>
                     </div>
                     {isPlayerMarket && leg.playerName ? (
-                      <div className="mt-2 flex items-center gap-3">
+                      <div className="mt-2 flex items-center gap-3 pt-10 sm:pt-14">
                         <PlayerHeadshot name={leg.playerName} teams={[home, away]} size={72} minSize={64} maxSize={80} />
                         <div className="min-w-0">
                           <div className="text-sm font-bold leading-tight break-words">{leg.playerName}</div>

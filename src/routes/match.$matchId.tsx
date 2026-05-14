@@ -2172,7 +2172,7 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
         {!det.playerDouble?.name || det.playerDouble.name === "Awaiting team list" ? (
           <p className="text-sm text-muted-foreground">{det.playerDouble?.reasoning ?? "Awaiting team list."}</p>
         ) : (
-          <div className="flex items-start gap-3">
+          <div className="flex items-start gap-3 pt-10 sm:pt-14">
             <PlayerHeadshot name={det.playerDouble.name} teams={[home, away]} size={64} />
             <div className="min-w-0 flex-1">
               <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Double-try ceiling</div>

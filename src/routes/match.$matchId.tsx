@@ -1138,34 +1138,37 @@ function findPlayerHeadshot(name: string | null | undefined, teams: (TeamWithPla
   return null;
 }
 
-function PlayerHeadshot({ name, teams, size = 56, minSize, maxSize }:
+function PlayerHeadshot({ name, teams }:
   { name: string | null | undefined; teams: (TeamWithPlayers | undefined | null)[]; size?: number; minSize?: number; maxSize?: number }) {
   const found = findPlayerHeadshot(name, teams);
   const initials = (name ?? "?").split(/\s+/).map((w) => w.charAt(0)).join("").slice(0, 2).toUpperCase();
-  // Responsive: scales with viewport between min..max so the headshot stays
-  // proportionate on mobile, tablet, and desktop.
-  const min = minSize ?? Math.round(size * 0.85);
-  const max = maxSize ?? Math.round(size * 1.4);
-  const dim = `clamp(${min}px, 14vw, ${max}px)`;
-  if (found?.headImage) {
-    return (
-      <img
-        src={found.headImage}
-        alt={name ?? "Player"}
-        loading="lazy"
-        className="object-contain bg-transparent shrink-0"
-        style={{ width: dim, height: dim }}
-        onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-      />
-    );
-  }
+  // Mirror the lineup headshot: a fixed box (w-[72px] h-20 mobile, w-28 h-28 sm+)
+  // with the image anchored to the bottom and overflowing upward by 50% so the
+  // head/hair sits proudly above the row. Callers must provide enough top
+  // padding so this overflow doesn't collide with what's above.
   return (
-    <div
-      className="rounded-full bg-accent/15 text-accent flex items-center justify-center font-black border border-accent/30 shrink-0"
-      style={{ width: dim, height: dim, fontSize: `calc(${dim} * 0.32)` }}
-      aria-label={name ?? "Player"}
-    >
-      {initials}
+    <div className="relative shrink-0 w-[72px] h-20 sm:w-28 sm:h-28 overflow-visible">
+      {found?.headImage ? (
+        <img
+          src={found.headImage}
+          alt={name ?? "Player"}
+          loading="lazy"
+          className="pointer-events-none absolute bottom-0 left-1/2 -translate-x-1/2 h-[150%] w-auto max-w-none object-contain object-bottom drop-shadow-[0_4px_10px_rgba(0,0,0,0.5)]"
+          onError={(e) => {
+            const img = e.currentTarget as HTMLImageElement;
+            img.style.display = "none";
+            const sib = img.nextElementSibling as HTMLElement | null;
+            if (sib) sib.style.display = "flex";
+          }}
+        />
+      ) : null}
+      <div
+        className={`absolute inset-0 ${found?.headImage ? "hidden" : "flex"} rounded-full bg-accent/15 text-accent items-center justify-center font-black border border-accent/30`}
+        style={{ fontSize: "1.25rem" }}
+        aria-label={name ?? "Player"}
+      >
+        {initials}
+      </div>
     </div>
   );
 }

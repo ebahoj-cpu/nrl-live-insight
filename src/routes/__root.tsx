@@ -67,7 +67,7 @@ function RootShell({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className="dark">
       <head><HeadContent /></head>
-      <body className="bg-background text-foreground antialiased">
+      <body className="bg-background text-foreground antialiased overflow-x-hidden">
         {children}
         <Scripts />
       </body>
@@ -80,7 +80,7 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <Header />
-      <main className="mx-auto max-w-6xl px-4 sm:px-6 pb-32">
+      <main className="mx-auto max-w-6xl px-4 sm:px-6 pb-32 overflow-x-hidden">
         <Outlet />
       </main>
       <BottomNav />

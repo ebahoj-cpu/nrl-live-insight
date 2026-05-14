@@ -2533,6 +2533,7 @@ type BetLeg = {
   market: string;
   selection: string;
   detail?: string;
+  playerName?: string;
 };
 
 type SlipId = "predicted" | "anytimes" | "secondaries" | "underdog";

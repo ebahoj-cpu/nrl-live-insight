@@ -3034,9 +3034,9 @@ function BetTab({ insights, insightsError, insightsLoading, home, away }:
                       <div className="text-sm font-bold mt-0.5 leading-tight">
                         Projected Tryscorers
                       </div>
-                      <div className="mt-2 space-y-2">
+                      <div className="mt-2 space-y-4">
                         {anytimeLegs.map((al) => (
-                          <div key={al.id} className="grid grid-cols-[1fr_auto] items-center gap-3">
+                          <div key={al.id} className="grid grid-cols-[1fr_auto] items-center gap-3 pt-10 sm:pt-14">
                             <div className="flex items-center gap-3 min-w-0">
                               {al.playerName ? (
                                 <PlayerHeadshot name={al.playerName} teams={[home, away]} size={56} minSize={48} maxSize={64} />

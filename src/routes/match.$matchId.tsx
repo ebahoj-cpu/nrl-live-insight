@@ -2771,7 +2771,56 @@ function buildSlips(args: {
   const underdogForwards = forwardPicks
     .filter((p) => p?.name && !/^awaiting/i.test(p.name) && String(p.team ?? "").toLowerCase() === underdogNickLc)
     .slice(0, 1);
-  const underdogHtFt = `Draw / ${underdogNick}`; // realistic upset script
+  // Half/Full Time Double — derive from the simulation's htftProbabilities map
+  // instead of hard-coding "Draw / underdog". Only allow a halftime draw when
+  // the model's draw share genuinely competes with both teams' HT win shares.
+  const underdogSide: "home" | "away" = winnerIsHome ? "away" : "home";
+  const htftProbs: Record<string, number> = (sim?.htftProbabilities && typeof sim.htftProbabilities === "object") ? sim.htftProbabilities : {};
+  const labelFor = (s: "home" | "away" | "draw") => s === "home" ? home.nickName : s === "away" ? away.nickName : "Draw";
+  type HtKey = "home" | "away" | "draw";
+  const htKeys: HtKey[] = ["home", "away", "draw"];
+  const candidates = htKeys.map((ht) => ({
+    ht,
+    key: `${ht}/${underdogSide}`,
+    label: `${labelFor(ht)} / ${labelFor(underdogSide)}`,
+    prob: Number(htftProbs[`${ht}/${underdogSide}`] ?? 0),
+  }));
+  // Aggregate halftime probabilities across all FT outcomes for the draw guard
+  const htAgg: Record<HtKey, number> = { home: 0, away: 0, draw: 0 };
+  for (const [k, v] of Object.entries(htftProbs)) {
+    const ht = (k.split("/")[0] ?? "") as HtKey;
+    if (ht === "home" || ht === "away" || ht === "draw") htAgg[ht] += Number(v) || 0;
+  }
+  const drawDominantHt = htAgg.draw > 0 && htAgg.draw >= Math.max(htAgg.home, htAgg.away) * 0.85;
+  // Sort candidates highest-first; reject Draw/* unless the model genuinely
+  // supports a halftime draw.
+  candidates.sort((a, b) => b.prob - a.prob);
+  let chosen = candidates.find((c) => c.ht !== "draw" || drawDominantHt) ?? candidates[0];
+  // If the simulation gave us nothing usable, fall back to a sensible upset
+  // script: underdog leads at half AND wins (Underdog/Underdog).
+  if (!chosen || chosen.prob <= 0) {
+    chosen = { ht: underdogSide, key: `${underdogSide}/${underdogSide}`, label: `${labelFor(underdogSide)} / ${labelFor(underdogSide)}`, prob: 0 };
+  }
+  const underdogHtFt = chosen.label;
+  if (typeof window !== "undefined" && (window as any).__SCOUT_DEBUG_HTFT) {
+    // Internal-only debug trace, gated behind window.__SCOUT_DEBUG_HTFT
+    // eslint-disable-next-line no-console
+    console.debug("[underdog-htft]", {
+      fixture: `${home.nickName} v ${away.nickName}`,
+      underdogSide,
+      selected: chosen.label,
+      reason: chosen.ht === "draw" ? "draw HT was top candidate and competitive" : "highest sim probability among realistic HT outcomes",
+      probs: {
+        home_ht_total: htAgg.home,
+        away_ht_total: htAgg.away,
+        draw_ht_total: htAgg.draw,
+        home_ft: Number(sim?.homeWinProb ?? 0),
+        away_ft: Number(sim?.awayWinProb ?? 0),
+        draw_ft: Number(sim?.drawProb ?? 0),
+      },
+      candidates,
+    });
+  }
   const underdogLegs: BetLeg[] = [
     { id: "ud-winner", market: "Upset Winner", selection: `${underdogNick} to win` },
     { id: "ud-margin", market: "Winning Margin", selection: `${underdogNick} 1-12` },

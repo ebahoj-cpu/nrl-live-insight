@@ -2526,46 +2526,16 @@ const formatTime = (utc: string): string => {
   }).format(d).toLowerCase();
 };
 
-/* ================= BET TAB — PROFESSIONAL BETSLIP ================= */
+/* ================= BET TAB — INSIGHT-DRIVEN BETSLIP ================= */
 
 type BetLeg = {
   id: string;
   market: string;
   selection: string;
   detail?: string;
-  price: number;
-  // Optional selectable options { label, price }
-  options?: { label: string; price: number }[];
 };
 
-// Margin price by bucket (rough but consistent across both sides)
-function marginPriceFor(bucket: string): number {
-  switch (bucket) {
-    case "1-12": return 1.65;
-    case "13+":  return 2.40;
-    case "1-2":  return 6.50;
-    case "3-12": return 1.95;
-    case "13-24": return 3.10;
-    case "25+":  return 4.50;
-    default: return 2.00;
-  }
-}
-
-function htftPriceFor(label: string, favouriteLabel: string): number {
-  // Cheaper for favourite/favourite, expensive for underdog double or comebacks
-  if (label === favouriteLabel) return 2.40;
-  if (label.includes("Draw")) return 21.0;
-  const [ht, ft] = label.split(" / ");
-  if (ht === ft) return 4.50; // led wire-to-wire by underdog
-  return 6.50; // mixed comeback
-}
-
-function totalPriceFor(side: "Over" | "Under", line: number, lean: "Over" | "Under"): number {
-  // Slight juice toward the leaning side
-  return side === lean ? 1.85 : 1.95;
-}
-
-function BetTab({ insights, insightsError, insightsLoading, home, away, tryscorers, odds }:
+function BetTab({ insights, insightsError, insightsLoading, home, away }:
   { insights: any; insightsError: string | null; insightsLoading?: boolean;
     home: TeamWithPlayers; away: TeamWithPlayers;
     tryscorers: TryscorerMarkets | null; odds?: OddsEvent | null }) {
@@ -2576,198 +2546,110 @@ function BetTab({ insights, insightsError, insightsLoading, home, away, tryscore
   const det = insights?.deterministic;
   if (!det) return <Empty msg="Stats engine output not yet computed for this fixture." />;
 
-  // Best anytime price lookup
-  const anytimePriceByName = new Map<string, number>();
-  for (const t of tryscorers?.anytime ?? []) {
-    const key = t.player.trim().toLowerCase();
-    const existing = anytimePriceByName.get(key);
-    if (existing == null || t.price < existing) anytimePriceByName.set(key, t.price);
-  }
-  const getAnytime = (name?: string | null): number | null => {
-    if (!name) return null;
-    return anytimePriceByName.get(name.trim().toLowerCase()) ?? null;
-  };
-
-  // Match Winner odds (selectable both sides)
-  const winnerSide: "home" | "away" = det.matchWinner?.team ?? "home";
+  // ---- Build legs purely from the insights engine, no odds, no calculator ----
   const winnerNick: string = det.matchWinner?.nickname ?? home.nickName;
-  const bestOdds = odds ? bestH2H(odds) : { home: null, away: null };
-  const homeWinPrice = bestOdds.home?.price ?? (winnerSide === "home" ? 1.85 : 2.10);
-  const awayWinPrice = bestOdds.away?.price ?? (winnerSide === "away" ? 1.85 : 2.10);
-  const winnerOptions = [
-    { label: home.nickName, price: Number(homeWinPrice.toFixed(2)) },
-    { label: away.nickName, price: Number(awayWinPrice.toFixed(2)) },
-  ];
-  const initialWinner = winnerOptions.find((o) => o.label === winnerNick) ?? winnerOptions[0];
-
-  // Winning margin — only 1-12 or 13+ per team. Mutually exclusive with Match Winner.
-  // "No margin" leaves only the Match Winner price in the calc.
-  // Prices vary by team (favourite vs underdog) and bucket so the calculator
-  // recalculates the payout when the user picks a different outcome.
-  const marginBuckets = ["1-12", "13+"];
-  const NO_MARGIN_LABEL = "No margin (use match winner)";
-  // Derive favourite from match-winner prices (lower price = favourite).
-  const homeIsFav = homeWinPrice <= awayWinPrice;
-  const marginPriceForTeam = (team: "home" | "away", bucket: string): number => {
-    const isFav = team === "home" ? homeIsFav : !homeIsFav;
-    if (bucket === "1-12") return Number((isFav ? 2.40 : 4.20).toFixed(2));
-    // 13+
-    return Number((isFav ? 3.50 : 8.00).toFixed(2));
-  };
-  const marginOptions: { label: string; price: number }[] = [
-    { label: NO_MARGIN_LABEL, price: 1 },
-    ...marginBuckets.map((b) => ({ label: `${home.nickName} ${b}`, price: marginPriceForTeam("home", b) })),
-    ...marginBuckets.map((b) => ({ label: `${away.nickName} ${b}`, price: marginPriceForTeam("away", b) })),
-  ];
   const rawDetBucket = String(det.margin?.bucket ?? "1-12").replace("–", "-");
-  const detMarginBucket = rawDetBucket === "13+" ? "13+" : "1-12";
-  const initialMarginLabel = `${winnerNick} ${detMarginBucket}`;
-  const initialMargin = marginOptions.find((o) => o.label === initialMarginLabel) ?? marginOptions[0];
+  const marginBucket = rawDetBucket === "13+" ? "13+" : "1-12";
 
-  // Total points — Over/Under selectable
+  const totalLine = det.totalPoints?.line ?? 41.5;
   const rawLean = String(det.totalPoints?.lean ?? "Over").toLowerCase();
   const totalLean: "Over" | "Under" = rawLean.startsWith("u") ? "Under" : "Over";
-  const totalLine = det.totalPoints?.line ?? 41.5;
-  const totalOptions = [
-    { label: `Over ${totalLine}`, price: totalPriceFor("Over", totalLine, totalLean) },
-    { label: `Under ${totalLine}`, price: totalPriceFor("Under", totalLine, totalLean) },
-  ];
 
-  // HT/FT — all 9 combos
-  const sides = [home.nickName, "Draw", away.nickName];
-  const favouriteLabel = `${winnerNick} / ${winnerNick}`;
-  const htftOptions = sides.flatMap((ht) =>
-    sides.map((ft) => {
-      const label = `${ht} / ${ft}`;
-      return { label, price: htftPriceFor(label, favouriteLabel) };
-    })
+  const htftPick: string = det.htft?.pick ?? `${winnerNick} / ${winnerNick}`;
+
+  const firstTry = det.firstTryscorer;
+  const firstName: string | undefined = firstTry?.name;
+  const firstIsValid = firstName && !/^awaiting/i.test(firstName);
+
+  const homeAnytime: any[] = Array.isArray(det.topAnytimeHome) ? det.topAnytimeHome : [];
+  const awayAnytime: any[] = Array.isArray(det.topAnytimeAway) ? det.topAnytimeAway : [];
+
+  // Decide if first tryscorer belongs to the home team.
+  const homeNamesLc = new Set(homeAnytime.map((p) => String(p?.name ?? "").toLowerCase()));
+  const firstIsHome = firstIsValid && (
+    String(firstTry?.team ?? "").toLowerCase() === home.nickName.toLowerCase() ||
+    homeNamesLc.has(String(firstName).toLowerCase())
   );
-  const detHtftPick = det.htft?.pick ?? favouriteLabel;
-  const initialHtft = htftOptions.find((o) => o.label === detHtftPick) ?? htftOptions.find((o) => o.label === favouriteLabel)!;
 
-  // 3 anytime tryscorers from insights
-  const outcomePicks: any[] = det.predictedOutcome?.picks ?? [];
-  const fallbackPicks: any[] = [
-    ...(det.topAnytimeHome ?? []).slice(0, 2),
-    ...(det.topAnytimeAway ?? []).slice(0, 1),
-  ];
-  const tryscorerPicks: any[] = (outcomePicks.length >= 3 ? outcomePicks : fallbackPicks).slice(0, 3);
+  // Two home-team anytimes: include the first tryscorer if home, plus one other.
+  const homePicks: any[] = [];
+  if (firstIsHome) {
+    homePicks.push({ ...firstTry });
+    const extra = homeAnytime.find((p) => String(p?.name ?? "").toLowerCase() !== String(firstName).toLowerCase());
+    if (extra) homePicks.push(extra);
+    else if (homeAnytime[0]) homePicks.push(homeAnytime[0]);
+  } else {
+    homePicks.push(...homeAnytime.slice(0, 2));
+  }
+
+  // One away-team anytime.
+  const awayPick = awayAnytime[0] ?? null;
+
+  // To Score a Double — must NOT be the first tryscorer.
+  const doublePick = det.playerDouble;
+  const doubleName: string | undefined = doublePick?.name;
+  const doubleIsValid = doubleName && !/^awaiting/i.test(doubleName)
+    && (!firstIsValid || String(doubleName).toLowerCase() !== String(firstName).toLowerCase());
+
+  const formatDetail = (p: any): string | undefined => {
+    if (!p) return undefined;
+    const team = p.team ?? "";
+    const pos = p.position ?? "";
+    if (team && pos) return `${team} · ${pos}`;
+    return team || pos || undefined;
+  };
 
   const initialLegs: BetLeg[] = [
     {
-      id: "winner",
-      market: "Match Winner",
-      selection: initialWinner.label,
-      price: initialWinner.price,
-      options: winnerOptions,
-    },
-    {
       id: "margin",
       market: "Winning Margin",
-      selection: initialMargin.label,
-      price: initialMargin.price,
-      options: marginOptions,
+      selection: `${winnerNick} ${marginBucket}`,
     },
     {
       id: "total",
       market: "Total Points",
       selection: `${totalLean} ${totalLine}`,
-      price: totalPriceFor(totalLean, totalLine, totalLean),
-      options: totalOptions,
     },
     {
       id: "htft",
       market: "Halftime / Fulltime Double",
-      selection: initialHtft.label,
-      price: initialHtft.price,
-      options: htftOptions,
+      selection: htftPick,
     },
-    ...tryscorerPicks.map((p, i) => {
-      const livePrice = getAnytime(p?.name);
-      return {
-        id: `tryscorer-${i}`,
-        market: `Anytime Tryscorer ${i + 1}`,
-        selection: p?.name ?? "—",
-        detail: p?.team ? `${p.team}${p.position ? ` · ${p.position}` : ""}` : (p?.position ?? ""),
-        price: livePrice ?? (typeof p?.price === "number" ? p.price : 4.50),
-      };
-    }),
+    ...(firstIsValid ? [{
+      id: "first-try",
+      market: "First Tryscorer",
+      selection: firstName!,
+      detail: formatDetail(firstTry),
+    }] : []),
+    ...(doubleIsValid ? [{
+      id: "double",
+      market: "To Score a Double",
+      selection: doubleName!,
+      detail: formatDetail(doublePick),
+    }] : []),
+    ...homePicks.map((p, i) => ({
+      id: `anytime-home-${i}`,
+      market: `Anytime Tryscorer ${i + 1}`,
+      selection: p?.name ?? "—",
+      detail: formatDetail(p),
+    })),
+    ...(awayPick ? [{
+      id: "anytime-away",
+      market: `Anytime Tryscorer ${homePicks.length + 1}`,
+      selection: awayPick?.name ?? "—",
+      detail: formatDetail(awayPick),
+    }] : []),
   ];
 
   const [legs, setLegs] = useState<BetLeg[]>(initialLegs);
-  const [stake, setStake] = useState<string>("10");
-  const [addingTry, setAddingTry] = useState<boolean>(false);
-
   const removeLeg = (id: string) => setLegs((prev) => prev.filter((l) => l.id !== id));
-
-  const updateLegSelection = (id: string, label: string) => {
-    setLegs((prev) => prev.map((l) => {
-      if (l.id !== id || !l.options) return l;
-      const opt = l.options.find((o) => o.label === label);
-      if (!opt) return l;
-      return { ...l, selection: opt.label, price: opt.price };
-    }));
-  };
-
-  // Players already on the slip (anytime legs) — exclude from add list
-  const usedTryscorerNames = new Set(
-    legs.filter((l) => l.market.startsWith("Anytime Tryscorer")).map((l) => l.selection.trim().toLowerCase())
-  );
-
-  // Live tryscorer markets sourced exclusively from The Odds API. No estimates —
-  // if bookies haven't released player markets yet (~24h pre-game), the add
-  // button is disabled with a clear message.
-  type TryCandidate = { player: string; price: number; team: string; isEstimate: false };
-  const allCandidates: TryCandidate[] = (tryscorers?.anytime ?? []).map((t) => {
-    const aff = affiliatePlayer(t.player, home, away);
-    const teamLabel = aff === "home" ? home.nickName : aff === "away" ? away.nickName : "";
-    return { player: t.player, price: t.price, team: teamLabel, isEstimate: false };
-  });
-  const availableTryscorers = allCandidates
-    .filter((t) => !usedTryscorerNames.has(t.player.trim().toLowerCase()))
-    .sort((a, b) => a.price - b.price);
-  const marketsLive = (tryscorers?.anytime?.length ?? 0) > 0;
-
-  const addTryscorer = (name: string) => {
-    const t = allCandidates.find((x) => x.player === name);
-    if (!t) return;
-    setLegs((prev) => {
-      const idx = prev.filter((l) => l.market.startsWith("Anytime Tryscorer")).length + 1;
-      return [
-        ...prev,
-        {
-          id: `tryscorer-extra-${Date.now()}`,
-          market: `Anytime Tryscorer ${idx}${t.isEstimate ? " (est.)" : ""}`,
-          selection: t.player,
-          detail: t.team,
-          price: t.price,
-        },
-      ];
-    });
-    setAddingTry(false);
-  };
-
-  // Mutual exclusion: if a Winning Margin is selected (not "No margin"), exclude Match Winner from calc.
-  const marginLeg = legs.find((l) => l.id === "margin");
-  const marginActive = !!marginLeg && marginLeg.selection !== NO_MARGIN_LABEL;
-  const totalOdds = legs.reduce((acc, l) => {
-    if (marginActive && l.id === "winner") return acc;
-    if (!marginActive && l.id === "margin") return acc;
-    return acc * l.price;
-  }, 1);
-  const stakeNum = Math.max(0, Number(stake) || 0);
-  const payout = stakeNum * totalOdds;
-  const profit = payout - stakeNum;
 
   return (
     <div className="space-y-4 pt-4">
       <Card title="Betslip" icon={Receipt} className="accent-glow">
         <div className="flex items-center justify-between mb-4 -mt-2">
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
-            {(() => {
-              const counted = legs.filter((l) => !((marginActive && l.id === "winner") || (!marginActive && l.id === "margin"))).length;
-              return `${counted} ${counted === 1 ? "leg" : "legs"} · Multi`;
-            })()}
+            {`${legs.length} ${legs.length === 1 ? "selection" : "selections"}`}
           </div>
           <div className="flex items-center gap-2.5">
             <div className="h-11 w-11 rounded-full bg-surface-2 border border-border/60 ring-1 ring-accent/20 shadow-[0_2px_10px_-2px_color-mix(in_oklab,var(--accent)_35%,transparent)] flex items-center justify-center">
@@ -2782,167 +2664,41 @@ function BetTab({ insights, insightsError, insightsLoading, home, away, tryscore
 
         {legs.length === 0 ? (
           <div className="text-center py-8 text-sm text-muted-foreground">
-            No selections. Switch to Insights to rebuild your slip.
+            No selections. Switch to Insights to see the model picks.
           </div>
         ) : (
           <ul className="space-y-2">
-            {legs.map((leg) => {
-              const excluded = (marginActive && leg.id === "winner") || (!marginActive && leg.id === "margin");
-              return (
+            {legs.map((leg) => (
               <li
                 key={leg.id}
-                className={`bg-surface-2 rounded-lg px-3 py-3 sm:px-4 sm:py-3.5 grid grid-cols-[1fr_auto] items-center gap-3 sm:gap-4 border border-border/40 transition ${excluded ? "opacity-50" : ""}`}
+                className="bg-surface-2 rounded-lg px-3 py-3 sm:px-4 sm:py-3.5 grid grid-cols-[1fr_auto] items-center gap-3 sm:gap-4 border border-border/40"
               >
                 <div className="min-w-0">
-                  <div className="text-[9px] uppercase tracking-wider text-muted-foreground font-bold flex items-center gap-2">
-                    <span>{leg.market}</span>
-                    {excluded && (
-                      <span className="text-[8px] font-bold text-muted-foreground/80 bg-surface px-1.5 py-0.5 rounded normal-case tracking-normal">
-                        not counted
-                      </span>
-                    )}
+                  <div className="text-[9px] uppercase tracking-wider text-muted-foreground font-bold">
+                    {leg.market}
                   </div>
-                  {leg.options ? (
-                    <Select value={leg.selection} onValueChange={(v) => updateLegSelection(leg.id, v)}>
-                      <SelectTrigger className="mt-1 h-auto min-h-[2rem] px-2 py-1 -ml-2 bg-transparent border border-transparent hover:border-accent/40 hover:bg-accent/5 focus:ring-0 focus:border-accent/60 rounded-md text-base font-bold text-foreground shadow-none transition w-fit max-w-full justify-start gap-1.5 [&>span]:line-clamp-none [&>span]:text-left [&>span]:whitespace-normal [&>span]:break-words [&>svg]:opacity-60 [&>svg]:shrink-0">
-                        <SelectValue placeholder="Select…" />
-                      </SelectTrigger>
-                      <SelectContent
-                        className="bg-surface-2 border-accent/30 text-foreground shadow-xl rounded-lg backdrop-blur"
-                        position="popper"
-                      >
-                        {leg.options.map((o) => (
-                          <SelectItem
-                            key={o.label}
-                            value={o.label}
-                            className="text-sm font-semibold focus:bg-accent/20 focus:text-foreground data-[state=checked]:text-accent rounded-md"
-                          >
-                            {o.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  ) : (
-                    <div className="text-base font-bold mt-1 break-words">{leg.selection}</div>
-                  )}
+                  <div className="text-base font-bold mt-1 break-words">{leg.selection}</div>
                   {leg.detail ? (
                     <div className="text-[11px] text-muted-foreground truncate mt-0.5">{leg.detail}</div>
                   ) : null}
                 </div>
-                <div className="flex items-center gap-2 shrink-0 self-center">
-                  <span className={`text-sm font-black tabular-nums px-3 py-1 rounded-full border min-w-[3.25rem] text-center ${excluded ? "bg-surface text-muted-foreground border-border" : "bg-accent !text-white border-accent shadow-[0_2px_8px_-2px_color-mix(in_oklab,var(--accent)_60%,transparent)]"}`}>
-                    {leg.price.toFixed(2)}
-                  </span>
+                <div className="flex items-center shrink-0 self-center">
                   <button
                     onClick={() => removeLeg(leg.id)}
                     aria-label={`Remove ${leg.market}`}
-                    className="h-6 w-6 rounded-full bg-surface hover:bg-danger/15 hover:text-danger text-muted-foreground flex items-center justify-center transition"
+                    className="h-7 w-7 rounded-full bg-surface hover:bg-danger/15 hover:text-danger text-muted-foreground flex items-center justify-center transition"
                   >
                     <X className="h-3.5 w-3.5" />
                   </button>
                 </div>
               </li>
-              );
-            })}
+            ))}
           </ul>
         )}
 
-        {/* Add tryscorer */}
-        <div className="mt-3">
-          {addingTry ? (
-            <div className="bg-surface-2 rounded-lg p-2 border border-accent/40 flex items-center gap-2">
-              <Select onValueChange={(v) => v && addTryscorer(v)}>
-                <SelectTrigger className="flex-1 h-9 bg-transparent border-0 focus:ring-0 text-sm font-bold text-foreground shadow-none">
-                  <SelectValue placeholder="Select a player…" />
-                </SelectTrigger>
-                <SelectContent
-                  className="bg-surface-2 border-accent/30 text-foreground shadow-xl rounded-lg max-h-72"
-                  position="popper"
-                >
-                  {availableTryscorers.map((t) => {
-                    return (
-                      <SelectItem
-                        key={t.player}
-                        value={t.player}
-                        className="text-sm font-semibold focus:bg-accent/20 focus:text-foreground rounded-md"
-                      >
-                        <span className="flex items-center justify-between gap-4 w-full">
-                          <span className="truncate">
-                            {t.player}
-                            {t.team ? <span className="text-muted-foreground font-normal"> · {t.team}</span> : null}
-                          </span>
-                          <span className="tabular-nums text-[11px] font-black text-accent">{t.price.toFixed(2)}{t.isEstimate ? "*" : ""}</span>
-                        </span>
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
-              <button
-                onClick={() => setAddingTry(false)}
-                className="h-7 w-7 rounded-full bg-surface hover:bg-danger/15 hover:text-danger text-muted-foreground flex items-center justify-center transition"
-                aria-label="Cancel add tryscorer"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={() => setAddingTry(true)}
-              disabled={availableTryscorers.length === 0}
-              className="w-full text-[11px] uppercase tracking-wider font-bold py-2.5 rounded-lg border border-dashed border-accent/40 text-accent hover:bg-accent/10 transition disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              {availableTryscorers.length === 0
-                ? marketsLive
-                  ? "No more tryscorer markets"
-                  : "Tryscorer odds drop weekly · 6pm NZT / 4pm Sydney"
-                : "+ Add another anytime tryscorer"}
-            </button>
-          )}
-        </div>
-
-        {/* Calculator */}
-        <div className="mt-5 pt-4 border-t border-border space-y-3">
-          <div className="flex items-center justify-between gap-3">
-            <label htmlFor="bet-stake" className="text-[11px] uppercase tracking-wider font-bold text-muted-foreground">
-              Stake
-            </label>
-            <div className="flex items-center gap-1 bg-surface-2 rounded-lg px-2 py-1.5 border border-border/40 focus-within:border-accent/60">
-              <span className="text-sm font-bold text-muted-foreground">$</span>
-              <input
-                id="bet-stake"
-                inputMode="decimal"
-                value={stake}
-                onChange={(e) => setStake(e.target.value.replace(/[^0-9.]/g, ""))}
-                className="w-24 bg-transparent outline-none text-right text-base font-black tabular-nums"
-                placeholder="0"
-              />
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Total odds</span>
-            <span className="font-black tabular-nums kbd">{totalOdds.toFixed(2)}</span>
-          </div>
-
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Potential profit</span>
-            <span className="font-black tabular-nums text-success">
-              ${profit.toFixed(2)}
-            </span>
-          </div>
-
-          <div className="rounded-lg bg-accent/10 border border-accent/30 px-4 py-3 flex items-center justify-between">
-            <span className="text-[11px] uppercase tracking-wider font-bold text-accent">Potential payout</span>
-            <span className="text-2xl font-black tabular-nums text-accent">
-              ${payout.toFixed(2)}
-            </span>
-          </div>
-
-          <p className="text-[10px] text-muted-foreground text-center pt-1">
-            Odds shown are the best live market price from The Odds API. Confirm with your bookie before placing. 18+ · Bet responsibly.
-          </p>
-        </div>
+        <p className="text-[10px] text-muted-foreground text-center pt-4 mt-4 border-t border-border">
+          Selections sourced from the insights engine for this fixture. 18+ · Bet responsibly.
+        </p>
       </Card>
     </div>
   );

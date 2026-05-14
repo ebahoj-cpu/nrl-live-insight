@@ -11,7 +11,7 @@ import scoutHead from "@/assets/scout-bubble.png";
 import {
   speechSynthAvailable,
   loadPrefs as loadVoicePrefs,
-  speakWithPrefs,
+  speakSmart,
   stopSpeaking,
   type SpeakHandle,
 } from "@/lib/scout-voice";

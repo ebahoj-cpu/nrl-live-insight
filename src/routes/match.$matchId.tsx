@@ -3001,7 +3001,7 @@ function BetTab({ insights, insightsError, insightsLoading, home, away }:
         ) : (
           <ul className="space-y-1.5">
             {(() => {
-              const nodes: JSX.Element[] = [];
+              const nodes: React.ReactNode[] = [];
               const anytimeLegs: typeof visibleLegs = [];
               for (const leg of visibleLegs) {
                 if (/anytime\s+tryscorer|secondary\s+anytime\s+tryscorer/i.test(leg.market)) {

@@ -270,14 +270,16 @@ function NavMenu({ onClose }: { onClose: () => void }) {
 
         {/* Footer / account */}
         <div className="border-t border-border px-3 py-3 space-y-1">
-          <button
-            type="button"
+          <Link
+            to="/settings"
             onClick={onClose}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-foreground hover:bg-surface-2 transition"
+            activeProps={{ className: "bg-accent/15 text-accent" }}
+            inactiveProps={{ className: "text-foreground hover:bg-surface-2" }}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition"
           >
             <Settings className="h-5 w-5" />
             <span className="font-semibold text-sm uppercase tracking-wider">Settings</span>
-          </button>
+          </Link>
           <button
             type="button"
             onClick={onClose}

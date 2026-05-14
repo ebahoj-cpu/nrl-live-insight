@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ScoutRouteImport } from './routes/scout'
 import { Route as NewsRouteImport } from './routes/news'
 import { Route as LadderRouteImport } from './routes/ladder'
@@ -21,6 +22,11 @@ import { Route as ApiPublicHooksRefreshNrlDataRouteImport } from './routes/api/p
 import { Route as ApiPublicHooksPrecomputeInsightsRouteImport } from './routes/api/public/hooks/precompute-insights'
 import { Route as ApiPublicHooksModelHealthRouteImport } from './routes/api/public/hooks/model-health'
 
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ScoutRoute = ScoutRouteImport.update({
   id: '/scout',
   path: '/scout',
@@ -86,6 +92,7 @@ export interface FileRoutesByFullPath {
   '/ladder': typeof LadderRoute
   '/news': typeof NewsRoute
   '/scout': typeof ScoutRoute
+  '/settings': typeof SettingsRoute
   '/match/$matchId': typeof MatchMatchIdRoute
   '/api/public/app-icon': typeof ApiPublicAppIconRoute
   '/api/public/manifest': typeof ApiPublicManifestRoute
@@ -99,6 +106,7 @@ export interface FileRoutesByTo {
   '/ladder': typeof LadderRoute
   '/news': typeof NewsRoute
   '/scout': typeof ScoutRoute
+  '/settings': typeof SettingsRoute
   '/match/$matchId': typeof MatchMatchIdRoute
   '/api/public/app-icon': typeof ApiPublicAppIconRoute
   '/api/public/manifest': typeof ApiPublicManifestRoute
@@ -113,6 +121,7 @@ export interface FileRoutesById {
   '/ladder': typeof LadderRoute
   '/news': typeof NewsRoute
   '/scout': typeof ScoutRoute
+  '/settings': typeof SettingsRoute
   '/match/$matchId': typeof MatchMatchIdRoute
   '/api/public/app-icon': typeof ApiPublicAppIconRoute
   '/api/public/manifest': typeof ApiPublicManifestRoute
@@ -128,6 +137,7 @@ export interface FileRouteTypes {
     | '/ladder'
     | '/news'
     | '/scout'
+    | '/settings'
     | '/match/$matchId'
     | '/api/public/app-icon'
     | '/api/public/manifest'
@@ -141,6 +151,7 @@ export interface FileRouteTypes {
     | '/ladder'
     | '/news'
     | '/scout'
+    | '/settings'
     | '/match/$matchId'
     | '/api/public/app-icon'
     | '/api/public/manifest'
@@ -154,6 +165,7 @@ export interface FileRouteTypes {
     | '/ladder'
     | '/news'
     | '/scout'
+    | '/settings'
     | '/match/$matchId'
     | '/api/public/app-icon'
     | '/api/public/manifest'
@@ -168,6 +180,7 @@ export interface RootRouteChildren {
   LadderRoute: typeof LadderRoute
   NewsRoute: typeof NewsRoute
   ScoutRoute: typeof ScoutRoute
+  SettingsRoute: typeof SettingsRoute
   MatchMatchIdRoute: typeof MatchMatchIdRoute
   ApiPublicAppIconRoute: typeof ApiPublicAppIconRoute
   ApiPublicManifestRoute: typeof ApiPublicManifestRoute
@@ -179,6 +192,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/scout': {
       id: '/scout'
       path: '/scout'
@@ -264,6 +284,7 @@ const rootRouteChildren: RootRouteChildren = {
   LadderRoute: LadderRoute,
   NewsRoute: NewsRoute,
   ScoutRoute: ScoutRoute,
+  SettingsRoute: SettingsRoute,
   MatchMatchIdRoute: MatchMatchIdRoute,
   ApiPublicAppIconRoute: ApiPublicAppIconRoute,
   ApiPublicManifestRoute: ApiPublicManifestRoute,

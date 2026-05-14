@@ -2608,8 +2608,7 @@ function buildSlips(args: {
 
   const doublePick = det.playerDouble;
   const doubleName: string | undefined = doublePick?.name;
-  const doubleIsValid = !!(doubleName && !/^awaiting/i.test(doubleName)
-    && (!firstIsValid || String(doubleName).toLowerCase() !== String(firstName).toLowerCase()));
+  const doubleIsValid = !!(doubleName && !/^awaiting/i.test(doubleName));
 
   const sim = insights?.simulation ?? null;
   const profile = sim?.profile ?? null;
@@ -3053,27 +3052,44 @@ function BetTab({ insights, insightsError, insightsLoading, home, away }:
         ) : (
           <ul className="space-y-1.5">
             {visibleLegs.map((leg, idx) => {
+              const isFirstTry = /^first\s+tryscorer$/i.test(leg.market);
+              const isDouble = /^to\s+score\s+a\s+double$/i.test(leg.market);
               const isAnytime = /anytime\s+tryscorer|secondary\s+anytime\s+tryscorer/i.test(leg.market);
+              const isPlayerMarket = isFirstTry || isDouble || isAnytime;
               const prev = visibleLegs[idx - 1];
               const prevIsAnytime = prev && /anytime\s+tryscorer|secondary\s+anytime\s+tryscorer/i.test(prev.market);
               const showAnytimeHeader = isAnytime && !prevIsAnytime;
+              const showFirstTryHeader = isFirstTry;
+              const showDoubleHeader = isDouble;
               return (
                 <Fragment key={leg.id}>
+                  {showFirstTryHeader && (
+                    <li className="px-1 pt-1 text-xs font-extrabold uppercase tracking-wider text-foreground">
+                      First Tryscorer
+                    </li>
+                  )}
+                  {showDoubleHeader && (
+                    <li className="px-1 pt-1 text-xs font-extrabold uppercase tracking-wider text-foreground">
+                      To Score A Double
+                    </li>
+                  )}
                   {showAnytimeHeader && (
                     <li className="px-1 pt-1 text-xs font-extrabold uppercase tracking-wider text-foreground">
                       Anytime Tryscorers
                     </li>
                   )}
                   <li
-                    className="bg-surface-2 rounded-lg px-2.5 py-2 grid grid-cols-[auto_1fr_auto] items-center gap-3 border border-border/40 min-h-[80px]"
+                    className={
+                      isPlayerMarket
+                        ? "bg-surface-2 rounded-lg px-2.5 py-2 grid grid-cols-[auto_1fr_auto] items-center gap-3 border border-border/40 min-h-[80px]"
+                        : "bg-surface-2 rounded-lg px-2.5 py-2 grid grid-cols-[1fr_auto] items-center gap-3 border border-border/40"
+                    }
                   >
-                    {leg.playerName ? (
+                    {isPlayerMarket && leg.playerName ? (
                       <PlayerHeadshot name={leg.playerName} teams={[home, away]} size={72} minSize={64} maxSize={80} />
-                    ) : (
-                      <div className="w-0" />
-                    )}
+                    ) : null}
                     <div className="min-w-0">
-                      {!isAnytime && (
+                      {!isPlayerMarket && (
                         <div className="text-[9px] uppercase tracking-wider text-muted-foreground font-bold">
                           {leg.market}
                         </div>

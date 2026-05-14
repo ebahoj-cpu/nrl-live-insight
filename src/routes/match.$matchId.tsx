@@ -3029,7 +3029,7 @@ function BetTab({ insights, insightsError, insightsLoading, home, away }:
                         Anytime
                       </div>
                       <div className="text-sm font-bold mt-0.5 leading-tight">
-                        Projected Tryscorers
+                        Projected Anytime Tryscorers
                       </div>
                       <div className="mt-2 space-y-2">
                         {anytimeLegs.map((al) => (

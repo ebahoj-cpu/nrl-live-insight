@@ -2608,8 +2608,7 @@ function buildSlips(args: {
 
   const doublePick = det.playerDouble;
   const doubleName: string | undefined = doublePick?.name;
-  const doubleIsValid = !!(doubleName && !/^awaiting/i.test(doubleName)
-    && (!firstIsValid || String(doubleName).toLowerCase() !== String(firstName).toLowerCase()));
+  const doubleIsValid = !!(doubleName && !/^awaiting/i.test(doubleName));
 
   const sim = insights?.simulation ?? null;
   const profile = sim?.profile ?? null;

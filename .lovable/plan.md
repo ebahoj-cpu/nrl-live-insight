@@ -1,71 +1,120 @@
 
-# Phase 3 — Real NRL.com + Zyla Adapters
+# Scout Intelligence Rebuild — Backend Only
 
-## Scope
+**Hard constraint: zero UI changes.** `src/routes/scout.tsx` is not touched. The chat shell, layout, animations, Composer, bubbles, image, and styling stay byte-for-byte identical. Only `src/server/scout.functions.ts` (the RPC entrypoint that the UI calls) keeps its exported `scoutChat` signature — internals get replaced.
 
-Build production-safe normalised adapters for NRL.com (primary) and Zyla (enrichment-only), merge them through a Supabase-backed store, and let the simulation feature builder consume the enriched data. Keep the SeasonSnapshot / deterministic path as fallback, keep the UI unchanged, keep the `ENABLE_SIMULATION_ENGINE` flag wiring exactly as is.
+## Goal
 
-Out of scope: pg_cron, Phase 4 modelling (referee/fatigue/edge/momentum), UI changes.
+Replace the current free-form prompt-stuffed Scout with a deterministic orchestration layer that:
 
-## Source priority
+1. Builds a typed **ScoutMatchContext** per fixture from existing engines (sim, calibration, value, correlation, fatigue, ruck/tempo, edge attack, momentum, referee, fair-odds, staking).
+2. Feeds the LLM only that structured bundle (no raw HTML, no hallucinated stats).
+3. Enforces a fixed reasoning format: **Direct answer → Why (2–3 drivers) → Confidence → Value → Risk**.
+4. Supports **session-scoped news injections** (e.g. "Broncos lose halfback") that re-run a lightweight `simulateWithModifiers` pass without ever touching stored sim/insight data.
+5. Exposes calibrated EV / edge / Kelly-sized stake recommendations using the existing `staking-model.ts` and `correlation-guard.ts`. Emits "No positive edge detected." when EV ≤ 0.
+6. Caches match bundles aggressively (warm reuse < 800ms target).
 
-1. NRL.com (truth): fixture identity, kickoff, venue, status, scores, team lists, officials, injuries, timeline.
-2. Zyla (enrichment only): player ID hints, fallback ladder, fallback fixtures, supplemental career stats.
-3. Supabase `nrl_source_cache` (stale-while-revalidate).
-4. SeasonSnapshot / deterministic engine (ultimate fallback).
+## New files
 
-NRL.com always wins on conflict. Zyla can only fill missing fields. All enriched outputs carry `SourceCoverage`.
+```
+src/server/scout/
+├── scout-contracts.ts     // Zod schemas + TS types: ScoutMatchContext,
+│                          //    NewsModifier, ScoutTurnInput, ScoutBetSuggestion
+├── scout-service.ts       // buildMatchContext(matchId), getOrBuildContext (cached),
+│                          //    simulateWithModifiers(matchId, modifiers)
+├── scout-memory.ts        // Per-session in-memory store of active news modifiers
+│                          //    keyed by a session id derived from message history hash.
+│                          //    TTL 30min, capped, never persisted.
+├── scout-reasoning.ts     // Pure functions: pickTopDrivers, formatConfidence,
+│                          //    formatValueLine, formatRiskWarning,
+│                          //    parseNewsInjection(userText) → NewsModifier|null
+└── scout-functions.ts     // NEW slim createServerFn export: orchestrates
+                           //   parse → resolve fixtures → build/refresh context
+                           //   → ask LLM with structured system prompt + bundle
+                           //   → post-validate (no fabricated numbers leak through)
+```
 
-## Files
+`src/server/scout.functions.ts` becomes a thin re-export of `scout/scout-functions.ts` so the UI import path is unchanged.
 
-### Created
-- `src/server/nrlcom-client.ts` — official adapter emitting `Normalised*` types. Wraps existing `fetchDraw / fetchLadder / fetchMatchDetails` from `nrl.ts` plus team-news/season-stats data; adds new lightweight calls for officials/injuries (from match details `officials` + `team-news` casualty data we already parse).
-- `src/server/zyla-client.ts` — enrichment adapter. Wraps existing `fetchZylaLadder / fetchZylaFixtures / fetchZylaMatchDetails`, plus new `getZylaAllPlayers` and `getZylaPlayerStatistics` against endpoints `17262` / `17263` (centralised endpoint config with `// TODO_VERIFY` markers). Reads `ZYLA_NRL_TOKEN` first, then `ZYLA_API_KEY` alias. Returns null safely if no key.
-- `src/server/nrl-data-refresh.ts` — orchestrator used by the refresh hook; one function per kind plus a `refreshAll` summariser.
-- `src/routes/api/public/hooks/refresh-nrl-data.ts` — POST/GET hook accepting `mode=fixtures|ladder|match|teamlists|injuries|officials|historical|teamstats|playerstats|all`. Returns `{ mode, refreshed, failed, keys, coverageSummary }`. No secrets in response.
-- Tests: `src/server/__tests__/nrlcom-client.test.ts`, `zyla-client.test.ts`, `nrl-data-merge.test.ts`, `nrl-data-store.test.ts`, `simulation-feature-builder.enriched.test.ts`.
+## ScoutMatchContext shape (excerpt)
 
-### Completed (extended in place — no breaking export removals)
-- `src/server/nrl-data-types.ts` — add `NormalisedHistoricalMatch`, `notes?: string[]` on `SourceCoverage`, ensure all listed types exist.
-- `src/server/source-coverage.ts` — `addNote()`, `withConflictNote()` helpers; tighten `coverageScore` to factor team-list / officials / injuries presence.
-- `src/server/nrl-data-merge.ts` — add `mergeMatchDetails`, `mergeTeamLists`, `mergePlayerStats`, `mergeInjuries`, `mergeMatchOfficials`, `mergeHistoricalMatches`, plus reject rules (impossible scores, missing matchId/team, unparsable dates, malformed Zyla shifted-column rows).
-- `src/server/nrl-data-store.ts` — add the per-kind getters listed in the prompt; each calls `readWithRefresh` with the right TTL, uses the NRL.com adapter as primary fetcher and the Zyla adapter as enrichment via the merge engine.
-- `src/server/simulation-feature-builder.ts` — accept optional enriched bundle (team lists, player stats, injuries, officials) and prefer it over SeasonSnapshot per-field; map injury status → `availabilityProb`; widen coverage `missingFields`; SeasonSnapshot path untouched when bundle absent.
-- `src/server/simulation-integration.ts` — pass the enriched bundle into the feature builder when present; downgrade confidence when only cache/Zyla contributed.
-- `src/server/index.functions.ts` — in `getMatchInsights`, fetch the enriched bundle from `nrl-data-store` (best-effort, never throws), pass to simulation builder; deterministic path preserved.
-- `src/routes/api/public/hooks/precompute-insights.ts` — opportunistically warm `nrl-data-store` (`fixtures`, `ladder`, `teamLists`, `injuries`, `officials`) before precomputing, with all errors swallowed.
-- Light touch on `src/server/nrl.ts`, `zyla.ts`, `season-stats.ts`, `team-news.ts` only to expose internal helpers needed by the new adapters (no removed exports).
+```ts
+type ScoutMatchContext = {
+  match: { id, kickoffUtc, venue, homeNick, awayNick, status }
+  simulation: {
+    iterations, expectedHome, expectedAway, expectedTotal,
+    homeWinProb, awayWinProb, drawProb,
+    marginBands: { "1-12": number, "13+": number },
+    overProbAtLine, totalLine,
+    htftProbs: { HH, HA, AH, AA, draws },
+    playerProbabilities: PlayerProbability[]   // anytime/first/multi
+  }
+  calibration: { applied: boolean, method, blendWeight }
+  confidence: { tier: "low"|"medium"|"high", reasons: string[] }
+  drivers: ModelDriver[]                        // top 5 from existing engines
+  profiles: { referee?, fatigue?, ruckTempo?, edgeAttack?, momentum? }
+  market: { homeWin?, awayWin?, ... , anytime?, firstTry?, multiTry? }
+  value: ValuePick[]                            // sorted, EV>0 only at top
+  correlationWarnings: string[]
+  modifiersApplied: NewsModifier[]              // empty when no injections
+  dataGaps: string[]                            // explicit "missing market X"
+}
+```
 
-## Cache TTLs (in `nrl-data-store`)
+## News injection flow
 
-| Kind | TTL |
-|------|-----|
-| fixtures (future round) | 6h |
-| fixtures (current round, pre-match) | 15m |
-| fixtures (live) | 60s |
-| fixtures (completed <2h) | 5m |
-| fixtures (completed ≥2h) | 24h |
-| ladder | 15m on match days, 60m otherwise |
-| team lists | 30m → 5m within 24h of kickoff → 2m within 90m |
-| injuries | 2h |
-| officials | 24h |
-| historical | 12h |
-| team/player season stats | 6h |
+1. `parseNewsInjection(userText)` detects patterns like "X loses Y", "Y ruled out", "rain expected at <venue>", "Z named on bench", returning a typed `NewsModifier` or `null`.
+2. Modifier is saved in `scout-memory` against the session id.
+3. Next time `getOrBuildContext` runs for an affected match it calls `simulateWithModifiers`, which:
+   - Loads the cached `SimulationSummary` (does not re-run the full 10k engine).
+   - Applies bounded multiplicative deltas to home/away expected points, tempo, attack shape, and per-player try rates.
+   - Recomputes derived probs (winner, margin bands, totals over/under, htft, anytime) deterministically from the perturbed expectations.
+   - Marks `simulation.iterations = 0` reused, sets `modifiersApplied`, and adds a `dataGaps` note if confidence drops a tier.
+4. Modifiers expire when session memory expires; they never reach `insights-store` or `odds-store`.
 
-TTL chosen at call time from kickoff/status; no scheduler added in this phase.
+## Reasoning + tone enforcement
 
-## Confidence updates
+`scout-functions.ts` builds the LLM prompt as:
 
-`coverage.score` increases with: NRL.com primary + named team lists + player stats + officials + injuries + odds + weather. Decreases for: cache-only, Zyla-only, no named squads, stale (>6h) or missing fields, conflict notes, deterministic fallback. `confidence` can only reach `high` when NRL.com is primary AND team lists are named AND player stats are present.
+- **System**: persona rules (calm, sharp, analytical, no "lock"/"guaranteed"/"free money", no team bias, responsible-betting reminder when bets are surfaced), the required 5-section response shape, and an explicit instruction to refuse fabrication ("If a value is missing from the bundle, say 'Current data unavailable for this market.'").
+- **User**: the JSON `ScoutMatchContext` (compacted, no nulls), the active modifiers, and the user's question.
+- **Validator**: regex/keyword post-check strips disallowed phrases and inserts the responsible-betting line whenever a `ScoutBetSuggestion` appears.
 
-## Tests
+Bet suggestions always include: implied prob, model prob, edge %, Kelly stake (via `recommendStake` from `staking-model.ts`), confidence tier. Suppressed by `correlation-guard` when stacked.
 
-Mock `fetch` and `supabaseAdmin`. Cover: NRL.com parsers (draw/match/teamlist/officials/injuries) handling missing fields without throwing; Zyla returning null when no token, rejecting malformed shifted-column fixtures, coercing numeric strings, never logging the token; merge precedence and field-fill behaviour; store fresh/stale/forceRefresh/live-failure paths; feature builder consuming enriched bundles vs. falling back to SeasonSnapshot; integration: `getMatchInsights` returns same shape with and without enriched bundle.
+## Caching / performance
 
-## Verification
+- `getOrBuildContext(matchId)` wraps `cached(...)` with `CTX_TTL = 5 min`.
+- Sub-pieces (sim summary, calibration, drivers) reuse existing per-engine caches; we never re-fetch within a turn.
+- LLM call uses `google/gemini-2.5-flash` (fast tier) by default with `gemini-2.5-pro` fallback only on parsing failure.
 
-`bunx vitest run`, build/typecheck via the harness. Manually verify match page still renders and homepage/ladder unaffected.
+## Safety / guards preserved
 
-## Deliverables in final reply
+- Honors existing `ENABLE_SIMULATION_ENGINE` flag — if disabled, falls back to the deterministic path and labels confidence "low".
+- All numeric fields in the bundle come from existing engines; the LLM is never asked to compute probabilities.
+- `simulateWithModifiers` clamps deltas (|Δ| ≤ 0.15 on attack/tempo, ≤ 0.25 on per-player try rate) so a single news line can't flip a market.
 
-Files created/modified, test counts, NRL.com vs Zyla fields used, fallback-only fields, source-priority + cache description, simulation enrichment notes, known limitations (Zyla endpoint IDs `17262/17263` marked TODO_VERIFY; injuries/officials parser is best-effort against current NRL.com shape; no pg_cron yet), Phase-3 completion status, and Phase 4 focus (referee tendencies, fatigue from short turnaround, edge attack channels, live game-state, momentum waves).
+## Tests (`src/server/scout/__tests__/`)
+
+- `news-modifiers.test.ts` — parse + clamp + applied to expected points.
+- `simulate-with-modifiers.test.ts` — deterministic seed reproducibility, no DB writes.
+- `calibration-blend.test.ts` — uses fixture `SimulationSummary`, verifies blend weight applied.
+- `correlation-suppression.test.ts` — overlapping selections downgraded.
+- `staking.test.ts` — re-asserts EV ≤ 0 → 0 stake, capped-by-confidence path.
+- `missing-data.test.ts` — bundle returns `dataGaps`, prompt forbids fabrication.
+- `deterministic-fallback.test.ts` — sim disabled → confidence=low, structured response still emitted.
+- `match-bundle-cache.test.ts` — second build within TTL hits cache, no engine re-entry.
+
+## Out of scope
+
+- No UI/route/component edits.
+- No schema/migration changes.
+- No new pages, no new public API routes.
+- Existing `scout.functions.ts` cron/insights/news web-search helpers are kept where reused; dead helpers are removed only if nothing else imports them.
+
+## Risks
+
+- The current `scout.functions.ts` is 954 lines and shares helpers with other modules — refactor preserves all currently exported symbols.
+- `simulateWithModifiers` is an analytic perturbation, not a re-run; documented clearly in code and in the bundle (`simulation.method = "perturbed"`).
+
+After approval I'll implement file-by-file, starting with `scout-contracts.ts` and the memory/reasoning pure modules, then service, then the new `scout-functions.ts` orchestrator, then tests.

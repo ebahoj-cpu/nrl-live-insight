@@ -1050,7 +1050,8 @@ export const scoutChat = createServerFn({ method: "POST" })
     }
 
     if (!reply) throw new Error("Scout returned no reply");
-    return { reply };
+    const scrubbed = toneScrub(reply, { hasBets: intelligenceBlock.includes("Value bets (EV>0") });
+    return { reply: scrubbed };
     } catch (e) {
       console.error("[scout] handler error:", e);
       throw e instanceof Error ? e : new Error(String(e));

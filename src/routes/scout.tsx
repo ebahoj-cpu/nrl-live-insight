@@ -170,8 +170,17 @@ function ScoutPage() {
               <div ref={scrollRef} className="flex-1 overflow-y-auto no-scrollbar">
                 <div className="px-3 sm:px-6 py-3 space-y-3">
                   {messages.map((m, i) => (
-                    <Bubble key={i} msg={m} />
+                    <Bubble
+                      key={i}
+                      msg={m}
+                      userAvatar={userAvatar}
+                      isSpeaking={speakingIdx === i}
+                      onToggleSpeak={() => speak(i, m.content)}
+                    />
                   ))}
+                  {voiceError && (
+                    <div className="text-[11px] text-destructive pl-1">{voiceError}</div>
+                  )}
 
                   {mutation.isPending && (
                     <div className="flex items-center gap-2 pl-1">

@@ -3051,65 +3051,64 @@ function BetTab({ insights, insightsError, insightsLoading, home, away }:
           </div>
         ) : (
           <ul className="space-y-1.5">
-            {visibleLegs.map((leg, idx) => {
+            {visibleLegs.map((leg) => {
               const isFirstTry = /^first\s+tryscorer$/i.test(leg.market);
               const isDouble = /^to\s+score\s+a\s+double$/i.test(leg.market);
               const isAnytime = /anytime\s+tryscorer|secondary\s+anytime\s+tryscorer/i.test(leg.market);
               const isPlayerMarket = isFirstTry || isDouble || isAnytime;
-              const prev = visibleLegs[idx - 1];
-              const prevIsAnytime = prev && /anytime\s+tryscorer|secondary\s+anytime\s+tryscorer/i.test(prev.market);
-              const showAnytimeHeader = isAnytime && !prevIsAnytime;
-              const showFirstTryHeader = isFirstTry;
-              const showDoubleHeader = isDouble;
+
+              const labelGrey = isFirstTry
+                ? "First Tryscorer"
+                : isDouble
+                ? "To Score A Double"
+                : isAnytime
+                ? "Anytime Tryscorer"
+                : leg.market;
+              const labelWhite = isFirstTry
+                ? "Projected First Tryscorer"
+                : isDouble
+                ? "Projected To Score 2+"
+                : isAnytime
+                ? "Projected Anytime Tryscorer"
+                : leg.selection;
+
               return (
-                <Fragment key={leg.id}>
-                  {showFirstTryHeader && (
-                    <li className="px-1 pt-1 text-xs font-extrabold uppercase tracking-wider text-foreground">
-                      First Tryscorer
-                    </li>
-                  )}
-                  {showDoubleHeader && (
-                    <li className="px-1 pt-1 text-xs font-extrabold uppercase tracking-wider text-foreground">
-                      To Score A Double
-                    </li>
-                  )}
-                  {showAnytimeHeader && (
-                    <li className="px-1 pt-1 text-xs font-extrabold uppercase tracking-wider text-foreground">
-                      Anytime Tryscorers
-                    </li>
-                  )}
-                  <li
-                    className={
-                      isPlayerMarket
-                        ? "bg-surface-2 rounded-lg px-2.5 py-2 grid grid-cols-[auto_1fr_auto] items-center gap-3 border border-border/40 min-h-[80px]"
-                        : "bg-surface-2 rounded-lg px-2.5 py-2 grid grid-cols-[1fr_auto] items-center gap-3 border border-border/40"
-                    }
-                  >
-                    {isPlayerMarket && leg.playerName ? (
-                      <PlayerHeadshot name={leg.playerName} teams={[home, away]} size={72} minSize={64} maxSize={80} />
-                    ) : null}
+                <li
+                  key={leg.id}
+                  className="bg-surface-2 rounded-lg px-2.5 py-2 border border-border/40"
+                >
+                  <div className="grid grid-cols-[1fr_auto] items-start gap-3">
                     <div className="min-w-0">
-                      {!isPlayerMarket && (
-                        <div className="text-[9px] uppercase tracking-wider text-muted-foreground font-bold">
-                          {leg.market}
-                        </div>
-                      )}
-                      <div className="text-sm font-bold mt-0.5 break-words leading-tight">{leg.selection}</div>
-                      {leg.detail ? (
+                      <div className="text-[9px] uppercase tracking-wider text-muted-foreground font-bold">
+                        {labelGrey}
+                      </div>
+                      <div className="text-sm font-bold mt-0.5 break-words leading-tight">
+                        {labelWhite}
+                      </div>
+                      {!isPlayerMarket && leg.detail ? (
                         <div className="text-[10px] text-muted-foreground truncate mt-0.5">{leg.detail}</div>
                       ) : null}
                     </div>
-                    <div className="flex items-center shrink-0 self-center">
-                      <button
-                        onClick={() => removeLeg(leg.id)}
-                        aria-label={`Remove ${leg.market}`}
-                        className="h-6 w-6 rounded-full bg-surface hover:bg-danger/15 hover:text-danger text-muted-foreground flex items-center justify-center transition"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
+                    <button
+                      onClick={() => removeLeg(leg.id)}
+                      aria-label={`Remove ${leg.market}`}
+                      className="h-6 w-6 rounded-full bg-surface hover:bg-danger/15 hover:text-danger text-muted-foreground flex items-center justify-center transition shrink-0"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                  {isPlayerMarket && leg.playerName ? (
+                    <div className="mt-2 flex items-center gap-3">
+                      <PlayerHeadshot name={leg.playerName} teams={[home, away]} size={72} minSize={64} maxSize={80} />
+                      <div className="min-w-0">
+                        <div className="text-sm font-bold leading-tight break-words">{leg.playerName}</div>
+                        {leg.detail ? (
+                          <div className="text-[10px] text-muted-foreground mt-0.5 break-words">{leg.detail}</div>
+                        ) : null}
+                      </div>
                     </div>
-                  </li>
-                </Fragment>
+                  ) : null}
+                </li>
               );
             })}
           </ul>

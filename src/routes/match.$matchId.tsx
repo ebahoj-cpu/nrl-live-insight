@@ -2535,19 +2535,16 @@ type BetLeg = {
   detail?: string;
 };
 
-type SlipId = "predicted" | "safe" | "value" | "script" | "scout" | "ultra";
+type SlipId = "predicted" | "anytimes" | "secondaries" | "underdog";
 type RiskLevel = "Low" | "Medium-Low" | "Medium" | "Medium-High" | "High" | "Very High";
 
 type Slip = {
   id: SlipId;
   label: string;
   short: string;
-  tagline: string;
   legs: BetLeg[];
   confidence: number; // 0-100
-  edgePct: number;    // model edge % (can be negative)
   risk: RiskLevel;
-  volatility: RiskLevel;
   why: string[];
 };
 
@@ -2573,7 +2570,7 @@ function buildSlips(args: {
   home: TeamWithPlayers;
   away: TeamWithPlayers;
 }): Slip[] {
-  const { insights, det, home } = args;
+  const { insights, det, home, away } = args;
 
   const winnerNick: string = det.matchWinner?.nickname ?? home.nickName;
   const winnerReason: string = det.matchWinner?.reasoning ?? "";
@@ -2613,21 +2610,13 @@ function buildSlips(args: {
   const doubleIsValid = !!(doubleName && !/^awaiting/i.test(doubleName)
     && (!firstIsValid || String(doubleName).toLowerCase() !== String(firstName).toLowerCase()));
 
-  // Soft narrative sources (already computed by backend — never invented here)
   const sim = insights?.simulation ?? null;
   const profile = sim?.profile ?? null;
   const scriptA = insights?.scriptAnalyst ?? null;
-  const newsImpacts: any[] = Array.isArray(insights?.newsImpactsApplied) ? insights.newsImpactsApplied : [];
-  const recPlays: any[] = Array.isArray(sim?.recommendedPlays) ? sim.recommendedPlays : [];
-  const valuePlays = recPlays.filter((p) => typeof p?.edgePct === "number" && p.edgePct > 0)
-    .sort((a, b) => (b.edgePct ?? 0) - (a.edgePct ?? 0));
-  const avgEdge = valuePlays.length
-    ? valuePlays.reduce((a, p) => a + (p.edgePct ?? 0), 0) / valuePlays.length
-    : 0;
+  const playerProbs: any[] = Array.isArray(sim?.playerProbabilities) ? sim.playerProbabilities : [];
 
   const baseConf = pickConfidenceBase(det?.confidence);
 
-  // Helper to drop empty bullets and de-dup
   const bulletClean = (arr: (string | undefined | null)[]): string[] => {
     const out: string[] = [];
     const seen = new Set<string>();
@@ -2643,7 +2632,7 @@ function buildSlips(args: {
     return out;
   };
 
-  // -------- 1. Predicted Outcome (current behaviour) --------
+  // -------- 1. Predicted Outcome --------
   const predictedLegs: BetLeg[] = [
     { id: "winner", market: "Match Winner", selection: `${winnerNick} to win` },
     { id: "margin", market: "Winning Margin", selection: `${winnerNick} ${marginBucket}` },
@@ -2667,12 +2656,9 @@ function buildSlips(args: {
     id: "predicted",
     label: "Predicted Outcome Bet Slip",
     short: "Predicted",
-    tagline: "Primary AI projected game script",
     legs: predictedLegs,
     confidence: clampPct(baseConf + 4),
-    edgePct: Math.round(avgEdge * 0.6),
     risk: "Medium",
-    volatility: "Medium",
     why: bulletClean([
       winnerReason,
       det.totalPoints?.reasoning,
@@ -2682,174 +2668,146 @@ function buildSlips(args: {
     ]),
   };
 
-  // -------- 2. Safe Bet Slip --------
-  const safeAnytime = allAnytime.find((p) => p?.confidence === "high")
-    ?? allAnytime.find((p) => p?.confidence === "medium")
-    ?? allAnytime[0] ?? null;
-  const safeLegs: BetLeg[] = [
-    { id: "winner", market: "Match Winner", selection: `${winnerNick} to win` },
-    { id: "total-safe", market: "Total Points (safer line)", selection: `${totalLean} ${totalLean === "Over" ? totalLine - 2.5 : totalLine + 2.5}` },
-    ...(safeAnytime ? [{
-      id: "anytime-safe", market: "Conservative Anytime Tryscorer", selection: safeAnytime.name, detail: formatLegDetail(safeAnytime),
-    }] : []),
-  ];
-  const safe: Slip = {
-    id: "safe",
-    label: "Safe Bet Slip",
-    short: "Safe",
-    tagline: "Lower risk, higher hit-rate selections",
-    legs: safeLegs,
-    confidence: clampPct(baseConf + 14),
-    edgePct: Math.max(0, Math.round(avgEdge * 0.4)),
-    risk: "Low",
-    volatility: "Low",
-    why: bulletClean([
-      `Anchored on the model's strongest read: ${winnerNick} to win.`,
-      `Total moved away from the line by 2.5 points to absorb variance.`,
-      safeAnytime ? `${safeAnytime.name} carries the highest tryscorer confidence (${safeAnytime.confidence ?? "high"}).` : null,
-      profile?.dominanceNote,
-    ]),
-  };
-
-  // -------- 3. Value Bet Slip --------
-  const valueLegs: BetLeg[] = [];
-  if (valuePlays.length) {
-    for (const p of valuePlays.slice(0, 4)) {
-      valueLegs.push({
-        id: `value-${valueLegs.length}`,
-        market: String(p.market ?? "Value Pick"),
-        selection: String(p.pick ?? "—"),
-        detail: typeof p.edgePct === "number" ? `Edge +${p.edgePct.toFixed(1)}%` : undefined,
-      });
-    }
-  } else {
-    // Fallback: lean on engine's best-confidence anytime + total
-    const valuePick = allAnytime.find((p) => p?.confidence === "high") ?? allAnytime[0];
-    valueLegs.push({ id: "value-total", market: "Total Points", selection: `${totalLean} ${totalLine}` });
-    if (valuePick) valueLegs.push({
-      id: "value-any", market: "Anytime Tryscorer", selection: valuePick.name, detail: formatLegDetail(valuePick),
-    });
+  // -------- 2. Anytimes (pure anytime multi, dynamic count) --------
+  // Use simulation per-player anytime probability; fall back to engine ranked lists.
+  const homeNickLc = home.nickName.toLowerCase();
+  const awayNickLc = away.nickName.toLowerCase();
+  type AnyCand = { name: string; team: string; position?: string; prob: number };
+  const candMap = new Map<string, AnyCand>();
+  for (const p of playerProbs) {
+    const name = String(p?.name ?? "").trim();
+    const teamNick = String(p?.teamNickname ?? "").trim();
+    const prob = Number(p?.anytimeProb);
+    if (!name || !Number.isFinite(prob) || prob <= 0) continue;
+    candMap.set(name.toLowerCase(), { name, team: teamNick, position: p?.position, prob });
   }
-  const value: Slip = {
-    id: "value",
-    label: "Value Bet Slip",
-    short: "Value",
-    tagline: "Model edge vs market price",
-    legs: valueLegs,
-    confidence: clampPct(baseConf - 4),
-    edgePct: Math.round(avgEdge || 6),
-    risk: "Medium",
-    volatility: "Medium",
+  // Layer engine picks (ensures we don't surface players outside the named board)
+  const engineList = [...homeAnytime, ...awayAnytime];
+  const engineNamesLc = new Set(engineList.map((p) => String(p?.name ?? "").toLowerCase()).filter(Boolean));
+  let cands: AnyCand[] = [];
+  if (engineNamesLc.size > 0) {
+    cands = engineList
+      .filter((p) => p?.name && !/^awaiting/i.test(p.name))
+      .map((p, i) => {
+        const lc = String(p.name).toLowerCase();
+        const sc = candMap.get(lc);
+        // Prob: prefer sim, else decay by engine rank
+        const rankProb = 0.55 - i * 0.05;
+        return { name: p.name, team: p.team ?? "", position: p.position, prob: sc?.prob ?? rankProb };
+      });
+  } else {
+    cands = [...candMap.values()];
+  }
+  cands.sort((a, b) => b.prob - a.prob);
+
+  // Dynamic count: scale with expected total. Low-scoring → fewer legs.
+  const expTotal = Number(sim?.expectedTotal ?? totalLine ?? 40);
+  let targetCount = 6;
+  if (expTotal < 32) targetCount = 3;
+  else if (expTotal < 38) targetCount = 4;
+  else if (expTotal < 44) targetCount = 5;
+  // Apply a probability floor too — never include weak picks just to fill 6
+  const PROB_FLOOR = 0.28;
+  const filtered = cands.filter((c) => c.prob >= PROB_FLOOR).slice(0, targetCount);
+  const anytimeLegs: BetLeg[] = filtered.map((c, i) => ({
+    id: `any-${i}-${c.name.toLowerCase().replace(/\s+/g, "-")}`,
+    market: `Anytime Tryscorer ${i + 1}`,
+    selection: c.name,
+    detail: c.team || c.position ? [c.team, c.position].filter(Boolean).join(" · ") : undefined,
+  }));
+  const homeCount = filtered.filter((c) => c.team.toLowerCase() === homeNickLc).length;
+  const awayCount = filtered.filter((c) => c.team.toLowerCase() === awayNickLc).length;
+  const anytimes: Slip = {
+    id: "anytimes",
+    label: "Anytime Multi",
+    short: "Anytimes",
+    legs: anytimeLegs,
+    confidence: clampPct(baseConf - 6 + (filtered.length <= 3 ? 6 : 0)),
+    risk: filtered.length <= 3 ? "Medium" : filtered.length >= 6 ? "High" : "Medium-High",
     why: bulletClean([
-      valuePlays.length ? `${valuePlays.length} market(s) flagged with positive expected value vs implied price.` : "No live +EV markets — falling back to highest-confidence engine picks.",
-      "Calibrated probabilities used; obvious public-bias trap markets filtered.",
-      profile?.edgeAttack?.note,
-      det.totalPoints?.reasoning,
+      `Model projects ${filtered.length} anytime tryscorer${filtered.length === 1 ? "" : "s"} above the ${(PROB_FLOOR*100).toFixed(0)}% probability floor for this fixture.`,
+      `Distribution: ${homeCount} ${home.nickName} / ${awayCount} ${away.nickName} — driven by projected scoring share.`,
+      profile?.scoringPatternNote ?? null,
+      profile?.edgeAttack?.note ? `Edge attack — ${profile.edgeAttack.note}` : null,
+      `Expected total ${expTotal.toFixed(1)} sets the leg count.`,
     ]),
   };
 
-  // -------- 4. Script Bet Slip --------
-  const edgeNote: string = profile?.edgeAttack?.note ?? "";
-  const scriptLegs: BetLeg[] = [
-    { id: "winner", market: "Match Winner", selection: `${winnerNick} to win` },
-    { id: "script-total", market: profile?.tempo ? `Total Points (${profile.tempo} tempo)` : "Total Points", selection: `${totalLean} ${totalLine}` },
-    { id: "script-htft", market: "Halftime / Fulltime", selection: htftPick },
-    ...(firstIsValid ? [{
-      id: "script-first", market: "First Tryscorer (script entry)", selection: firstName!, detail: formatLegDetail(firstTry),
-    }] : []),
-  ];
-  const script: Slip = {
-    id: "script",
-    label: "Script Bet Slip",
-    short: "Script",
-    tagline: "Built from projected game flow & edges",
-    legs: scriptLegs,
-    confidence: clampPct(baseConf),
-    edgePct: Math.round(avgEdge * 0.7),
-    risk: "Medium",
-    volatility: "Medium-High",
+  // -------- 3. Secondaries (forward / next-best picks per team) --------
+  const forwardPicks: any[] = Array.isArray(det.forwardPicks) ? det.forwardPicks : [];
+  const secondariesLegs: BetLeg[] = forwardPicks
+    .filter((p) => p?.name && !/^awaiting/i.test(p.name))
+    .slice(0, 6)
+    .map((p, i) => ({
+      id: `sec-${i}-${String(p.name).toLowerCase().replace(/\s+/g, "-")}`,
+      market: "Secondary Anytime Tryscorer",
+      selection: p.name,
+      detail: formatLegDetail(p),
+    }));
+  const secondaries: Slip = {
+    id: "secondaries",
+    label: "Secondary Picks",
+    short: "Secondaries",
+    legs: secondariesLegs,
+    confidence: clampPct(baseConf - 12),
+    risk: "Medium-High",
     why: bulletClean([
-      profile?.tempoNote ?? null,
+      "Next-best scorers if the headline anytime board doesn't convert.",
+      "Forwards and outside-top-six options with attacking involvement.",
       profile?.scoringPatternNote ?? null,
-      edgeNote ? `Edge attack read — ${edgeNote}` : null,
-      scriptA?.marketLean?.coverLikelihood ?? null,
       scriptA?.marketLean?.totalsAngle ?? null,
     ]),
   };
 
-  // -------- 5. Scout Special --------
-  const scoutAnytime = homePicks[0] ?? allAnytime[0] ?? null;
-  const scoutAway = awayPick ?? awayAnytime[0] ?? null;
-  const scoutLegs: BetLeg[] = [
-    { id: "winner", market: "Match Winner", selection: `${winnerNick} to win` },
-    { id: "scout-margin", market: "Winning Margin", selection: `${winnerNick} ${marginBucket}` },
-    ...(scoutAnytime ? [{
-      id: "scout-any-h", market: "Anytime Tryscorer", selection: scoutAnytime.name, detail: formatLegDetail(scoutAnytime),
-    }] : []),
-    ...(scoutAway ? [{
-      id: "scout-any-a", market: "Anytime Tryscorer", selection: scoutAway.name, detail: formatLegDetail(scoutAway),
-    }] : []),
+  // -------- 4. Underdog (contrarian, model-aware) --------
+  const winnerIsHome = String(winnerNick).toLowerCase() === homeNickLc;
+  const underdogNick = winnerIsHome ? away.nickName : home.nickName;
+  const underdogNickLc = underdogNick.toLowerCase();
+  const underdogAnyAll: AnyCand[] = cands.filter((c) => c.team.toLowerCase() === underdogNickLc);
+  const underdogTopAny = underdogAnyAll.slice(0, 3);
+  const underdogForwards = forwardPicks
+    .filter((p) => p?.name && !/^awaiting/i.test(p.name) && String(p.team ?? "").toLowerCase() === underdogNickLc)
+    .slice(0, 1);
+  const underdogHtFt = `Draw / ${underdogNick}`; // realistic upset script
+  const underdogLegs: BetLeg[] = [
+    { id: "ud-winner", market: "Upset Winner", selection: `${underdogNick} to win` },
+    { id: "ud-margin", market: "Winning Margin", selection: `${underdogNick} 1-12` },
+    { id: "ud-total", market: "Total Points (contrarian line)", selection: `${totalLean === "Over" ? "Under" : "Over"} ${totalLine}` },
+    { id: "ud-htft", market: "Halftime / Fulltime Double", selection: underdogHtFt },
+    ...underdogTopAny.map((c, i) => ({
+      id: `ud-any-${i}`,
+      market: `${underdogNick} Anytime Tryscorer ${i + 1}`,
+      selection: c.name,
+      detail: c.team || c.position ? [c.team, c.position].filter(Boolean).join(" · ") : undefined,
+    })),
+    ...underdogForwards.map((p, i) => ({
+      id: `ud-sec-${i}`,
+      market: `${underdogNick} Secondary Pick`,
+      selection: p.name,
+      detail: formatLegDetail(p),
+    })),
   ];
-  const newsBullets = newsImpacts.slice(0, 2).map((n: any) => {
-    const team = n?.team ? `${n.team}: ` : "";
-    const note = n?.note ?? n?.title ?? n?.summary ?? "";
-    return note ? `${team}${note}` : null;
-  });
-  const scout: Slip = {
-    id: "scout",
-    label: "Scout Special",
-    short: "Scout",
-    tagline: "Sharp-bettor angle — context & motivation",
-    legs: scoutLegs,
-    confidence: clampPct(baseConf - 2),
-    edgePct: Math.round(avgEdge * 0.85),
-    risk: "Medium-High",
-    volatility: "Medium-High",
+  // Confidence: lower than predicted, but lifted if the model's win-margin is tight
+  const homeProb = Number(sim?.homeWinProb ?? 0.5);
+  const awayProb = Number(sim?.awayWinProb ?? 0.5);
+  const underdogProb = winnerIsHome ? awayProb : homeProb;
+  const underdog: Slip = {
+    id: "underdog",
+    label: "Underdog Bet Slip",
+    short: "Underdog",
+    legs: underdogLegs,
+    confidence: clampPct(20 + Math.round(underdogProb * 60)),
+    risk: underdogProb > 0.35 ? "High" : "Very High",
     why: bulletClean([
-      ...newsBullets,
-      scriptA?.stakes?.home?.psychology ?? null,
-      scriptA?.stakes?.away?.psychology ?? null,
+      `Contrarian to the projected script — ${underdogNick} carry an underlying win share of ${(underdogProb * 100).toFixed(0)}%.`,
+      `Built around an upset stay-with-it 1-12 margin and a ${totalLean === "Over" ? "lower-scoring" : "higher-scoring"} contrarian total.`,
+      underdogTopAny.length ? `Anchors on ${underdogTopAny.map((p) => p.name).join(", ")} from ${underdogNick}'s top tryscorer board.` : null,
       profile?.dominanceNote ?? null,
-      winnerReason,
+      scriptA?.marketLean?.coverLikelihood ?? null,
     ]),
   };
 
-  // -------- 6. Ultra Multi (correlation-guarded) --------
-  // Avoid stacking conflicting markets: include winner, margin, total, first try,
-  // ONE home anytime (not the first tryscorer), and HT/FT.
-  const ultraAnytime = homePicks.find((p) => !firstIsValid || String(p?.name ?? "").toLowerCase() !== String(firstName).toLowerCase())
-    ?? awayPick ?? null;
-  const ultraLegs: BetLeg[] = [
-    { id: "winner", market: "Match Winner", selection: `${winnerNick} to win` },
-    { id: "ultra-margin", market: "Exact Margin Bucket", selection: `${winnerNick} ${marginBucket}` },
-    { id: "ultra-total", market: "Total Points", selection: `${totalLean} ${totalLine}` },
-    { id: "ultra-htft", market: "HT/FT Double", selection: htftPick },
-    ...(firstIsValid ? [{
-      id: "ultra-first", market: "First Tryscorer", selection: firstName!, detail: formatLegDetail(firstTry),
-    }] : []),
-    ...(ultraAnytime ? [{
-      id: "ultra-any", market: "Anytime Tryscorer", selection: ultraAnytime.name, detail: formatLegDetail(ultraAnytime),
-    }] : []),
-  ];
-  const ultra: Slip = {
-    id: "ultra",
-    label: "Ultra Multi",
-    short: "Ultra",
-    tagline: "High risk · high reward entertainment multi",
-    legs: ultraLegs,
-    confidence: clampPct(baseConf - 22),
-    edgePct: Math.round(avgEdge * 1.1),
-    risk: "Very High",
-    volatility: "Very High",
-    why: bulletClean([
-      "All legs are positively correlated with the projected script (no conflicting markets).",
-      `Stack relies on ${winnerNick} controlling the contest in the projected ${marginBucket} band.`,
-      firstIsValid ? `${firstName} as first try sits inside the projected scoring shape.` : null,
-      profile?.scoringPatternNote ?? null,
-    ]),
-  };
-
-  return [predicted, safe, value, script, scout, ultra];
+  return [predicted, anytimes, secondaries, underdog];
 }
 
 function riskTone(r: RiskLevel): string {
@@ -2886,8 +2844,8 @@ function BetTab({ insights, insightsError, insightsLoading, home, away }:
   const slips = buildSlips({ insights, det, home, away });
   const [activeId, setActiveId] = useState<SlipId>("predicted");
   const [removed, setRemoved] = useState<Record<SlipId, Set<string>>>(() => ({
-    predicted: new Set(), safe: new Set(), value: new Set(),
-    script: new Set(), scout: new Set(), ultra: new Set(),
+    predicted: new Set<string>(), anytimes: new Set<string>(),
+    secondaries: new Set<string>(), underdog: new Set<string>(),
   }));
   const [whyOpen, setWhyOpen] = useState(false);
 
@@ -2927,29 +2885,6 @@ function BetTab({ insights, insightsError, insightsLoading, home, away }:
       </div>
 
       <Card title={active.label} icon={Receipt} className="accent-glow">
-        <div className="flex items-center justify-between mb-3 -mt-2">
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
-            {`${visibleLegs.length} ${visibleLegs.length === 1 ? "selection" : "selections"} · ${active.tagline}`}
-          </div>
-          <div className="flex items-center gap-2.5">
-            <div className="h-11 w-11 rounded-full bg-surface-2 border border-border/60 ring-1 ring-accent/20 shadow-[0_2px_10px_-2px_color-mix(in_oklab,var(--accent)_35%,transparent)] flex items-center justify-center">
-              <TeamLogo themeKey={home.themeKey} name={home.nickName} size={34} />
-            </div>
-            <span className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground font-bold">v</span>
-            <div className="h-11 w-11 rounded-full bg-surface-2 border border-border/60 ring-1 ring-accent/20 shadow-[0_2px_10px_-2px_color-mix(in_oklab,var(--accent)_35%,transparent)] flex items-center justify-center">
-              <TeamLogo themeKey={away.themeKey} name={away.nickName} size={34} />
-            </div>
-          </div>
-        </div>
-
-        {/* Intelligence metadata strip */}
-        <div className="grid grid-cols-4 gap-2 mb-4">
-          <MetaPill label="Confidence" value={`${active.confidence}%`} tone="text-accent" />
-          <MetaPill label="Risk" value={active.risk} tone={riskTone(active.risk)} />
-          <MetaPill label="Model Edge" value={`${active.edgePct >= 0 ? "+" : ""}${active.edgePct}%`} tone={active.edgePct >= 0 ? "text-emerald-400" : "text-danger"} />
-          <MetaPill label="Volatility" value={active.volatility} tone={riskTone(active.volatility)} />
-        </div>
-
         {visibleLegs.length === 0 ? (
           <div className="text-center py-8 text-sm text-muted-foreground">
             No selections in this slip. Switch to another slip above.
@@ -2984,6 +2919,12 @@ function BetTab({ insights, insightsError, insightsLoading, home, away }:
           </ul>
         )}
 
+        {/* Confidence + Risk — centered, above Why this slip */}
+        <div className="mt-4 flex justify-center gap-2">
+          <MetaPill label="Confidence" value={`${active.confidence}%`} tone="text-accent" />
+          <MetaPill label="Risk" value={active.risk} tone={riskTone(active.risk)} />
+        </div>
+
         {/* Why this slip? — collapsible */}
         {active.why.length > 0 && (
           <div className="mt-4 border-t border-border pt-3">
@@ -3008,10 +2949,6 @@ function BetTab({ insights, insightsError, insightsLoading, home, away }:
             )}
           </div>
         )}
-
-        <p className="text-[10px] text-muted-foreground text-center pt-4 mt-4 border-t border-border">
-          Slips dynamically generated from the simulation, script, calibration, edge attack, fatigue, referee & news engines for this fixture. 18+ · Bet responsibly.
-        </p>
       </Card>
     </div>
   );

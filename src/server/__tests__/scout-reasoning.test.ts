@@ -58,7 +58,7 @@ describe("formatters", () => {
 
   it("formatValueLine includes odds, edge, and stake", () => {
     const b: ScoutBetSuggestion = {
-      market: "h2h",
+      market: "match_winner",
       selection: "Broncos",
       modelProb: 0.6,
       impliedProb: 0.5,

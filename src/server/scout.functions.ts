@@ -852,7 +852,7 @@ export const scoutChat = createServerFn({ method: "POST" })
         buildDeepContext,
         fastFallback,
       );
-      context = [roundContext, targetContext, freshWebContext].filter(Boolean).join("\n\n");
+      context = [roundContext, targetContext, intelligenceBlock, freshWebContext].filter(Boolean).join("\n\n");
     } catch (e) {
       console.error("[scout] context build failed:", e);
       throw new Error("Scout can't verify the latest official fixtures right now — try again shortly.");

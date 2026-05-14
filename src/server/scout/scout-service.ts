@@ -314,8 +314,8 @@ export async function buildMatchContext(args: BuildContextArgs): Promise<ScoutMa
     calibration: summary?.calibration
       ? {
           applied: true,
-          method: summary.calibration.method,
-          blendWeight: (summary.calibration as { blendWeight?: number }).blendWeight,
+          method: summary.calibration.calibrationNote,
+          blendWeight: summary.calibration.marketAgreement,
         }
       : { applied: false },
     confidence: conf,

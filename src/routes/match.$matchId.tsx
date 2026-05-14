@@ -3026,10 +3026,10 @@ function BetTab({ insights, insightsError, insightsLoading, home, away }:
                       className="bg-surface-2 rounded-lg px-2.5 py-2 border border-border/40"
                     >
                       <div className="text-[9px] uppercase tracking-wider text-muted-foreground font-bold">
-                        Tryscorers
+                        Anytime
                       </div>
                       <div className="text-sm font-bold mt-0.5 leading-tight">
-                        Projected Tryscorers
+                        Projected Anytime Tryscorers
                       </div>
                       <div className="mt-2 space-y-2">
                         {anytimeLegs.map((al) => (

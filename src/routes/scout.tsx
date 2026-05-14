@@ -53,6 +53,44 @@ function ScoutPage() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const autoSentRef = useRef(false);
+  const [userAvatar, setUserAvatar] = useState<string | null>(null);
+  const [speakingIdx, setSpeakingIdx] = useState<number | null>(null);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
+
+  // Load profile avatar (best effort)
+  useEffect(() => {
+    let active = true;
+    supabase.auth.getUser().then(({ data }) => {
+      if (!active) return;
+      const meta = (data.user?.user_metadata ?? {}) as Record<string, unknown>;
+      const url = (meta.avatar_url || meta.picture) as string | undefined;
+      if (url) setUserAvatar(url);
+    }).catch(() => {});
+    return () => { active = false; };
+  }, []);
+
+  // Cancel any TTS on unmount
+  useEffect(() => () => {
+    if (speechSynthAvailable()) window.speechSynthesis.cancel();
+  }, []);
+
+  const speak = useCallback((idx: number, text: string) => {
+    if (!speechSynthAvailable()) {
+      setVoiceError("Text-to-speech isn't supported in this browser.");
+      return;
+    }
+    const synth = window.speechSynthesis;
+    synth.cancel();
+    if (speakingIdx === idx) { setSpeakingIdx(null); return; }
+    // Strip markdown for cleaner reading
+    const clean = text.replace(/\*\*|`|#+\s?|>\s?/g, "").replace(/\[(.*?)\]\(.*?\)/g, "$1");
+    const utt = new SpeechSynthesisUtterance(clean);
+    utt.rate = 1; utt.pitch = 1;
+    utt.onend = () => setSpeakingIdx((cur) => (cur === idx ? null : cur));
+    utt.onerror = () => setSpeakingIdx((cur) => (cur === idx ? null : cur));
+    setSpeakingIdx(idx);
+    synth.speak(utt);
+  }, [speakingIdx]);
 
   const mutation = useMutation({
     mutationFn: async (msgs: Msg[]) => {

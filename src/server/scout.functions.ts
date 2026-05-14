@@ -16,6 +16,17 @@ import { findTeam, ALL_TEAMS } from "@/lib/teams";
 import { readAnySharedInsights } from "./insights-store";
 import type { Insights } from "./ai-insights";
 import { generateDeterministicInsights, type DeterministicInsights } from "./insights-engine";
+import { getOrBuildContext } from "./scout/scout-service";
+import { deriveSessionId, getActiveModifiers, pushModifier } from "./scout/scout-memory";
+import {
+  parseNewsInjection,
+  pickTopDrivers,
+  formatConfidence,
+  formatValueLine,
+  formatRiskWarning,
+  toneScrub,
+} from "./scout/scout-reasoning";
+import type { ScoutMatchContext } from "./scout/scout-contracts";
 
 // Race a promise against a timeout, returning a fallback if it doesn't beat the clock.
 function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
@@ -755,12 +766,105 @@ async function buildTargetBriefsContext(messages: ChatMessage[]): Promise<string
   ].join("\n\n");
 }
 
+// Render a ScoutMatchContext bundle into a compact text block for the LLM.
+function formatIntelligenceBundle(ctx: ScoutMatchContext): string {
+  const out: string[] = [];
+  out.push(`### ${ctx.match.homeNickname} v ${ctx.match.awayNickname} — intelligence`);
+  if (ctx.simulation.method !== "absent") {
+    const s = ctx.simulation;
+    out.push(`Sim (${s.method}, ${s.iterations} iters): expected ${ctx.match.homeNickname} ${s.expectedHomeScore.toFixed(1)}–${s.expectedAwayScore.toFixed(1)} ${ctx.match.awayNickname} (total ${s.expectedTotal.toFixed(1)})`);
+    out.push(`Win probs: ${ctx.match.homeNickname} ${(s.homeWinProb*100).toFixed(0)}% / draw ${(s.drawProb*100).toFixed(0)}% / ${ctx.match.awayNickname} ${(s.awayWinProb*100).toFixed(0)}%`);
+    out.push(`Margin bands: draw ${(s.marginBands.draw*100).toFixed(0)}%, 1-12 ${(s.marginBands["1-12"]*100).toFixed(0)}%, 13+ ${(s.marginBands["13+"]*100).toFixed(0)}% · O/U ${s.totalLine}: over ${(s.overProbAtLine*100).toFixed(0)}%`);
+  } else {
+    out.push(`Sim: absent (${ctx.simulation.reason}) — Scout falls back to deterministic heuristics for this match.`);
+  }
+  if (ctx.calibration.applied) {
+    out.push(`Calibration: ${ctx.calibration.method ?? "blended"}${ctx.calibration.blendWeight != null ? ` (w=${ctx.calibration.blendWeight.toFixed(2)})` : ""}`);
+  }
+  out.push(formatConfidence(ctx.confidence.tier, ctx.confidence.reasons));
+  const drivers = pickTopDrivers(ctx.drivers, 3);
+  if (drivers.length) out.push(`Top drivers: ${drivers.map((d) => d.label).join("; ")}`);
+  if (ctx.bets.length) {
+    out.push("Value bets (EV>0, sorted):");
+    for (const b of ctx.bets.slice(0, 6)) out.push(`  • ${formatValueLine(b)}`);
+  } else {
+    out.push("Value bets: none above threshold this run.");
+  }
+  const risk = formatRiskWarning(ctx.correlationWarnings);
+  if (risk) out.push(risk);
+  if (ctx.modifiersApplied.length) {
+    out.push(`Active news modifiers: ${ctx.modifiersApplied.map((m) => `${m.kind}:${m.description.slice(0, 60)}`).join(" | ")}`);
+  }
+  if (ctx.dataGaps.length) {
+    out.push(`Data gaps: ${ctx.dataGaps.slice(0, 4).join("; ")}`);
+  }
+  return out.join("\n");
+}
+
 export const scoutChat = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => Input.parse(i))
   .handler(async ({ data }): Promise<{ reply: string }> => {
     try {
     const key = process.env.LOVABLE_API_KEY;
     if (!key) throw new Error("LOVABLE_API_KEY not configured");
+
+    // ── Scout intelligence layer ────────────────────────────────────────────
+    // Session-scoped news modifiers + per-fixture ScoutMatchContext bundle.
+    // This block is additive — failures fall back to the existing context.
+    const sessionId = deriveSessionId(data.messages);
+    const latestUser = latestUserText(data.messages);
+    const parsedMod = parseNewsInjection(latestUser);
+    if (parsedMod) {
+      try { pushModifier(sessionId, parsedMod); } catch (e) { console.warn("[scout] pushModifier failed", e); }
+    }
+
+    let intelligenceBlock = "";
+    try {
+      const season = NOW_SEASON();
+      const [fixtures, ladder, liveOdds, snap] = await Promise.all([
+        cached(`scout:fixtures:${season}:v2-official`, 60_000, () => fetchDraw(season)).catch(() => [] as NrlFixture[]),
+        cached(`ladder:${season}`, TTL.ladder, () => fetchLadder(season)).catch(() => [] as NrlLadderRow[]),
+        cached(`odds:nrl`, TTL.odds, () => fetchNrlOdds()).catch(() => [] as OddsEvent[]),
+        getSeasonSnapshot(season).catch(() => null),
+      ]);
+      const targets = await resolveTargetFixtures(season, fixtures, data.messages).catch(() => [] as NrlFixture[]);
+      if (targets.length) {
+        const oddsAll = liveOdds.length ? liveOdds : buildEstimatedOdds(fixtures, ladder);
+        const ctxs = await Promise.all(targets.slice(0, 3).map(async (f) => {
+          const ev = matchOddsEvent(oddsAll, f.homeTeam.nickName, f.awayTeam.nickName) ?? null;
+          const tryscorer = ev
+            ? await cached(`scout:try:${ev.id}`, TRYSCORER_TTL, () => fetchTryscorerOdds(ev.id).catch(() => null))
+            : null;
+          const modifiers = getActiveModifiers(sessionId, f.matchId);
+          return withTimeout(
+            getOrBuildContext({
+              matchId: f.matchId,
+              homeNickname: f.homeTeam.nickName,
+              awayNickname: f.awayTeam.nickName,
+              kickoffUtc: f.kickoffUtc,
+              venue: f.venue,
+              status: f.matchState,
+              odds: ev,
+              tryscorers: tryscorer,
+              modifiers,
+            }).catch(() => null),
+            6000,
+            null as ScoutMatchContext | null,
+          );
+        }));
+        const blocks = ctxs.filter((c): c is ScoutMatchContext => !!c).map(formatIntelligenceBundle);
+        if (blocks.length) {
+          intelligenceBlock = [
+            "## SCOUT INTELLIGENCE — grounded simulation/value bundles for named matches; prefer these numbers over generic context",
+            ...blocks,
+          ].join("\n\n");
+        }
+      }
+    } catch (e) {
+      console.warn("[scout] intelligence layer failed:", e);
+    }
+    // ────────────────────────────────────────────────────────────────────────
+
 
     // Two-tier context for snappy first reply + accurate steady-state:
     //   • DEEP context (lineups, late mail, app-insights, tryscorers per fixture)
@@ -783,7 +887,7 @@ export const scoutChat = createServerFn({ method: "POST" })
         buildDeepContext,
         fastFallback,
       );
-      context = [roundContext, targetContext, freshWebContext].filter(Boolean).join("\n\n");
+      context = [roundContext, targetContext, intelligenceBlock, freshWebContext].filter(Boolean).join("\n\n");
     } catch (e) {
       console.error("[scout] context build failed:", e);
       throw new Error("Scout can't verify the latest official fixtures right now — try again shortly.");
@@ -946,7 +1050,8 @@ export const scoutChat = createServerFn({ method: "POST" })
     }
 
     if (!reply) throw new Error("Scout returned no reply");
-    return { reply };
+    const scrubbed = toneScrub(reply, { hasBets: intelligenceBlock.includes("Value bets (EV>0") });
+    return { reply: scrubbed };
     } catch (e) {
       console.error("[scout] handler error:", e);
       throw e instanceof Error ? e : new Error(String(e));

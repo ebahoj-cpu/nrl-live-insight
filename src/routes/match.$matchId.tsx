@@ -2533,6 +2533,7 @@ type BetLeg = {
   market: string;
   selection: string;
   detail?: string;
+  playerName?: string;
 };
 
 type SlipId = "predicted" | "anytimes" | "secondaries" | "underdog";
@@ -2639,16 +2640,16 @@ function buildSlips(args: {
     { id: "total", market: "Total Points", selection: `${totalLean} ${totalLine}` },
     { id: "htft", market: "Halftime / Fulltime Double", selection: htftPick },
     ...(firstIsValid ? [{
-      id: "first-try", market: "First Tryscorer", selection: firstName!, detail: formatLegDetail(firstTry),
+      id: "first-try", market: "First Tryscorer", selection: firstName!, detail: formatLegDetail(firstTry), playerName: firstName!,
     }] : []),
     ...(doubleIsValid ? [{
-      id: "double", market: "To Score a Double", selection: doubleName!, detail: formatLegDetail(doublePick),
+      id: "double", market: "To Score a Double", selection: doubleName!, detail: formatLegDetail(doublePick), playerName: doubleName!,
     }] : []),
     ...homePicks.map((p, i) => ({
-      id: `anytime-home-${i}`, market: `Anytime Tryscorer ${i + 1}`, selection: p?.name ?? "—", detail: formatLegDetail(p),
+      id: `anytime-home-${i}`, market: `Anytime Tryscorer ${i + 1}`, selection: p?.name ?? "—", detail: formatLegDetail(p), playerName: p?.name,
     })),
     ...(awayPick ? [{
-      id: "anytime-away", market: `Anytime Tryscorer ${homePicks.length + 1}`, selection: awayPick?.name ?? "—", detail: formatLegDetail(awayPick),
+      id: "anytime-away", market: `Anytime Tryscorer ${homePicks.length + 1}`, selection: awayPick?.name ?? "—", detail: formatLegDetail(awayPick), playerName: awayPick?.name,
     }] : []),
   ];
 
@@ -2714,6 +2715,7 @@ function buildSlips(args: {
     market: `Anytime Tryscorer ${i + 1}`,
     selection: c.name,
     detail: c.team || c.position ? [c.team, c.position].filter(Boolean).join(" · ") : undefined,
+    playerName: c.name,
   }));
   const homeCount = filtered.filter((c) => c.team.toLowerCase() === homeNickLc).length;
   const awayCount = filtered.filter((c) => c.team.toLowerCase() === awayNickLc).length;
@@ -2743,6 +2745,7 @@ function buildSlips(args: {
       market: "Secondary Anytime Tryscorer",
       selection: p.name,
       detail: formatLegDetail(p),
+      playerName: p.name,
     }));
   const secondaries: Slip = {
     id: "secondaries",
@@ -2779,12 +2782,14 @@ function buildSlips(args: {
       market: `${underdogNick} Anytime Tryscorer ${i + 1}`,
       selection: c.name,
       detail: c.team || c.position ? [c.team, c.position].filter(Boolean).join(" · ") : undefined,
+      playerName: c.name,
     })),
     ...underdogForwards.map((p, i) => ({
       id: `ud-sec-${i}`,
       market: `${underdogNick} Secondary Pick`,
       selection: p.name,
       detail: formatLegDetail(p),
+      playerName: p.name,
     })),
   ];
   // Confidence: lower than predicted, but lifted if the model's win-margin is tight
@@ -2864,14 +2869,14 @@ function BetTab({ insights, insightsError, insightsLoading, home, away }:
     <div className="space-y-4 pt-4">
       {/* Slip selector chips — horizontally scrollable */}
       <div className="-mx-1 overflow-x-auto no-scrollbar">
-        <div className="flex gap-2 px-1 pb-1">
+        <div className="flex gap-1.5 px-1 pb-1 justify-between">
           {slips.map((s) => {
             const isActive = s.id === active.id;
             return (
               <button
                 key={s.id}
                 onClick={() => setActiveId(s.id)}
-                className={`shrink-0 px-3.5 py-1.5 rounded-full text-[11px] uppercase tracking-wider font-bold border transition ${
+                className={`flex-1 min-w-0 px-2 py-1 rounded-full text-[10px] uppercase tracking-wide font-bold border transition truncate ${
                   isActive
                     ? "bg-accent text-accent-foreground border-accent shadow-[0_2px_10px_-2px_color-mix(in_oklab,var(--accent)_45%,transparent)]"
                     : "bg-surface-2 text-muted-foreground border-border/50 hover:text-foreground"
@@ -2890,28 +2895,33 @@ function BetTab({ insights, insightsError, insightsLoading, home, away }:
             No selections in this slip. Switch to another slip above.
           </div>
         ) : (
-          <ul className="space-y-2">
+          <ul className="space-y-1.5">
             {visibleLegs.map((leg) => (
               <li
                 key={leg.id}
-                className="bg-surface-2 rounded-lg px-3 py-3 sm:px-4 sm:py-3.5 grid grid-cols-[1fr_auto] items-center gap-3 sm:gap-4 border border-border/40"
+                className="bg-surface-2 rounded-lg px-2.5 py-2 grid grid-cols-[auto_1fr_auto] items-center gap-2.5 border border-border/40"
               >
+                {leg.playerName ? (
+                  <PlayerHeadshot name={leg.playerName} teams={[home, away]} size={36} />
+                ) : (
+                  <div className="w-0" />
+                )}
                 <div className="min-w-0">
                   <div className="text-[9px] uppercase tracking-wider text-muted-foreground font-bold">
                     {leg.market}
                   </div>
-                  <div className="text-base font-bold mt-1 break-words">{leg.selection}</div>
+                  <div className="text-sm font-bold mt-0.5 break-words leading-tight">{leg.selection}</div>
                   {leg.detail ? (
-                    <div className="text-[11px] text-muted-foreground truncate mt-0.5">{leg.detail}</div>
+                    <div className="text-[10px] text-muted-foreground truncate mt-0.5">{leg.detail}</div>
                   ) : null}
                 </div>
                 <div className="flex items-center shrink-0 self-center">
                   <button
                     onClick={() => removeLeg(leg.id)}
                     aria-label={`Remove ${leg.market}`}
-                    className="h-7 w-7 rounded-full bg-surface hover:bg-danger/15 hover:text-danger text-muted-foreground flex items-center justify-center transition"
+                    className="h-6 w-6 rounded-full bg-surface hover:bg-danger/15 hover:text-danger text-muted-foreground flex items-center justify-center transition"
                   >
-                    <X className="h-3.5 w-3.5" />
+                    <X className="h-3 w-3" />
                   </button>
                 </div>
               </li>

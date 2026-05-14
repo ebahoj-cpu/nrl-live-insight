@@ -2146,7 +2146,7 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
 
       {/* 6 — First Tryscorer */}
       <Card title="First tryscorer" icon={Flag} className="accent-glow">
-        <div className="flex items-start gap-3">
+        <div className="flex items-start gap-3 pt-10 sm:pt-14">
           <PlayerHeadshot name={det.firstTryscorer?.name} teams={[home, away]} size={64} />
           <div className="min-w-0 flex-1">
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Top opening-set pick</div>

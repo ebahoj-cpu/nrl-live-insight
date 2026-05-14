@@ -2791,7 +2791,7 @@ function buildSlips(args: {
     const ht = (k.split("/")[0] ?? "") as HtKey;
     if (ht === "home" || ht === "away" || ht === "draw") htAgg[ht] += Number(v) || 0;
   }
-  const drawDominantHt = htAgg.draw > 0 && htAgg.draw >= Math.max(htAgg.home, htAgg.away) * 0.85;
+  const drawDominantHt = htAgg.draw >= Math.max(htAgg.home, htAgg.away) * 0.85 && htAgg.draw >= 0.22;
   // Sort candidates highest-first; reject Draw/* unless the model genuinely
   // supports a halftime draw.
   candidates.sort((a, b) => b.prob - a.prob);

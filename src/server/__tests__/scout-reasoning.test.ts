@@ -82,9 +82,9 @@ describe("formatters", () => {
 
   it("pickTopDrivers de-dupes by label", () => {
     const drivers = [
-      { label: "Ruck tempo", weight: 1, direction: "home" as const, summary: "" },
-      { label: "ruck tempo", weight: 0.5, direction: "home" as const, summary: "" },
-      { label: "Edge attack", weight: 0.4, direction: "away" as const, summary: "" },
+      { label: "Ruck tempo", direction: "home" as const, strength: "strong" as const, marketImpact: "totals", note: "" },
+      { label: "ruck tempo", direction: "home" as const, strength: "small" as const, marketImpact: "totals", note: "" },
+      { label: "Edge attack", direction: "away" as const, strength: "medium" as const, marketImpact: "h2h", note: "" },
     ];
     const out = pickTopDrivers(drivers, 3);
     expect(out.length).toBe(2);

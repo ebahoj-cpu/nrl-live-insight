@@ -2844,8 +2844,8 @@ function BetTab({ insights, insightsError, insightsLoading, home, away }:
   const slips = buildSlips({ insights, det, home, away });
   const [activeId, setActiveId] = useState<SlipId>("predicted");
   const [removed, setRemoved] = useState<Record<SlipId, Set<string>>>(() => ({
-    predicted: new Set(), safe: new Set(), value: new Set(),
-    script: new Set(), scout: new Set(), ultra: new Set(),
+    predicted: new Set<string>(), anytimes: new Set<string>(),
+    secondaries: new Set<string>(), underdog: new Set<string>(),
   }));
   const [whyOpen, setWhyOpen] = useState(false);
 
@@ -2885,29 +2885,6 @@ function BetTab({ insights, insightsError, insightsLoading, home, away }:
       </div>
 
       <Card title={active.label} icon={Receipt} className="accent-glow">
-        <div className="flex items-center justify-between mb-3 -mt-2">
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
-            {`${visibleLegs.length} ${visibleLegs.length === 1 ? "selection" : "selections"} · ${active.tagline}`}
-          </div>
-          <div className="flex items-center gap-2.5">
-            <div className="h-11 w-11 rounded-full bg-surface-2 border border-border/60 ring-1 ring-accent/20 shadow-[0_2px_10px_-2px_color-mix(in_oklab,var(--accent)_35%,transparent)] flex items-center justify-center">
-              <TeamLogo themeKey={home.themeKey} name={home.nickName} size={34} />
-            </div>
-            <span className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground font-bold">v</span>
-            <div className="h-11 w-11 rounded-full bg-surface-2 border border-border/60 ring-1 ring-accent/20 shadow-[0_2px_10px_-2px_color-mix(in_oklab,var(--accent)_35%,transparent)] flex items-center justify-center">
-              <TeamLogo themeKey={away.themeKey} name={away.nickName} size={34} />
-            </div>
-          </div>
-        </div>
-
-        {/* Intelligence metadata strip */}
-        <div className="grid grid-cols-4 gap-2 mb-4">
-          <MetaPill label="Confidence" value={`${active.confidence}%`} tone="text-accent" />
-          <MetaPill label="Risk" value={active.risk} tone={riskTone(active.risk)} />
-          <MetaPill label="Model Edge" value={`${active.edgePct >= 0 ? "+" : ""}${active.edgePct}%`} tone={active.edgePct >= 0 ? "text-emerald-400" : "text-danger"} />
-          <MetaPill label="Volatility" value={active.volatility} tone={riskTone(active.volatility)} />
-        </div>
-
         {visibleLegs.length === 0 ? (
           <div className="text-center py-8 text-sm text-muted-foreground">
             No selections in this slip. Switch to another slip above.
@@ -2942,6 +2919,12 @@ function BetTab({ insights, insightsError, insightsLoading, home, away }:
           </ul>
         )}
 
+        {/* Confidence + Risk — centered, above Why this slip */}
+        <div className="mt-4 flex justify-center gap-2">
+          <MetaPill label="Confidence" value={`${active.confidence}%`} tone="text-accent" />
+          <MetaPill label="Risk" value={active.risk} tone={riskTone(active.risk)} />
+        </div>
+
         {/* Why this slip? — collapsible */}
         {active.why.length > 0 && (
           <div className="mt-4 border-t border-border pt-3">
@@ -2966,10 +2949,6 @@ function BetTab({ insights, insightsError, insightsLoading, home, away }:
             )}
           </div>
         )}
-
-        <p className="text-[10px] text-muted-foreground text-center pt-4 mt-4 border-t border-border">
-          Slips dynamically generated from the simulation, script, calibration, edge attack, fatigue, referee & news engines for this fixture. 18+ · Bet responsibly.
-        </p>
       </Card>
     </div>
   );

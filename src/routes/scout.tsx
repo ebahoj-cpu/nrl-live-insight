@@ -1,12 +1,33 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
-import { Send, Loader2, AlertTriangle } from "lucide-react";
+import { useEffect, useRef, useState, useCallback } from "react";
+import { Send, Loader2, AlertTriangle, Mic, MicOff, Volume2, Square, User as UserIcon } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { z } from "zod";
 import { scoutChat } from "@/server/scout.functions";
+import { supabase } from "@/integrations/supabase/client";
 import scoutAvatar from "@/assets/scout-avatar.png";
 import scoutHead from "@/assets/scout-bubble.png";
+
+// ---- Web Speech API helpers ----
+type SpeechRecognitionLike = {
+  lang: string;
+  interimResults: boolean;
+  continuous: boolean;
+  onresult: ((e: any) => void) | null;
+  onerror: ((e: any) => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+  abort: () => void;
+};
+function getSpeechRecognitionCtor(): (new () => SpeechRecognitionLike) | null {
+  if (typeof window === "undefined") return null;
+  return (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition || null;
+}
+function speechSynthAvailable(): boolean {
+  return typeof window !== "undefined" && "speechSynthesis" in window;
+}
 
 const searchSchema = z.object({
   q: z.string().max(2000).optional(),
@@ -32,6 +53,44 @@ function ScoutPage() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const autoSentRef = useRef(false);
+  const [userAvatar, setUserAvatar] = useState<string | null>(null);
+  const [speakingIdx, setSpeakingIdx] = useState<number | null>(null);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
+
+  // Load profile avatar (best effort)
+  useEffect(() => {
+    let active = true;
+    supabase.auth.getUser().then(({ data }) => {
+      if (!active) return;
+      const meta = (data.user?.user_metadata ?? {}) as Record<string, unknown>;
+      const url = (meta.avatar_url || meta.picture) as string | undefined;
+      if (url) setUserAvatar(url);
+    }).catch(() => {});
+    return () => { active = false; };
+  }, []);
+
+  // Cancel any TTS on unmount
+  useEffect(() => () => {
+    if (speechSynthAvailable()) window.speechSynthesis.cancel();
+  }, []);
+
+  const speak = useCallback((idx: number, text: string) => {
+    if (!speechSynthAvailable()) {
+      setVoiceError("Text-to-speech isn't supported in this browser.");
+      return;
+    }
+    const synth = window.speechSynthesis;
+    synth.cancel();
+    if (speakingIdx === idx) { setSpeakingIdx(null); return; }
+    // Strip markdown for cleaner reading
+    const clean = text.replace(/\*\*|`|#+\s?|>\s?/g, "").replace(/\[(.*?)\]\(.*?\)/g, "$1");
+    const utt = new SpeechSynthesisUtterance(clean);
+    utt.rate = 1; utt.pitch = 1;
+    utt.onend = () => setSpeakingIdx((cur) => (cur === idx ? null : cur));
+    utt.onerror = () => setSpeakingIdx((cur) => (cur === idx ? null : cur));
+    setSpeakingIdx(idx);
+    synth.speak(utt);
+  }, [speakingIdx]);
 
   const mutation = useMutation({
     mutationFn: async (msgs: Msg[]) => {
@@ -111,8 +170,17 @@ function ScoutPage() {
               <div ref={scrollRef} className="flex-1 overflow-y-auto no-scrollbar">
                 <div className="px-3 sm:px-6 py-3 space-y-3">
                   {messages.map((m, i) => (
-                    <Bubble key={i} msg={m} />
+                    <Bubble
+                      key={i}
+                      msg={m}
+                      userAvatar={userAvatar}
+                      isSpeaking={speakingIdx === i}
+                      onToggleSpeak={() => speak(i, m.content)}
+                    />
                   ))}
+                  {voiceError && (
+                    <div className="text-[11px] text-destructive pl-1">{voiceError}</div>
+                  )}
 
                   {mutation.isPending && (
                     <div className="flex items-center gap-2 pl-1">
@@ -222,54 +290,145 @@ function Composer({
   onSend: () => void;
   isPending: boolean;
 }) {
-  return (
-    <form
-      onSubmit={(e) => { e.preventDefault(); onSend(); }}
-      className="flex items-end gap-2 rounded-2xl border border-border bg-surface backdrop-blur-xl focus-within:border-accent transition px-3 py-2 shadow-2xl shadow-black/70 ring-1 ring-black/40"
-    >
-      <textarea
-        ref={inputRef}
-        value={input}
-        onChange={(e) => {
-          setInput(e.target.value);
-          const el = e.currentTarget;
-          el.style.height = "auto";
+  const [listening, setListening] = useState(false);
+  const [micError, setMicError] = useState<string | null>(null);
+  const recRef = useRef<SpeechRecognitionLike | null>(null);
+  const baseRef = useRef<string>("");
+
+  const supported = !!getSpeechRecognitionCtor();
+
+  const stopListening = useCallback(() => {
+    try { recRef.current?.stop(); } catch {}
+    setListening(false);
+  }, []);
+
+  const startListening = useCallback(() => {
+    setMicError(null);
+    const Ctor = getSpeechRecognitionCtor();
+    if (!Ctor) { setMicError("Voice input isn't supported in this browser."); return; }
+    try {
+      const rec = new Ctor();
+      rec.lang = (typeof navigator !== "undefined" && navigator.language) || "en-AU";
+      rec.interimResults = true;
+      rec.continuous = false;
+      baseRef.current = input ? input.trimEnd() + " " : "";
+      rec.onresult = (e: any) => {
+        let txt = "";
+        for (let i = 0; i < e.results.length; i++) txt += e.results[i][0].transcript;
+        const next = (baseRef.current + txt).slice(0, 2000);
+        setInput(next);
+        if (inputRef.current) {
+          inputRef.current.style.height = "auto";
           const cap = Math.round(window.innerHeight * 0.4);
-          el.style.height = Math.min(el.scrollHeight, cap) + "px";
-        }}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && !e.shiftKey) {
-            e.preventDefault();
-            onSend();
-          }
-        }}
-        placeholder="Ask for the inside info..."
-        rows={1}
-        className="font-chat flex-1 resize-none bg-transparent outline-none text-[15px] font-medium placeholder:text-muted-foreground placeholder:font-normal py-1 overflow-y-auto no-scrollbar"
-        style={{ minHeight: "28px" }}
-      />
-      <button
-        type="submit"
-        onClick={(e) => { e.preventDefault(); onSend(); }}
-        disabled={!input.trim() || isPending}
-        aria-label="Send"
-        className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground disabled:opacity-40 disabled:cursor-not-allowed hover:scale-105 transition shadow-md shadow-accent/30"
+          inputRef.current.style.height = Math.min(inputRef.current.scrollHeight, cap) + "px";
+        }
+      };
+      rec.onerror = (e: any) => {
+        const code = e?.error || "";
+        if (code === "not-allowed" || code === "service-not-allowed") {
+          setMicError("Microphone permission denied.");
+        } else if (code === "no-speech") {
+          setMicError("Didn't catch that — try again.");
+        } else if (code) {
+          setMicError("Voice input error.");
+        }
+        setListening(false);
+      };
+      rec.onend = () => setListening(false);
+      recRef.current = rec;
+      rec.start();
+      setListening(true);
+    } catch {
+      setMicError("Couldn't start voice input.");
+      setListening(false);
+    }
+  }, [input, inputRef, setInput]);
+
+  useEffect(() => () => { try { recRef.current?.abort(); } catch {} }, []);
+
+  const handleSend = () => {
+    if (listening) stopListening();
+    onSend();
+  };
+
+  return (
+    <div className="flex flex-col gap-1">
+      <form
+        onSubmit={(e) => { e.preventDefault(); handleSend(); }}
+        className="flex items-end gap-2 rounded-2xl border border-border bg-surface backdrop-blur-xl focus-within:border-accent transition px-3 py-2 shadow-2xl shadow-black/70 ring-1 ring-black/40"
       >
-        {isPending
-          ? <Loader2 className="h-4 w-4 animate-spin" />
-          : <Send className="h-4 w-4" />}
-      </button>
-    </form>
+        <textarea
+          ref={inputRef}
+          value={input}
+          onChange={(e) => {
+            setInput(e.target.value);
+            const el = e.currentTarget;
+            el.style.height = "auto";
+            const cap = Math.round(window.innerHeight * 0.4);
+            el.style.height = Math.min(el.scrollHeight, cap) + "px";
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              handleSend();
+            }
+          }}
+          placeholder={listening ? "Listening…" : "Ask for the inside info..."}
+          rows={1}
+          className="font-chat flex-1 resize-none bg-transparent outline-none text-[15px] font-medium placeholder:text-muted-foreground placeholder:font-normal py-1 overflow-y-auto no-scrollbar"
+          style={{ minHeight: "28px" }}
+        />
+        {supported && (
+          <button
+            type="button"
+            onClick={listening ? stopListening : startListening}
+            disabled={isPending}
+            aria-label={listening ? "Stop voice input" : "Start voice input"}
+            className={
+              "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition shadow-md disabled:opacity-40 disabled:cursor-not-allowed " +
+              (listening
+                ? "bg-destructive text-destructive-foreground animate-pulse shadow-destructive/40"
+                : "bg-surface-2 text-foreground hover:bg-accent/20 border border-border")
+            }
+          >
+            {listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+          </button>
+        )}
+        <button
+          type="submit"
+          onClick={(e) => { e.preventDefault(); handleSend(); }}
+          disabled={!input.trim() || isPending}
+          aria-label="Send"
+          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground disabled:opacity-40 disabled:cursor-not-allowed hover:scale-105 transition shadow-md shadow-accent/30"
+        >
+          {isPending
+            ? <Loader2 className="h-4 w-4 animate-spin" />
+            : <Send className="h-4 w-4" />}
+        </button>
+      </form>
+      {micError && (
+        <div className="text-[11px] text-destructive px-2">{micError}</div>
+      )}
+    </div>
   );
 }
 
-function Bubble({ msg }: { msg: Msg }) {
+function Bubble({
+  msg,
+  userAvatar,
+  isSpeaking,
+  onToggleSpeak,
+}: {
+  msg: Msg;
+  userAvatar?: string | null;
+  isSpeaking?: boolean;
+  onToggleSpeak?: () => void;
+}) {
   const isUser = msg.role === "user";
 
   if (isUser) {
-    // No bubble — plain right-aligned text with strong shadow for legibility over Scout
     return (
-      <div className="flex justify-end animate-fade-in">
+      <div className="flex justify-end items-start gap-2 animate-fade-in">
         <div
           className="font-chat max-w-[85%] text-right text-[15px] leading-snug font-semibold text-foreground whitespace-pre-wrap tracking-tight px-2"
           style={{
@@ -279,6 +438,19 @@ function Bubble({ msg }: { msg: Msg }) {
         >
           {msg.content}
         </div>
+        {userAvatar ? (
+          <img
+            src={userAvatar}
+            alt=""
+            aria-hidden="true"
+            draggable={false}
+            className="h-9 w-9 shrink-0 rounded-full object-cover border border-border mt-0.5"
+          />
+        ) : (
+          <div className="h-9 w-9 shrink-0 rounded-full bg-surface-2 border border-border flex items-center justify-center mt-0.5">
+            <UserIcon className="h-4 w-4 text-muted-foreground" />
+          </div>
+        )}
       </div>
     );
   }
@@ -326,6 +498,18 @@ function Bubble({ msg }: { msg: Msg }) {
         >
           {msg.content}
         </ReactMarkdown>
+        {onToggleSpeak && speechSynthAvailable() && (
+          <div className="mt-1.5 flex justify-end">
+            <button
+              type="button"
+              onClick={onToggleSpeak}
+              aria-label={isSpeaking ? "Stop reading" : "Read aloud"}
+              className="inline-flex h-6 w-6 items-center justify-center rounded-full text-muted-foreground hover:text-accent hover:bg-accent/10 transition"
+            >
+              {isSpeaking ? <Square className="h-3 w-3 fill-current" /> : <Volume2 className="h-3.5 w-3.5" />}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

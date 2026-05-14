@@ -773,6 +773,64 @@ export const scoutChat = createServerFn({ method: "POST" })
     const key = process.env.LOVABLE_API_KEY;
     if (!key) throw new Error("LOVABLE_API_KEY not configured");
 
+    // ── Scout intelligence layer ────────────────────────────────────────────
+    // Session-scoped news modifiers + per-fixture ScoutMatchContext bundle.
+    // This block is additive — failures fall back to the existing context.
+    const sessionId = deriveSessionId(data.messages);
+    const latestUser = latestUserText(data.messages);
+    const parsedMod = parseNewsInjection(latestUser);
+    if (parsedMod) {
+      try { pushModifier(sessionId, parsedMod); } catch (e) { console.warn("[scout] pushModifier failed", e); }
+    }
+
+    let intelligenceBlock = "";
+    try {
+      const season = NOW_SEASON();
+      const [fixtures, ladder, liveOdds, snap] = await Promise.all([
+        cached(`scout:fixtures:${season}:v2-official`, 60_000, () => fetchDraw(season)).catch(() => [] as NrlFixture[]),
+        cached(`ladder:${season}`, TTL.ladder, () => fetchLadder(season)).catch(() => [] as NrlLadderRow[]),
+        cached(`odds:nrl`, TTL.odds, () => fetchNrlOdds()).catch(() => [] as OddsEvent[]),
+        getSeasonSnapshot(season).catch(() => null),
+      ]);
+      const targets = await resolveTargetFixtures(season, fixtures, data.messages).catch(() => [] as NrlFixture[]);
+      if (targets.length) {
+        const oddsAll = liveOdds.length ? liveOdds : buildEstimatedOdds(fixtures, ladder);
+        const ctxs = await Promise.all(targets.slice(0, 3).map(async (f) => {
+          const ev = matchOddsEvent(oddsAll, f.homeTeam.nickName, f.awayTeam.nickName) ?? null;
+          const tryscorer = ev
+            ? await cached(`scout:try:${ev.id}`, TRYSCORER_TTL, () => fetchTryscorerOdds(ev.id).catch(() => null))
+            : null;
+          const modifiers = getActiveModifiers(sessionId, f.matchId);
+          return withTimeout(
+            getOrBuildContext({
+              matchId: f.matchId,
+              homeNickname: f.homeTeam.nickName,
+              awayNickname: f.awayTeam.nickName,
+              kickoffUtc: f.kickoffUtc,
+              venue: f.venue,
+              status: f.matchState,
+              odds: ev,
+              tryscorers: tryscorer,
+              modifiers,
+            }).catch(() => null),
+            6000,
+            null as ScoutMatchContext | null,
+          );
+        }));
+        const blocks = ctxs.filter((c): c is ScoutMatchContext => !!c).map(formatIntelligenceBundle);
+        if (blocks.length) {
+          intelligenceBlock = [
+            "## SCOUT INTELLIGENCE — grounded simulation/value bundles for named matches; prefer these numbers over generic context",
+            ...blocks,
+          ].join("\n\n");
+        }
+      }
+    } catch (e) {
+      console.warn("[scout] intelligence layer failed:", e);
+    }
+    // ────────────────────────────────────────────────────────────────────────
+
+
     // Two-tier context for snappy first reply + accurate steady-state:
     //   • DEEP context (lineups, late mail, app-insights, tryscorers per fixture)
     //     is built in the background and cached. Once warm, every reply uses it.

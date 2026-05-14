@@ -2715,6 +2715,7 @@ function buildSlips(args: {
     market: `Anytime Tryscorer ${i + 1}`,
     selection: c.name,
     detail: c.team || c.position ? [c.team, c.position].filter(Boolean).join(" · ") : undefined,
+    playerName: c.name,
   }));
   const homeCount = filtered.filter((c) => c.team.toLowerCase() === homeNickLc).length;
   const awayCount = filtered.filter((c) => c.team.toLowerCase() === awayNickLc).length;

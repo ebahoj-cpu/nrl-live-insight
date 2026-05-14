@@ -8,6 +8,13 @@ import { scoutChat } from "@/server/scout.functions";
 import { supabase } from "@/integrations/supabase/client";
 import scoutAvatar from "@/assets/scout-avatar.png";
 import scoutHead from "@/assets/scout-bubble.png";
+import {
+  speechSynthAvailable,
+  loadPrefs as loadVoicePrefs,
+  speakWithPrefs,
+  stopSpeaking,
+  type SpeakHandle,
+} from "@/lib/scout-voice";
 
 // ---- Web Speech API helpers ----
 type SpeechRecognitionLike = {
@@ -24,9 +31,6 @@ type SpeechRecognitionLike = {
 function getSpeechRecognitionCtor(): (new () => SpeechRecognitionLike) | null {
   if (typeof window === "undefined") return null;
   return (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition || null;
-}
-function speechSynthAvailable(): boolean {
-  return typeof window !== "undefined" && "speechSynthesis" in window;
 }
 
 const searchSchema = z.object({
@@ -69,9 +73,12 @@ function ScoutPage() {
     return () => { active = false; };
   }, []);
 
+  const speakHandleRef = useRef<SpeakHandle | null>(null);
+
   // Cancel any TTS on unmount
   useEffect(() => () => {
-    if (speechSynthAvailable()) window.speechSynthesis.cancel();
+    speakHandleRef.current?.stop();
+    stopSpeaking();
   }, []);
 
   const speak = useCallback((idx: number, text: string) => {
@@ -79,17 +86,20 @@ function ScoutPage() {
       setVoiceError("Text-to-speech isn't supported in this browser.");
       return;
     }
-    const synth = window.speechSynthesis;
-    synth.cancel();
-    if (speakingIdx === idx) { setSpeakingIdx(null); return; }
-    // Strip markdown for cleaner reading
-    const clean = text.replace(/\*\*|`|#+\s?|>\s?/g, "").replace(/\[(.*?)\]\(.*?\)/g, "$1");
-    const utt = new SpeechSynthesisUtterance(clean);
-    utt.rate = 1; utt.pitch = 1;
-    utt.onend = () => setSpeakingIdx((cur) => (cur === idx ? null : cur));
-    utt.onerror = () => setSpeakingIdx((cur) => (cur === idx ? null : cur));
+    // Toggle off if already speaking this message.
+    if (speakingIdx === idx) {
+      speakHandleRef.current?.stop();
+      stopSpeaking();
+      setSpeakingIdx(null);
+      return;
+    }
+    speakHandleRef.current?.stop();
     setSpeakingIdx(idx);
-    synth.speak(utt);
+    const prefs = loadVoicePrefs();
+    speakWithPrefs(text, prefs, {
+      onEnd: () => setSpeakingIdx((cur) => (cur === idx ? null : cur)),
+      onError: () => setSpeakingIdx((cur) => (cur === idx ? null : cur)),
+    }).then((h) => { speakHandleRef.current = h; }).catch(() => {});
   }, [speakingIdx]);
 
   const mutation = useMutation({

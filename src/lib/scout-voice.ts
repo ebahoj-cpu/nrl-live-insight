@@ -206,10 +206,82 @@ function hardWrap(s: string, maxLen: number): string[] {
 
 export type SpeakHandle = { stop: () => void };
 
+// Track the active HTMLAudioElement (custom voice) so we can hard-stop it
+// across calls and prevent overlapping audio.
+let activeAudio: HTMLAudioElement | null = null;
+
 export function stopSpeaking(): void {
+  if (activeAudio) {
+    try { activeAudio.pause(); activeAudio.src = ""; } catch {}
+    activeAudio = null;
+  }
   if (!speechSynthAvailable()) return;
   try { window.speechSynthesis.cancel(); } catch {}
 }
+
+// Try the server's custom-voice endpoint (ElevenLabs). Returns an audio blob
+// when enabled and successful, or null to indicate "use browser fallback".
+export async function tryFetchCustomVoice(
+  text: string,
+  endpoint = "/api/scout-voice",
+): Promise<Blob | null> {
+  try {
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: cleanForSpeech(text).slice(0, 5000) }),
+    });
+    if (!res.ok) return null;
+    const ct = res.headers.get("content-type") || "";
+    if (ct.startsWith("audio/")) return await res.blob();
+    // JSON fallback payload from server (flag off / missing key / upstream error).
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+// Play a blob of audio. Resolves a SpeakHandle that stops it.
+function playAudioBlob(
+  blob: Blob,
+  rate: number,
+  opts?: { onEnd?: () => void; onError?: (e: unknown) => void },
+): SpeakHandle {
+  const url = URL.createObjectURL(blob);
+  const audio = new Audio(url);
+  audio.playbackRate = clamp(rate, 0.5, 1.5);
+  activeAudio = audio;
+  const cleanup = () => {
+    try { URL.revokeObjectURL(url); } catch {}
+    if (activeAudio === audio) activeAudio = null;
+  };
+  audio.onended = () => { cleanup(); opts?.onEnd?.(); };
+  audio.onerror = (e) => { cleanup(); opts?.onError?.(e); };
+  audio.play().catch((e) => { cleanup(); opts?.onError?.(e); });
+  return {
+    stop: () => {
+      try { audio.pause(); } catch {}
+      cleanup();
+    },
+  };
+}
+
+// High-level "speak" with custom-voice preference + automatic fallback.
+// 1) tries /api/scout-voice; if it returns audio, plays it
+// 2) otherwise falls back to browser SpeechSynthesis
+export async function speakSmart(
+  text: string,
+  prefs: ScoutVoicePrefs,
+  opts?: { onEnd?: () => void; onError?: (e: unknown) => void; preferCustom?: boolean },
+): Promise<SpeakHandle> {
+  stopSpeaking(); // never overlap
+  if (opts?.preferCustom !== false) {
+    const blob = await tryFetchCustomVoice(text);
+    if (blob) return playAudioBlob(blob, prefs.rate, opts);
+  }
+  return speakWithPrefs(text, prefs, opts);
+}
+
 
 // Speak text using the preferred voice. Returns a handle so callers can stop.
 // Always cancels any in-flight speech first to prevent overlap.

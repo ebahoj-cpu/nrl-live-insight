@@ -2640,16 +2640,16 @@ function buildSlips(args: {
     { id: "total", market: "Total Points", selection: `${totalLean} ${totalLine}` },
     { id: "htft", market: "Halftime / Fulltime Double", selection: htftPick },
     ...(firstIsValid ? [{
-      id: "first-try", market: "First Tryscorer", selection: firstName!, detail: formatLegDetail(firstTry),
+      id: "first-try", market: "First Tryscorer", selection: firstName!, detail: formatLegDetail(firstTry), playerName: firstName!,
     }] : []),
     ...(doubleIsValid ? [{
-      id: "double", market: "To Score a Double", selection: doubleName!, detail: formatLegDetail(doublePick),
+      id: "double", market: "To Score a Double", selection: doubleName!, detail: formatLegDetail(doublePick), playerName: doubleName!,
     }] : []),
     ...homePicks.map((p, i) => ({
-      id: `anytime-home-${i}`, market: `Anytime Tryscorer ${i + 1}`, selection: p?.name ?? "—", detail: formatLegDetail(p),
+      id: `anytime-home-${i}`, market: `Anytime Tryscorer ${i + 1}`, selection: p?.name ?? "—", detail: formatLegDetail(p), playerName: p?.name,
     })),
     ...(awayPick ? [{
-      id: "anytime-away", market: `Anytime Tryscorer ${homePicks.length + 1}`, selection: awayPick?.name ?? "—", detail: formatLegDetail(awayPick),
+      id: "anytime-away", market: `Anytime Tryscorer ${homePicks.length + 1}`, selection: awayPick?.name ?? "—", detail: formatLegDetail(awayPick), playerName: awayPick?.name,
     }] : []),
   ];
 

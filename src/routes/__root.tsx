@@ -84,7 +84,6 @@ function RootComponent() {
         <Outlet />
       </main>
       <BottomNav />
-      <Footer />
     </QueryClientProvider>
   );
 }

@@ -96,10 +96,10 @@ function ScoutPage() {
     speakHandleRef.current?.stop();
     setSpeakingIdx(idx);
     const prefs = loadVoicePrefs();
-    speakWithPrefs(text, prefs, {
+    speakSmart(text, prefs, {
       onEnd: () => setSpeakingIdx((cur) => (cur === idx ? null : cur)),
       onError: () => setSpeakingIdx((cur) => (cur === idx ? null : cur)),
-    }).then((h) => { speakHandleRef.current = h; }).catch(() => {});
+    }).then((h: SpeakHandle) => { speakHandleRef.current = h; }).catch(() => {});
   }, [speakingIdx]);
 
   const mutation = useMutation({

@@ -11,8 +11,7 @@ import { z } from "zod";
 import type { ConfidenceTier } from "../confidence";
 import type { ModelDriver } from "../model-driver-explainer";
 import type { PlayerProbability, SimulationSummary } from "../simulation-types";
-import type { ValuePick } from "../value-engine";
-import type { MarketPrices } from "../simulation-integration";
+import type { ValuePick, MarketPrices } from "../value-engine";
 
 // ---------- News injection ------------------------------------------------
 

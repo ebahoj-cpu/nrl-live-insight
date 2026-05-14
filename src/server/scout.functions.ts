@@ -16,6 +16,17 @@ import { findTeam, ALL_TEAMS } from "@/lib/teams";
 import { readAnySharedInsights } from "./insights-store";
 import type { Insights } from "./ai-insights";
 import { generateDeterministicInsights, type DeterministicInsights } from "./insights-engine";
+import { getOrBuildContext } from "./scout/scout-service";
+import { deriveSessionId, getActiveModifiers, pushModifier } from "./scout/scout-memory";
+import {
+  parseNewsInjection,
+  pickTopDrivers,
+  formatConfidence,
+  formatValueLine,
+  formatRiskWarning,
+  toneScrub,
+} from "./scout/scout-reasoning";
+import type { ScoutMatchContext } from "./scout/scout-contracts";
 
 // Race a promise against a timeout, returning a fallback if it doesn't beat the clock.
 function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {

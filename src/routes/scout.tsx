@@ -11,7 +11,7 @@ import scoutHead from "@/assets/scout-bubble.png";
 import {
   speechSynthAvailable,
   loadPrefs as loadVoicePrefs,
-  speakWithPrefs,
+  speakSmart,
   stopSpeaking,
   type SpeakHandle,
 } from "@/lib/scout-voice";
@@ -96,10 +96,10 @@ function ScoutPage() {
     speakHandleRef.current?.stop();
     setSpeakingIdx(idx);
     const prefs = loadVoicePrefs();
-    speakWithPrefs(text, prefs, {
+    speakSmart(text, prefs, {
       onEnd: () => setSpeakingIdx((cur) => (cur === idx ? null : cur)),
       onError: () => setSpeakingIdx((cur) => (cur === idx ? null : cur)),
-    }).then((h) => { speakHandleRef.current = h; }).catch(() => {});
+    }).then((h: SpeakHandle) => { speakHandleRef.current = h; }).catch(() => {});
   }, [speakingIdx]);
 
   const mutation = useMutation({

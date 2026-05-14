@@ -2896,36 +2896,50 @@ function BetTab({ insights, insightsError, insightsLoading, home, away }:
           </div>
         ) : (
           <ul className="space-y-1.5">
-            {visibleLegs.map((leg) => (
-              <li
-                key={leg.id}
-                className="bg-surface-2 rounded-lg px-2.5 py-2 grid grid-cols-[auto_1fr_auto] items-center gap-2.5 border border-border/40"
-              >
-                {leg.playerName ? (
-                  <PlayerHeadshot name={leg.playerName} teams={[home, away]} size={36} />
-                ) : (
-                  <div className="w-0" />
-                )}
-                <div className="min-w-0">
-                  <div className="text-[9px] uppercase tracking-wider text-muted-foreground font-bold">
-                    {leg.market}
-                  </div>
-                  <div className="text-sm font-bold mt-0.5 break-words leading-tight">{leg.selection}</div>
-                  {leg.detail ? (
-                    <div className="text-[10px] text-muted-foreground truncate mt-0.5">{leg.detail}</div>
-                  ) : null}
-                </div>
-                <div className="flex items-center shrink-0 self-center">
-                  <button
-                    onClick={() => removeLeg(leg.id)}
-                    aria-label={`Remove ${leg.market}`}
-                    className="h-6 w-6 rounded-full bg-surface hover:bg-danger/15 hover:text-danger text-muted-foreground flex items-center justify-center transition"
+            {visibleLegs.map((leg, idx) => {
+              const isAnytime = /anytime\s+tryscorer|secondary\s+anytime\s+tryscorer/i.test(leg.market);
+              const prev = visibleLegs[idx - 1];
+              const prevIsAnytime = prev && /anytime\s+tryscorer|secondary\s+anytime\s+tryscorer/i.test(prev.market);
+              const showAnytimeHeader = isAnytime && !prevIsAnytime;
+              return (
+                <Fragment key={leg.id}>
+                  {showAnytimeHeader && (
+                    <li className="px-1 pt-1 text-xs font-extrabold uppercase tracking-wider text-foreground">
+                      Anytime Tryscorers
+                    </li>
+                  )}
+                  <li
+                    className="bg-surface-2 rounded-lg px-2.5 py-2 grid grid-cols-[auto_1fr_auto] items-center gap-2.5 border border-border/40"
                   >
-                    <X className="h-3 w-3" />
-                  </button>
-                </div>
-              </li>
-            ))}
+                    {leg.playerName ? (
+                      <PlayerHeadshot name={leg.playerName} teams={[home, away]} size={52} />
+                    ) : (
+                      <div className="w-0" />
+                    )}
+                    <div className="min-w-0">
+                      {!isAnytime && (
+                        <div className="text-[9px] uppercase tracking-wider text-muted-foreground font-bold">
+                          {leg.market}
+                        </div>
+                      )}
+                      <div className="text-sm font-bold mt-0.5 break-words leading-tight">{leg.selection}</div>
+                      {leg.detail ? (
+                        <div className="text-[10px] text-muted-foreground truncate mt-0.5">{leg.detail}</div>
+                      ) : null}
+                    </div>
+                    <div className="flex items-center shrink-0 self-center">
+                      <button
+                        onClick={() => removeLeg(leg.id)}
+                        aria-label={`Remove ${leg.market}`}
+                        className="h-6 w-6 rounded-full bg-surface hover:bg-danger/15 hover:text-danger text-muted-foreground flex items-center justify-center transition"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  </li>
+                </Fragment>
+              );
+            })}
           </ul>
         )}
 

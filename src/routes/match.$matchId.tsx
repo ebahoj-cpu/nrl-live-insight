@@ -2323,10 +2323,10 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
                 ) : (
                   <ul className="space-y-2.5">
                     {col.list.slice(0, 3).map((r: any, i: number) => (
-                      <li key={`${r.name}-${i}`} className="flex items-start gap-3 bg-surface-2 rounded-lg p-2.5 pt-10 sm:pt-14">
+                      <li key={`${r.name}-${i}`} className="flex flex-col items-center text-center gap-2 bg-surface-2 rounded-lg p-2.5 pt-14 sm:pt-20">
                         <PlayerHeadshot name={r.name} teams={[home, away]} size={72} minSize={56} maxSize={96} />
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-bold truncate">{r.name}</div>
+                        <div className="w-full min-w-0">
+                          <div className="text-sm font-bold">{r.name}</div>
                           <div className="text-[10px] text-muted-foreground">{r.position}</div>
                           {r.reasoning && <p className="text-[11px] text-muted-foreground leading-snug mt-1">{r.reasoning}</p>}
                         </div>

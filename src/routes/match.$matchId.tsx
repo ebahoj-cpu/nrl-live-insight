@@ -3036,25 +3036,23 @@ function BetTab({ insights, insightsError, insightsLoading, home, away }:
                       </div>
                       <div className="mt-2 space-y-4">
                         {anytimeLegs.map((al) => (
-                          <div key={al.id} className="grid grid-cols-[1fr_auto] items-center gap-3 pt-10 sm:pt-14">
-                            <div className="flex items-center gap-3 min-w-0">
-                              {al.playerName ? (
-                                <PlayerHeadshot name={al.playerName} teams={[home, away]} size={56} minSize={48} maxSize={64} />
-                              ) : null}
-                              <div className="min-w-0">
-                                <div className="text-sm font-bold leading-tight break-words">{al.playerName ?? al.selection}</div>
-                                {al.detail ? (
-                                  <div className="text-[10px] text-muted-foreground mt-0.5 break-words">{al.detail}</div>
-                                ) : null}
-                              </div>
-                            </div>
+                          <div key={al.id} className="relative flex flex-col items-center text-center gap-2 pt-14 sm:pt-20">
                             <button
                               onClick={() => removeLeg(al.id)}
                               aria-label={`Remove ${al.market}`}
-                              className="h-6 w-6 rounded-full bg-surface hover:bg-danger/15 hover:text-danger text-muted-foreground flex items-center justify-center transition shrink-0"
+                              className="absolute top-0 right-0 h-6 w-6 rounded-full bg-surface hover:bg-danger/15 hover:text-danger text-muted-foreground flex items-center justify-center transition z-10"
                             >
                               <X className="h-3 w-3" />
                             </button>
+                            {al.playerName ? (
+                              <PlayerHeadshot name={al.playerName} teams={[home, away]} size={56} minSize={48} maxSize={64} />
+                            ) : null}
+                            <div className="w-full min-w-0">
+                              <div className="text-sm font-bold leading-tight break-words">{al.playerName ?? al.selection}</div>
+                              {al.detail ? (
+                                <div className="text-[10px] text-muted-foreground mt-0.5 break-words">{al.detail}</div>
+                              ) : null}
+                            </div>
                           </div>
                         ))}
                       </div>

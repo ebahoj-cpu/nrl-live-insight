@@ -1147,13 +1147,13 @@ function PlayerHeadshot({ name, teams }:
   // head/hair sits proudly above the row. Callers must provide enough top
   // padding so this overflow doesn't collide with what's above.
   return (
-    <div className="relative shrink-0 w-20 h-16 sm:w-24 sm:h-20 overflow-visible">
+    <div className="relative shrink-0 w-[72px] h-20 sm:w-28 sm:h-28 overflow-visible">
       {found?.headImage ? (
         <img
           src={found.headImage}
           alt={name ?? "Player"}
           loading="lazy"
-          className="pointer-events-none absolute bottom-0 left-0 w-full h-auto object-contain object-bottom drop-shadow-[0_4px_10px_rgba(0,0,0,0.5)]"
+          className="pointer-events-none absolute bottom-0 left-1/2 -translate-x-1/2 h-[150%] w-auto max-w-none object-contain object-bottom drop-shadow-[0_4px_10px_rgba(0,0,0,0.5)]"
           onError={(e) => {
             const img = e.currentTarget as HTMLImageElement;
             img.style.display = "none";

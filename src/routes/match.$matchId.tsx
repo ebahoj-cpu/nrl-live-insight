@@ -2146,17 +2146,17 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
 
       {/* 6 — First Tryscorer */}
       <Card title="First tryscorer" icon={Flag} className="accent-glow">
-        <div className="flex items-start gap-3 pt-10 sm:pt-14">
+        <div className="flex flex-col items-center text-center gap-2 pt-14 sm:pt-20">
           <PlayerHeadshot name={det.firstTryscorer?.name} teams={[home, away]} size={64} />
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0 w-full">
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Top opening-set pick</div>
-            <div className="text-xl font-black truncate">{det.firstTryscorer?.name}</div>
+            <div className="text-xl font-black">{det.firstTryscorer?.name}</div>
             <div className="text-[11px] text-muted-foreground">{det.firstTryscorer?.position}</div>
             {det.firstTryscorer?.reasoning && (
               <p className="font-chat text-sm leading-relaxed text-foreground/90 mt-2">{det.firstTryscorer.reasoning}</p>
             )}
           </div>
-          <div className="flex flex-col items-end gap-1.5 shrink-0">
+          <div className="flex flex-col items-center gap-1.5">
             {firstTryPrice != null ? (
               <span className="text-lg font-black tabular-nums px-3 py-1.5 rounded-full bg-accent !text-white border border-accent shadow-[0_2px_8px_-2px_color-mix(in_oklab,var(--accent)_60%,transparent)]">
                 {firstTryPrice.toFixed(2)}

@@ -1147,13 +1147,13 @@ function PlayerHeadshot({ name, teams }:
   // head/hair sits proudly above the row. Callers must provide enough top
   // padding so this overflow doesn't collide with what's above.
   return (
-    <div className="relative shrink-0 w-20 h-16 sm:w-24 sm:h-20 overflow-visible">
+    <div className="relative shrink-0 w-[72px] h-20 sm:w-28 sm:h-28 overflow-visible">
       {found?.headImage ? (
         <img
           src={found.headImage}
           alt={name ?? "Player"}
           loading="lazy"
-          className="pointer-events-none absolute bottom-0 left-0 w-full h-auto object-contain object-bottom drop-shadow-[0_4px_10px_rgba(0,0,0,0.5)]"
+          className="pointer-events-none absolute bottom-0 left-1/2 -translate-x-1/2 h-[150%] w-auto max-w-none object-contain object-bottom drop-shadow-[0_4px_10px_rgba(0,0,0,0.5)]"
           onError={(e) => {
             const img = e.currentTarget as HTMLImageElement;
             img.style.display = "none";
@@ -2146,17 +2146,17 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
 
       {/* 6 — First Tryscorer */}
       <Card title="First tryscorer" icon={Flag} className="accent-glow">
-        <div className="flex items-start gap-3 pt-10 sm:pt-14">
+        <div className="flex flex-col items-center text-center gap-2 pt-14 sm:pt-20">
           <PlayerHeadshot name={det.firstTryscorer?.name} teams={[home, away]} size={64} />
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0 w-full">
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Top opening-set pick</div>
-            <div className="text-xl font-black truncate">{det.firstTryscorer?.name}</div>
+            <div className="text-xl font-black">{det.firstTryscorer?.name}</div>
             <div className="text-[11px] text-muted-foreground">{det.firstTryscorer?.position}</div>
             {det.firstTryscorer?.reasoning && (
               <p className="font-chat text-sm leading-relaxed text-foreground/90 mt-2">{det.firstTryscorer.reasoning}</p>
             )}
           </div>
-          <div className="flex flex-col items-end gap-1.5 shrink-0">
+          <div className="flex flex-col items-center gap-1.5">
             {firstTryPrice != null ? (
               <span className="text-lg font-black tabular-nums px-3 py-1.5 rounded-full bg-accent !text-white border border-accent shadow-[0_2px_8px_-2px_color-mix(in_oklab,var(--accent)_60%,transparent)]">
                 {firstTryPrice.toFixed(2)}
@@ -2172,17 +2172,17 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
         {!det.playerDouble?.name || det.playerDouble.name === "Awaiting team list" ? (
           <p className="text-sm text-muted-foreground">{det.playerDouble?.reasoning ?? "Awaiting team list."}</p>
         ) : (
-          <div className="flex items-start gap-3 pt-10 sm:pt-14">
+          <div className="flex flex-col items-center text-center gap-2 pt-14 sm:pt-20">
             <PlayerHeadshot name={det.playerDouble.name} teams={[home, away]} size={64} />
-            <div className="min-w-0 flex-1">
+            <div className="min-w-0 w-full">
               <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Double-try ceiling</div>
-              <div className="text-xl font-black truncate">{det.playerDouble.name}</div>
+              <div className="text-xl font-black">{det.playerDouble.name}</div>
               <div className="text-[11px] text-muted-foreground">{det.playerDouble.position}</div>
               {det.playerDouble.reasoning && (
                 <p className="font-chat text-sm leading-relaxed text-foreground/90 mt-2">{det.playerDouble.reasoning}</p>
               )}
             </div>
-            <div className="flex flex-col items-end gap-1.5 shrink-0">
+            <div className="flex flex-col items-center gap-1.5">
               {(() => {
                 const doublePrice = getMulti(det.playerDouble.name) ?? det.playerDouble.price ?? null;
                 return doublePrice != null ? (
@@ -2201,10 +2201,10 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
       <Card title="First / second / third tryscorer" icon={Target}>
         <ul className="space-y-2.5">
           {[det.rankedTryscorers?.first, det.rankedTryscorers?.second, det.rankedTryscorers?.third].map((p: any, i: number) => (
-            <li key={i} className="flex items-start gap-3 bg-surface-2 rounded-lg p-2.5 pt-10 sm:pt-14">
+            <li key={i} className="flex flex-col items-center text-center gap-2 bg-surface-2 rounded-lg p-2.5 pt-14 sm:pt-20">
               <PlayerHeadshot name={p?.name} teams={[home, away]} size={72} minSize={56} maxSize={96} />
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-bold truncate">{p?.name ?? ""}</div>
+              <div className="w-full min-w-0">
+                <div className="text-sm font-bold">{p?.name ?? ""}</div>
                 <div className="text-[10px] text-muted-foreground">{p?.position}</div>
                 {p?.reasoning && <p className="text-[11px] text-muted-foreground leading-snug mt-1">{p.reasoning}</p>}
               </div>
@@ -2221,10 +2221,10 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Three anytime tryscorers backing this script</div>
           <ul className="space-y-2.5">
             {(det.predictedOutcome.picks ?? []).map((p: any, i: number) => (
-              <li key={`${p.name}-${i}`} className="flex items-start gap-3 bg-surface-2 rounded-lg p-2.5 pt-10 sm:pt-14">
+              <li key={`${p.name}-${i}`} className="flex flex-col items-center text-center gap-2 bg-surface-2 rounded-lg p-2.5 pt-14 sm:pt-20">
                 <PlayerHeadshot name={p?.name} teams={[home, away]} size={72} minSize={56} maxSize={96} />
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-bold truncate">{p?.name ?? ""}</div>
+                <div className="w-full min-w-0">
+                  <div className="text-sm font-bold">{p?.name ?? ""}</div>
                   <div className="text-[10px] text-muted-foreground">{p?.position}</div>
                   {p?.reasoning && <p className="text-[11px] text-muted-foreground leading-snug mt-1">{p.reasoning}</p>}
                 </div>
@@ -2255,10 +2255,10 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
                 ) : (
                   <ul className="space-y-2.5">
                     {col.list.slice(0, 3).map((r: any, i: number) => (
-                      <li key={`${r.name}-${i}`} className="flex items-start gap-3 bg-surface-2 rounded-lg p-2.5 pt-10 sm:pt-14">
+                      <li key={`${r.name}-${i}`} className="flex flex-col items-center text-center gap-2 bg-surface-2 rounded-lg p-2.5 pt-14 sm:pt-20">
                         <PlayerHeadshot name={r.name} teams={[home, away]} size={72} minSize={56} maxSize={96} />
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-bold truncate">{r.name}</div>
+                        <div className="w-full min-w-0">
+                          <div className="text-sm font-bold">{r.name}</div>
                           <div className="text-[10px] text-muted-foreground">{r.position}</div>
                           {r.reasoning && <p className="text-[11px] text-muted-foreground leading-snug mt-1">{r.reasoning}</p>}
                         </div>
@@ -2323,10 +2323,10 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
                 ) : (
                   <ul className="space-y-2.5">
                     {col.list.slice(0, 3).map((r: any, i: number) => (
-                      <li key={`${r.name}-${i}`} className="flex items-start gap-3 bg-surface-2 rounded-lg p-2.5 pt-10 sm:pt-14">
+                      <li key={`${r.name}-${i}`} className="flex flex-col items-center text-center gap-2 bg-surface-2 rounded-lg p-2.5 pt-14 sm:pt-20">
                         <PlayerHeadshot name={r.name} teams={[home, away]} size={72} minSize={56} maxSize={96} />
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-bold truncate">{r.name}</div>
+                        <div className="w-full min-w-0">
+                          <div className="text-sm font-bold">{r.name}</div>
                           <div className="text-[10px] text-muted-foreground">{r.position}</div>
                           {r.reasoning && <p className="text-[11px] text-muted-foreground leading-snug mt-1">{r.reasoning}</p>}
                         </div>
@@ -3036,25 +3036,23 @@ function BetTab({ insights, insightsError, insightsLoading, home, away }:
                       </div>
                       <div className="mt-2 space-y-4">
                         {anytimeLegs.map((al) => (
-                          <div key={al.id} className="grid grid-cols-[1fr_auto] items-center gap-3 pt-10 sm:pt-14">
-                            <div className="flex items-center gap-3 min-w-0">
-                              {al.playerName ? (
-                                <PlayerHeadshot name={al.playerName} teams={[home, away]} size={56} minSize={48} maxSize={64} />
-                              ) : null}
-                              <div className="min-w-0">
-                                <div className="text-sm font-bold leading-tight break-words">{al.playerName ?? al.selection}</div>
-                                {al.detail ? (
-                                  <div className="text-[10px] text-muted-foreground mt-0.5 break-words">{al.detail}</div>
-                                ) : null}
-                              </div>
-                            </div>
+                          <div key={al.id} className="relative flex flex-col items-center text-center gap-2 pt-14 sm:pt-20">
                             <button
                               onClick={() => removeLeg(al.id)}
                               aria-label={`Remove ${al.market}`}
-                              className="h-6 w-6 rounded-full bg-surface hover:bg-danger/15 hover:text-danger text-muted-foreground flex items-center justify-center transition shrink-0"
+                              className="absolute top-0 right-0 h-6 w-6 rounded-full bg-surface hover:bg-danger/15 hover:text-danger text-muted-foreground flex items-center justify-center transition z-10"
                             >
                               <X className="h-3 w-3" />
                             </button>
+                            {al.playerName ? (
+                              <PlayerHeadshot name={al.playerName} teams={[home, away]} size={56} minSize={48} maxSize={64} />
+                            ) : null}
+                            <div className="w-full min-w-0">
+                              <div className="text-sm font-bold leading-tight break-words">{al.playerName ?? al.selection}</div>
+                              {al.detail ? (
+                                <div className="text-[10px] text-muted-foreground mt-0.5 break-words">{al.detail}</div>
+                              ) : null}
+                            </div>
                           </div>
                         ))}
                       </div>
@@ -3100,9 +3098,9 @@ function BetTab({ insights, insightsError, insightsLoading, home, away }:
                       </button>
                     </div>
                     {isPlayerMarket && leg.playerName ? (
-                      <div className="mt-2 flex items-center gap-3 pt-10 sm:pt-14">
+                      <div className="mt-2 flex flex-col items-center text-center gap-2 pt-14 sm:pt-20">
                         <PlayerHeadshot name={leg.playerName} teams={[home, away]} size={72} minSize={64} maxSize={80} />
-                        <div className="min-w-0">
+                        <div className="w-full min-w-0">
                           <div className="text-sm font-bold leading-tight break-words">{leg.playerName}</div>
                           {leg.detail ? (
                             <div className="text-[10px] text-muted-foreground mt-0.5 break-words">{leg.detail}</div>

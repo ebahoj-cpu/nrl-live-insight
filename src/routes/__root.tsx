@@ -80,7 +80,7 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <Header />
-      <main className="mx-auto max-w-6xl px-4 sm:px-6 pb-32 overflow-x-hidden">
+      <main className="mx-auto max-w-6xl px-4 sm:px-6 pt-16 pb-32 overflow-x-hidden">
         <Outlet />
       </main>
       <BottomNav />

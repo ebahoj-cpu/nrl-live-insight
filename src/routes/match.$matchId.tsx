@@ -2221,10 +2221,10 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Three anytime tryscorers backing this script</div>
           <ul className="space-y-2.5">
             {(det.predictedOutcome.picks ?? []).map((p: any, i: number) => (
-              <li key={`${p.name}-${i}`} className="flex items-start gap-3 bg-surface-2 rounded-lg p-2.5 pt-10 sm:pt-14">
+              <li key={`${p.name}-${i}`} className="flex flex-col items-center text-center gap-2 bg-surface-2 rounded-lg p-2.5 pt-14 sm:pt-20">
                 <PlayerHeadshot name={p?.name} teams={[home, away]} size={72} minSize={56} maxSize={96} />
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-bold truncate">{p?.name ?? ""}</div>
+                <div className="w-full min-w-0">
+                  <div className="text-sm font-bold">{p?.name ?? ""}</div>
                   <div className="text-[10px] text-muted-foreground">{p?.position}</div>
                   {p?.reasoning && <p className="text-[11px] text-muted-foreground leading-snug mt-1">{p.reasoning}</p>}
                 </div>

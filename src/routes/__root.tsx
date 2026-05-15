@@ -80,7 +80,7 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <Header />
-      <main className="mx-auto max-w-6xl px-4 sm:px-6 pb-32 overflow-x-hidden">
+      <main className="mx-auto max-w-6xl px-4 sm:px-6 pt-16 pb-32 overflow-x-hidden">
         <Outlet />
       </main>
       <BottomNav />
@@ -141,7 +141,7 @@ function Header() {
 
   return (
     <>
-    <header className="sticky top-0 z-30 backdrop-blur-xl bg-background/70 border-b border-border">
+    <header className="fixed top-0 inset-x-0 z-40 backdrop-blur-xl bg-background/85 border-b border-border">
       <div className="mx-auto max-w-6xl px-4 sm:px-6 h-16 flex items-center justify-between">
         <Link to="/" search={{ round: undefined }} className="flex items-center gap-2 group">
           <span className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-accent text-accent-foreground font-black">

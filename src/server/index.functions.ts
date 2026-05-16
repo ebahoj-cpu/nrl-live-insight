@@ -443,6 +443,19 @@ export const getMatchInsights = createServerFn({ method: "GET" })
       // validate any cached payload against today's reality.
       const detailsForCheck = await cached(`match:${data.matchId}`, TTL.match, () => fetchMatchDetails(data.matchId), { bypass: data.refresh });
 
+      // LOCK: once a match is finished, insights become an immutable historical
+      // snapshot. NEVER regenerate, NEVER overwrite, NEVER rerun AI — even on
+      // explicit refresh. This prevents hindsight bias (e.g. post-match season
+      // stats flipping a "1-12 home win" prediction to match the actual result).
+      const isFinished = /^(FullTime|Final|Completed)$/i.test(detailsForCheck.matchState);
+      if (isFinished) {
+        const locked = await readAnySharedInsights(data.matchId);
+        return {
+          insights: locked?.payload ?? null,
+          insightsError: locked ? null : "No pre-match insights were stored for this completed fixture.",
+        };
+      }
+
       // 1) Fast-path: shared DB cache hit, but ONLY if the squad signature and
       //    mode match what's stored. Stale rows (e.g. generated before squads
       //    were named, or before late team-list changes) are ignored.

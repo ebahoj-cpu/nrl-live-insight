@@ -376,20 +376,30 @@ export const getMatchPage = createServerFn({ method: "GET" })
     // Aftermatch (only for finished matches) + lessons-from-last-week per team.
     const finished = /^(FullTime|Final|Completed)$/i.test(details.matchState);
     let aftermatch: AftermatchPayload | null = null;
+    // For finished matches, the Insights tab must show the ORIGINAL pre-match
+    // prediction — never a freshly recalculated one (which would now include
+    // the completed match in season stats, causing hindsight bias). Stale /
+    // signature-mismatched rows are still the correct historical snapshot.
+    let insightsForResponse = stored?.payload ?? null;
     if (finished) {
+      const locked = await readAnySharedInsights(data.matchId);
+      if (locked) insightsForResponse = locked.payload;
+
       // Read existing first; if missing, generate in the background but don't
       // block the page render. Cached forever once written.
       aftermatch = await readAftermatch(data.matchId);
       if (!aftermatch) {
-        // Use the most recent recap pair (recaps are past matches for the
-        // teams; not the current). Fetch this match's own recap directly.
         try {
           const ownRecap = await fetchMatchRecap(`https://www.nrl.com${matchIdToPath(data.matchId)}`);
           aftermatch = await ensureAftermatch({
             matchId: data.matchId,
             details,
             recap: ownRecap,
-            insights: stored?.payload ?? null,
+            // CRITICAL: pass the ORIGINAL stored prediction (any age), never a
+            // freshly recalculated one. ensureAftermatch compares actual result
+            // vs this snapshot — using a regenerated prediction would falsely
+            // "predict" the actual winner.
+            insights: insightsForResponse,
           });
         } catch (e) {
           console.warn("aftermatch generation failed:", e);

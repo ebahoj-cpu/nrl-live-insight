@@ -205,16 +205,10 @@ export function buildDeterministicAftermatch(args: {
       });
     }
 
-    // HT/FT — we don't have HT score from recap reliably; mark unknown if absent.
-    if (det.htft?.pick) {
-      hits.push({
-        market: "HT/FT",
-        predicted: det.htft.pick,
-        actual: actualWinnerNick === "Draw" ? "Draw final" : `${actualWinnerNick} won`,
-        status: det.htft.pick.endsWith(actualWinnerNick) ? "partial" : "miss",
-        detail: "HT score not tracked — assessed on FT only",
-      });
-    }
+    // HT/FT intentionally excluded from hit-rate scoring: we don't currently
+    // capture HT scores reliably, so it can never be a verified "hit". It is
+    // still surfaced in the structured `comparison.team.htft` block for
+    // display, but does NOT contribute to the hits/total tally.
   }
 
   // Tryscorer hits

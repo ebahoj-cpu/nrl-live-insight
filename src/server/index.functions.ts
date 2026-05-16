@@ -376,20 +376,30 @@ export const getMatchPage = createServerFn({ method: "GET" })
     // Aftermatch (only for finished matches) + lessons-from-last-week per team.
     const finished = /^(FullTime|Final|Completed)$/i.test(details.matchState);
     let aftermatch: AftermatchPayload | null = null;
+    // For finished matches, the Insights tab must show the ORIGINAL pre-match
+    // prediction — never a freshly recalculated one (which would now include
+    // the completed match in season stats, causing hindsight bias). Stale /
+    // signature-mismatched rows are still the correct historical snapshot.
+    let insightsForResponse = stored?.payload ?? null;
     if (finished) {
+      const locked = await readAnySharedInsights(data.matchId);
+      if (locked) insightsForResponse = locked.payload;
+
       // Read existing first; if missing, generate in the background but don't
       // block the page render. Cached forever once written.
       aftermatch = await readAftermatch(data.matchId);
       if (!aftermatch) {
-        // Use the most recent recap pair (recaps are past matches for the
-        // teams; not the current). Fetch this match's own recap directly.
         try {
           const ownRecap = await fetchMatchRecap(`https://www.nrl.com${matchIdToPath(data.matchId)}`);
           aftermatch = await ensureAftermatch({
             matchId: data.matchId,
             details,
             recap: ownRecap,
-            insights: stored?.payload ?? null,
+            // CRITICAL: pass the ORIGINAL stored prediction (any age), never a
+            // freshly recalculated one. ensureAftermatch compares actual result
+            // vs this snapshot — using a regenerated prediction would falsely
+            // "predict" the actual winner.
+            insights: insightsForResponse,
           });
         } catch (e) {
           console.warn("aftermatch generation failed:", e);
@@ -417,7 +427,7 @@ export const getMatchPage = createServerFn({ method: "GET" })
       tryscorers,
       tryscorersError,
       ladder,
-      insights: stored?.payload ?? null,
+      insights: insightsForResponse,
       insightsError: null,
       recentRecaps: { home: homeRecaps, away: awayRecaps },
       aftermatch,
@@ -442,6 +452,19 @@ export const getMatchInsights = createServerFn({ method: "GET" })
       // Resolve current mode + squad signature up front so we can
       // validate any cached payload against today's reality.
       const detailsForCheck = await cached(`match:${data.matchId}`, TTL.match, () => fetchMatchDetails(data.matchId), { bypass: data.refresh });
+
+      // LOCK: once a match is finished, insights become an immutable historical
+      // snapshot. NEVER regenerate, NEVER overwrite, NEVER rerun AI — even on
+      // explicit refresh. This prevents hindsight bias (e.g. post-match season
+      // stats flipping a "1-12 home win" prediction to match the actual result).
+      const isFinished = /^(FullTime|Final|Completed)$/i.test(detailsForCheck.matchState);
+      if (isFinished) {
+        const locked = await readAnySharedInsights(data.matchId);
+        return {
+          insights: locked?.payload ?? null,
+          insightsError: locked ? null : "No pre-match insights were stored for this completed fixture.",
+        };
+      }
 
       // 1) Fast-path: shared DB cache hit, but ONLY if the squad signature and
       //    mode match what's stored. Stale rows (e.g. generated before squads
@@ -608,7 +631,7 @@ export const getMatchInsights = createServerFn({ method: "GET" })
             applyImpacts(minimalPayload as unknown as Record<string, unknown>, relevant);
           } catch (e) { console.warn("applyImpacts (minimal) failed:", e); }
 
-          await writeSharedInsights(data.matchId, minimalPayload, insightsTtlMs(details.kickoffUtc));
+          await writeSharedInsights(data.matchId, minimalPayload, insightsTtlMs(details.kickoffUtc), { matchState: details.matchState });
           // Lock the prediction snapshot before kickoff (insert-only — never
           // overwrites an existing locked row).
           try {
@@ -691,7 +714,7 @@ export const getMatchInsights = createServerFn({ method: "GET" })
             });
             applyImpacts(generated as unknown as Record<string, unknown>, relevant);
           } catch (e) { console.warn("applyImpacts (enriched) failed:", e); }
-          await writeSharedInsights(data.matchId, generated, insightsTtlMs(details.kickoffUtc));
+          await writeSharedInsights(data.matchId, generated, insightsTtlMs(details.kickoffUtc), { matchState: details.matchState });
           return generated;
         } catch (err) {
           console.warn("AI insight enrichment failed (deterministic still served):", err);

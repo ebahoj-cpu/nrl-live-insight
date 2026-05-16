@@ -631,7 +631,7 @@ export const getMatchInsights = createServerFn({ method: "GET" })
             applyImpacts(minimalPayload as unknown as Record<string, unknown>, relevant);
           } catch (e) { console.warn("applyImpacts (minimal) failed:", e); }
 
-          await writeSharedInsights(data.matchId, minimalPayload, insightsTtlMs(details.kickoffUtc));
+          await writeSharedInsights(data.matchId, minimalPayload, insightsTtlMs(details.kickoffUtc), { matchState: details.matchState });
           // Lock the prediction snapshot before kickoff (insert-only — never
           // overwrites an existing locked row).
           try {
@@ -714,7 +714,7 @@ export const getMatchInsights = createServerFn({ method: "GET" })
             });
             applyImpacts(generated as unknown as Record<string, unknown>, relevant);
           } catch (e) { console.warn("applyImpacts (enriched) failed:", e); }
-          await writeSharedInsights(data.matchId, generated, insightsTtlMs(details.kickoffUtc));
+          await writeSharedInsights(data.matchId, generated, insightsTtlMs(details.kickoffUtc), { matchState: details.matchState });
           return generated;
         } catch (err) {
           console.warn("AI insight enrichment failed (deterministic still served):", err);

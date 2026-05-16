@@ -427,7 +427,7 @@ export const getMatchPage = createServerFn({ method: "GET" })
       tryscorers,
       tryscorersError,
       ladder,
-      insights: stored?.payload ?? null,
+      insights: insightsForResponse,
       insightsError: null,
       recentRecaps: { home: homeRecaps, away: awayRecaps },
       aftermatch,

@@ -71,8 +71,20 @@ export async function writeSharedInsights(
   matchId: string,
   payload: Insights,
   ttlMs: number,
+  opts?: { matchState?: string },
 ): Promise<void> {
   try {
+    // Defence-in-depth: once a match is finished, the stored row is the
+    // historical pre-match snapshot and must NEVER be overwritten — even by
+    // a racing late request or a background refresh. Callers should already
+    // skip this code path for finished matches, but enforce it here too.
+    const finished = opts?.matchState
+      ? /^(FullTime|Final|Completed)$/i.test(opts.matchState)
+      : false;
+    if (finished) {
+      const existing = await readAnySharedInsights(matchId);
+      if (existing) return; // preserve original pre-match prediction forever
+    }
     const now = new Date();
     const expiresAt = new Date(now.getTime() + ttlMs);
     const { error } = await supabaseAdmin
@@ -91,3 +103,4 @@ export async function writeSharedInsights(
     console.warn("writeSharedInsights threw:", e);
   }
 }
+

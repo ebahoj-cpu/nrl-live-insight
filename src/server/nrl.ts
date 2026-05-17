@@ -368,16 +368,29 @@ export async function fetchMatchRecap(matchUrl: string): Promise<NrlMatchRecap |
       if (id != null) idToName.set(id, `${p.firstName ?? ""} ${p.lastName ?? ""}`.trim());
     }
   }
-  // playerId -> teamId from timeline tries (in order)
-  const tries: { playerId: number; teamId: number; minute: number | null }[] = [];
-  for (const ev of (d.timeline ?? [])) {
+  // playerId -> teamId from timeline tries. NRL.com's timeline is typically
+  // ordered newest-first, so we MUST sort by game minute ascending before
+  // determining the first tryscorer (otherwise the LAST try of the match
+  // would be picked as the "first" — that's the Hopoate-vs-Koula bug).
+  const tries: { playerId: number; teamId: number; minute: number | null; order: number }[] = [];
+  const timeline = (d.timeline ?? []) as unknown[];
+  timeline.forEach((ev: any, idx: number) => {
     if ((ev?.type ?? ev?.title) === "Try" && ev.playerId != null && ev.teamId != null) {
       const minute = typeof ev.minute === "number" ? ev.minute
         : typeof ev.gameMinute === "number" ? ev.gameMinute
         : null;
-      tries.push({ playerId: ev.playerId, teamId: ev.teamId, minute });
+      tries.push({ playerId: ev.playerId, teamId: ev.teamId, minute, order: idx });
     }
-  }
+  });
+  // Sort ascending by minute (nulls last), then by reverse insertion order as
+  // a tiebreak (newest-first feeds → earliest = highest original index).
+  tries.sort((a, b) => {
+    if (a.minute == null && b.minute == null) return b.order - a.order;
+    if (a.minute == null) return 1;
+    if (b.minute == null) return -1;
+    if (a.minute !== b.minute) return a.minute - b.minute;
+    return b.order - a.order;
+  });
   const tally = (teamId: number) => {
     const counts = new Map<number, number>();
     for (const t of tries) if (t.teamId === teamId) counts.set(t.playerId, (counts.get(t.playerId) ?? 0) + 1);

@@ -348,7 +348,7 @@ async function fetchFreshTryscorerMarkets(eventId: string): Promise<TryscorerMar
   if (fresh?.payload?.hasAny) return fresh.payload;
   const emptyIsFresh = fresh && Date.now() - Date.parse(fresh.generatedAt) < EMPTY_TRYSCORER_RETRY_MS;
   if (emptyIsFresh) return fresh.payload;
-  const live = await cached(cacheKey, TRYSCORER_TTL, () => fetchTryscorerOdds(eventId), { bypass: true }).catch(() => null);
+  const live = await cached(`scout:try:${eventId}`, TRYSCORER_TTL, () => fetchTryscorerOdds(eventId)).catch(() => null);
   if (live?.hasAny) return live;
   const stale = await readOddsCacheStaleEntry<TryscorerMarkets>(cacheKey).catch(() => null);
   return stale?.payload?.hasAny ? stale.payload : live;

@@ -447,10 +447,13 @@ async function buildFixtureBrief(
     const allDropped = [...new Set([...anyF.dropped, ...firstF.dropped])];
     if (allDropped.length) lines.push(`IGNORED stale market entries (not in current squads): ${allDropped.join(", ")}`);
   } else {
-    lines.push(`Tryscorer markets: not posted yet`);
+    lines.push(`Tryscorer markets: no live player-price feed available for this fixture; use named squads and app tryscorer projections instead of saying lineups are unreleased.`);
   }
 
   // Team lists / late mail
+  if (details?.homeTeam?.players?.length || details?.awayTeam?.players?.length) {
+    lines.push("Lineups: released — official squad lists are loaded below from the app Lineup tab / NRL.com match centre.");
+  }
   if (details?.teamNews?.home) {
     const tn = details.teamNews.home;
     if (tn.ins.length || tn.outs.length || tn.blurb) {

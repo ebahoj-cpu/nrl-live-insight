@@ -141,7 +141,7 @@ export async function fetchTryscorerOdds(eventId: string): Promise<TryscorerMark
 
   const res = await fetch(url);
   const empty: TryscorerMarkets = { first: [], anytime: [], multi: [], hasAny: false, lastUpdate: null };
-  if (!res.ok) return empty;
+  if (!res.ok) throw new Error(`Tryscorer odds HTTP ${res.status}`);
 
   const data = await res.json() as any;
   const bookmakers: any[] = data?.bookmakers ?? [];

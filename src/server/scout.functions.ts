@@ -14,7 +14,7 @@ import { fetchNews, type NewsItem } from "./news";
 import { getSeasonSnapshot, getTeam, type SeasonSnapshot, type TeamSeasonStats } from "./season-stats";
 import { findTeam, ALL_TEAMS } from "@/lib/teams";
 import { readAnySharedInsights } from "./insights-store";
-import { readOddsCacheEntry, readOddsCacheStaleEntry } from "./odds-store";
+import { readOddsCacheEntry, readOddsCacheStaleEntry, writeOddsCache } from "./odds-store";
 import type { Insights } from "./ai-insights";
 import { generateDeterministicInsights, type DeterministicInsights } from "./insights-engine";
 import { getOrBuildContext } from "./scout/scout-service";
@@ -362,6 +362,7 @@ async function fetchFreshTryscorerMarkets(eventId: string): Promise<TryscorerMar
   const emptyIsFresh = fresh && Date.now() - Date.parse(fresh.generatedAt) < EMPTY_TRYSCORER_RETRY_MS;
   if (emptyIsFresh) return fresh.payload;
   const live = await cached(`scout:try:${eventId}`, TRYSCORER_TTL, () => fetchTryscorerOdds(eventId)).catch(() => null);
+  if (live) await writeOddsCache(cacheKey, live, TRYSCORER_TTL).catch(() => {});
   if (live?.hasAny) return live;
   const stale = await readOddsCacheStaleEntry<TryscorerMarkets>(cacheKey).catch(() => null);
   return stale?.payload?.hasAny ? stale.payload : live;

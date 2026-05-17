@@ -461,7 +461,7 @@ async function buildFixtureBrief(
     const allDropped = [...new Set([...anyF.dropped, ...firstF.dropped])];
     if (allDropped.length) lines.push(`IGNORED stale market entries (not in current squads): ${allDropped.join(", ")}`);
   } else {
-    lines.push(`Tryscorer markets: no live player-price feed available for this fixture; use named squads and app tryscorer projections instead of saying lineups are unreleased.`);
+    lines.push(`Tryscorer markets: live player prices are unavailable from the odds feed; do NOT say markets or lineups are unreleased — use named squads and app tryscorer projections.`);
   }
 
   // Team lists / late mail
@@ -959,7 +959,7 @@ export const scoutChat = createServerFn({ method: "POST" })
       "DATA RULES for missing fields:",
       "• If a fixture has squad blocks or roster lines, lineups ARE released — never say lineups/team sheets are unavailable.",
       "• If a fixture has no ins/outs lines but does have squad blocks, say late-mail ins/outs are not shown, not that lineups are unreleased.",
-      "• If a fixture has no live player-price feed, still use named squads + app tryscorer projections; only say prices are unavailable, not players/lineups.",
+      "• If a fixture says live player prices are unavailable, do NOT say tryscorer markets haven't been released. Say player prices are unavailable from the feed, then use named squads + app tryscorer projections.",
       "• If no squad block is shown for a fixture → say the squad hasn't been named yet.",
       "• Otherwise NEVER claim you lack data that IS in APP DATA. Read the relevant fixture block carefully before answering.",
       "",

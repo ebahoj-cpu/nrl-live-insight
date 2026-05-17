@@ -14,6 +14,7 @@ import { fetchNews, type NewsItem } from "./news";
 import { getSeasonSnapshot, getTeam, type SeasonSnapshot, type TeamSeasonStats } from "./season-stats";
 import { findTeam, ALL_TEAMS } from "@/lib/teams";
 import { readAnySharedInsights } from "./insights-store";
+import { readOddsCacheEntry, readOddsCacheStaleEntry, writeOddsCache } from "./odds-store";
 import type { Insights } from "./ai-insights";
 import { generateDeterministicInsights, type DeterministicInsights } from "./insights-engine";
 import { getOrBuildContext } from "./scout/scout-service";
@@ -115,6 +116,7 @@ const NOW_SEASON = () => new Date().getUTCFullYear();
 const CTX_TTL = 5 * 60_000;            // 5 min – whole context bundle
 const FIXTURE_TTL = 10 * 60_000;       // 10 min – per-match deep data
 const TRYSCORER_TTL = 15 * 60_000;     // 15 min – player markets
+const EMPTY_TRYSCORER_RETRY_MS = 30 * 60_000;
 const SEASON_ROUNDS = 27;
 type ChatMessage = z.infer<typeof Message>;
 
@@ -124,6 +126,19 @@ function latestUserText(messages: ChatMessage[]): string {
 
 function needsFreshWebCheck(text: string): boolean {
   return /\b(up\s*to\s*date|latest|today|tonight|now|current|fresh|late mail|lineups?|squads?|teams?|players?|plays?|playing|club|roster|injur(?:y|ies|ed)|ruled out|named|available|transfers?|signed|moved|weather|nrl\.com|stats?|history|snap(?:shot)?|missing)\b/i.test(text);
+}
+
+function needsDeepAppData(text: string): boolean {
+  return /\b(bet|bets|betting|multi|sgm|same game|tip|tips|pick|picks|value|edge|odds|market|markets|lineups?|squads?|team lists?|try\s*scorer|tryscorer|anytime|first try|today|tonight)\b/i.test(text);
+}
+
+async function fetchScoutOdds(): Promise<OddsEvent[]> {
+  const fresh = await readOddsCacheEntry<OddsEvent[]>("odds:nrl").catch(() => null);
+  if (fresh?.payload?.length) return fresh.payload;
+  const live = await cached(`odds:nrl`, TTL.odds, () => fetchNrlOdds()).catch(() => [] as OddsEvent[]);
+  if (live.length) return live;
+  const stale = await readOddsCacheStaleEntry<OddsEvent[]>("odds:nrl").catch(() => null);
+  return stale?.payload?.length ? stale.payload : [];
 }
 
 function normaliseTeamNick(input: string): string {
@@ -340,6 +355,19 @@ async function summarizeStoredInsights(matchId: string, homeNick: string, awayNi
   return lines.join("\n");
 }
 
+async function fetchFreshTryscorerMarkets(eventId: string): Promise<TryscorerMarkets | null> {
+  const cacheKey = `tryscorers:${eventId}`;
+  const fresh = await readOddsCacheEntry<TryscorerMarkets>(cacheKey).catch(() => null);
+  if (fresh?.payload?.hasAny) return fresh.payload;
+  const emptyIsFresh = fresh && Date.now() - Date.parse(fresh.generatedAt) < EMPTY_TRYSCORER_RETRY_MS;
+  if (emptyIsFresh) return fresh.payload;
+  const live = await cached(`scout:try:${eventId}`, TRYSCORER_TTL, () => fetchTryscorerOdds(eventId)).catch(() => null);
+  if (live) await writeOddsCache(cacheKey, live, TRYSCORER_TTL).catch(() => {});
+  if (live?.hasAny) return live;
+  const stale = await readOddsCacheStaleEntry<TryscorerMarkets>(cacheKey).catch(() => null);
+  return stale?.payload?.hasAny ? stale.payload : live;
+}
+
 // Build a deep per-fixture brief: odds, lineups, ins/outs, H2H, top tryscorers.
 async function buildFixtureBrief(
   matchId: string,
@@ -356,7 +384,7 @@ async function buildFixtureBrief(
   );
   const ev = matchOddsEvent(oddsAll, homeNick, awayNick);
   const tryscorer = ev
-    ? await cached(`scout:try:${ev.id}`, TRYSCORER_TTL, () => fetchTryscorerOdds(ev.id).catch(() => null))
+    ? await fetchFreshTryscorerMarkets(ev.id)
     : null;
 
   const lines: string[] = [];
@@ -433,10 +461,13 @@ async function buildFixtureBrief(
     const allDropped = [...new Set([...anyF.dropped, ...firstF.dropped])];
     if (allDropped.length) lines.push(`IGNORED stale market entries (not in current squads): ${allDropped.join(", ")}`);
   } else {
-    lines.push(`Tryscorer markets: not posted yet`);
+    lines.push(`Tryscorer markets: live player prices are unavailable from the odds feed; do NOT say markets or lineups are unreleased — use named squads and app tryscorer projections.`);
   }
 
   // Team lists / late mail
+  if (details?.homeTeam?.players?.length || details?.awayTeam?.players?.length) {
+    lines.push("Lineups: released — official squad lists are loaded below from the app Lineup tab / NRL.com match centre.");
+  }
   if (details?.teamNews?.home) {
     const tn = details.teamNews.home;
     if (tn.ins.length || tn.outs.length || tn.blurb) {
@@ -674,7 +705,7 @@ async function buildFastContext(): Promise<string> {
   const [fixtures, ladder, liveOdds, news, snap] = await Promise.all([
     cached(`scout:fixtures:${season}:v2-official`, 60_000, () => fetchDraw(season)),
     cached(`ladder:${season}`, TTL.ladder, () => fetchLadder(season)).catch(() => []),
-    cached(`odds:nrl`, TTL.odds, () => fetchNrlOdds()).catch(() => [] as OddsEvent[]),
+    fetchScoutOdds(),
     cached("news:all", 15 * 60_000, () => fetchNews()).catch(() => [] as NewsItem[]),
     getSeasonSnapshot(season).catch(() => null),
   ]);
@@ -691,7 +722,7 @@ async function buildDeepContext(): Promise<string> {
   const [fixtures, ladder, liveOdds, news, snap] = await Promise.all([
     cached(`scout:fixtures:${season}:v2-official`, 60_000, () => fetchDraw(season)),
     cached(`ladder:${season}`, TTL.ladder, () => fetchLadder(season)).catch(() => []),
-    cached(`odds:nrl`, TTL.odds, () => fetchNrlOdds()).catch(() => [] as OddsEvent[]),
+    fetchScoutOdds(),
     cached("news:all", 15 * 60_000, () => fetchNews()).catch(() => [] as NewsItem[]),
     getSeasonSnapshot(season).catch(() => null),
   ]);
@@ -749,7 +780,7 @@ async function buildTargetBriefsContext(messages: ChatMessage[]): Promise<string
   const [fixtures, ladder, liveOdds, snap] = await Promise.all([
     cached(`scout:fixtures:${season}:v2-official`, 60_000, () => fetchDraw(season)).catch(() => [] as NrlFixture[]),
     cached(`ladder:${season}`, TTL.ladder, () => fetchLadder(season)).catch(() => [] as NrlLadderRow[]),
-    cached(`odds:nrl`, TTL.odds, () => fetchNrlOdds()).catch(() => [] as OddsEvent[]),
+    fetchScoutOdds(),
     getSeasonSnapshot(season).catch(() => null),
   ]);
   const targets = await resolveTargetFixtures(season, fixtures, messages);
@@ -824,7 +855,7 @@ export const scoutChat = createServerFn({ method: "POST" })
       const [fixtures, ladder, liveOdds, snap] = await Promise.all([
         cached(`scout:fixtures:${season}:v2-official`, 60_000, () => fetchDraw(season)).catch(() => [] as NrlFixture[]),
         cached(`ladder:${season}`, TTL.ladder, () => fetchLadder(season)).catch(() => [] as NrlLadderRow[]),
-        cached(`odds:nrl`, TTL.odds, () => fetchNrlOdds()).catch(() => [] as OddsEvent[]),
+        fetchScoutOdds(),
         getSeasonSnapshot(season).catch(() => null),
       ]);
       const targets = await resolveTargetFixtures(season, fixtures, data.messages).catch(() => [] as NrlFixture[]);
@@ -833,7 +864,7 @@ export const scoutChat = createServerFn({ method: "POST" })
         const ctxs = await Promise.all(targets.slice(0, 3).map(async (f) => {
           const ev = matchOddsEvent(oddsAll, f.homeTeam.nickName, f.awayTeam.nickName) ?? null;
           const tryscorer = ev
-            ? await cached(`scout:try:${ev.id}`, TRYSCORER_TTL, () => fetchTryscorerOdds(ev.id).catch(() => null))
+            ? await fetchFreshTryscorerMarkets(ev.id)
             : null;
           const modifiers = getActiveModifiers(sessionId, f.matchId);
           return withTimeout(
@@ -855,7 +886,7 @@ export const scoutChat = createServerFn({ method: "POST" })
         const blocks = ctxs.filter((c): c is ScoutMatchContext => !!c).map(formatIntelligenceBundle);
         if (blocks.length) {
           intelligenceBlock = [
-            "## SCOUT INTELLIGENCE — grounded simulation/value bundles for named matches; prefer these numbers over generic context",
+        "## SCOUT INTELLIGENCE — simulation/value bundles for named matches; use for probabilities, but use USER-REQUESTED MATCH BRIEFS for lineup and player-market availability",
             ...blocks,
           ].join("\n\n");
         }
@@ -873,7 +904,7 @@ export const scoutChat = createServerFn({ method: "POST" })
     //     for the very first cold-cache request so users don't wait 60-120s for
     //     NRL.com round-trips. It STILL contains the authoritative GROUND TRUTH
     //     fixtures + byes block, so all grounding rules still hold.
-    const DEEP_KEY = "scout:context:v15-fresh-web-grounded";
+    const DEEP_KEY = "scout:context:v16-lineups-players-grounded";
     let context: string;
     try {
       const [fastFallback, targetContext, freshWebContext] = await Promise.all([
@@ -881,12 +912,15 @@ export const scoutChat = createServerFn({ method: "POST" })
         buildTargetBriefsContext(data.messages),
         buildFreshWebContext(data.messages),
       ]);
-      const roundContext = await staleWhileRevalidate<string>(
-        DEEP_KEY,
-        CTX_TTL,
-        buildDeepContext,
-        fastFallback,
-      );
+      const requiresDeepData = needsDeepAppData(latestUserText(data.messages));
+      const roundContext = requiresDeepData
+        ? await withTimeout(buildDeepContext(), 35_000, fastFallback)
+        : await staleWhileRevalidate<string>(
+            DEEP_KEY,
+            CTX_TTL,
+            buildDeepContext,
+            fastFallback,
+          );
       context = [roundContext, targetContext, intelligenceBlock, freshWebContext].filter(Boolean).join("\n\n");
     } catch (e) {
       console.error("[scout] context build failed:", e);
@@ -923,9 +957,10 @@ export const scoutChat = createServerFn({ method: "POST" })
       "• Recent news headlines",
       "",
       "DATA RULES for missing fields:",
-      "• If a fixture brief says 'Tryscorer markets: not posted yet' → say markets aren't out yet for that game.",
-      "• If a fixture has no ins/outs lines → say lineups aren't released yet for that game.",
-      "• If a squad block isn't shown for a fixture → say the squad hasn't been named yet.",
+      "• If a fixture has squad blocks or roster lines, lineups ARE released — never say lineups/team sheets are unavailable.",
+      "• If a fixture has no ins/outs lines but does have squad blocks, say late-mail ins/outs are not shown, not that lineups are unreleased.",
+      "• If a fixture says live player prices are unavailable, do NOT say tryscorer markets haven't been released. Say player prices are unavailable from the feed, then use named squads + app tryscorer projections.",
+      "• If no squad block is shown for a fixture → say the squad hasn't been named yet.",
       "• Otherwise NEVER claim you lack data that IS in APP DATA. Read the relevant fixture block carefully before answering.",
       "",
       "EXTERNAL STATS — only when the answer is NOT in USER-REQUESTED MATCH BRIEFS / app Stats / app Insights / lineups:",

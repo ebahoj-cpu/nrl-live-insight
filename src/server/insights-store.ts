@@ -74,10 +74,6 @@ export async function writeSharedInsights(
   opts?: { matchState?: string },
 ): Promise<void> {
   try {
-    // Defence-in-depth: once a match is finished, the stored row is the
-    // historical pre-match snapshot and must NEVER be overwritten — even by
-    // a racing late request or a background refresh. Callers should already
-    // skip this code path for finished matches, but enforce it here too.
     // Defence-in-depth: once a match has STARTED (in-progress, half-time,
     // full-time, final, completed), the stored row is the historical pre-match
     // snapshot and must NEVER be overwritten — even by a racing late request

@@ -854,7 +854,7 @@ export const scoutChat = createServerFn({ method: "POST" })
       const [fixtures, ladder, liveOdds, snap] = await Promise.all([
         cached(`scout:fixtures:${season}:v2-official`, 60_000, () => fetchDraw(season)).catch(() => [] as NrlFixture[]),
         cached(`ladder:${season}`, TTL.ladder, () => fetchLadder(season)).catch(() => [] as NrlLadderRow[]),
-        cached(`odds:nrl`, TTL.odds, () => fetchNrlOdds()).catch(() => [] as OddsEvent[]),
+        fetchScoutOdds(),
         getSeasonSnapshot(season).catch(() => null),
       ]);
       const targets = await resolveTargetFixtures(season, fixtures, data.messages).catch(() => [] as NrlFixture[]);
@@ -863,7 +863,7 @@ export const scoutChat = createServerFn({ method: "POST" })
         const ctxs = await Promise.all(targets.slice(0, 3).map(async (f) => {
           const ev = matchOddsEvent(oddsAll, f.homeTeam.nickName, f.awayTeam.nickName) ?? null;
           const tryscorer = ev
-            ? await cached(`scout:try:${ev.id}`, TRYSCORER_TTL, () => fetchTryscorerOdds(ev.id).catch(() => null))
+            ? await fetchFreshTryscorerMarkets(ev.id)
             : null;
           const modifiers = getActiveModifiers(sessionId, f.matchId);
           return withTimeout(

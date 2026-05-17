@@ -342,6 +342,18 @@ async function summarizeStoredInsights(matchId: string, homeNick: string, awayNi
   return lines.join("\n");
 }
 
+async function fetchFreshTryscorerMarkets(eventId: string): Promise<TryscorerMarkets | null> {
+  const cacheKey = `tryscorers:${eventId}`;
+  const fresh = await readOddsCacheEntry<TryscorerMarkets>(cacheKey).catch(() => null);
+  if (fresh?.payload?.hasAny) return fresh.payload;
+  const emptyIsFresh = fresh && Date.now() - Date.parse(fresh.generatedAt) < EMPTY_TRYSCORER_RETRY_MS;
+  if (emptyIsFresh) return fresh.payload;
+  const live = await cached(cacheKey, TRYSCORER_TTL, () => fetchTryscorerOdds(eventId), { bypass: true }).catch(() => null);
+  if (live?.hasAny) return live;
+  const stale = await readOddsCacheStaleEntry<TryscorerMarkets>(cacheKey).catch(() => null);
+  return stale?.payload?.hasAny ? stale.payload : live;
+}
+
 // Build a deep per-fixture brief: odds, lineups, ins/outs, H2H, top tryscorers.
 async function buildFixtureBrief(
   matchId: string,
@@ -358,7 +370,7 @@ async function buildFixtureBrief(
   );
   const ev = matchOddsEvent(oddsAll, homeNick, awayNick);
   const tryscorer = ev
-    ? await cached(`scout:try:${ev.id}`, TRYSCORER_TTL, () => fetchTryscorerOdds(ev.id).catch(() => null))
+    ? await fetchFreshTryscorerMarkets(ev.id)
     : null;
 
   const lines: string[] = [];

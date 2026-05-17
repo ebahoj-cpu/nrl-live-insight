@@ -911,12 +911,15 @@ export const scoutChat = createServerFn({ method: "POST" })
         buildTargetBriefsContext(data.messages),
         buildFreshWebContext(data.messages),
       ]);
-      const roundContext = await staleWhileRevalidate<string>(
-        DEEP_KEY,
-        CTX_TTL,
-        buildDeepContext,
-        fastFallback,
-      );
+      const requiresDeepData = needsDeepAppData(latestUserText(data.messages));
+      const roundContext = requiresDeepData
+        ? await withTimeout(buildDeepContext(), 35_000, fastFallback)
+        : await staleWhileRevalidate<string>(
+            DEEP_KEY,
+            CTX_TTL,
+            buildDeepContext,
+            fastFallback,
+          );
       context = [roundContext, targetContext, intelligenceBlock, freshWebContext].filter(Boolean).join("\n\n");
     } catch (e) {
       console.error("[scout] context build failed:", e);

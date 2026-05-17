@@ -14,6 +14,7 @@ import { fetchNews, type NewsItem } from "./news";
 import { getSeasonSnapshot, getTeam, type SeasonSnapshot, type TeamSeasonStats } from "./season-stats";
 import { findTeam, ALL_TEAMS } from "@/lib/teams";
 import { readAnySharedInsights } from "./insights-store";
+import { readOddsCacheEntry, readOddsCacheStaleEntry } from "./odds-store";
 import type { Insights } from "./ai-insights";
 import { generateDeterministicInsights, type DeterministicInsights } from "./insights-engine";
 import { getOrBuildContext } from "./scout/scout-service";
@@ -115,6 +116,7 @@ const NOW_SEASON = () => new Date().getUTCFullYear();
 const CTX_TTL = 5 * 60_000;            // 5 min – whole context bundle
 const FIXTURE_TTL = 10 * 60_000;       // 10 min – per-match deep data
 const TRYSCORER_TTL = 15 * 60_000;     // 15 min – player markets
+const EMPTY_TRYSCORER_RETRY_MS = 30 * 60_000;
 const SEASON_ROUNDS = 27;
 type ChatMessage = z.infer<typeof Message>;
 

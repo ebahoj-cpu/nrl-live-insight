@@ -24,7 +24,7 @@ import { indexSquads, isInSquad } from "./validate-picks";
 import { ensureAftermatch, getLastLessonForTeam, readAftermatch, type AftermatchPayload, type TeamLesson } from "./aftermatch";
 import { fetchZylaLadder, getZylaRequestCount } from "./zyla";
 import { generateScript, type ScriptPayload } from "./script-engine";
-import { readOddsCache, readOddsCacheStale, writeOddsCache } from "./odds-store";
+import { readOddsCache, readOddsCacheEntry, readOddsCacheStale, readOddsCacheStaleEntry, writeOddsCache } from "./odds-store";
 import { snapshotPrediction, buildSnapshotRow } from "./prediction-tracking";
 import { listActiveImpacts, impactsForFixture, applyImpacts } from "./news-impacts";
 import { getOrGenerateSimulation, isSimulationEnabled } from "./simulation-integration";
@@ -79,6 +79,7 @@ async function readFreshInsights(
 // without it, every new worker re-hits the Odds API on first use.
 let lastGoodOdds: { at: number; data: OddsEvent[] } | null = null;
 const lastGoodTryscorers = new Map<string, { at: number; data: TryscorerMarkets }>();
+const EMPTY_TRYSCORER_RETRY_MS = 30 * 60_000;
 
 async function safeOdds(refresh?: boolean): Promise<{ data: OddsEvent[]; error: string | null; stale: boolean }> {
   // 1) Memory cache first (fastest)
@@ -107,10 +108,10 @@ async function safeOdds(refresh?: boolean): Promise<{ data: OddsEvent[]; error: 
 
 async function safeTryscorers(eventId: string, refresh?: boolean): Promise<{ data: TryscorerMarkets | null; error: string | null }> {
   if (!refresh) {
-    const dbHit = await readOddsCache<TryscorerMarkets>(`tryscorers:${eventId}`);
-    if (dbHit) {
-      lastGoodTryscorers.set(eventId, { at: Date.now(), data: dbHit });
-      return { data: dbHit, error: null };
+    const dbHit = await readOddsCacheEntry<TryscorerMarkets>(`tryscorers:${eventId}`);
+    if (dbHit && (dbHit.payload.hasAny || Date.now() - Date.parse(dbHit.generatedAt) < EMPTY_TRYSCORER_RETRY_MS)) {
+      lastGoodTryscorers.set(eventId, { at: Date.now(), data: dbHit.payload });
+      return { data: dbHit.payload, error: null };
     }
   }
   try {
@@ -122,8 +123,8 @@ async function safeTryscorers(eventId: string, refresh?: boolean): Promise<{ dat
     const msg = e instanceof Error ? e.message : "Tryscorer odds unavailable";
     const prev = lastGoodTryscorers.get(eventId);
     if (prev) return { data: prev.data, error: msg };
-    const stale = await readOddsCacheStale<TryscorerMarkets>(`tryscorers:${eventId}`);
-    if (stale) return { data: stale, error: msg };
+    const stale = await readOddsCacheStaleEntry<TryscorerMarkets>(`tryscorers:${eventId}`);
+    if (stale && (stale.payload.hasAny || Date.now() - Date.parse(stale.generatedAt) < EMPTY_TRYSCORER_RETRY_MS)) return { data: stale.payload, error: msg };
     return { data: null, error: msg };
   }
 }

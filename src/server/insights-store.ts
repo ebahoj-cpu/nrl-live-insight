@@ -74,14 +74,14 @@ export async function writeSharedInsights(
   opts?: { matchState?: string },
 ): Promise<void> {
   try {
-    // Defence-in-depth: once a match is finished, the stored row is the
-    // historical pre-match snapshot and must NEVER be overwritten — even by
-    // a racing late request or a background refresh. Callers should already
-    // skip this code path for finished matches, but enforce it here too.
-    const finished = opts?.matchState
-      ? /^(FullTime|Final|Completed)$/i.test(opts.matchState)
-      : false;
-    if (finished) {
+    // Defence-in-depth: once a match has STARTED (in-progress, half-time,
+    // full-time, final, completed), the stored row is the historical pre-match
+    // snapshot and must NEVER be overwritten — even by a racing late request
+    // or a background refresh. Only "Upcoming"/"PreGame"/"Scheduled" states
+    // may overwrite an existing row.
+    const state = opts?.matchState ?? "";
+    const started = state ? !/^(Upcoming|Pre[\s_-]?Game|Scheduled)$/i.test(state) : false;
+    if (started) {
       const existing = await readAnySharedInsights(matchId);
       if (existing) return; // preserve original pre-match prediction forever
     }

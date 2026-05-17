@@ -375,15 +375,21 @@ export const getMatchPage = createServerFn({ method: "GET" })
 
     // Aftermatch (only for finished matches) + lessons-from-last-week per team.
     const finished = /^(FullTime|Final|Completed)$/i.test(details.matchState);
+    // Insights "lock" fires as soon as a match has STARTED (kickoff has passed
+    // OR the matchState moved past Upcoming/PreGame). After that point, the
+    // Insights tab must show the ORIGINAL pre-match prediction forever — never
+    // a recalculated one (which leaks live/post-match data into the prediction).
+    const kickoffMs = details.kickoffUtc ? Date.parse(details.kickoffUtc) : NaN;
+    const kickoffPassed = Number.isFinite(kickoffMs) && kickoffMs <= Date.now();
+    const stateStarted = !/^(Upcoming|Pre[\s_-]?Game|Scheduled)$/i.test(details.matchState);
+    const started = finished || kickoffPassed || stateStarted;
     let aftermatch: AftermatchPayload | null = null;
-    // For finished matches, the Insights tab must show the ORIGINAL pre-match
-    // prediction — never a freshly recalculated one (which would now include
-    // the completed match in season stats, causing hindsight bias). Stale /
-    // signature-mismatched rows are still the correct historical snapshot.
     let insightsForResponse = stored?.payload ?? null;
-    if (finished) {
+    if (started) {
       const locked = await readAnySharedInsights(data.matchId);
       if (locked) insightsForResponse = locked.payload;
+    }
+    if (finished) {
 
       // Read existing first; if missing, generate in the background but don't
       // block the page render. Cached forever once written.
@@ -453,16 +459,21 @@ export const getMatchInsights = createServerFn({ method: "GET" })
       // validate any cached payload against today's reality.
       const detailsForCheck = await cached(`match:${data.matchId}`, TTL.match, () => fetchMatchDetails(data.matchId), { bypass: data.refresh });
 
-      // LOCK: once a match is finished, insights become an immutable historical
-      // snapshot. NEVER regenerate, NEVER overwrite, NEVER rerun AI — even on
-      // explicit refresh. This prevents hindsight bias (e.g. post-match season
-      // stats flipping a "1-12 home win" prediction to match the actual result).
+      // LOCK: once a match has STARTED (kickoff passed OR matchState past
+      // Upcoming/PreGame), insights become an immutable historical snapshot.
+      // NEVER regenerate, NEVER overwrite, NEVER rerun AI — even on explicit
+      // refresh. This prevents hindsight bias (e.g. live/post-match stats
+      // flipping a "1-12 home win" prediction to match the actual result).
       const isFinished = /^(FullTime|Final|Completed)$/i.test(detailsForCheck.matchState);
-      if (isFinished) {
+      const kickoffMs = detailsForCheck.kickoffUtc ? Date.parse(detailsForCheck.kickoffUtc) : NaN;
+      const kickoffPassed = Number.isFinite(kickoffMs) && kickoffMs <= Date.now();
+      const stateStarted = !/^(Upcoming|Pre[\s_-]?Game|Scheduled)$/i.test(detailsForCheck.matchState);
+      const isStarted = isFinished || kickoffPassed || stateStarted;
+      if (isStarted) {
         const locked = await readAnySharedInsights(data.matchId);
         return {
           insights: locked?.payload ?? null,
-          insightsError: locked ? null : "No pre-match insights were stored for this completed fixture.",
+          insightsError: locked ? null : "No pre-match insights were stored before kickoff for this fixture.",
         };
       }
 

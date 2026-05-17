@@ -128,6 +128,19 @@ function needsFreshWebCheck(text: string): boolean {
   return /\b(up\s*to\s*date|latest|today|tonight|now|current|fresh|late mail|lineups?|squads?|teams?|players?|plays?|playing|club|roster|injur(?:y|ies|ed)|ruled out|named|available|transfers?|signed|moved|weather|nrl\.com|stats?|history|snap(?:shot)?|missing)\b/i.test(text);
 }
 
+function needsDeepAppData(text: string): boolean {
+  return /\b(bet|bets|betting|multi|sgm|same game|tip|tips|pick|picks|value|edge|odds|market|markets|lineups?|squads?|team lists?|try\s*scorer|tryscorer|anytime|first try|today|tonight)\b/i.test(text);
+}
+
+async function fetchScoutOdds(): Promise<OddsEvent[]> {
+  const fresh = await readOddsCacheEntry<OddsEvent[]>("odds:nrl").catch(() => null);
+  if (fresh?.payload?.length) return fresh.payload;
+  const live = await cached(`odds:nrl`, TTL.odds, () => fetchNrlOdds()).catch(() => [] as OddsEvent[]);
+  if (live.length) return live;
+  const stale = await readOddsCacheStaleEntry<OddsEvent[]>("odds:nrl").catch(() => null);
+  return stale?.payload?.length ? stale.payload : [];
+}
+
 function normaliseTeamNick(input: string): string {
   return findTeam(input)?.nickname ?? input;
 }

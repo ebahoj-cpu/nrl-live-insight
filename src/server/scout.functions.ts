@@ -885,7 +885,7 @@ export const scoutChat = createServerFn({ method: "POST" })
         const blocks = ctxs.filter((c): c is ScoutMatchContext => !!c).map(formatIntelligenceBundle);
         if (blocks.length) {
           intelligenceBlock = [
-            "## SCOUT INTELLIGENCE — grounded simulation/value bundles for named matches; prefer these numbers over generic context",
+        "## SCOUT INTELLIGENCE — simulation/value bundles for named matches; use for probabilities, but use USER-REQUESTED MATCH BRIEFS for lineup and player-market availability",
             ...blocks,
           ].join("\n\n");
         }

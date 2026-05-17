@@ -903,7 +903,7 @@ export const scoutChat = createServerFn({ method: "POST" })
     //     for the very first cold-cache request so users don't wait 60-120s for
     //     NRL.com round-trips. It STILL contains the authoritative GROUND TRUTH
     //     fixtures + byes block, so all grounding rules still hold.
-    const DEEP_KEY = "scout:context:v15-fresh-web-grounded";
+    const DEEP_KEY = "scout:context:v16-lineups-players-grounded";
     let context: string;
     try {
       const [fastFallback, targetContext, freshWebContext] = await Promise.all([
@@ -953,9 +953,10 @@ export const scoutChat = createServerFn({ method: "POST" })
       "• Recent news headlines",
       "",
       "DATA RULES for missing fields:",
-      "• If a fixture brief says 'Tryscorer markets: not posted yet' → say markets aren't out yet for that game.",
-      "• If a fixture has no ins/outs lines → say lineups aren't released yet for that game.",
-      "• If a squad block isn't shown for a fixture → say the squad hasn't been named yet.",
+      "• If a fixture has squad blocks or roster lines, lineups ARE released — never say lineups/team sheets are unavailable.",
+      "• If a fixture has no ins/outs lines but does have squad blocks, say late-mail ins/outs are not shown, not that lineups are unreleased.",
+      "• If a fixture has no live player-price feed, still use named squads + app tryscorer projections; only say prices are unavailable, not players/lineups.",
+      "• If no squad block is shown for a fixture → say the squad hasn't been named yet.",
       "• Otherwise NEVER claim you lack data that IS in APP DATA. Read the relevant fixture block carefully before answering.",
       "",
       "EXTERNAL STATS — only when the answer is NOT in USER-REQUESTED MATCH BRIEFS / app Stats / app Insights / lineups:",

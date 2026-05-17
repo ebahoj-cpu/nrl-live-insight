@@ -704,7 +704,7 @@ async function buildFastContext(): Promise<string> {
   const [fixtures, ladder, liveOdds, news, snap] = await Promise.all([
     cached(`scout:fixtures:${season}:v2-official`, 60_000, () => fetchDraw(season)),
     cached(`ladder:${season}`, TTL.ladder, () => fetchLadder(season)).catch(() => []),
-    cached(`odds:nrl`, TTL.odds, () => fetchNrlOdds()).catch(() => [] as OddsEvent[]),
+    fetchScoutOdds(),
     cached("news:all", 15 * 60_000, () => fetchNews()).catch(() => [] as NewsItem[]),
     getSeasonSnapshot(season).catch(() => null),
   ]);
@@ -721,7 +721,7 @@ async function buildDeepContext(): Promise<string> {
   const [fixtures, ladder, liveOdds, news, snap] = await Promise.all([
     cached(`scout:fixtures:${season}:v2-official`, 60_000, () => fetchDraw(season)),
     cached(`ladder:${season}`, TTL.ladder, () => fetchLadder(season)).catch(() => []),
-    cached(`odds:nrl`, TTL.odds, () => fetchNrlOdds()).catch(() => [] as OddsEvent[]),
+    fetchScoutOdds(),
     cached("news:all", 15 * 60_000, () => fetchNews()).catch(() => [] as NewsItem[]),
     getSeasonSnapshot(season).catch(() => null),
   ]);
@@ -779,7 +779,7 @@ async function buildTargetBriefsContext(messages: ChatMessage[]): Promise<string
   const [fixtures, ladder, liveOdds, snap] = await Promise.all([
     cached(`scout:fixtures:${season}:v2-official`, 60_000, () => fetchDraw(season)).catch(() => [] as NrlFixture[]),
     cached(`ladder:${season}`, TTL.ladder, () => fetchLadder(season)).catch(() => [] as NrlLadderRow[]),
-    cached(`odds:nrl`, TTL.odds, () => fetchNrlOdds()).catch(() => [] as OddsEvent[]),
+    fetchScoutOdds(),
     getSeasonSnapshot(season).catch(() => null),
   ]);
   const targets = await resolveTargetFixtures(season, fixtures, messages);

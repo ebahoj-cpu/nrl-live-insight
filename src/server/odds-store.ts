@@ -55,6 +55,21 @@ export async function readOddsCacheStale<T>(key: string): Promise<T | null> {
   }
 }
 
+export async function readOddsCacheStaleEntry<T>(key: string): Promise<{ payload: T; generatedAt: string; expiresAt: string } | null> {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from(TABLE as never)
+      .select("payload, generated_at, expires_at")
+      .eq("cache_key" as never, key as never)
+      .maybeSingle();
+    if (error || !data) return null;
+    const row = data as { payload: unknown; generated_at: string; expires_at: string };
+    return { payload: row.payload as T, generatedAt: row.generated_at, expiresAt: row.expires_at };
+  } catch {
+    return null;
+  }
+}
+
 export async function writeOddsCache(key: string, payload: unknown, ttlMs: number): Promise<void> {
   try {
     const expiresAt = new Date(Date.now() + ttlMs).toISOString();

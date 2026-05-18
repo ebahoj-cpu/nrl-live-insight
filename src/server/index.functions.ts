@@ -461,10 +461,11 @@ export const getMatchInsights = createServerFn({ method: "GET" })
   })
   .handler(async ({ data }) => {
     const season = currentSeason();
+    let detailsForCheck: Awaited<ReturnType<typeof fetchMatchDetails>> | null = null;
     try {
       // Resolve current mode + squad signature up front so we can
       // validate any cached payload against today's reality.
-      const detailsForCheck = await cached(`match:${data.matchId}`, TTL.match, () => fetchMatchDetails(data.matchId), { bypass: data.refresh });
+      detailsForCheck = await cached(`match:${data.matchId}`, TTL.match, () => fetchMatchDetails(data.matchId), { bypass: data.refresh });
 
       // LOCK: once a match has STARTED (kickoff passed OR matchState past
       // Upcoming/PreGame), insights become an immutable historical snapshot.
@@ -749,6 +750,14 @@ export const getMatchInsights = createServerFn({ method: "GET" })
         inFlight.delete(lockKey);
       }
     } catch (e) {
+      const kickoffUtc = detailsForCheck?.kickoffUtc;
+      const kickoffMs = kickoffUtc ? Date.parse(kickoffUtc) : NaN;
+      const kickoffPassed = Number.isFinite(kickoffMs) && kickoffMs <= Date.now();
+      const stateStarted = detailsForCheck?.matchState ? !/^(Upcoming|Pre[\s_-]?Game|Scheduled)$/i.test(detailsForCheck.matchState) : false;
+      if (kickoffPassed || stateStarted) {
+        const locked = await readLockedSharedInsights(data.matchId, kickoffUtc);
+        if (locked) return { insights: locked.payload, insightsError: null as string | null };
+      }
       const stale = await readAnySharedInsights(data.matchId);
       if (stale) return { insights: stale.payload, insightsError: null as string | null };
       return { insights: null, insightsError: e instanceof Error ? e.message : "Insights unavailable" };

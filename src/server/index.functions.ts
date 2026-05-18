@@ -393,7 +393,7 @@ export const getMatchPage = createServerFn({ method: "GET" })
     let aftermatch: AftermatchPayload | null = null;
     let insightsForResponse = stored?.payload ?? null;
     if (started) {
-      const locked = await readAnySharedInsights(data.matchId);
+      const locked = await readLockedSharedInsights(data.matchId, details.kickoffUtc);
       if (locked) insightsForResponse = locked.payload;
     }
     if (finished) {

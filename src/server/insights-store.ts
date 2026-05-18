@@ -69,22 +69,23 @@ export async function readAnySharedInsights(matchId: string): Promise<StoredInsi
 
 // Historical lock read: once kickoff has passed, prompt-version bumps must NOT
 // make the app ignore the original prediction and write a new post-match row.
-// Prefer the latest row generated before kickoff across every prompt version.
+// Prefer the latest row generated before kickoff across every prompt version;
+// if a legacy fixture has no pre-kickoff row, freeze the earliest row we have.
 export async function readLockedSharedInsights(matchId: string, kickoffUtc?: string): Promise<StoredInsights | null> {
   try {
     const { data, error } = await supabaseAdmin
       .from(TABLE as never)
       .select("payload, generated_at, expires_at, match_id")
       .like("match_id" as never, `${matchId}::%` as never)
-      .order("generated_at" as never, { ascending: false } as never)
+      .order("generated_at" as never, { ascending: true } as never)
       .limit(50);
     if (error || !data) return null;
     const rows = data as { payload: unknown; generated_at: string; expires_at: string; match_id: string }[];
     const kickoffMs = kickoffUtc ? Date.parse(kickoffUtc) : NaN;
-    const candidates = Number.isFinite(kickoffMs)
+    const preKickoff = Number.isFinite(kickoffMs)
       ? rows.filter((row) => Date.parse(row.generated_at) <= kickoffMs)
-      : rows;
-    const row = candidates[0];
+      : [];
+    const row = preKickoff[preKickoff.length - 1] ?? rows[0];
     if (!row) return null;
     return {
       payload: row.payload as Insights,

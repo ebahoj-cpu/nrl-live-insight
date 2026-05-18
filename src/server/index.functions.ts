@@ -15,7 +15,7 @@ import { buildEstimatedOdds, fetchNrlOdds, fetchEventOdds, fetchTryscorerOdds, t
 import { generateInsights, type RealOdds, type Insights } from "./ai-insights";
 import { fetchVenueWeather, type WeatherSnapshot } from "./weather";
 import { findTeam } from "@/lib/teams";
-import { readSharedInsights, readAnySharedInsights, writeSharedInsights } from "./insights-store";
+import { readSharedInsights, readAnySharedInsights, readLockedSharedInsights, writeSharedInsights } from "./insights-store";
 import { getSeasonSnapshot } from "./season-stats";
 import { generateDeterministicInsights, type DeterministicInsights } from "./insights-engine";
 import { resolveModelMode, squadIsNamed, squadSignature, modeAdvanced, type ModelMode } from "./model-mode";
@@ -48,6 +48,12 @@ async function readFreshInsights(
   details: Awaited<ReturnType<typeof fetchMatchDetails>>,
   tryscorers: TryscorerMarkets | null,
 ): Promise<Awaited<ReturnType<typeof readSharedInsights>>> {
+  const kickoffMs = details.kickoffUtc ? Date.parse(details.kickoffUtc) : NaN;
+  const kickoffPassed = Number.isFinite(kickoffMs) && kickoffMs <= Date.now();
+  const stateStarted = details.matchState ? !/^(Upcoming|Pre[\s_-]?Game|Scheduled)$/i.test(details.matchState) : false;
+  if (kickoffPassed || stateStarted) {
+    return readLockedSharedInsights(matchId, details.kickoffUtc);
+  }
   const stored = await readSharedInsights(matchId);
   if (!stored) return null;
   const payload = stored.payload as unknown as {
@@ -387,7 +393,7 @@ export const getMatchPage = createServerFn({ method: "GET" })
     let aftermatch: AftermatchPayload | null = null;
     let insightsForResponse = stored?.payload ?? null;
     if (started) {
-      const locked = await readAnySharedInsights(data.matchId);
+      const locked = await readLockedSharedInsights(data.matchId, details.kickoffUtc);
       if (locked) insightsForResponse = locked.payload;
     }
     if (finished) {
@@ -455,10 +461,11 @@ export const getMatchInsights = createServerFn({ method: "GET" })
   })
   .handler(async ({ data }) => {
     const season = currentSeason();
+    let detailsForCheck: Awaited<ReturnType<typeof fetchMatchDetails>> | null = null;
     try {
       // Resolve current mode + squad signature up front so we can
       // validate any cached payload against today's reality.
-      const detailsForCheck = await cached(`match:${data.matchId}`, TTL.match, () => fetchMatchDetails(data.matchId), { bypass: data.refresh });
+      detailsForCheck = await cached(`match:${data.matchId}`, TTL.match, () => fetchMatchDetails(data.matchId), { bypass: data.refresh });
 
       // LOCK: once a match has STARTED (kickoff passed OR matchState past
       // Upcoming/PreGame), insights become an immutable historical snapshot.
@@ -471,7 +478,7 @@ export const getMatchInsights = createServerFn({ method: "GET" })
       const stateStarted = !/^(Upcoming|Pre[\s_-]?Game|Scheduled)$/i.test(detailsForCheck.matchState);
       const isStarted = isFinished || kickoffPassed || stateStarted;
       if (isStarted) {
-        const locked = await readAnySharedInsights(data.matchId);
+        const locked = await readLockedSharedInsights(data.matchId, detailsForCheck.kickoffUtc);
         return {
           insights: locked?.payload ?? null,
           insightsError: locked ? null : "No pre-match insights were stored before kickoff for this fixture.",
@@ -643,7 +650,7 @@ export const getMatchInsights = createServerFn({ method: "GET" })
             applyImpacts(minimalPayload as unknown as Record<string, unknown>, relevant);
           } catch (e) { console.warn("applyImpacts (minimal) failed:", e); }
 
-          await writeSharedInsights(data.matchId, minimalPayload, insightsTtlMs(details.kickoffUtc), { matchState: details.matchState });
+          await writeSharedInsights(data.matchId, minimalPayload, insightsTtlMs(details.kickoffUtc), { matchState: details.matchState, kickoffUtc: details.kickoffUtc });
           // Lock the prediction snapshot before kickoff (insert-only — never
           // overwrites an existing locked row).
           try {
@@ -726,7 +733,7 @@ export const getMatchInsights = createServerFn({ method: "GET" })
             });
             applyImpacts(generated as unknown as Record<string, unknown>, relevant);
           } catch (e) { console.warn("applyImpacts (enriched) failed:", e); }
-          await writeSharedInsights(data.matchId, generated, insightsTtlMs(details.kickoffUtc), { matchState: details.matchState });
+          await writeSharedInsights(data.matchId, generated, insightsTtlMs(details.kickoffUtc), { matchState: details.matchState, kickoffUtc: details.kickoffUtc });
           return generated;
         } catch (err) {
           console.warn("AI insight enrichment failed (deterministic still served):", err);
@@ -743,6 +750,14 @@ export const getMatchInsights = createServerFn({ method: "GET" })
         inFlight.delete(lockKey);
       }
     } catch (e) {
+      const kickoffUtc = detailsForCheck?.kickoffUtc;
+      const kickoffMs = kickoffUtc ? Date.parse(kickoffUtc) : NaN;
+      const kickoffPassed = Number.isFinite(kickoffMs) && kickoffMs <= Date.now();
+      const stateStarted = detailsForCheck?.matchState ? !/^(Upcoming|Pre[\s_-]?Game|Scheduled)$/i.test(detailsForCheck.matchState) : false;
+      if (kickoffPassed || stateStarted) {
+        const locked = await readLockedSharedInsights(data.matchId, kickoffUtc);
+        if (locked) return { insights: locked.payload, insightsError: null as string | null };
+      }
       const stale = await readAnySharedInsights(data.matchId);
       if (stale) return { insights: stale.payload, insightsError: null as string | null };
       return { insights: null, insightsError: e instanceof Error ? e.message : "Insights unavailable" };

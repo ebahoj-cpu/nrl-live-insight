@@ -52,6 +52,13 @@ export const Route = createFileRoute("/api/public/hooks/precompute-insights")({
         for (const f of allFixtures) {
           try {
             const details = await fetchMatchDetails(f.matchId);
+            const kickoffMs = details.kickoffUtc ? Date.parse(details.kickoffUtc) : NaN;
+            const kickoffPassed = Number.isFinite(kickoffMs) && kickoffMs <= Date.now();
+            const stateStarted = details.matchState ? !/^(Upcoming|Pre[\s_-]?Game|Scheduled)$/i.test(details.matchState) : false;
+            if (kickoffPassed || stateStarted) {
+              results.push({ matchId: f.matchId, ok: false, reason: "locked after kickoff" });
+              continue;
+            }
             const homeNick = findTeam(details.homeTeam.nickName)?.nickname ?? details.homeTeam.nickName;
             const awayNick = findTeam(details.awayTeam.nickName)?.nickname ?? details.awayTeam.nickName;
             const event = odds.find((e) => {
@@ -130,7 +137,7 @@ export const Route = createFileRoute("/api/public/hooks/precompute-insights")({
                 away: squadSignature(details.awayTeam.players),
               },
             } as unknown as Insights;
-            await writeSharedInsights(f.matchId, payload, insightsTtlMs(details.kickoffUtc));
+            await writeSharedInsights(f.matchId, payload, insightsTtlMs(details.kickoffUtc), { matchState: details.matchState, kickoffUtc: details.kickoffUtc });
             try {
               await snapshotPrediction(buildSnapshotRow({
                 matchId: f.matchId,

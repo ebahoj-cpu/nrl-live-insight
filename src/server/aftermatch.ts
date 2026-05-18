@@ -575,17 +575,17 @@ export async function getLastLessonForTeam(args: {
         return shapeLesson(args.nickname, row);
       }
 
-      // Pull pre-match insights + match details, then build.
-      const [{ fetchMatchDetails, fetchMatchRecap }, { readAnySharedInsights }] = await Promise.all([
+      // Pull the locked kickoff insight snapshot + match details, then build.
+      const [{ fetchMatchDetails, fetchMatchRecap }, { readLockedSharedInsights }] = await Promise.all([
         import("./nrl"),
         import("./insights-store"),
       ]);
-      const [details, recap, insightsRow] = await Promise.all([
+      const [details, recap] = await Promise.all([
         fetchMatchDetails(matchId).catch(() => null),
         fetchMatchRecap(`https://www.nrl.com/draw/nrl-premiership/${matchId}/`).catch(() => null),
-        readAnySharedInsights(matchId).catch(() => null),
       ]);
       if (!details) continue;
+      const insightsRow = await readLockedSharedInsights(matchId, details.kickoffUtc).catch(() => null);
       const built = await ensureAftermatch({
         matchId,
         details,

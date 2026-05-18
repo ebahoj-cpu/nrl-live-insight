@@ -15,7 +15,7 @@ import { buildEstimatedOdds, fetchNrlOdds, fetchEventOdds, fetchTryscorerOdds, t
 import { generateInsights, type RealOdds, type Insights } from "./ai-insights";
 import { fetchVenueWeather, type WeatherSnapshot } from "./weather";
 import { findTeam } from "@/lib/teams";
-import { readSharedInsights, readAnySharedInsights, writeSharedInsights } from "./insights-store";
+import { readSharedInsights, readAnySharedInsights, readLockedSharedInsights, writeSharedInsights } from "./insights-store";
 import { getSeasonSnapshot } from "./season-stats";
 import { generateDeterministicInsights, type DeterministicInsights } from "./insights-engine";
 import { resolveModelMode, squadIsNamed, squadSignature, modeAdvanced, type ModelMode } from "./model-mode";
@@ -48,6 +48,12 @@ async function readFreshInsights(
   details: Awaited<ReturnType<typeof fetchMatchDetails>>,
   tryscorers: TryscorerMarkets | null,
 ): Promise<Awaited<ReturnType<typeof readSharedInsights>>> {
+  const kickoffMs = details.kickoffUtc ? Date.parse(details.kickoffUtc) : NaN;
+  const kickoffPassed = Number.isFinite(kickoffMs) && kickoffMs <= Date.now();
+  const stateStarted = details.matchState ? !/^(Upcoming|Pre[\s_-]?Game|Scheduled)$/i.test(details.matchState) : false;
+  if (kickoffPassed || stateStarted) {
+    return readLockedSharedInsights(matchId, details.kickoffUtc);
+  }
   const stored = await readSharedInsights(matchId);
   if (!stored) return null;
   const payload = stored.payload as unknown as {

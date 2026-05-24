@@ -47,6 +47,7 @@ async function readSealedSnapshotInsights(matchId: string): Promise<StoredInsigh
       created_at?: string | null;
       sealed_at?: string | null;
     };
+    if (!row.insights_payload && !row.snapshot_payload && !row.deterministic_payload) return null;
     const payload = (row.insights_payload ?? row.snapshot_payload?.insights ?? {
       deterministic: row.deterministic_payload ?? null,
       simulation: row.simulation_payload ?? null,

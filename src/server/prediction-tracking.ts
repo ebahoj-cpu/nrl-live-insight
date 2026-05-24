@@ -212,8 +212,18 @@ export function buildSnapshotRow(args: {
       tryscorers: !!args.tryscorers?.hasAny,
     },
     locked_before_kickoff: !kickoffPassed,
+    snapshot_version: SNAPSHOT_VERSION,
+    sealed_at: null,
+    is_sealed: false,
+    snapshot_payload: {},
+    deterministic_payload: insights as unknown as Record<string, unknown>,
+    simulation_payload: (adv.rawSimulationProb ?? null) as unknown as Record<string, unknown> | null,
+    insights_payload: null,
+    generated_bets: null,
+    payload_hash: null,
+    source_match_insights_key: null,
   };
-  return {
+  const row = {
     ...base,
     ...(adv.rawSimulationProb != null ? { raw_simulation_prob: adv.rawSimulationProb } : {}),
     ...(adv.calibratedProb != null ? { calibrated_prob: adv.calibratedProb } : {}),
@@ -222,6 +232,19 @@ export function buildSnapshotRow(args: {
     ...(adv.valueEdges != null ? { value_edges: adv.valueEdges } : {}),
     ...(adv.marketSnapshot != null ? { market_snapshot: adv.marketSnapshot } : {}),
   } as PredictionSnapshotRow;
+  const fullPayload = buildFullSnapshotPayload({
+    row,
+    deterministic: insights,
+    script,
+    odds: args.odds,
+    tryscorers: args.tryscorers,
+    simulationPayload: adv.rawSimulationProb ?? null,
+  });
+  return {
+    ...row,
+    snapshot_payload: fullPayload,
+    payload_hash: hashPayload(fullPayload),
+  };
 }
 
 // Insert-only. If a row already exists for this match_id we DO NOT overwrite —

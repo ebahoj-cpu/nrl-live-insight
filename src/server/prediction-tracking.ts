@@ -157,6 +157,9 @@ export function buildSnapshotRow(args: {
   script: ScriptPayload | null;
   odds: OddsEvent | null;
   tryscorers: TryscorerMarkets | null;
+  insightsPayload?: Insights | null;
+  simulationPayload?: unknown | null;
+  generatedBets?: unknown | null;
   round?: number | null;
   season?: number | null;
   advanced?: AdvancedSnapshotExtras;
@@ -217,9 +220,9 @@ export function buildSnapshotRow(args: {
     is_sealed: false,
     snapshot_payload: {},
     deterministic_payload: insights as unknown as Record<string, unknown>,
-    simulation_payload: (adv.rawSimulationProb ?? null) as unknown as Record<string, unknown> | null,
-    insights_payload: null,
-    generated_bets: null,
+    simulation_payload: (args.simulationPayload ?? adv.rawSimulationProb ?? null) as unknown as Record<string, unknown> | null,
+    insights_payload: (args.insightsPayload ?? null) as unknown as Record<string, unknown> | null,
+    generated_bets: args.generatedBets ?? null,
     payload_hash: null,
     source_match_insights_key: null,
   };
@@ -238,7 +241,9 @@ export function buildSnapshotRow(args: {
     script,
     odds: args.odds,
     tryscorers: args.tryscorers,
-    simulationPayload: adv.rawSimulationProb ?? null,
+    insightsPayload: args.insightsPayload ?? null,
+    simulationPayload: args.simulationPayload ?? adv.rawSimulationProb ?? null,
+    generatedBets: args.generatedBets ?? null,
   });
   return {
     ...row,

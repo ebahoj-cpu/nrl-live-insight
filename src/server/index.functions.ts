@@ -25,7 +25,7 @@ import { ensureAftermatch, getLastLessonForTeam, readAftermatch, type Aftermatch
 import { fetchZylaLadder, getZylaRequestCount } from "./zyla";
 import { generateScript, type ScriptPayload } from "./script-engine";
 import { readOddsCache, readOddsCacheEntry, readOddsCacheStale, readOddsCacheStaleEntry, writeOddsCache } from "./odds-store";
-import { snapshotPrediction, buildSnapshotRow } from "./prediction-tracking";
+import { snapshotPrediction, buildSnapshotRow, sealPredictionSnapshot } from "./prediction-tracking";
 import { listActiveImpacts, impactsForFixture, applyImpacts } from "./news-impacts";
 import { getOrGenerateSimulation, isSimulationEnabled } from "./simulation-integration";
 
@@ -77,6 +77,25 @@ async function readFreshInsights(
     return null; // mode advanced (e.g. early → squad once team lists dropped)
   }
   return stored;
+}
+
+function hasStartedOrFinished(details: { matchState?: string; kickoffUtc?: string }): { started: boolean; finished: boolean } {
+  const finished = /^(FullTime|Final|Completed)$/i.test(details.matchState ?? "");
+  const kickoffMs = details.kickoffUtc ? Date.parse(details.kickoffUtc) : NaN;
+  const kickoffPassed = Number.isFinite(kickoffMs) && kickoffMs <= Date.now();
+  const stateStarted = details.matchState ? !/^(Upcoming|Pre[\s_-]?Game|Scheduled)$/i.test(details.matchState) : false;
+  return { started: finished || kickoffPassed || stateStarted, finished };
+}
+
+async function sealFromLockedInsights(matchId: string, details: Awaited<ReturnType<typeof fetchMatchDetails>>) {
+  const locked = await readLockedSharedInsights(matchId, details.kickoffUtc);
+  await sealPredictionSnapshot({
+    matchId,
+    kickoffUtc: details.kickoffUtc,
+    insightsPayload: locked?.payload ?? null,
+    sourceMatchInsightsKey: locked?.sourceKey ?? null,
+  });
+  return locked;
 }
 
 // ---------- Last-good snapshots (graceful degradation) ----------
@@ -381,19 +400,11 @@ export const getMatchPage = createServerFn({ method: "GET" })
     const stored = await readFreshInsights(data.matchId, details, tryscorers);
 
     // Aftermatch (only for finished matches) + lessons-from-last-week per team.
-    const finished = /^(FullTime|Final|Completed)$/i.test(details.matchState);
-    // Insights "lock" fires as soon as a match has STARTED (kickoff has passed
-    // OR the matchState moved past Upcoming/PreGame). After that point, the
-    // Insights tab must show the ORIGINAL pre-match prediction forever — never
-    // a recalculated one (which leaks live/post-match data into the prediction).
-    const kickoffMs = details.kickoffUtc ? Date.parse(details.kickoffUtc) : NaN;
-    const kickoffPassed = Number.isFinite(kickoffMs) && kickoffMs <= Date.now();
-    const stateStarted = !/^(Upcoming|Pre[\s_-]?Game|Scheduled)$/i.test(details.matchState);
-    const started = finished || kickoffPassed || stateStarted;
+    const { started, finished } = hasStartedOrFinished(details);
     let aftermatch: AftermatchPayload | null = null;
     let insightsForResponse = stored?.payload ?? null;
     if (started) {
-      const locked = await readLockedSharedInsights(data.matchId, details.kickoffUtc);
+      const locked = await sealFromLockedInsights(data.matchId, details);
       if (locked) insightsForResponse = locked.payload;
     }
     if (finished) {
@@ -523,6 +534,11 @@ export const getMatchInsights = createServerFn({ method: "GET" })
           cached(`match:${data.matchId}`, TTL.match, () => fetchMatchDetails(data.matchId)),
           cached(`ladder:${season}`, TTL.ladder, () => fetchLadder(season)),
         ]);
+        const timing = hasStartedOrFinished(details);
+        if (timing.started) {
+          const locked = await sealFromLockedInsights(data.matchId, details);
+          return locked?.payload ?? null;
+        }
         const homeNick = findTeam(details.homeTeam.nickName)?.nickname ?? details.homeTeam.nickName;
         const awayNick = findTeam(details.awayTeam.nickName)?.nickname ?? details.awayTeam.nickName;
         const oddsResult = await safeOdds();
@@ -661,6 +677,8 @@ export const getMatchInsights = createServerFn({ method: "GET" })
               script: scriptPayload,
               odds,
               tryscorers,
+              insightsPayload: minimalPayload,
+              simulationPayload: simulation,
             }));
           } catch (e) { console.warn("snapshotPrediction failed:", e); }
         }
@@ -734,6 +752,21 @@ export const getMatchInsights = createServerFn({ method: "GET" })
             applyImpacts(generated as unknown as Record<string, unknown>, relevant);
           } catch (e) { console.warn("applyImpacts (enriched) failed:", e); }
           await writeSharedInsights(data.matchId, generated, insightsTtlMs(details.kickoffUtc), { matchState: details.matchState, kickoffUtc: details.kickoffUtc });
+          if (deterministic) {
+            try {
+              await snapshotPrediction(buildSnapshotRow({
+                matchId: data.matchId,
+                details,
+                insights: deterministic,
+                script: scriptPayload,
+                odds,
+                tryscorers,
+                insightsPayload: generated,
+                simulationPayload: simulation,
+                generatedBets: generated.bets ?? null,
+              }));
+            } catch (e) { console.warn("snapshotPrediction enriched failed:", e); }
+          }
           return generated;
         } catch (err) {
           console.warn("AI insight enrichment failed (deterministic still served):", err);

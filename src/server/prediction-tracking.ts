@@ -9,19 +9,23 @@
 // it. This guarantees we score what the model actually predicted before
 // kickoff, not a regenerated post-hoc payload.
 
+import { createHash } from "crypto";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import type { DeterministicInsights } from "./insights-engine";
 import type { ScriptPayload } from "./script-engine";
 import type { NrlMatchDetails, NrlMatchRecap } from "./nrl";
 import type { OddsEvent, TryscorerMarkets } from "./odds";
 import type { ModelMode } from "./model-mode";
+import type { Insights } from "./ai-insights";
 
 // ------------------------------------------------------------------
 // Types (mirror the table columns; JSONB blobs typed for safety)
 // ------------------------------------------------------------------
 
 export type PredictionSnapshotRow = {
+  id?: string;
   match_id: string;
+  created_at?: string;
   round: number | null;
   season: number | null;
   home_team: string;
@@ -49,6 +53,16 @@ export type PredictionSnapshotRow = {
   odds_snapshot: Record<string, unknown> | null;
   data_sources: { nrl: boolean; odds: boolean; tryscorers: boolean } | null;
   locked_before_kickoff: boolean;
+  snapshot_version?: string;
+  sealed_at?: string | null;
+  is_sealed?: boolean;
+  snapshot_payload?: Record<string, unknown>;
+  deterministic_payload?: Record<string, unknown> | null;
+  simulation_payload?: Record<string, unknown> | null;
+  insights_payload?: Record<string, unknown> | null;
+  generated_bets?: unknown | null;
+  payload_hash?: string | null;
+  source_match_insights_key?: string | null;
 };
 
 export type ModelPerformance = {
@@ -64,8 +78,11 @@ export type ModelPerformance = {
 };
 
 // ------------------------------------------------------------------
-// Snapshot — locked write before kickoff
+// Snapshot — versioned writes before kickoff, canonical seal at kickoff
 // ------------------------------------------------------------------
+
+const SNAPSHOT_VERSION = "prediction-v2";
+const SEALED_SNAPSHOT_VERSION = "sealed-v2";
 
 function normName(s: string | null | undefined): string | null {
   if (!s) return null;
@@ -77,6 +94,51 @@ function normName(s: string | null | undefined): string | null {
 
 function pickName(p: { name?: string } | undefined | null): string | null {
   return normName(p?.name);
+}
+
+function stableJson(value: unknown): string {
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
+  const obj = value as Record<string, unknown>;
+  return `{${Object.keys(obj).sort().map((k) => `${JSON.stringify(k)}:${stableJson(obj[k])}`).join(",")}}`;
+}
+
+function hashPayload(value: unknown): string {
+  return createHash("sha256").update(stableJson(value)).digest("hex");
+}
+
+function buildFullSnapshotPayload(args: {
+  row: PredictionSnapshotRow;
+  deterministic: DeterministicInsights;
+  script: ScriptPayload | null;
+  odds: OddsEvent | null;
+  tryscorers: TryscorerMarkets | null;
+  insightsPayload?: Insights | null;
+  simulationPayload?: unknown | null;
+  generatedBets?: unknown | null;
+}) {
+  return {
+    snapshotVersion: args.row.snapshot_version ?? SNAPSHOT_VERSION,
+    matchId: args.row.match_id,
+    generatedAt: args.deterministic.generatedAt,
+    sealedAt: args.row.sealed_at ?? null,
+    projectedWinner: args.row.predicted_winner,
+    projectedMargin: args.row.predicted_margin_band,
+    projectedScore: { home: args.row.predicted_score_home, away: args.row.predicted_score_away },
+    projectedTotals: { lean: args.row.predicted_total_lean, line: args.row.predicted_total_line },
+    htft: args.row.predicted_htft,
+    firstTryScorer: args.row.first_try_pick,
+    anytimeScorers: args.row.anytime_try_picks,
+    secondaryScorers: args.row.secondary_tier_picks,
+    deterministic: args.deterministic,
+    simulation: args.simulationPayload ?? null,
+    odds: args.odds,
+    tryscorers: args.tryscorers,
+    insights: args.insightsPayload ?? null,
+    script: args.script,
+    bets: args.generatedBets ?? null,
+    dataSources: args.row.data_sources,
+  };
 }
 
 export type AdvancedSnapshotExtras = {
@@ -95,6 +157,9 @@ export function buildSnapshotRow(args: {
   script: ScriptPayload | null;
   odds: OddsEvent | null;
   tryscorers: TryscorerMarkets | null;
+  insightsPayload?: Insights | null;
+  simulationPayload?: unknown | null;
+  generatedBets?: unknown | null;
   round?: number | null;
   season?: number | null;
   advanced?: AdvancedSnapshotExtras;
@@ -150,8 +215,18 @@ export function buildSnapshotRow(args: {
       tryscorers: !!args.tryscorers?.hasAny,
     },
     locked_before_kickoff: !kickoffPassed,
+    snapshot_version: SNAPSHOT_VERSION,
+    sealed_at: null,
+    is_sealed: false,
+    snapshot_payload: {},
+    deterministic_payload: insights as unknown as Record<string, unknown>,
+    simulation_payload: (args.simulationPayload ?? adv.rawSimulationProb ?? null) as unknown as Record<string, unknown> | null,
+    insights_payload: (args.insightsPayload ?? null) as unknown as Record<string, unknown> | null,
+    generated_bets: args.generatedBets ?? null,
+    payload_hash: null,
+    source_match_insights_key: null,
   };
-  return {
+  const row = {
     ...base,
     ...(adv.rawSimulationProb != null ? { raw_simulation_prob: adv.rawSimulationProb } : {}),
     ...(adv.calibratedProb != null ? { calibrated_prob: adv.calibratedProb } : {}),
@@ -160,13 +235,26 @@ export function buildSnapshotRow(args: {
     ...(adv.valueEdges != null ? { value_edges: adv.valueEdges } : {}),
     ...(adv.marketSnapshot != null ? { market_snapshot: adv.marketSnapshot } : {}),
   } as PredictionSnapshotRow;
+  const fullPayload = buildFullSnapshotPayload({
+    row,
+    deterministic: insights,
+    script,
+    odds: args.odds,
+    tryscorers: args.tryscorers,
+    insightsPayload: args.insightsPayload ?? null,
+    simulationPayload: args.simulationPayload ?? adv.rawSimulationProb ?? null,
+    generatedBets: args.generatedBets ?? null,
+  });
+  return {
+    ...row,
+    snapshot_payload: fullPayload,
+    payload_hash: hashPayload(fullPayload),
+  };
 }
 
-// Insert-only. If a row already exists for this match_id we DO NOT overwrite —
-// that's what guarantees "never score regenerated predictions".
+// Versioned insert-only. Pre-kickoff predictions may evolve, but each version is
+// preserved. At/after kickoff, callers seal exactly one canonical version.
 export async function snapshotPrediction(row: PredictionSnapshotRow): Promise<void> {
-  // Only lock predictions made before kickoff. Post-kickoff regenerations are
-  // skipped silently so they never pollute the learning set.
   if (!row.locked_before_kickoff) return;
   try {
     const { error } = await supabaseAdmin
@@ -183,17 +271,92 @@ export async function snapshotPrediction(row: PredictionSnapshotRow): Promise<vo
   }
 }
 
-async function readSnapshot(matchId: string): Promise<PredictionSnapshotRow | null> {
+export async function readSealedPredictionSnapshot(matchId: string): Promise<PredictionSnapshotRow | null> {
   try {
     const { data } = await supabaseAdmin
       .from("prediction_snapshots" as never)
       .select("*")
       .eq("match_id" as never, matchId as never)
+      .eq("is_sealed" as never, true as never)
+      .order("sealed_at" as never, { ascending: false } as never)
+      .limit(1)
       .maybeSingle();
     return (data as PredictionSnapshotRow | null) ?? null;
   } catch {
     return null;
   }
+}
+
+export async function readLatestPreKickoffPredictionSnapshot(matchId: string, kickoffUtc?: string | null): Promise<PredictionSnapshotRow | null> {
+  try {
+    const { data } = await supabaseAdmin
+      .from("prediction_snapshots" as never)
+      .select("*")
+      .eq("match_id" as never, matchId as never)
+      .order("created_at" as never, { ascending: true } as never)
+      .limit(100);
+    const rows = (data as PredictionSnapshotRow[] | null) ?? [];
+    if (!rows.length) return null;
+    const kickoffMs = kickoffUtc ? Date.parse(kickoffUtc) : NaN;
+    const pre = Number.isFinite(kickoffMs)
+      ? rows.filter((r) => Date.parse(r.created_at ?? "") <= kickoffMs)
+      : rows;
+    return pre[pre.length - 1] ?? rows[0] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export async function sealPredictionSnapshot(args: {
+  matchId: string;
+  kickoffUtc?: string | null;
+  insightsPayload?: Insights | null;
+  sourceMatchInsightsKey?: string | null;
+}): Promise<PredictionSnapshotRow | null> {
+  const existing = await readSealedPredictionSnapshot(args.matchId);
+  if (existing) return existing;
+  const source = await readLatestPreKickoffPredictionSnapshot(args.matchId, args.kickoffUtc);
+  if (!source) return null;
+  const sealedAt = new Date().toISOString();
+  const snapshotPayload = {
+    ...(source.snapshot_payload ?? {}),
+    snapshotVersion: SEALED_SNAPSHOT_VERSION,
+    sealedAt,
+    insights: args.insightsPayload ?? source.insights_payload ?? (source.snapshot_payload as { insights?: unknown } | undefined)?.insights ?? null,
+  };
+  const sealedRow = {
+    ...source,
+    id: undefined,
+    created_at: undefined,
+    snapshot_version: SEALED_SNAPSHOT_VERSION,
+    sealed_at: sealedAt,
+    is_sealed: true,
+    locked_before_kickoff: true,
+    insights_payload: (args.insightsPayload ?? source.insights_payload ?? null) as unknown as Record<string, unknown> | null,
+    snapshot_payload: snapshotPayload,
+    payload_hash: hashPayload(snapshotPayload),
+    source_match_insights_key: args.sourceMatchInsightsKey ?? source.source_match_insights_key ?? null,
+  } as PredictionSnapshotRow;
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("prediction_snapshots" as never)
+      .insert(sealedRow as never)
+      .select("*")
+      .maybeSingle();
+    if (error) {
+      if (/duplicate key|unique/i.test(error.message)) return readSealedPredictionSnapshot(args.matchId);
+      console.warn("sealPredictionSnapshot failed:", error.message);
+      return null;
+    }
+    return (data as PredictionSnapshotRow | null) ?? sealedRow;
+  } catch (e) {
+    console.warn("sealPredictionSnapshot threw:", e);
+    return readSealedPredictionSnapshot(args.matchId);
+  }
+}
+
+async function readSnapshot(matchId: string): Promise<PredictionSnapshotRow | null> {
+  return readSealedPredictionSnapshot(matchId) ?? readLatestPreKickoffPredictionSnapshot(matchId);
 }
 
 // ------------------------------------------------------------------

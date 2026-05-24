@@ -9,7 +9,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import type { NrlMatchDetails, NrlMatchRecap } from "./nrl";
 import type { Insights } from "./ai-insights";
 import type { DeterministicInsights, EnginePlayerPick } from "./insights-engine";
-import { recordResultAndScore } from "./prediction-tracking";
+import { recordResultAndScore, sealPredictionSnapshot } from "./prediction-tracking";
 
 const TABLE = "match_aftermatch";
 const VERSION = "v3-structured";
@@ -97,16 +97,13 @@ async function writeAftermatch(matchId: string, payload: AftermatchPayload): Pro
     const expiresAt = new Date(Date.now() + 365 * 24 * 60 * 60_000);
     const { error } = await supabaseAdmin
       .from(TABLE as never)
-      .upsert(
-        {
-          match_id: key(matchId),
-          payload: payload as unknown as Record<string, unknown>,
-          generated_at: new Date().toISOString(),
-          expires_at: expiresAt.toISOString(),
-        } as never,
-        { onConflict: "match_id" },
-      );
-    if (error) console.warn("writeAftermatch failed:", error.message);
+      .insert({
+        match_id: key(matchId),
+        payload: payload as unknown as Record<string, unknown>,
+        generated_at: new Date().toISOString(),
+        expires_at: expiresAt.toISOString(),
+      } as never);
+    if (error && !/duplicate key|unique/i.test(error.message)) console.warn("writeAftermatch failed:", error.message);
   } catch (e) {
     console.warn("writeAftermatch threw:", e);
   }
@@ -510,6 +507,8 @@ export async function ensureAftermatch(args: {
 
   const cached = await readAftermatch(args.matchId);
   if (cached && cached.summary) return cached;
+
+  await sealPredictionSnapshot({ matchId: args.matchId, kickoffUtc: args.details.kickoffUtc, insightsPayload: args.insights });
 
   const built = buildDeterministicAftermatch(args);
   if (!built) return null;

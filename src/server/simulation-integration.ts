@@ -118,7 +118,7 @@ function weatherTempoModifier(w: WeatherSnapshot | null | undefined): number | u
 }
 
 // ---------- Cache ----------
-async function readCachedSummary(matchId: string): Promise<SimulationSummary | null> {
+async function readCachedSummary(matchId: string, allowExpired = false): Promise<SimulationSummary | null> {
   try {
     const { data, error } = await supabaseAdmin
       .from("simulation_summaries" as never)
@@ -129,7 +129,7 @@ async function readCachedSummary(matchId: string): Promise<SimulationSummary | n
       .maybeSingle();
     if (error || !data) { devLog("cache-miss", { matchId }); return null; }
     const row = data as unknown as { payload: SimulationSummary; expires_at: string };
-    if (Date.parse(row.expires_at) <= Date.now()) { devLog("cache-expired", { matchId }); return null; }
+    if (!allowExpired && Date.parse(row.expires_at) <= Date.now()) { devLog("cache-expired", { matchId }); return null; }
     const valid = validateSimulation(row.payload);
     if (!valid) { devLog("validation-failed", { matchId, where: "cache" }); return null; }
     devLog("cache-hit", { matchId });
@@ -228,6 +228,11 @@ export async function getOrGenerateSimulation(args: {
   if (!isSimulationEnabled()) { devLog("flag-off"); return null; }
   if (!args.snapshot) return null;
   devLog("flag-on", { matchId: args.matchId, mode: args.modelMode });
+
+  const completed = /^(FullTime|Final|Completed)$/i.test(args.matchState ?? "");
+  if (completed) {
+    return readCachedSummary(args.matchId, true);
+  }
 
   // 1) Cache
   if (!args.forceRefresh) {

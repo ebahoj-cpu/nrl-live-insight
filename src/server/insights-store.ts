@@ -23,7 +23,47 @@ export type StoredInsights = {
   payload: Insights;
   generatedAt: string;
   expiresAt: string;
+  sourceKey?: string;
+  sealed?: boolean;
 };
+
+async function readSealedSnapshotInsights(matchId: string): Promise<StoredInsights | null> {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("prediction_snapshots" as never)
+      .select("snapshot_payload, insights_payload, deterministic_payload, simulation_payload, generated_bets, created_at, sealed_at")
+      .eq("match_id" as never, matchId as never)
+      .eq("is_sealed" as never, true as never)
+      .order("sealed_at" as never, { ascending: false } as never)
+      .limit(1)
+      .maybeSingle();
+    if (error || !data) return null;
+    const row = data as {
+      snapshot_payload?: { insights?: unknown } | null;
+      insights_payload?: unknown | null;
+      deterministic_payload?: unknown | null;
+      simulation_payload?: unknown | null;
+      generated_bets?: unknown | null;
+      created_at?: string | null;
+      sealed_at?: string | null;
+    };
+    if (!row.insights_payload && !row.snapshot_payload && !row.deterministic_payload) return null;
+    const payload = (row.insights_payload ?? row.snapshot_payload?.insights ?? {
+      deterministic: row.deterministic_payload ?? null,
+      simulation: row.simulation_payload ?? null,
+      bets: row.generated_bets ?? null,
+    }) as Insights;
+    return {
+      payload,
+      generatedAt: row.created_at ?? row.sealed_at ?? new Date(0).toISOString(),
+      expiresAt: new Date(Date.now() + 10 * 365 * 24 * 60 * 60_000).toISOString(),
+      sourceKey: "prediction_snapshots:sealed",
+      sealed: true,
+    };
+  } catch {
+    return null;
+  }
+}
 
 export async function readSharedInsights(matchId: string): Promise<StoredInsights | null> {
   try {
@@ -73,6 +113,8 @@ export async function readAnySharedInsights(matchId: string): Promise<StoredInsi
 // if a legacy fixture has no pre-kickoff row, freeze the earliest row we have.
 export async function readLockedSharedInsights(matchId: string, kickoffUtc?: string): Promise<StoredInsights | null> {
   try {
+    const sealed = await readSealedSnapshotInsights(matchId);
+    if (sealed) return sealed;
     const { data, error } = await supabaseAdmin
       .from(TABLE as never)
       .select("payload, generated_at, expires_at, match_id")
@@ -91,6 +133,7 @@ export async function readLockedSharedInsights(matchId: string, kickoffUtc?: str
       payload: row.payload as Insights,
       generatedAt: row.generated_at,
       expiresAt: row.expires_at,
+      sourceKey: row.match_id,
     };
   } catch {
     return null;

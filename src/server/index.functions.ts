@@ -534,6 +534,11 @@ export const getMatchInsights = createServerFn({ method: "GET" })
           cached(`match:${data.matchId}`, TTL.match, () => fetchMatchDetails(data.matchId)),
           cached(`ladder:${season}`, TTL.ladder, () => fetchLadder(season)),
         ]);
+        const timing = hasStartedOrFinished(details);
+        if (timing.started) {
+          const locked = await sealFromLockedInsights(data.matchId, details);
+          return locked?.payload ?? null;
+        }
         const homeNick = findTeam(details.homeTeam.nickName)?.nickname ?? details.homeTeam.nickName;
         const awayNick = findTeam(details.awayTeam.nickName)?.nickname ?? details.awayTeam.nickName;
         const oddsResult = await safeOdds();

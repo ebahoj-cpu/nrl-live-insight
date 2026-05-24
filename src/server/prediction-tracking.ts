@@ -96,6 +96,51 @@ function pickName(p: { name?: string } | undefined | null): string | null {
   return normName(p?.name);
 }
 
+function stableJson(value: unknown): string {
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
+  const obj = value as Record<string, unknown>;
+  return `{${Object.keys(obj).sort().map((k) => `${JSON.stringify(k)}:${stableJson(obj[k])}`).join(",")}}`;
+}
+
+function hashPayload(value: unknown): string {
+  return createHash("sha256").update(stableJson(value)).digest("hex");
+}
+
+function buildFullSnapshotPayload(args: {
+  row: PredictionSnapshotRow;
+  deterministic: DeterministicInsights;
+  script: ScriptPayload | null;
+  odds: OddsEvent | null;
+  tryscorers: TryscorerMarkets | null;
+  insightsPayload?: Insights | null;
+  simulationPayload?: unknown | null;
+  generatedBets?: unknown | null;
+}) {
+  return {
+    snapshotVersion: args.row.snapshot_version ?? SNAPSHOT_VERSION,
+    matchId: args.row.match_id,
+    generatedAt: args.deterministic.generatedAt,
+    sealedAt: args.row.sealed_at ?? null,
+    projectedWinner: args.row.predicted_winner,
+    projectedMargin: args.row.predicted_margin_band,
+    projectedScore: { home: args.row.predicted_score_home, away: args.row.predicted_score_away },
+    projectedTotals: { lean: args.row.predicted_total_lean, line: args.row.predicted_total_line },
+    htft: args.row.predicted_htft,
+    firstTryScorer: args.row.first_try_pick,
+    anytimeScorers: args.row.anytime_try_picks,
+    secondaryScorers: args.row.secondary_tier_picks,
+    deterministic: args.deterministic,
+    simulation: args.simulationPayload ?? null,
+    odds: args.odds,
+    tryscorers: args.tryscorers,
+    insights: args.insightsPayload ?? null,
+    script: args.script,
+    bets: args.generatedBets ?? null,
+    dataSources: args.row.data_sources,
+  };
+}
+
 export type AdvancedSnapshotExtras = {
   rawSimulationProb?: { home: number; away: number; draw: number } | null;
   calibratedProb?: { home: number; away: number; draw: number } | null;

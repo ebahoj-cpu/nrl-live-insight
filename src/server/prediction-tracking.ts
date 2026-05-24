@@ -9,19 +9,23 @@
 // it. This guarantees we score what the model actually predicted before
 // kickoff, not a regenerated post-hoc payload.
 
+import { createHash } from "crypto";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import type { DeterministicInsights } from "./insights-engine";
 import type { ScriptPayload } from "./script-engine";
 import type { NrlMatchDetails, NrlMatchRecap } from "./nrl";
 import type { OddsEvent, TryscorerMarkets } from "./odds";
 import type { ModelMode } from "./model-mode";
+import type { Insights } from "./ai-insights";
 
 // ------------------------------------------------------------------
 // Types (mirror the table columns; JSONB blobs typed for safety)
 // ------------------------------------------------------------------
 
 export type PredictionSnapshotRow = {
+  id?: string;
   match_id: string;
+  created_at?: string;
   round: number | null;
   season: number | null;
   home_team: string;
@@ -49,6 +53,16 @@ export type PredictionSnapshotRow = {
   odds_snapshot: Record<string, unknown> | null;
   data_sources: { nrl: boolean; odds: boolean; tryscorers: boolean } | null;
   locked_before_kickoff: boolean;
+  snapshot_version?: string;
+  sealed_at?: string | null;
+  is_sealed?: boolean;
+  snapshot_payload?: Record<string, unknown>;
+  deterministic_payload?: Record<string, unknown> | null;
+  simulation_payload?: Record<string, unknown> | null;
+  insights_payload?: Record<string, unknown> | null;
+  generated_bets?: unknown | null;
+  payload_hash?: string | null;
+  source_match_insights_key?: string | null;
 };
 
 export type ModelPerformance = {
@@ -64,8 +78,11 @@ export type ModelPerformance = {
 };
 
 // ------------------------------------------------------------------
-// Snapshot — locked write before kickoff
+// Snapshot — versioned writes before kickoff, canonical seal at kickoff
 // ------------------------------------------------------------------
+
+const SNAPSHOT_VERSION = "prediction-v2";
+const SEALED_SNAPSHOT_VERSION = "sealed-v2";
 
 function normName(s: string | null | undefined): string | null {
   if (!s) return null;

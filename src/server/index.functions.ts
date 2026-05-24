@@ -400,19 +400,11 @@ export const getMatchPage = createServerFn({ method: "GET" })
     const stored = await readFreshInsights(data.matchId, details, tryscorers);
 
     // Aftermatch (only for finished matches) + lessons-from-last-week per team.
-    const finished = /^(FullTime|Final|Completed)$/i.test(details.matchState);
-    // Insights "lock" fires as soon as a match has STARTED (kickoff has passed
-    // OR the matchState moved past Upcoming/PreGame). After that point, the
-    // Insights tab must show the ORIGINAL pre-match prediction forever — never
-    // a recalculated one (which leaks live/post-match data into the prediction).
-    const kickoffMs = details.kickoffUtc ? Date.parse(details.kickoffUtc) : NaN;
-    const kickoffPassed = Number.isFinite(kickoffMs) && kickoffMs <= Date.now();
-    const stateStarted = !/^(Upcoming|Pre[\s_-]?Game|Scheduled)$/i.test(details.matchState);
-    const started = finished || kickoffPassed || stateStarted;
+    const { started, finished } = hasStartedOrFinished(details);
     let aftermatch: AftermatchPayload | null = null;
     let insightsForResponse = stored?.payload ?? null;
     if (started) {
-      const locked = await readLockedSharedInsights(data.matchId, details.kickoffUtc);
+      const locked = await sealFromLockedInsights(data.matchId, details);
       if (locked) insightsForResponse = locked.payload;
     }
     if (finished) {

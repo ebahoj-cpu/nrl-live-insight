@@ -677,6 +677,8 @@ export const getMatchInsights = createServerFn({ method: "GET" })
               script: scriptPayload,
               odds,
               tryscorers,
+              insightsPayload: minimalPayload,
+              simulationPayload: simulation,
             }));
           } catch (e) { console.warn("snapshotPrediction failed:", e); }
         }
@@ -750,6 +752,21 @@ export const getMatchInsights = createServerFn({ method: "GET" })
             applyImpacts(generated as unknown as Record<string, unknown>, relevant);
           } catch (e) { console.warn("applyImpacts (enriched) failed:", e); }
           await writeSharedInsights(data.matchId, generated, insightsTtlMs(details.kickoffUtc), { matchState: details.matchState, kickoffUtc: details.kickoffUtc });
+          if (deterministic) {
+            try {
+              await snapshotPrediction(buildSnapshotRow({
+                matchId: data.matchId,
+                details,
+                insights: deterministic,
+                script: scriptPayload,
+                odds,
+                tryscorers,
+                insightsPayload: generated,
+                simulationPayload: simulation,
+                generatedBets: generated.bets ?? null,
+              }));
+            } catch (e) { console.warn("snapshotPrediction enriched failed:", e); }
+          }
           return generated;
         } catch (err) {
           console.warn("AI insight enrichment failed (deterministic still served):", err);

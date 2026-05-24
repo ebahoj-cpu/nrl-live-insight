@@ -25,7 +25,7 @@ import { ensureAftermatch, getLastLessonForTeam, readAftermatch, type Aftermatch
 import { fetchZylaLadder, getZylaRequestCount } from "./zyla";
 import { generateScript, type ScriptPayload } from "./script-engine";
 import { readOddsCache, readOddsCacheEntry, readOddsCacheStale, readOddsCacheStaleEntry, writeOddsCache } from "./odds-store";
-import { snapshotPrediction, buildSnapshotRow } from "./prediction-tracking";
+import { snapshotPrediction, buildSnapshotRow, sealPredictionSnapshot } from "./prediction-tracking";
 import { listActiveImpacts, impactsForFixture, applyImpacts } from "./news-impacts";
 import { getOrGenerateSimulation, isSimulationEnabled } from "./simulation-integration";
 

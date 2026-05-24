@@ -347,9 +347,13 @@ export type Database = {
           confidence_scores: Json | null
           created_at: string
           data_sources: Json | null
+          deterministic_payload: Json | null
           first_try_pick: string | null
+          generated_bets: Json | null
           home_team: string
           id: string
+          insights_payload: Json | null
+          is_sealed: boolean
           kickoff_utc: string | null
           locked_before_kickoff: boolean
           market_snapshot: Json | null
@@ -357,6 +361,7 @@ export type Database = {
           model_drivers: Json | null
           model_mode: string
           odds_snapshot: Json | null
+          payload_hash: string | null
           predicted_htft: string | null
           predicted_margin_band: string | null
           predicted_score_away: number | null
@@ -367,8 +372,13 @@ export type Database = {
           raw_simulation_prob: Json | null
           round: number | null
           script_prediction: Json | null
+          sealed_at: string | null
           season: number | null
           secondary_tier_picks: Json
+          simulation_payload: Json | null
+          snapshot_payload: Json
+          snapshot_version: string
+          source_match_insights_key: string | null
           value_edges: Json | null
         }
         Insert: {
@@ -379,9 +389,13 @@ export type Database = {
           confidence_scores?: Json | null
           created_at?: string
           data_sources?: Json | null
+          deterministic_payload?: Json | null
           first_try_pick?: string | null
+          generated_bets?: Json | null
           home_team: string
           id?: string
+          insights_payload?: Json | null
+          is_sealed?: boolean
           kickoff_utc?: string | null
           locked_before_kickoff?: boolean
           market_snapshot?: Json | null
@@ -389,6 +403,7 @@ export type Database = {
           model_drivers?: Json | null
           model_mode: string
           odds_snapshot?: Json | null
+          payload_hash?: string | null
           predicted_htft?: string | null
           predicted_margin_band?: string | null
           predicted_score_away?: number | null
@@ -399,8 +414,13 @@ export type Database = {
           raw_simulation_prob?: Json | null
           round?: number | null
           script_prediction?: Json | null
+          sealed_at?: string | null
           season?: number | null
           secondary_tier_picks?: Json
+          simulation_payload?: Json | null
+          snapshot_payload?: Json
+          snapshot_version?: string
+          source_match_insights_key?: string | null
           value_edges?: Json | null
         }
         Update: {
@@ -411,9 +431,13 @@ export type Database = {
           confidence_scores?: Json | null
           created_at?: string
           data_sources?: Json | null
+          deterministic_payload?: Json | null
           first_try_pick?: string | null
+          generated_bets?: Json | null
           home_team?: string
           id?: string
+          insights_payload?: Json | null
+          is_sealed?: boolean
           kickoff_utc?: string | null
           locked_before_kickoff?: boolean
           market_snapshot?: Json | null
@@ -421,6 +445,7 @@ export type Database = {
           model_drivers?: Json | null
           model_mode?: string
           odds_snapshot?: Json | null
+          payload_hash?: string | null
           predicted_htft?: string | null
           predicted_margin_band?: string | null
           predicted_score_away?: number | null
@@ -431,8 +456,13 @@ export type Database = {
           raw_simulation_prob?: Json | null
           round?: number | null
           script_prediction?: Json | null
+          sealed_at?: string | null
           season?: number | null
           secondary_tier_picks?: Json
+          simulation_payload?: Json | null
+          snapshot_payload?: Json
+          snapshot_version?: string
+          source_match_insights_key?: string | null
           value_edges?: Json | null
         }
         Relationships: []

@@ -79,6 +79,25 @@ async function readFreshInsights(
   return stored;
 }
 
+function hasStartedOrFinished(details: { matchState?: string; kickoffUtc?: string }): { started: boolean; finished: boolean } {
+  const finished = /^(FullTime|Final|Completed)$/i.test(details.matchState ?? "");
+  const kickoffMs = details.kickoffUtc ? Date.parse(details.kickoffUtc) : NaN;
+  const kickoffPassed = Number.isFinite(kickoffMs) && kickoffMs <= Date.now();
+  const stateStarted = details.matchState ? !/^(Upcoming|Pre[\s_-]?Game|Scheduled)$/i.test(details.matchState) : false;
+  return { started: finished || kickoffPassed || stateStarted, finished };
+}
+
+async function sealFromLockedInsights(matchId: string, details: Awaited<ReturnType<typeof fetchMatchDetails>>) {
+  const locked = await readLockedSharedInsights(matchId, details.kickoffUtc);
+  await sealPredictionSnapshot({
+    matchId,
+    kickoffUtc: details.kickoffUtc,
+    insightsPayload: locked?.payload ?? null,
+    sourceMatchInsightsKey: locked?.sourceKey ?? null,
+  });
+  return locked;
+}
+
 // ---------- Last-good snapshots (graceful degradation) ----------
 // Two layers: in-memory (per worker, instant) and DB-backed (survives cold
 // starts, written by cron warmers). The DB layer is the key quota saver —

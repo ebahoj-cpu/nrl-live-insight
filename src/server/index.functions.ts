@@ -450,10 +450,10 @@ export const getMatchPage = createServerFn({ method: "GET" })
     // Invalidate the cache when squads or mode have advanced since storage.
     const stored = await readFreshInsights(data.matchId, details, tryscorers);
 
-    let insightsForResponse = stored?.payload ?? null;
+    let insightsForResponse = normaliseStoredInsights(stored?.payload ?? null, details.homeTeam.nickName, details.awayTeam.nickName);
     if (started) {
       const locked = await sealFromLockedInsights(data.matchId, details);
-      if (locked) insightsForResponse = locked.payload;
+      if (locked) insightsForResponse = normaliseStoredInsights(locked.payload, details.homeTeam.nickName, details.awayTeam.nickName);
     }
 
     return {
@@ -535,7 +535,7 @@ export const getMatchInsights = createServerFn({ method: "GET" })
       if (isStarted) {
         const locked = await readLockedSharedInsights(data.matchId, detailsForCheck.kickoffUtc);
         return {
-          insights: locked?.payload ?? null,
+          insights: normaliseStoredInsights(locked?.payload ?? null, detailsForCheck.homeTeam.nickName, detailsForCheck.awayTeam.nickName),
           insightsError: locked ? null : "No pre-match insights were stored before kickoff for this fixture.",
         };
       }
@@ -560,7 +560,10 @@ export const getMatchInsights = createServerFn({ method: "GET" })
           (stored.payload as unknown as { deterministic?: unknown }).deterministic &&
           (stored.payload as unknown as { script?: unknown }).script
         ) {
-          return { insights: stored.payload, insightsError: null as string | null };
+          return {
+            insights: normaliseStoredInsights(stored.payload, detailsForCheck.homeTeam.nickName, detailsForCheck.awayTeam.nickName),
+            insightsError: null as string | null,
+          };
         }
       }
 

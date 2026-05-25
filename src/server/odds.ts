@@ -31,6 +31,10 @@ import { findTeam } from "@/lib/teams";
 import type { NrlFixture, NrlLadderRow } from "./nrl";
 import { fetchDraw } from "./nrl";
 import { readOddsCacheEntry, readOddsCacheStaleEntry, writeOddsCache } from "./odds-store";
+// Lineup-gated tryscorer fetching: we share the team-list TTL ladder so player
+// props refresh at exactly the same cadence as named lineups, and we never
+// burn a credit before lineups are out.
+import { getTeamLists, teamListTtl, getFixtures } from "./nrl-data-store";
 
 const BASE = "https://api.the-odds-api.com/v4";
 const SPORT = "rugbyleague_nrl";

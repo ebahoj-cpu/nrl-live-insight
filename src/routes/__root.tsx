@@ -4,7 +4,7 @@ import {
 } from "@tanstack/react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import appCss from "../styles.css?url";
-import { Menu, X, Swords, ListOrdered, Newspaper, Bird, Settings, UserCircle2, LogOut, Crown } from "lucide-react";
+import { Menu, X, Swords, ListOrdered, Newspaper, Bird, Settings, UserCircle2, LogOut, Crown, Download } from "lucide-react";
 import { useEffect, useState } from "react";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { AuthGate } from "@/components/AuthGate";
@@ -123,8 +123,53 @@ function cleanupPreviewServiceWorkers() {
   });
 }
 
+type BeforeInstallPromptEvent = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
+};
+
+function useInstallPrompt() {
+  const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
+  const [installed, setInstalled] = useState(false);
+
+  useEffect(() => {
+    // Hide if app is already running as installed PWA
+    const standalone =
+      window.matchMedia?.("(display-mode: standalone)").matches ||
+      // iOS Safari
+      (window.navigator as unknown as { standalone?: boolean }).standalone === true;
+    if (standalone) setInstalled(true);
+
+    const onPrompt = (e: Event) => {
+      e.preventDefault();
+      setDeferred(e as BeforeInstallPromptEvent);
+    };
+    const onInstalled = () => {
+      setInstalled(true);
+      setDeferred(null);
+    };
+    window.addEventListener("beforeinstallprompt", onPrompt);
+    window.addEventListener("appinstalled", onInstalled);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", onPrompt);
+      window.removeEventListener("appinstalled", onInstalled);
+    };
+  }, []);
+
+  const promptInstall = async () => {
+    if (!deferred) return;
+    await deferred.prompt();
+    const { outcome } = await deferred.userChoice;
+    if (outcome === "accepted") setInstalled(true);
+    setDeferred(null);
+  };
+
+  return { canInstall: !!deferred && !installed, installed, promptInstall };
+}
+
 function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const { canInstall, promptInstall } = useInstallPrompt();
 
   useEffect(() => {
     cleanupPreviewServiceWorkers();
@@ -143,6 +188,16 @@ function Header() {
           </span>
         </Link>
         <div className="flex items-center gap-2">
+          {canInstall && (
+            <button
+              onClick={promptInstall}
+              aria-label="Install app"
+              title="Install app"
+              className="inline-flex items-center justify-center h-9 w-9 rounded-full border border-accent/40 bg-accent/10 text-accent hover:bg-accent/20 transition"
+            >
+              <Download className="h-4 w-4" />
+            </button>
+          )}
           <button
             onClick={() => setMenuOpen((v) => !v)}
             aria-label="Open menu"

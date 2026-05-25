@@ -34,9 +34,14 @@ import { readOddsCacheEntry, readOddsCacheStaleEntry, writeOddsCache } from "./o
 const BASE = "https://api.the-odds-api.com/v4";
 const SPORT = "rugbyleague_nrl";
 const REGION = "au";
-// The ONLY two markets we ever request — see header for rationale.
-const MARKETS = "h2h,player_try_scorer_anytime";
+// The bulk /odds endpoint only supports "featured" markets (h2h/spreads/totals).
+// Player-prop markets like player_try_scorer_anytime MUST be fetched per-event
+// from /events/:id/odds. We request ONLY h2h in bulk (1 credit) and lazily
+// fetch tryscorers per event with aggressive caching.
+const BULK_MARKETS = "h2h";
+const TRYSCORER_MARKET = "player_try_scorer_anytime";
 const BULK_CACHE_KEY = "odds:nrl";
+const tryscorerCacheKey = (eventId: string) => `odds:nrl:tryscorers:${eventId}`;
 
 export type Outcome = { name: string; price: number; point?: number; description?: string };
 export type Market = { key: string; outcomes: Outcome[] };

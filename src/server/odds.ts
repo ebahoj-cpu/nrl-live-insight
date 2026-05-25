@@ -125,9 +125,10 @@ export async function fetchNrlOdds(): Promise<OddsEvent[]> {
 
 // ---------------------------------------------------------------------------
 // Round-wide soft refresh — mirrors maybeSweepRoundTeamLists.
-// When ANY match's odds are requested, we touch the bulk payload once. The
-// bulk call already covers every match in the round, so this is effectively a
-// throttled "refresh the round" operation. Throttled to once per round per 2m.
+// When ANY match's odds are requested, we touch the bulk h2h payload once
+// and (for matches whose lineups are already NAMED) trigger a cached
+// per-event tryscorer refresh. Throttled to once per round per 2m so even
+// frequent UI requests can never hammer The Odds API.
 // ---------------------------------------------------------------------------
 const roundOddsSweepAt = new Map<string, number>();
 const ROUND_SWEEP_INTERVAL_MS = 2 * MIN;
@@ -142,14 +143,39 @@ async function maybeSweepRoundOdds(triggerMatchId: string): Promise<void> {
   if (Date.now() - last < ROUND_SWEEP_INTERVAL_MS) return;
   roundOddsSweepAt.set(roundKey, Date.now());
 
-  // Check current cache freshness; only refetch if expired or close to it.
+  // 1. Bulk h2h refresh (1 credit, only if cache expired).
   const fresh = await readOddsCacheEntry<OddsEvent[]>(BULK_CACHE_KEY).catch(() => null);
-  if (fresh) {
-    // Already fresh — no need to spend a credit.
-    return;
+  let events: OddsEvent[] | null = fresh?.payload ?? null;
+  if (!events) {
+    events = await fetchNrlOdds().catch(() => null);
   }
-  // Background refetch; errors swallowed.
-  await fetchNrlOdds().catch(() => {});
+  if (!events || events.length === 0) return;
+
+  // 2. Tryscorer prefetch — only for upcoming matches with NAMED lineups.
+  //    Each fetchTryscorerOdds() internally re-gates on lineups + cache, so
+  //    we never spend a credit for matches without team lists, and matches
+  //    whose per-event cache is still fresh are no-ops.
+  const fixtures = await getFixtures({ season, round }).catch(() => null);
+  if (!fixtures) return;
+  const now = Date.now();
+  const upcoming = fixtures.filter((f) => {
+    const ko = Date.parse(f.kickoffUtc);
+    return Number.isFinite(ko) && ko > now - 30 * MIN;
+  });
+  await Promise.allSettled(
+    upcoming.map(async (fx) => {
+      const tl = await getTeamLists({ matchId: fx.matchId, kickoffUtc: fx.kickoffUtc }).catch(() => null);
+      if (!tl?.home.isNamed || !tl?.away.isNamed) return; // gate — no credit spent
+      const event = events!.find((e) => {
+        const fh = findTeam(fx.homeNickname)?.nickname ?? fx.homeNickname;
+        const fa = findTeam(fx.awayNickname)?.nickname ?? fx.awayNickname;
+        return (e.homeNickname === fh && e.awayNickname === fa)
+            || (e.homeNickname === fa && e.awayNickname === fh);
+      });
+      if (!event) return;
+      await fetchTryscorerOdds(event.id).catch(() => {});
+    }),
+  );
 }
 
 // ---------------------------------------------------------------------------

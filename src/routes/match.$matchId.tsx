@@ -1278,10 +1278,23 @@ function GameScriptTab({ insights, insightsLoading, home, away }:
 function KeysToVictoryPanel({ insights, insightsLoading, home, away }:
   { insights: any; insightsLoading?: boolean; home: string; away: string }) {
   const kt = insights?.intelligence?.keysToVictoryAnalyst;
-  const homeKeys: Array<{ key: string; targetsWeakness?: string; reasoning?: string }> =
-    Array.isArray(kt?.home) ? kt.home.slice(0, 3) : [];
-  const awayKeys: Array<{ key: string; targetsWeakness?: string; reasoning?: string }> =
-    Array.isArray(kt?.away) ? kt.away.slice(0, 3) : [];
+  const legacy = insights?.keysToVictory;
+  const toKeyObjects = (value: unknown): Array<{ key: string; targetsWeakness?: string; reasoning?: string }> => {
+    if (Array.isArray(value)) {
+      return value
+        .filter((item): item is string | { key?: string; targetsWeakness?: string; reasoning?: string } => !!item)
+        .map((item) => typeof item === "string" ? { key: item } : {
+          key: item.key ?? "",
+          targetsWeakness: item.targetsWeakness,
+          reasoning: item.reasoning,
+        })
+        .filter((item) => item.key)
+        .slice(0, 3);
+    }
+    return [];
+  };
+  const homeKeys = toKeyObjects(kt?.home).length > 0 ? toKeyObjects(kt?.home) : toKeyObjects(legacy?.home);
+  const awayKeys = toKeyObjects(kt?.away).length > 0 ? toKeyObjects(kt?.away) : toKeyObjects(legacy?.away);
 
   const Column = ({ team, keys }: { team: string; keys: typeof homeKeys }) => (
     <div>

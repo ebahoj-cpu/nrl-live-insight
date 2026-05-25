@@ -65,7 +65,7 @@ function MatchPage() {
 function MatchInner() {
   const { matchId } = Route.useParams();
   const { data } = useSuspenseQuery(matchQO(matchId));
-  const { details, ladder, odds, tryscorers, oddsError, oddsStale, tryscorersError, recentRecaps, aftermatch } = data as any;
+  const { details, ladder, odds, tryscorers, oddsError, oddsStale, tryscorersError, recentRecaps, aftermatch: initialAftermatch } = data as any;
 
   // Lazy AI insights — fetched in background after the page renders.
   // Initial value comes from the page payload (cache hit on the server).
@@ -81,6 +81,18 @@ function MatchInner() {
   const [tab, setTab] = useState<TabKey>("lineup");
 
   const isFinished = /^(FullTime|Final|Completed)$/i.test(details.matchState);
+
+  // Lazy aftermatch — if the finished match has no stored aftermatch yet,
+  // fetch in the background so the page renders instantly. Once generated it's
+  // persisted forever, so subsequent visits get it on the initial payload.
+  const aftermatchQ = useQuery({
+    queryKey: ["match-aftermatch", matchId],
+    queryFn: () => getMatchAftermatch({ data: { matchId } }),
+    enabled: isFinished && !initialAftermatch,
+    staleTime: Infinity,
+    retry: 1,
+  });
+  const aftermatch = initialAftermatch ?? aftermatchQ.data?.aftermatch ?? null;
 
   const homeRow = ladder.find((r: any) => r.nickname === details.homeTeam.nickName);
   const awayRow = ladder.find((r: any) => r.nickname === details.awayTeam.nickName);

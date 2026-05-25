@@ -294,6 +294,12 @@ export async function getMatchDetails(args: { matchId: string; forceRefresh?: bo
 }
 
 // ---------- Team lists ----------
+// Tracks which rounds have had a recent round-wide background sweep so
+// requesting one match's team list doesn't fan out NRL.com calls every
+// single time. One sweep per round per 2 minutes is plenty.
+const roundSweepAt = new Map<string, number>();
+const ROUND_SWEEP_INTERVAL_MS = 2 * MIN;
+
 export async function getTeamLists(args: { matchId: string; kickoffUtc?: string; forceRefresh?: boolean }): Promise<{ home: NormalisedTeamList; away: NormalisedTeamList } | null> {
   const entry = await readWithRefresh<{ home: NormalisedTeamList; away: NormalisedTeamList }>({
     kind: "team_list",
@@ -307,8 +313,41 @@ export async function getTeamLists(args: { matchId: string; kickoffUtc?: string;
       return { payload: tl, coverage: tl.home.coverage };
     },
   });
+
+  // Soft background sweep: opening one match keeps the whole round fresh.
+  // Throttled per (season, round) so we never hammer NRL.com. Each sibling
+  // match is fetched through readWithRefresh, so its own TTL/SWR rules apply —
+  // if a sibling is still fresh, nothing is refetched. Errors are swallowed.
+  void maybeSweepRoundTeamLists(args.matchId).catch(() => {});
+
   return entry?.payload ?? null;
 }
+
+async function maybeSweepRoundTeamLists(triggerMatchId: string): Promise<void> {
+  const parts = triggerMatchId.split("/");
+  const season = Number(parts[0]);
+  const round = Number((parts[1] ?? "").replace(/\D/g, ""));
+  if (!Number.isFinite(season) || !Number.isFinite(round)) return;
+  const roundKey = `${season}:${round}`;
+  const last = roundSweepAt.get(roundKey) ?? 0;
+  if (Date.now() - last < ROUND_SWEEP_INTERVAL_MS) return;
+  roundSweepAt.set(roundKey, Date.now());
+
+  const fixtures = await getFixtures({ season, round }).catch(() => null);
+  if (!fixtures) return;
+  const now = Date.now();
+  // Only sweep matches that haven't kicked off yet (or finished long ago is N/A).
+  const upcoming = fixtures.filter((f) => {
+    if (f.matchId === triggerMatchId) return false;
+    const ko = Date.parse(f.kickoffUtc);
+    return Number.isFinite(ko) && ko > now - 30 * MIN; // include just-kicked-off
+  });
+  // Fire-and-forget; each call is SWR + throttled by its own TTL.
+  await Promise.allSettled(
+    upcoming.map((f) => getTeamLists({ matchId: f.matchId, kickoffUtc: f.kickoffUtc })),
+  );
+}
+
 
 // ---------- Injuries ----------
 export async function getInjuries(args: { matchId: string; forceRefresh?: boolean }): Promise<NormalisedInjury[] | null> {

@@ -350,8 +350,8 @@ async function resolveEventContext(
   const home = event.homeNickname;
   const away = event.awayNickname;
   const fx = fixtures.find((f) => {
-    const fh = findTeam(f.homeTeam.nickName)?.nickname ?? f.homeTeam.nickName;
-    const fa = findTeam(f.awayTeam.nickName)?.nickname ?? f.awayTeam.nickName;
+    const fh = findTeam(f.homeNickname)?.nickname ?? f.homeNickname;
+    const fa = findTeam(f.awayNickname)?.nickname ?? f.awayNickname;
     return (fh === home && fa === away) || (fh === away && fa === home);
   });
   if (!fx) return null;

@@ -383,6 +383,53 @@ async function buildFixtureBrief(
     FIXTURE_TTL,
     async () => fetchMatchDetails(matchId).catch(() => null),
   );
+
+  // LATE-MAIL FRESHNESS: always pull the absolute freshest official team lists,
+  // bypassing every cache layer, so any in-week lineup change (named squad,
+  // 24h confirmation, 1h late mail) is reflected immediately in Scout. The
+  // aggressive TTL in nrl-data-store keeps NRL.com load reasonable; this just
+  // ensures Scout never serves a stale roster.
+  const freshTeamLists = await withTimeout(
+    getTeamLists({
+      matchId,
+      kickoffUtc: details?.kickoffUtc,
+      forceRefresh: true,
+    }).catch(() => null),
+    5000,
+    null,
+  );
+  if (details && freshTeamLists) {
+    const mergePlayers = (existing: NrlPlayer[] | undefined, list: typeof freshTeamLists.home | null): NrlPlayer[] | undefined => {
+      if (!list || !list.isNamed || !list.players?.length) return existing;
+      const captainById = new Map<number, boolean>();
+      for (const p of existing ?? []) {
+        // Preserve captain flag by matching firstName+lastName since playerId
+        // isn't on NrlPlayer; fall back to no captain marking otherwise.
+      }
+      const captainNames = new Set(
+        (existing ?? []).filter((p) => p.isCaptain).map((p) => `${p.firstName} ${p.lastName}`.toLowerCase()),
+      );
+      const existingHead = new Map(
+        (existing ?? []).map((p) => [`${p.firstName} ${p.lastName}`.toLowerCase(), p.headImage] as const),
+      );
+      return list.players.map<NrlPlayer>((p) => {
+        const key = `${p.firstName} ${p.lastName}`.toLowerCase();
+        return {
+          firstName: p.firstName,
+          lastName: p.lastName,
+          position: p.position,
+          jerseyNumber: p.jerseyNumber,
+          headImage: p.headshotUrl ?? existingHead.get(key),
+          isCaptain: captainNames.has(key),
+        };
+      });
+    };
+    const home = mergePlayers(details.homeTeam.players, freshTeamLists.home);
+    const away = mergePlayers(details.awayTeam.players, freshTeamLists.away);
+    if (home) details.homeTeam.players = home;
+    if (away) details.awayTeam.players = away;
+  }
+
   const ev = matchOddsEvent(oddsAll, homeNick, awayNick);
   const tryscorer = ev
     ? await fetchFreshTryscorerMarkets(ev.id)

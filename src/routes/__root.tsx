@@ -4,7 +4,7 @@ import {
 } from "@tanstack/react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import appCss from "../styles.css?url";
-import { Menu, X, Swords, ListOrdered, Newspaper, Bird, Settings, UserCircle2, LogOut, Crown } from "lucide-react";
+import { Menu, X, Swords, ListOrdered, Newspaper, Bird, Settings, UserCircle2, LogOut, Crown, Download } from "lucide-react";
 import { useEffect, useState } from "react";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { AuthGate } from "@/components/AuthGate";

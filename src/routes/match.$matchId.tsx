@@ -3158,6 +3158,11 @@ type AftermatchPayload = {
   consistencies: string[];
   inconsistencies: string[];
   summary: string;
+  comparison?: {
+    players?: {
+      firstTry?: { predicted: string | null; actual: string | null; correct: boolean };
+    };
+  };
 };
 
 function AftermatchTab({ aftermatch, home, away }:
@@ -3208,65 +3213,240 @@ function AftermatchTab({ aftermatch, home, away }:
       </Card>
 
       {aftermatch.tryscorerHits.length > 0 && (
-        <Card title="Tryscorer picks" icon={Flag}>
-          <div className="space-y-1.5">
-            {aftermatch.tryscorerHits.map((p, i) => (
-              <div key={i} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-surface-2/50 border border-border">
-                <StatusBadge status={p.status} />
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-semibold truncate">{p.name}</div>
-                  <div className="text-[11px] text-muted-foreground">{p.predictedAs}</div>
-                </div>
-                <div className="text-sm font-black tabular-nums">
-                  {p.scored} {p.scored === 1 ? "try" : "tries"}
-                </div>
-              </div>
-            ))}
-          </div>
-        </Card>
+        <TryscorerPicksCard hits={aftermatch.tryscorerHits} />
       )}
 
-      {(aftermatch.consistencies.length > 0 || aftermatch.inconsistencies.length > 0) && (
-        <Card title="Where the model held / slipped" icon={Activity}>
-          <div className="grid sm:grid-cols-2 gap-3">
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <ThumbsUp className="h-4 w-4 text-accent" />
-                <h4 className="text-xs font-bold uppercase tracking-wider">Consistencies</h4>
-              </div>
-              {aftermatch.consistencies.length === 0 ? (
-                <p className="text-xs text-muted-foreground">None this match.</p>
-              ) : (
-                <ul className="space-y-1.5">
-                  {aftermatch.consistencies.map((c, i) => (
-                    <li key={i} className="text-xs leading-relaxed text-foreground/90 flex gap-2">
-                      <Check className="h-3.5 w-3.5 text-accent shrink-0 mt-0.5" />
-                      <span>{c}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
+      <ModelReviewCard aftermatch={aftermatch} />
+    </div>
+  );
+}
+
+/* ---------- Tryscorer Picks (post-match, deduped + grouped) ---------- */
+
+type GroupedPick = { name: string; scored: number; status: "hit" | "miss"; markets: Set<string> };
+
+function groupTryscorerPicks(hits: AftermatchPlayerHit[]): {
+  first: GroupedPick | null;
+  anytime: GroupedPick[];
+  bonus: GroupedPick[];
+} {
+  // Dedupe by player name — same player often appears as First + Anytime + 2+.
+  const byName = new Map<string, GroupedPick>();
+  for (const h of hits) {
+    const key = h.name.trim().toLowerCase();
+    const existing = byName.get(key);
+    if (existing) {
+      existing.markets.add(h.predictedAs);
+      // Trust the higher scored count if duplicates disagree.
+      if (h.scored > existing.scored) existing.scored = h.scored;
+      // Promote to hit if any market for that player is a hit.
+      if (h.status === "hit") existing.status = "hit";
+    } else {
+      byName.set(key, {
+        name: h.name,
+        scored: h.scored,
+        status: h.status,
+        markets: new Set([h.predictedAs]),
+      });
+    }
+  }
+  const all = Array.from(byName.values());
+
+  // First Tryscorer pick = the player tagged "First Tryscorer".
+  const first = all.find((p) => p.markets.has("First Tryscorer")) ?? null;
+
+  // Bonus = players tagged for 2+ Tries.
+  const bonus = all.filter((p) => p.markets.has("2+ Tries"));
+
+  // Anytime = everyone else (Top Anytime #1/#2/#3, Predicted Anytime). Exclude
+  // the first-try pick from this list (we surface it separately above).
+  const anytime = all
+    .filter((p) => {
+      if (first && p === first) return false;
+      if (p.markets.has("2+ Tries") && p.markets.size === 1) return false;
+      return Array.from(p.markets).some((m) => m.includes("Anytime"));
+    })
+    // Hits first, then by tries scored desc.
+    .sort((a, b) => {
+      if (a.status !== b.status) return a.status === "hit" ? -1 : 1;
+      return b.scored - a.scored;
+    })
+    .slice(0, 4);
+
+  return { first, anytime, bonus };
+}
+
+function TryscorerPicksCard({ hits }: { hits: AftermatchPlayerHit[] }) {
+  const { first, anytime, bonus } = groupTryscorerPicks(hits);
+  return (
+    <Card title="Tryscorer Picks" icon={Flag}>
+      <div className="space-y-4">
+        {first && (
+          <Section label="First Tryscorer">
+            <PickRow pick={first} />
+          </Section>
+        )}
+        {anytime.length > 0 && (
+          <Section label="Anytime Try Scorers">
+            <div className="space-y-1.5">
+              {anytime.map((p) => <PickRow key={p.name} pick={p} />)}
             </div>
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <ThumbsDown className="h-4 w-4 text-danger" />
-                <h4 className="text-xs font-bold uppercase tracking-wider">Inconsistencies</h4>
-              </div>
-              {aftermatch.inconsistencies.length === 0 ? (
-                <p className="text-xs text-muted-foreground">None — a clean read.</p>
-              ) : (
-                <ul className="space-y-1.5">
-                  {aftermatch.inconsistencies.map((c, i) => (
-                    <li key={i} className="text-xs leading-relaxed text-foreground/90 flex gap-2">
-                      <X className="h-3.5 w-3.5 text-danger shrink-0 mt-0.5" />
-                      <span>{c}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
+          </Section>
+        )}
+        {bonus.length > 0 && (
+          <Section label="Bonus Picks · 2+ Tries">
+            <div className="space-y-1.5">
+              {bonus.map((p) => <PickRow key={p.name} pick={p} />)}
             </div>
-          </div>
-        </Card>
+          </Section>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+function Section({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5 font-bold">{label}</div>
+      {children}
+    </div>
+  );
+}
+
+function PickRow({ pick }: { pick: GroupedPick }) {
+  return (
+    <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-surface-2/50 border border-border">
+      <StatusBadge status={pick.status} />
+      <div className="flex-1 min-w-0 text-sm font-semibold truncate">{pick.name}</div>
+      <div className="text-sm font-black tabular-nums text-foreground/90">
+        {pick.scored} {pick.scored === 1 ? "try" : "tries"}
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Model Review (How the Model Did) ---------- */
+
+type ReviewItem = { label: string; line: string; status: "hit" | "miss" };
+
+function buildModelReview(p: AftermatchPayload): { right: ReviewItem[]; wrong: ReviewItem[] } {
+  const items: ReviewItem[] = [];
+
+  // Pull from the structured hits list (Match Winner, Margin, Score, Totals).
+  for (const h of p.hits) {
+    // Friendly label rewrites.
+    let label = h.market;
+    if (label.startsWith("Total Points")) label = "Total Points";
+    if (label === "Predicted Score") label = "Final Score";
+
+    let line: string;
+    if (h.status === "hit") {
+      line = `Predicted ${h.predicted} · actual ${h.actual}`;
+    } else if (h.status === "partial") {
+      line = `Predicted ${h.predicted}, actual ${h.actual}${h.detail ? ` (${h.detail.toLowerCase()})` : ""}`;
+    } else {
+      line = `Predicted ${h.predicted} · actual ${h.actual}`;
+    }
+    items.push({ label, line, status: h.status === "hit" ? "hit" : "miss" });
+  }
+
+  // First Tryscorer — from structured comparison, more reliable than text.
+  const ft = p.comparison?.players?.firstTry;
+  if (ft && (ft.predicted || ft.actual)) {
+    const predicted = ft.predicted ?? "—";
+    const actual = ft.actual ?? "no try scored";
+    items.push({
+      label: "First Tryscorer",
+      line: ft.correct
+        ? `Predicted ${predicted} — first on the board ✓`
+        : `Predicted ${predicted} — ${actual} scored first`,
+      status: ft.correct ? "hit" : "miss",
+    });
+  }
+
+  // Tryscorer picks summary — dedupe by player, list who landed vs missed.
+  const grouped = groupTryscorerPicks(p.tryscorerHits);
+  const landed = [grouped.first, ...grouped.anytime, ...grouped.bonus]
+    .filter((x): x is GroupedPick => !!x && x.status === "hit");
+  const missed = [grouped.first, ...grouped.anytime, ...grouped.bonus]
+    .filter((x): x is GroupedPick => !!x && x.status === "miss");
+  // Dedupe across the three buckets.
+  const dedup = (arr: GroupedPick[]) => Array.from(new Map(arr.map((p) => [p.name, p])).values());
+  const landedU = dedup(landed);
+  const missedU = dedup(missed);
+
+  if (landedU.length > 0) {
+    items.push({
+      label: "Tryscorer Picks",
+      line: `Landed: ${landedU.map((p) => `${p.name} (${p.scored})`).join(", ")}`,
+      status: "hit",
+    });
+  }
+  if (missedU.length > 0) {
+    items.push({
+      label: "Tryscorer Picks",
+      line: `Missed: ${missedU.map((p) => p.name).join(", ")}`,
+      status: "miss",
+    });
+  }
+
+  return {
+    right: items.filter((i) => i.status === "hit"),
+    wrong: items.filter((i) => i.status === "miss"),
+  };
+}
+
+function ModelReviewCard({ aftermatch }: { aftermatch: AftermatchPayload }) {
+  const { right, wrong } = buildModelReview(aftermatch);
+  if (right.length === 0 && wrong.length === 0) return null;
+  return (
+    <Card title="How the Model Did" icon={Activity}>
+      <div className="grid sm:grid-cols-2 gap-4">
+        <ReviewColumn
+          title="What We Got Right"
+          icon={<Check className="h-4 w-4 text-accent" />}
+          items={right}
+          tone="hit"
+          emptyMsg="No clean reads this match."
+        />
+        <ReviewColumn
+          title="What We Missed"
+          icon={<X className="h-4 w-4 text-danger" />}
+          items={wrong}
+          tone="miss"
+          emptyMsg="Nothing missed — a clean read."
+        />
+      </div>
+    </Card>
+  );
+}
+
+function ReviewColumn({
+  title, icon, items, tone, emptyMsg,
+}: { title: string; icon: React.ReactNode; items: ReviewItem[]; tone: "hit" | "miss"; emptyMsg: string }) {
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-2">
+        {icon}
+        <h4 className="text-xs font-bold uppercase tracking-wider">{title}</h4>
+      </div>
+      {items.length === 0 ? (
+        <p className="text-xs text-muted-foreground">{emptyMsg}</p>
+      ) : (
+        <ul className="space-y-1.5">
+          {items.map((it, i) => (
+            <li key={i} className="flex gap-2 items-start text-sm leading-snug">
+              {tone === "hit"
+                ? <Check className="h-3.5 w-3.5 text-accent shrink-0 mt-1" />
+                : <X className="h-3.5 w-3.5 text-danger shrink-0 mt-1" />}
+              <div className="min-w-0">
+                <div className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{it.label}</div>
+                <div className="text-foreground/90">{it.line}</div>
+              </div>
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   );

@@ -338,6 +338,7 @@ function InjectIntoMatchButton({ item, data }: { item: NewsItemProps["item"]; da
   );
 }
 
+function ImpactBody({ item, data }: { item: NewsItemProps["item"]; data: ArticleSummary }) {
   const dir = data.bettingImpact.direction;
   const tone =
     dir === "positive"

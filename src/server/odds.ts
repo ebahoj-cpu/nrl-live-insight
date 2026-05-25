@@ -5,25 +5,26 @@
 // CREDIT-SAVING STRATEGY (free tier = 500 credits / month must last the season)
 // ---------------------------------------------------------------------------
 // The Odds API charges 1 credit per (region × market) per /odds call. We
-// deliberately restrict ourselves to TWO markets and ONE region:
+// restrict ourselves to ONE region ("au") and only the markets we actually use:
 //
-//   • h2h                         — head-to-head (moneyline) winner
-//   • player_try_scorer_anytime   — anytime tryscorer Yes/No per player
+//   • h2h                         — head-to-head winner (BULK endpoint)
+//   • player_try_scorer_anytime   — anytime tryscorer Yes/No (PER-EVENT only;
+//                                   bulk /odds rejects player_* markets with
+//                                   422 INVALID_MARKET)
 //
-// Region: "au" only.
+// Call pattern:
+//   - fetchNrlOdds(): one bulk GET /sports/.../odds with markets=h2h.
+//     Cost = 1 credit. Returns every NRL event for the round.
+//   - fetchTryscorerOdds(eventId): per-event GET /events/:id/odds with
+//     markets=player_try_scorer_anytime. Cost = 1 credit per event, cached
+//     per-event with the same kickoff-aware TTL ladder.
 //
-// Crucially we hit the BULK /odds endpoint (one call returns every NRL event
-// for the sport with both markets). We DO NOT call the per-event /events/:id/
-// odds endpoint anymore — that used to multiply our credit burn by the number
-// of fixtures in a round. `fetchTryscorerOdds(eventId)` now derives its result
-// from the cached bulk payload at zero additional credit cost.
-//
-// Combined with the aggressive TTL (mirrors `teamListTtl` in nrl-data-store):
+// TTL ladder (mirrors `teamListTtl` in nrl-data-store):
 //   >48h until any kickoff → 15 min
 //   ≤48h                   → 5 min
 //   ≤12h                   → 2 min
 //   ≤3h  (live window)     → 60 s
-// We comfortably stay under 500 credits/month across a full NRL season.
+// A typical 8-match round refresh = 1 (bulk h2h) + 8 (tryscorers) = 9 credits.
 // ============================================================================
 
 import { findTeam } from "@/lib/teams";

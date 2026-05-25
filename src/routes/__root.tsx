@@ -4,7 +4,7 @@ import {
 } from "@tanstack/react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import appCss from "../styles.css?url";
-import { Download, Menu, X, Swords, ListOrdered, Newspaper, Bird, Settings, UserCircle2, LogOut } from "lucide-react";
+import { Menu, X, Swords, ListOrdered, Newspaper, Bird, Settings, UserCircle2, LogOut } from "lucide-react";
 import { useEffect, useState } from "react";
 
 interface RouterContext { queryClient: QueryClient }
@@ -54,7 +54,6 @@ export const Route = createRootRouteWithContext<RouterContext>()({
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "" },
       { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@500;600;700&display=swap" },
-      { rel: "manifest", href: "/api/public/manifest" },
       { rel: "apple-touch-icon", href: "/api/public/app-icon?size=512" },
     ],
   }),
@@ -77,6 +76,11 @@ function RootShell({ children }: { children: React.ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+
+  useEffect(() => {
+    cleanupPreviewServiceWorkers();
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <Header />
@@ -88,56 +92,37 @@ function RootComponent() {
   );
 }
 
-type BIPEvent = Event & {
-  prompt: () => Promise<void>;
-  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
-};
+function isPreviewRuntime() {
+  if (typeof window === "undefined") return false;
+  const host = window.location.hostname;
+  const inIframe = (() => {
+    try {
+      return window.self !== window.top;
+    } catch {
+      return true;
+    }
+  })();
+  return inIframe || host.includes("id-preview--") || host.includes("lovableproject.com");
+}
+
+function cleanupPreviewServiceWorkers() {
+  if (typeof window === "undefined" || !isPreviewRuntime()) return;
+  // Installed preview PWAs can keep an old cached shell and show only the launch icon.
+  // In Lovable preview/iframe contexts, clear any prior service worker/cache state.
+  void navigator.serviceWorker?.getRegistrations().then((registrations) => {
+    registrations.forEach((registration) => void registration.unregister());
+  });
+  void window.caches?.keys().then((names) => {
+    names.forEach((name) => void window.caches.delete(name));
+  });
+}
 
 function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [installPrompt, setInstallPrompt] = useState<BIPEvent | null>(null);
-  const [installed, setInstalled] = useState(false);
-  const [showIosHint, setShowIosHint] = useState(false);
 
   useEffect(() => {
-    const onBIP = (e: Event) => {
-      e.preventDefault();
-      setInstallPrompt(e as BIPEvent);
-    };
-    const onInstalled = () => {
-      setInstalled(true);
-      setInstallPrompt(null);
-    };
-    // Already installed?
-    const standalone =
-      window.matchMedia?.("(display-mode: standalone)").matches ||
-      // iOS Safari
-      (navigator as unknown as { standalone?: boolean }).standalone === true;
-    if (standalone) setInstalled(true);
-
-    window.addEventListener("beforeinstallprompt", onBIP);
-    window.addEventListener("appinstalled", onInstalled);
-    return () => {
-      window.removeEventListener("beforeinstallprompt", onBIP);
-      window.removeEventListener("appinstalled", onInstalled);
-    };
+    cleanupPreviewServiceWorkers();
   }, []);
-
-  const installApp = async () => {
-    if (installPrompt) {
-      await installPrompt.prompt();
-      const choice = await installPrompt.userChoice;
-      if (choice.outcome === "accepted") setInstalled(true);
-      setInstallPrompt(null);
-      return;
-    }
-    // Fallback (iOS / unsupported): show "Add to Home Screen" hint.
-    setShowIosHint(true);
-  };
-
-  if (installed) {
-    // No-op: keep menu still rendered via the button below.
-  }
 
   return (
     <>
@@ -152,16 +137,6 @@ function Header() {
           </span>
         </Link>
         <div className="flex items-center gap-2">
-          {!installed && (
-            <button
-              onClick={installApp}
-              aria-label="Install app"
-              className="inline-flex items-center gap-2 rounded-full border border-accent/40 bg-accent/15 text-accent px-3 py-1.5 text-sm font-semibold hover:bg-accent/25 transition"
-            >
-              <Download className="h-4 w-4" />
-              <span className="hidden sm:inline">Install app</span>
-            </button>
-          )}
           <button
             onClick={() => setMenuOpen((v) => !v)}
             aria-label="Open menu"
@@ -174,32 +149,7 @@ function Header() {
       </div>
     </header>
     {menuOpen && <NavMenu onClose={() => setMenuOpen(false)} />}
-    {showIosHint && <IosInstallHint onClose={() => setShowIosHint(false)} />}
     </>
-  );
-}
-
-function IosInstallHint({ onClose }: { onClose: () => void }) {
-  return (
-    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-4 bg-background/60 backdrop-blur-sm overflow-y-auto">
-      <div className="w-full max-w-sm my-auto rounded-2xl border border-border bg-surface p-5 shadow-2xl max-h-[calc(100vh-2rem)] overflow-y-auto">
-        <div className="text-[10px] uppercase tracking-[0.2em] text-accent font-bold mb-2">Install LINEBREAK</div>
-        <h2 className="font-display font-extrabold text-lg mb-2">Add to Home Screen</h2>
-        <p className="text-sm text-muted-foreground">
-          On iPhone: tap the <span className="font-semibold text-foreground">Share</span> button in Safari, then choose
-          <span className="font-semibold text-foreground"> "Add to Home Screen"</span>.
-        </p>
-        <p className="text-sm text-muted-foreground mt-2">
-          On Android: open the browser menu and tap <span className="font-semibold text-foreground">"Install app"</span>.
-        </p>
-        <button
-          onClick={onClose}
-          className="mt-4 w-full inline-flex items-center justify-center rounded-full bg-accent text-accent-foreground font-semibold py-2 text-sm"
-        >
-          Got it
-        </button>
-      </div>
-    </div>
   );
 }
 

@@ -5,25 +5,26 @@
 // CREDIT-SAVING STRATEGY (free tier = 500 credits / month must last the season)
 // ---------------------------------------------------------------------------
 // The Odds API charges 1 credit per (region × market) per /odds call. We
-// deliberately restrict ourselves to TWO markets and ONE region:
+// restrict ourselves to ONE region ("au") and only the markets we actually use:
 //
-//   • h2h                         — head-to-head (moneyline) winner
-//   • player_try_scorer_anytime   — anytime tryscorer Yes/No per player
+//   • h2h                         — head-to-head winner (BULK endpoint)
+//   • player_try_scorer_anytime   — anytime tryscorer Yes/No (PER-EVENT only;
+//                                   bulk /odds rejects player_* markets with
+//                                   422 INVALID_MARKET)
 //
-// Region: "au" only.
+// Call pattern:
+//   - fetchNrlOdds(): one bulk GET /sports/.../odds with markets=h2h.
+//     Cost = 1 credit. Returns every NRL event for the round.
+//   - fetchTryscorerOdds(eventId): per-event GET /events/:id/odds with
+//     markets=player_try_scorer_anytime. Cost = 1 credit per event, cached
+//     per-event with the same kickoff-aware TTL ladder.
 //
-// Crucially we hit the BULK /odds endpoint (one call returns every NRL event
-// for the sport with both markets). We DO NOT call the per-event /events/:id/
-// odds endpoint anymore — that used to multiply our credit burn by the number
-// of fixtures in a round. `fetchTryscorerOdds(eventId)` now derives its result
-// from the cached bulk payload at zero additional credit cost.
-//
-// Combined with the aggressive TTL (mirrors `teamListTtl` in nrl-data-store):
+// TTL ladder (mirrors `teamListTtl` in nrl-data-store):
 //   >48h until any kickoff → 15 min
 //   ≤48h                   → 5 min
 //   ≤12h                   → 2 min
 //   ≤3h  (live window)     → 60 s
-// We comfortably stay under 500 credits/month across a full NRL season.
+// A typical 8-match round refresh = 1 (bulk h2h) + 8 (tryscorers) = 9 credits.
 // ============================================================================
 
 import { findTeam } from "@/lib/teams";
@@ -34,9 +35,14 @@ import { readOddsCacheEntry, readOddsCacheStaleEntry, writeOddsCache } from "./o
 const BASE = "https://api.the-odds-api.com/v4";
 const SPORT = "rugbyleague_nrl";
 const REGION = "au";
-// The ONLY two markets we ever request — see header for rationale.
-const MARKETS = "h2h,player_try_scorer_anytime";
+// The bulk /odds endpoint only supports "featured" markets (h2h/spreads/totals).
+// Player-prop markets like player_try_scorer_anytime MUST be fetched per-event
+// from /events/:id/odds. We request ONLY h2h in bulk (1 credit) and lazily
+// fetch tryscorers per event with aggressive caching.
+const BULK_MARKETS = "h2h";
+const TRYSCORER_MARKET = "player_try_scorer_anytime";
 const BULK_CACHE_KEY = "odds:nrl";
+const tryscorerCacheKey = (eventId: string) => `odds:nrl:tryscorers:${eventId}`;
 
 export type Outcome = { name: string; price: number; point?: number; description?: string };
 export type Market = { key: string; outcomes: Outcome[] };
@@ -101,7 +107,7 @@ export function oddsTtl(kickoffsUtc?: string[] | string): number {
 // ---------------------------------------------------------------------------
 export async function fetchNrlOdds(): Promise<OddsEvent[]> {
   const key = ensureKey();
-  const url = `${BASE}/sports/${SPORT}/odds/?apiKey=${key}&regions=${REGION}&markets=${MARKETS}&oddsFormat=decimal`;
+  const url = `${BASE}/sports/${SPORT}/odds/?apiKey=${key}&regions=${REGION}&markets=${BULK_MARKETS}&oddsFormat=decimal`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Odds API HTTP ${res.status}`);
   const data = (await res.json()) as unknown[];
@@ -278,9 +284,12 @@ export async function fetchEventOdds(eventId: string): Promise<OddsEvent | null>
 }
 
 // ---------------------------------------------------------------------------
-// Tryscorer markets — extracted from the bulk payload (ZERO extra credits).
-// We deliberately only support `anytime`. Other markets (first / multi) are
-// returned as empty arrays so existing call sites keep their shape.
+// Tryscorer markets — fetched per-event from /events/:id/odds (bulk /odds
+// does NOT accept player_*  markets, only featured h2h/spreads/totals).
+// Each call costs 1 credit per region per market = 1 credit. We cache each
+// event's tryscorer payload with the same kickoff-aware TTL ladder used for
+// h2h so a typical round only burns ~8 credits per refresh cycle.
+// Only `anytime` is requested; `first`/`multi` stay [] for shape parity.
 // ---------------------------------------------------------------------------
 export type TryscorerOdds = {
   player: string;
@@ -290,27 +299,43 @@ export type TryscorerOdds = {
 
 export type TryscorerMarkets = {
   first: TryscorerOdds[];   // always [] — not fetched (saves credits)
-  anytime: TryscorerOdds[]; // populated from bulk payload
+  anytime: TryscorerOdds[]; // populated from per-event /events/:id/odds call
   multi: TryscorerOdds[];   // always [] — not fetched (saves credits)
   hasAny: boolean;
   lastUpdate: string | null;
 };
 
+async function fetchEventTryscorerLive(eventId: string): Promise<OddsEvent | null> {
+  const key = ensureKey();
+  const url = `${BASE}/sports/${SPORT}/events/${eventId}/odds/?apiKey=${key}&regions=${REGION}&markets=${TRYSCORER_MARKET}&oddsFormat=decimal`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Odds API HTTP ${res.status}`);
+  const data = (await res.json()) as Record<string, unknown>;
+  return mapEvent(data);
+}
+
 export async function fetchTryscorerOdds(eventId: string): Promise<TryscorerMarkets> {
   const empty: TryscorerMarkets = { first: [], anytime: [], multi: [], hasAny: false, lastUpdate: null };
+  const cacheKey = tryscorerCacheKey(eventId);
 
-  const fresh = await readOddsCacheEntry<OddsEvent[]>(BULK_CACHE_KEY).catch(() => null);
-  let events = fresh?.payload ?? null;
-  if (!events) {
-    try { events = await fetchNrlOdds(); }
-    catch {
-      const stale = await readOddsCacheStaleEntry<OddsEvent[]>(BULK_CACHE_KEY).catch(() => null);
-      events = stale?.payload ?? null;
+  // 1. Fresh cache for this event.
+  let event: OddsEvent | null = null;
+  const fresh = await readOddsCacheEntry<OddsEvent>(cacheKey).catch(() => null);
+  if (fresh) event = fresh.payload;
+
+  // 2. Miss → live per-event fetch (1 credit). Fall back to stale on error.
+  if (!event) {
+    try {
+      event = await fetchEventTryscorerLive(eventId);
+      if (event) {
+        const ttl = oddsTtl(event.commenceUtc);
+        await writeOddsCache(cacheKey, event, ttl).catch(() => {});
+      }
+    } catch {
+      const stale = await readOddsCacheStaleEntry<OddsEvent>(cacheKey).catch(() => null);
+      event = stale?.payload ?? null;
     }
   }
-  if (!events) return empty;
-
-  const event = events.find((e) => e.id === eventId);
   if (!event) return empty;
 
   // Best (highest) price per player across all bookies for anytime markets.

@@ -27,6 +27,8 @@ import type { NormalisedTeamStats, NormalisedInjury, NormalisedMatchOfficial } f
 import { buildSimulationInput } from "./simulation-feature-builder";
 import { runSimulation } from "./simulation-engine";
 import { findTeam } from "@/lib/teams";
+// Learning layer: pulls gentle adjustments derived from past scored matches.
+import { getConfidenceAdjustments } from "./prediction-tracking";
 
 // Feature flag. Server-only — NEVER expose to the client.
 // Explicit truthy ("true"|"1"|"yes") or falsy ("false"|"0"|"no"|"off") values
@@ -275,6 +277,39 @@ export async function getOrGenerateSimulation(args: {
     const raw = runSimulation(input);
     const summary = validateSimulation(raw);
     if (!summary) { devLog("validation-failed", { matchId: args.matchId, where: "generate" }); return null; }
+
+    // === Learning layer nudge (gentle adaptation from past performance) ===
+    // Pulls lessons from the last 30 scored matches and applies tiny capped
+    // refinements on top of the deterministic engine. Caps below ensure this
+    // layer can only nudge — never override — the core simulation.
+    try {
+      const adjustments = await getConfidenceAdjustments(30);
+      summary.homeWinProb = Math.max(
+        0.01,
+        Math.min(0.99, summary.homeWinProb + (adjustments.winner ?? 0) * 0.12),
+      );
+      // Keep two-way probabilities consistent; draw prob is preserved by
+      // re-normalising against the remaining mass.
+      const remaining = Math.max(0, 1 - summary.homeWinProb - summary.drawProb);
+      summary.awayWinProb = remaining;
+      summary.expectedMargin += (adjustments.margin ?? 0) * 2.5;
+      // Engine exposes `expectedTotal` (no `meanTotal`); same semantic field.
+      summary.expectedTotal += (adjustments.total ?? 0) * 3;
+      // `confidence` is a string tier on SimulationSummary, so the numeric
+      // nudge from the learning layer is only applied if a numeric field is
+      // ever introduced — guarded so this is a no-op today.
+      const conf = (summary as unknown as { confidence: unknown }).confidence;
+      if (typeof conf === "number") {
+        (summary as unknown as { confidence: number }).confidence = Math.max(
+          0,
+          Math.min(1, conf + (adjustments.overall ?? 0) * 0.15),
+        );
+      }
+    } catch (e) {
+      // Learning layer must never break the simulation pipeline.
+      devLog("learning-layer-skipped", { matchId: args.matchId, err: String(e) });
+    }
+
     devLog("generated", { matchId: args.matchId, confidence: summary.confidence });
     // Fire-and-forget persistence — don't block the page.
     void writeSummary({

@@ -37,15 +37,21 @@ const AuthContext = createContext<AuthState | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [sessionResolved, setSessionResolved] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(false);
 
   const loadProfile = useCallback(async (userId: string) => {
-    const { data } = await supabase
-      .from("profiles")
-      .select("id, username, full_name, is_premium")
-      .eq("id", userId)
-      .maybeSingle();
-    setProfile((data as Profile) ?? null);
+    setProfileLoading(true);
+    try {
+      const { data } = await supabase
+        .from("profiles")
+        .select("id, username, full_name, is_premium")
+        .eq("id", userId)
+        .maybeSingle();
+      setProfile((data as Profile) ?? null);
+    } finally {
+      setProfileLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -53,21 +59,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => {
       setSession(newSession);
       if (newSession?.user) {
+        setProfileLoading(true);
         // Defer to avoid deadlock inside the auth callback
         setTimeout(() => void loadProfile(newSession.user.id), 0);
       } else {
         setProfile(null);
+        setProfileLoading(false);
       }
     });
 
     void supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
-      if (data.session?.user) void loadProfile(data.session.user.id);
-      setLoading(false);
+      if (data.session?.user) {
+        setProfileLoading(true);
+        void loadProfile(data.session.user.id);
+      }
+      setSessionResolved(true);
     });
 
     return () => sub.subscription.unsubscribe();
   }, [loadProfile]);
+
+  // Loading is true until we've resolved the session AND (when signed in) the
+  // profile row. This prevents the premium-gate flash where session is known
+  // but is_premium hasn't been fetched yet → isPremium briefly reads as false.
+  const loading = !sessionResolved || (!!session?.user && profileLoading && !profile);
 
   const value: AuthState = {
     session,

@@ -404,7 +404,10 @@ function SummaryBody({ item, data }: { item: NewsItemProps["item"]; data: Articl
             <Icon className="h-3.5 w-3.5" />
             {tone.label} on Insights bets
           </div>
-          <InjectButton item={item} data={data} />
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <InjectIntoMatchButton item={item} data={data} />
+            <InjectButton item={item} data={data} />
+          </div>
         </div>
         <p className="text-xs leading-relaxed text-foreground/90">{data.bettingImpact.note}</p>
       </div>

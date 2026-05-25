@@ -4,9 +4,11 @@ import { Suspense, useState } from "react";
 import { getNews } from "@/server/news.functions";
 import { summariseArticle, type ArticleSummary } from "@/server/news-summary.functions";
 import { injectNewsImpact, listInjectedArticles } from "@/server/news-impacts.functions";
-import { ExternalLink, Sparkles, TrendingUp, TrendingDown, Minus, Loader2, ClipboardList, Plus, Check } from "lucide-react";
+import { ExternalLink, Sparkles, TrendingUp, TrendingDown, Minus, Loader2, ClipboardList, Plus, Check, Target } from "lucide-react";
 import { findTeam } from "@/lib/teams";
 import { TeamLogo } from "@/components/TeamLogo";
+import { InjectIntoMatchDialog } from "@/components/InjectIntoMatchDialog";
+import { useAuth } from "@/hooks/useAuth";
 
 // Publisher logos for known sources (matched case-insensitively, substring).
 const PUBLISHER_LOGOS: { match: RegExp; src: string; alt: string }[] = [

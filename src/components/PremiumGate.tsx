@@ -9,11 +9,12 @@ import { Crown, Check, ArrowLeft } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 
 const FEATURES = [
-  "AI match insights & predicted scripts",
-  "Tryscorer picks (first, anytime, secondary)",
-  "Scout — chat with our NRL model",
-  "Live odds + value edges",
-  "News-driven model adjustments",
+  "Real-time AI match insights & predicted game scripts",
+  "Expert Tryscorer Picks (First Try, Anytime, 2+ Tries)",
+  "Chat directly with Scout — your personal NRL AI analyst",
+  "Live odds + smart value betting edges from major bookies",
+  "Instant lineup analysis & late mail updates",
+  "Weekly model performance reports & accuracy tracking",
 ];
 
 export function PremiumGate() {
@@ -47,8 +48,8 @@ export function PremiumGate() {
 
             <div className="mt-7 w-full">
               <div className="flex items-baseline justify-center gap-1 mb-3">
-                <span className="font-display font-extrabold text-4xl">$9</span>
-                <span className="text-sm text-muted-foreground">/ month</span>
+                <span className="font-display font-extrabold text-4xl">$9.95</span>
+                <span className="text-sm text-muted-foreground">/ week</span>
               </div>
               <Button
                 size="lg"

@@ -2078,6 +2078,9 @@ function InsightsTab({ matchId, insights, insightsError, insightsLoading, home, 
 
   return (
     <div className="space-y-4">
+      {/* Personal-only: user's own article-based injections for this match */}
+      <YourInjectedInsights matchId={matchId} />
+
       {/* 1 — Match Winner */}
       <Card title="Match winner" icon={Trophy} className="accent-glow">
         <div className="flex items-center gap-3 mb-2">

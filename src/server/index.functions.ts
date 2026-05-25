@@ -28,6 +28,7 @@ import { readOddsCache, readOddsCacheEntry, readOddsCacheStale, readOddsCacheSta
 import { snapshotPrediction, buildSnapshotRow, sealPredictionSnapshot } from "./prediction-tracking";
 import { listActiveImpacts, impactsForFixture, applyImpacts } from "./news-impacts";
 import { getOrGenerateSimulation, isSimulationEnabled } from "./simulation-integration";
+import { normaliseInsights } from "./normalise-insights";
 
 // Source tracking — surfaced in server logs and (where harmless) on payloads.
 export type DataSource = "nrl_com" | "zyla" | "mixed" | "proxy";
@@ -36,6 +37,16 @@ export type DataSource = "nrl_com" | "zyla" | "mixed" | "proxy";
 // simultaneously within a single worker, only one actually invokes the AI;
 // the rest await the same promise and read the freshly persisted DB row.
 const inFlight = new Map<string, Promise<Insights | null>>();
+
+function normaliseStoredInsights(payload: Insights | null | undefined, homeName: string, awayName: string): Insights | null {
+  if (!payload || typeof payload !== "object") return null;
+  try {
+    return normaliseInsights(payload, homeName, awayName);
+  } catch (error) {
+    console.warn("normaliseStoredInsights failed:", error);
+    return payload;
+  }
+}
 
 // Cache freshness gate. A stored insights row is only valid when:
 //   1. The squad signature on disk matches the current NRL.com squads, AND
@@ -439,10 +450,10 @@ export const getMatchPage = createServerFn({ method: "GET" })
     // Invalidate the cache when squads or mode have advanced since storage.
     const stored = await readFreshInsights(data.matchId, details, tryscorers);
 
-    let insightsForResponse = stored?.payload ?? null;
+    let insightsForResponse = normaliseStoredInsights(stored?.payload ?? null, details.homeTeam.nickName, details.awayTeam.nickName);
     if (started) {
       const locked = await sealFromLockedInsights(data.matchId, details);
-      if (locked) insightsForResponse = locked.payload;
+      if (locked) insightsForResponse = normaliseStoredInsights(locked.payload, details.homeTeam.nickName, details.awayTeam.nickName);
     }
 
     return {
@@ -524,7 +535,7 @@ export const getMatchInsights = createServerFn({ method: "GET" })
       if (isStarted) {
         const locked = await readLockedSharedInsights(data.matchId, detailsForCheck.kickoffUtc);
         return {
-          insights: locked?.payload ?? null,
+          insights: normaliseStoredInsights(locked?.payload ?? null, detailsForCheck.homeTeam.nickName, detailsForCheck.awayTeam.nickName),
           insightsError: locked ? null : "No pre-match insights were stored before kickoff for this fixture.",
         };
       }
@@ -549,7 +560,10 @@ export const getMatchInsights = createServerFn({ method: "GET" })
           (stored.payload as unknown as { deterministic?: unknown }).deterministic &&
           (stored.payload as unknown as { script?: unknown }).script
         ) {
-          return { insights: stored.payload, insightsError: null as string | null };
+          return {
+            insights: normaliseStoredInsights(stored.payload, detailsForCheck.homeTeam.nickName, detailsForCheck.awayTeam.nickName),
+            insightsError: null as string | null,
+          };
         }
       }
 
@@ -810,7 +824,12 @@ export const getMatchInsights = createServerFn({ method: "GET" })
       inFlight.set(lockKey, job);
       try {
         const insights = await job;
-        if (insights) return { insights, insightsError: null as string | null };
+        if (insights) {
+          return {
+            insights: normaliseStoredInsights(insights, detailsForCheck.homeTeam.nickName, detailsForCheck.awayTeam.nickName),
+            insightsError: null as string | null,
+          };
+        }
         return { insights: null, insightsError: "Insights engine produced no output" };
       } finally {
         inFlight.delete(lockKey);
@@ -822,10 +841,20 @@ export const getMatchInsights = createServerFn({ method: "GET" })
       const stateStarted = detailsForCheck?.matchState ? !/^(Upcoming|Pre[\s_-]?Game|Scheduled)$/i.test(detailsForCheck.matchState) : false;
       if (kickoffPassed || stateStarted) {
         const locked = await readLockedSharedInsights(data.matchId, kickoffUtc);
-        if (locked) return { insights: locked.payload, insightsError: null as string | null };
+        if (locked && detailsForCheck) {
+          return {
+            insights: normaliseStoredInsights(locked.payload, detailsForCheck.homeTeam.nickName, detailsForCheck.awayTeam.nickName),
+            insightsError: null as string | null,
+          };
+        }
       }
       const stale = await readAnySharedInsights(data.matchId);
-      if (stale) return { insights: stale.payload, insightsError: null as string | null };
+      if (stale && detailsForCheck) {
+        return {
+          insights: normaliseStoredInsights(stale.payload, detailsForCheck.homeTeam.nickName, detailsForCheck.awayTeam.nickName),
+          insightsError: null as string | null,
+        };
+      }
       return { insights: null, insightsError: e instanceof Error ? e.message : "Insights unavailable" };
     }
   });

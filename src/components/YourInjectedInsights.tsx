@@ -29,7 +29,7 @@ export function YourInjectedInsights({ matchId }: { matchId: string }) {
   });
 
   if (!session || !isPremium) return null;
-  const items = q.data ?? [];
+  const items = Array.isArray(q.data) ? q.data : [];
   if (q.isLoading) {
     return (
       <div className="rounded-2xl border border-accent/30 bg-accent/5 p-4 flex items-center gap-2 text-xs text-muted-foreground">
@@ -37,6 +37,7 @@ export function YourInjectedInsights({ matchId }: { matchId: string }) {
       </div>
     );
   }
+  if (q.isError) return null;
   if (items.length === 0) return null;
 
   return (

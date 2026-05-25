@@ -1278,10 +1278,23 @@ function GameScriptTab({ insights, insightsLoading, home, away }:
 function KeysToVictoryPanel({ insights, insightsLoading, home, away }:
   { insights: any; insightsLoading?: boolean; home: string; away: string }) {
   const kt = insights?.intelligence?.keysToVictoryAnalyst;
-  const homeKeys: Array<{ key: string; targetsWeakness?: string; reasoning?: string }> =
-    Array.isArray(kt?.home) ? kt.home.slice(0, 3) : [];
-  const awayKeys: Array<{ key: string; targetsWeakness?: string; reasoning?: string }> =
-    Array.isArray(kt?.away) ? kt.away.slice(0, 3) : [];
+  const legacy = insights?.keysToVictory;
+  const toKeyObjects = (value: unknown): Array<{ key: string; targetsWeakness?: string; reasoning?: string }> => {
+    if (Array.isArray(value)) {
+      return value
+        .filter((item): item is string | { key?: string; targetsWeakness?: string; reasoning?: string } => !!item)
+        .map((item) => typeof item === "string" ? { key: item } : {
+          key: item.key ?? "",
+          targetsWeakness: item.targetsWeakness,
+          reasoning: item.reasoning,
+        })
+        .filter((item) => item.key)
+        .slice(0, 3);
+    }
+    return [];
+  };
+  const homeKeys = toKeyObjects(kt?.home).length > 0 ? toKeyObjects(kt?.home) : toKeyObjects(legacy?.home);
+  const awayKeys = toKeyObjects(kt?.away).length > 0 ? toKeyObjects(kt?.away) : toKeyObjects(legacy?.away);
 
   const Column = ({ team, keys }: { team: string; keys: typeof homeKeys }) => (
     <div>
@@ -2123,6 +2136,7 @@ function InsightsTab({ matchId, insights, insightsError, insightsLoading, home, 
 
   const det = insights?.deterministic;
   if (!det) return <Empty msg="Stats engine output not yet computed for this fixture." />;
+  const asArray = <T,>(value: unknown): T[] => Array.isArray(value) ? value as T[] : [];
 
   const winnerNick: string = det.matchWinner?.nickname ?? home.nickName;
   const winnerSide: "home" | "away" = det.matchWinner?.team ?? "home";
@@ -2303,7 +2317,7 @@ function InsightsTab({ matchId, insights, insightsError, insightsLoading, home, 
           <p className="font-chat text-sm leading-relaxed text-foreground/90 mb-3">{det.predictedOutcome.summary}</p>
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Three anytime tryscorers backing this script</div>
           <ul className="space-y-2.5">
-            {(det.predictedOutcome.picks ?? []).map((p: any, i: number) => (
+            {asArray<any>(det.predictedOutcome.picks).map((p: any, i: number) => (
               <li key={`${p.name}-${i}`} className="flex flex-col items-center text-center gap-2 bg-surface-2 rounded-lg p-2.5 pt-14 sm:pt-20">
                 <PlayerHeadshot name={p?.name} teams={[home, away]} size={72} minSize={56} maxSize={96} />
                 <div className="w-full min-w-0">
@@ -2320,13 +2334,13 @@ function InsightsTab({ matchId, insights, insightsError, insightsLoading, home, 
 
       {/* 9 — Top 3 anytime tryscorers per team */}
       <Card title="Top 3 anytime tryscorers" icon={Sparkles}>
-        {((!det.topAnytimeHome || det.topAnytimeHome.length === 0) && (!det.topAnytimeAway || det.topAnytimeAway.length === 0)) ? (
+        {((asArray(det.topAnytimeHome).length === 0) && (asArray(det.topAnytimeAway).length === 0)) ? (
           <p className="text-sm text-muted-foreground">Try-scoring board pending squad release.</p>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {[
-              { label: home?.nickName ?? "Home", themeKey: home?.themeKey ?? "", list: det.topAnytimeHome ?? [] },
-              { label: away?.nickName ?? "Away", themeKey: away?.themeKey ?? "", list: det.topAnytimeAway ?? [] },
+              { label: home?.nickName ?? "Home", themeKey: home?.themeKey ?? "", list: asArray<any>(det.topAnytimeHome) },
+              { label: away?.nickName ?? "Away", themeKey: away?.themeKey ?? "", list: asArray<any>(det.topAnytimeAway) },
             ].map((col) => (
               <div key={col.label}>
                 <div className="flex items-center gap-3 mb-3">
@@ -2358,13 +2372,13 @@ function InsightsTab({ matchId, insights, insightsError, insightsLoading, home, 
 
       {/* 9b — Secondary Tier Picks (2 per team, forwards/outside top 6) */}
       <Card title="Secondary Tier Picks" icon={Sparkles}>
-        {(!det.forwardPicks || det.forwardPicks.length === 0) ? (
+        {(asArray(det.forwardPicks).length === 0) ? (
           <p className="text-sm text-muted-foreground">Secondary tier picks pending squad release.</p>
         ) : (
           <>
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Next-best scorers if the top 6 anytimes don't convert</div>
             <ul className="space-y-3">
-              {det.forwardPicks.map((r: any, i: number) => {
+              {asArray<any>(det.forwardPicks).map((r: any, i: number) => {
                 const teamMatch = [home, away].find((t) => t?.nickName?.toLowerCase() === String(r.team ?? "").toLowerCase()) ?? null;
                 const themeKey = teamMatch?.themeKey ?? "";
                 return (
@@ -2388,13 +2402,13 @@ function InsightsTab({ matchId, insights, insightsError, insightsLoading, home, 
 
       {/* 9c — Top 3 try assists per team */}
       <Card title="Top 3 try assists" icon={Compass}>
-        {((!det.tryAssistsHome || det.tryAssistsHome.length === 0) && (!det.tryAssistsAway || det.tryAssistsAway.length === 0)) ? (
+        {((asArray(det.tryAssistsHome).length === 0) && (asArray(det.tryAssistsAway).length === 0)) ? (
           <p className="text-sm text-muted-foreground">Try-assist board pending squad release.</p>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {[
-              { label: home?.nickName ?? "Home", themeKey: home?.themeKey ?? "", list: det.tryAssistsHome ?? [] },
-              { label: away?.nickName ?? "Away", themeKey: away?.themeKey ?? "", list: det.tryAssistsAway ?? [] },
+              { label: home?.nickName ?? "Home", themeKey: home?.themeKey ?? "", list: asArray<any>(det.tryAssistsHome) },
+              { label: away?.nickName ?? "Away", themeKey: away?.themeKey ?? "", list: asArray<any>(det.tryAssistsAway) },
             ].map((col) => (
               <div key={col.label}>
                 <div className="flex items-center gap-3 mb-3">
@@ -2435,7 +2449,8 @@ function InjectedNewsCard({ impacts }: { impacts: Array<{
   impact_area: string; impact_strength: string; impact_type: string;
   timeframe?: "short" | "mid" | "long"; adjustment_summary: string;
 }> }) {
-  if (!impacts || impacts.length === 0) return null;
+  const safeImpacts = Array.isArray(impacts) ? impacts : [];
+  if (safeImpacts.length === 0) return null;
   const tfMeta = (tf?: string) => tf === "long"
     ? { label: "Long term", sub: "Applies rest of season" }
     : tf === "mid"
@@ -2452,7 +2467,7 @@ function InjectedNewsCard({ impacts }: { impacts: Array<{
         News articles that have been read and folded into the predicted outcomes (winner, margin, totals, anytime tryscorers).
       </p>
       <ul className="space-y-2">
-        {impacts.map((i) => {
+        {safeImpacts.map((i) => {
           const meta = tfMeta(i.timeframe);
           return (
             <li key={i.article_id} className={`rounded-xl border p-3 ${toneFor(i.impact_type)}`}>

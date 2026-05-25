@@ -9,7 +9,7 @@ import {
   ArrowLeft, Clock, MapPin, Users, BarChart3, Sparkles,
   Trophy, Target, Flag, Crown, TrendingUp, AlertCircle, CloudSun, Calendar, Zap, Hourglass,
   ThumbsUp, ThumbsDown, Activity, Shield, Compass, Gauge, Check,
-  Receipt, X, Newspaper, History, GraduationCap, ScrollText,
+  Receipt, X, Newspaper, History, ScrollText,
 } from "lucide-react";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -64,7 +64,7 @@ function MatchPage() {
 function MatchInner() {
   const { matchId } = Route.useParams();
   const { data } = useSuspenseQuery(matchQO(matchId));
-  const { details, ladder, odds, tryscorers, oddsError, oddsStale, tryscorersError, recentRecaps, aftermatch, lessons } = data as any;
+  const { details, ladder, odds, tryscorers, oddsError, oddsStale, tryscorersError, recentRecaps, aftermatch } = data as any;
 
   // Lazy AI insights — fetched in background after the page renders.
   // Initial value comes from the page payload (cache hit on the server).
@@ -193,7 +193,6 @@ function MatchInner() {
             tryscorers={tryscorers}
             tryscorersError={tryscorersError}
             odds={odds}
-            lessons={lessons}
           />
         )}
         {tab === "script" && (
@@ -2028,13 +2027,12 @@ function AnytimeOddsTag({ price }: { price: number | null }) {
   );
 }
 
-function InsightsTab({ insights, insightsError, insightsLoading, home, away, tryscorers, odds, lessons }:
+function InsightsTab({ insights, insightsError, insightsLoading, home, away, tryscorers, odds }:
   { insights: any; insightsError: string | null; insightsLoading?: boolean;
     home: TeamWithPlayers; away: TeamWithPlayers;
     homeRow?: LadderRow; awayRow?: LadderRow;
     tryscorers: TryscorerMarkets | null; tryscorersError?: string | null;
-    odds?: OddsEvent | null;
-    lessons?: { home: any | null; away: any | null } }) {
+    odds?: OddsEvent | null; } ) {
   if (insightsLoading) return <InsightsLoading />;
   if (insightsError && !insights) return <Empty msg={insightsError} />;
   if (!insights) return <Empty msg="Insights unavailable." />;

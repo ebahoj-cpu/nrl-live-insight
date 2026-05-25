@@ -356,17 +356,50 @@ export const getMatchPage = createServerFn({ method: "GET" })
     const season = currentSeason();
 
     // ----- Tier 1 (parallel, throws if either fails) -----
-    // NB: fetchMatchDetails can throw (e.g. NRL 404 for invalid / unreleased match ids).
-    // Convert that into a clean Response so the dev server's unhandledRejection
-    // handler doesn't kill the Node process (which would black-screen the whole app).
+    // For FINISHED matches the details payload is immutable, so we cache it for
+    // 7 days under a separate key. This avoids re-hitting NRL.com on every cold
+    // worker for a played game — the #1 cause of slow past-match loads.
+    const liveDetailsP = cached(`match:${data.matchId}`, TTL.match, () => fetchMatchDetails(data.matchId), { bypass: data.refresh })
+      .catch((err) => {
+        console.error(`[getMatchPage] match ${data.matchId} unavailable:`, err);
+        throw new Response(`Match not found: ${data.matchId}`, { status: 404 });
+      });
     const [details, ladder] = await Promise.all([
-      cached(`match:${data.matchId}`, TTL.match, () => fetchMatchDetails(data.matchId), { bypass: data.refresh })
-        .catch((err) => {
-          console.error(`[getMatchPage] match ${data.matchId} unavailable:`, err);
-          throw new Response(`Match not found: ${data.matchId}`, { status: 404 });
-        }),
+      // Try the long-lived finished cache first (no network); fall back to live fetch.
+      cached(`match:finished:${data.matchId}`, 7 * 24 * 60 * 60_000, () => liveDetailsP, { bypass: data.refresh }),
       cached(`ladder:${season}`, TTL.ladder, () => fetchLadder(season), { bypass: data.refresh }),
     ]);
+
+    const { started, finished } = hasStartedOrFinished(details);
+
+    // ===== FAST PATH for finished matches =====
+    // Odds, weather, tryscorers, recent-form recaps and live insight regeneration
+    // are all irrelevant once the game is over — every tab (Lineup/Stats/Insights/
+    // Script/Aftermatch) reads from stored snapshots. Skip all Tier-2 network calls
+    // and return the locked prediction + cached aftermatch immediately.
+    if (finished) {
+      const [locked, aftermatch] = await Promise.all([
+        sealFromLockedInsights(data.matchId, details),
+        readAftermatch(data.matchId),
+      ]);
+      return {
+        details: { ...details, weather: null },
+        odds: null,
+        oddsError: null,
+        oddsStale: false,
+        tryscorers: null,
+        tryscorersError: null,
+        ladder,
+        insights: locked?.payload ?? null,
+        insightsError: null,
+        recentRecaps: { home: [], away: [] },
+        aftermatch: aftermatch ?? null,
+        generatedAt: new Date().toISOString(),
+        // NB: if aftermatch is null here, the client can lazily request it.
+        // We deliberately do NOT generate inline — that fetches the NRL recap
+        // page + runs AI, which would re-introduce the slow load.
+      };
+    }
 
     // ----- Tier 2 (parallel, each isolated — never blocks the page) -----
     const homeNick = findTeam(details.homeTeam.nickName)?.nickname ?? details.homeTeam.nickName;
@@ -406,36 +439,10 @@ export const getMatchPage = createServerFn({ method: "GET" })
     // Invalidate the cache when squads or mode have advanced since storage.
     const stored = await readFreshInsights(data.matchId, details, tryscorers);
 
-    // Aftermatch (only for finished matches) + lessons-from-last-week per team.
-    const { started, finished } = hasStartedOrFinished(details);
-    let aftermatch: AftermatchPayload | null = null;
     let insightsForResponse = stored?.payload ?? null;
     if (started) {
       const locked = await sealFromLockedInsights(data.matchId, details);
       if (locked) insightsForResponse = locked.payload;
-    }
-    if (finished) {
-
-      // Read existing first; if missing, generate in the background but don't
-      // block the page render. Cached forever once written.
-      aftermatch = await readAftermatch(data.matchId);
-      if (!aftermatch) {
-        try {
-          const ownRecap = await fetchMatchRecap(`https://www.nrl.com${matchIdToPath(data.matchId)}`);
-          aftermatch = await ensureAftermatch({
-            matchId: data.matchId,
-            details,
-            recap: ownRecap,
-            // CRITICAL: pass the ORIGINAL stored prediction (any age), never a
-            // freshly recalculated one. ensureAftermatch compares actual result
-            // vs this snapshot — using a regenerated prediction would falsely
-            // "predict" the actual winner.
-            insights: insightsForResponse,
-          });
-        } catch (e) {
-          console.warn("aftermatch generation failed:", e);
-        }
-      }
     }
 
     return {
@@ -449,10 +456,42 @@ export const getMatchPage = createServerFn({ method: "GET" })
       insights: insightsForResponse,
       insightsError: null,
       recentRecaps: { home: homeRecaps, away: awayRecaps },
-      aftermatch,
+      aftermatch: null as AftermatchPayload | null,
       generatedAt: new Date().toISOString(),
     };
   });
+
+// Lazy aftermatch — called by the client after the page renders when a finished
+// match has no stored aftermatch yet. Fetches NRL recap + runs the writeup, then
+// persists forever. Returns the existing row if already stored.
+export const getMatchAftermatch = createServerFn({ method: "GET" })
+  .inputValidator((i: { matchId: string }) => {
+    if (!i?.matchId) throw new Error("matchId required");
+    return i;
+  })
+  .handler(async ({ data }) => {
+    const existing = await readAftermatch(data.matchId);
+    if (existing) return { aftermatch: existing };
+    const details = await cached(`match:${data.matchId}`, TTL.match, () => fetchMatchDetails(data.matchId));
+    const { finished } = hasStartedOrFinished(details);
+    if (!finished) return { aftermatch: null };
+    try {
+      const ownRecap = await fetchMatchRecap(`https://www.nrl.com${matchIdToPath(data.matchId)}`);
+      const locked = await readLockedSharedInsights(data.matchId, details.kickoffUtc);
+      const aftermatch = await ensureAftermatch({
+        matchId: data.matchId,
+        details,
+        recap: ownRecap,
+        insights: locked?.payload ?? null,
+      });
+      return { aftermatch };
+    } catch (e) {
+      console.warn("lazy aftermatch generation failed:", e);
+      return { aftermatch: null };
+    }
+  });
+
+
 
 // Lazily generate insights — called by the client AFTER the match page renders.
 // PRIMARY path: deterministic stats engine (fast, no AI). It always runs and is

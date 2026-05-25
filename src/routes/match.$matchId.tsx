@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useSuspenseQuery, useQuery, queryOptions } from "@tanstack/react-query";
-import { getMatchPage, getMatchInsights } from "@/server/index.functions";
+import { getMatchPage, getMatchInsights, getMatchAftermatch } from "@/server/index.functions";
 import { TeamLogo } from "@/components/TeamLogo";
 import type { TryscorerMarkets, OddsEvent } from "@/server/odds";
 import { bestH2H } from "@/server/odds";
@@ -65,7 +65,7 @@ function MatchPage() {
 function MatchInner() {
   const { matchId } = Route.useParams();
   const { data } = useSuspenseQuery(matchQO(matchId));
-  const { details, ladder, odds, tryscorers, oddsError, oddsStale, tryscorersError, recentRecaps, aftermatch } = data as any;
+  const { details, ladder, odds, tryscorers, oddsError, oddsStale, tryscorersError, recentRecaps, aftermatch: initialAftermatch } = data as any;
 
   // Lazy AI insights — fetched in background after the page renders.
   // Initial value comes from the page payload (cache hit on the server).
@@ -81,6 +81,18 @@ function MatchInner() {
   const [tab, setTab] = useState<TabKey>("lineup");
 
   const isFinished = /^(FullTime|Final|Completed)$/i.test(details.matchState);
+
+  // Lazy aftermatch — if the finished match has no stored aftermatch yet,
+  // fetch in the background so the page renders instantly. Once generated it's
+  // persisted forever, so subsequent visits get it on the initial payload.
+  const aftermatchQ = useQuery({
+    queryKey: ["match-aftermatch", matchId],
+    queryFn: () => getMatchAftermatch({ data: { matchId } }),
+    enabled: isFinished && !initialAftermatch,
+    staleTime: Infinity,
+    retry: 1,
+  });
+  const aftermatch = initialAftermatch ?? aftermatchQ.data?.aftermatch ?? null;
 
   const homeRow = ladder.find((r: any) => r.nickname === details.homeTeam.nickName);
   const awayRow = ladder.find((r: any) => r.nickname === details.awayTeam.nickName);
@@ -221,6 +233,7 @@ function MatchInner() {
             aftermatch={aftermatch}
             home={details.homeTeam}
             away={details.awayTeam}
+            loading={aftermatchQ.isFetching && !aftermatch}
           />
         )}
       </div>
@@ -3170,10 +3183,10 @@ type AftermatchPayload = {
   };
 };
 
-function AftermatchTab({ aftermatch, home, away }:
-  { aftermatch: AftermatchPayload | null; home: TeamWithPlayers; away: TeamWithPlayers }) {
+function AftermatchTab({ aftermatch, home, away, loading }:
+  { aftermatch: AftermatchPayload | null; home: TeamWithPlayers; away: TeamWithPlayers; loading?: boolean }) {
   if (!aftermatch) {
-    return <Empty msg="Aftermatch comparison is being generated — refresh in a moment." />;
+    return <Empty msg={loading ? "Generating aftermatch report…" : "Aftermatch comparison is being generated — refresh in a moment."} />;
   }
   const pct = aftermatch.scoreLine.total > 0
     ? Math.round((aftermatch.scoreLine.hits / aftermatch.scoreLine.total) * 100)

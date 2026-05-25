@@ -106,7 +106,7 @@ export function oddsTtl(kickoffsUtc?: string[] | string): number {
 // ---------------------------------------------------------------------------
 export async function fetchNrlOdds(): Promise<OddsEvent[]> {
   const key = ensureKey();
-  const url = `${BASE}/sports/${SPORT}/odds/?apiKey=${key}&regions=${REGION}&markets=${MARKETS}&oddsFormat=decimal`;
+  const url = `${BASE}/sports/${SPORT}/odds/?apiKey=${key}&regions=${REGION}&markets=${BULK_MARKETS}&oddsFormat=decimal`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Odds API HTTP ${res.status}`);
   const data = (await res.json()) as unknown[];

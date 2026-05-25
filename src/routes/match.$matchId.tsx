@@ -3158,6 +3158,11 @@ type AftermatchPayload = {
   consistencies: string[];
   inconsistencies: string[];
   summary: string;
+  comparison?: {
+    players?: {
+      firstTry?: { predicted: string | null; actual: string | null; correct: boolean };
+    };
+  };
 };
 
 function AftermatchTab({ aftermatch, home, away }:

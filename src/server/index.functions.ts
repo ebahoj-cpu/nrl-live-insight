@@ -28,6 +28,7 @@ import { readOddsCache, readOddsCacheEntry, readOddsCacheStale, readOddsCacheSta
 import { snapshotPrediction, buildSnapshotRow, sealPredictionSnapshot } from "./prediction-tracking";
 import { listActiveImpacts, impactsForFixture, applyImpacts } from "./news-impacts";
 import { getOrGenerateSimulation, isSimulationEnabled } from "./simulation-integration";
+import { normaliseInsights } from "./normalise-insights";
 
 // Source tracking — surfaced in server logs and (where harmless) on payloads.
 export type DataSource = "nrl_com" | "zyla" | "mixed" | "proxy";
@@ -36,6 +37,16 @@ export type DataSource = "nrl_com" | "zyla" | "mixed" | "proxy";
 // simultaneously within a single worker, only one actually invokes the AI;
 // the rest await the same promise and read the freshly persisted DB row.
 const inFlight = new Map<string, Promise<Insights | null>>();
+
+function normaliseStoredInsights(payload: Insights | null | undefined, homeName: string, awayName: string): Insights | null {
+  if (!payload || typeof payload !== "object") return null;
+  try {
+    return normaliseInsights(payload, homeName, awayName);
+  } catch (error) {
+    console.warn("normaliseStoredInsights failed:", error);
+    return payload;
+  }
+}
 
 // Cache freshness gate. A stored insights row is only valid when:
 //   1. The squad signature on disk matches the current NRL.com squads, AND

@@ -1253,89 +1253,11 @@ function GameScriptTab({ insights, insightsLoading, home, away }:
           <Section title="Middle">{script.edges.middle}</Section>
         </div>
 
-        {/* Keys to Victory — surfaces the AI-generated keys from
-            insights.intelligence.keysToVictoryAnalyst. These are built off the
-            Monte Carlo simulation findings and the team's history of winning
-            against the odds (upsets) — i.e. how this side has actually beaten
-            similar opponents before. 3 bullets per team. */}
-        <KeysToVictoryPanel
-          insights={insights}
-          insightsLoading={insightsLoading}
-          home={home.nickName}
-          away={away.nickName}
-        />
       </Card>
     </div>
   );
 }
 
-/* Keys to Victory — rendered inside the Edges card on the Script tab.
-   Source: insights.intelligence.keysToVictoryAnalyst.{home,away}, which the
-   insights engine populates from (a) the Monte Carlo simulation profile
-   (edge attack, tempo, scoring pattern, defensive zones) and (b) the side's
-   record of winning against the odds — historical upsets are examined to
-   surface the repeatable ways this team beats stronger opponents. */
-function KeysToVictoryPanel({ insights, insightsLoading, home, away }:
-  { insights: any; insightsLoading?: boolean; home: string; away: string }) {
-  const kt = insights?.intelligence?.keysToVictoryAnalyst;
-  const legacy = insights?.keysToVictory;
-  const toKeyObjects = (value: unknown): Array<{ key: string; targetsWeakness?: string; reasoning?: string }> => {
-    if (Array.isArray(value)) {
-      return value
-        .filter((item): item is string | { key?: string; targetsWeakness?: string; reasoning?: string } => !!item)
-        .map((item) => typeof item === "string" ? { key: item } : {
-          key: item.key ?? "",
-          targetsWeakness: item.targetsWeakness,
-          reasoning: item.reasoning,
-        })
-        .filter((item) => item.key)
-        .slice(0, 3);
-    }
-    return [];
-  };
-  const homeKeys = toKeyObjects(kt?.home).length > 0 ? toKeyObjects(kt?.home) : toKeyObjects(legacy?.home);
-  const awayKeys = toKeyObjects(kt?.away).length > 0 ? toKeyObjects(kt?.away) : toKeyObjects(legacy?.away);
-
-  const Column = ({ team, keys }: { team: string; keys: typeof homeKeys }) => (
-    <div>
-      <div className="flex items-center gap-2 mb-2">
-        <Crown className="h-3.5 w-3.5 text-accent" />
-        <div className="text-[10px] uppercase tracking-wider font-bold text-accent">
-          {team} · Keys to Victory
-        </div>
-      </div>
-      {keys.length === 0 ? (
-        <p className="text-xs text-muted-foreground italic">
-          {insightsLoading ? "Generating from Monte Carlo simulation…" : "Keys pending — refresh in a moment."}
-        </p>
-      ) : (
-        <ul className="space-y-2">
-          {keys.map((k, i) => (
-            <li key={i} className="flex gap-2">
-              <span className="mt-1.5 inline-block h-1.5 w-1.5 rounded-full bg-accent shrink-0" />
-              <div className="font-chat text-sm leading-relaxed text-foreground/90">
-                <div className="font-semibold">{k.key}</div>
-                {k.targetsWeakness && (
-                  <div className="text-xs text-muted-foreground mt-0.5">Targets: {k.targetsWeakness}</div>
-                )}
-                {k.reasoning && (
-                  <div className="text-xs text-muted-foreground mt-0.5">Why: {k.reasoning}</div>
-                )}
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
-
-  return (
-    <div className="mt-5 pt-5 border-t border-border/60 grid gap-5 md:grid-cols-2">
-      <Column team={home} keys={homeKeys} />
-      <Column team={away} keys={awayKeys} />
-    </div>
-  );
-}
 
 function buildScriptFallback(det: any, home: TeamWithPlayers, away: TeamWithPlayers) {
   if (!det?.predictedScore || !det?.matchWinner || !det?.margin || !det?.totalPoints || !det?.htft) return null;

@@ -43,7 +43,16 @@ function makeRng(seed: number): () => number {
 }
 
 // ---------- Distributions ----------
-function poisson(lambda: number, rng: () => number): number {
+// IMPROVEMENT #1: Try counts are now drawn from a Negative Binomial (r=4.5)
+// instead of a Poisson. NRL try counts are over-dispersed vs Poisson — late
+// momentum runs, bunched tries and try-fest blowouts mean the empirical
+// variance > mean. NB(r, p) with mean = r(1-p)/p preserves the same mean
+// when p = r/(lambda+r), while inflating the variance to lambda + lambda^2/r.
+// This yields fatter tails (more realistic 40+ point blowouts and 12-pt grinds)
+// without changing any of the lambda math feeding into it.
+
+// Internal Poisson draw used only inside the NB gamma–Poisson mixture below.
+function poissonDraw(lambda: number, rng: () => number): number {
   if (lambda <= 0) return 0;
   if (lambda < 30) {
     const L = Math.exp(-lambda);
@@ -51,11 +60,53 @@ function poisson(lambda: number, rng: () => number): number {
     do { k++; p *= rng(); } while (p > L);
     return k - 1;
   }
-  // Normal approximation
   const u = rng() || 1e-9;
   const v = rng() || 1e-9;
   const z = Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
   return Math.max(0, Math.round(lambda + Math.sqrt(lambda) * z));
+}
+
+// Marsaglia–Tsang Gamma sampler (shape > 0, scale = 1). Used by NB mixture.
+function gammaDraw(shape: number, rng: () => number): number {
+  if (shape < 1) {
+    const u = rng() || 1e-12;
+    return gammaDraw(shape + 1, rng) * Math.pow(u, 1 / shape);
+  }
+  const d = shape - 1 / 3;
+  const c = 1 / Math.sqrt(9 * d);
+  // Bounded loop guard — in practice converges in 1–2 iterations.
+  for (let attempt = 0; attempt < 64; attempt++) {
+    let x: number, v: number;
+    do {
+      const u1 = rng() || 1e-12;
+      const u2 = rng() || 1e-12;
+      x = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+      v = 1 + c * x;
+    } while (v <= 0);
+    v = v * v * v;
+    const u = rng() || 1e-12;
+    if (u < 1 - 0.0331 * x * x * x * x) return d * v;
+    if (Math.log(u) < 0.5 * x * x + d * (1 - v + Math.log(v))) return d * v;
+  }
+  return d; // fallback
+}
+
+// Negative Binomial via Gamma–Poisson mixture. Accepts r (dispersion) and
+// p in the standard NB parameterisation. Call sites should pass
+// p = lambda / (lambda + r) so that E[X] = lambda.
+function negativeBinomial(r: number, p: number, rng: () => number): number {
+  if (r <= 0 || p <= 0) return 0;
+  if (p >= 1) return 0;
+  // NB(r,p) === Poisson(Gamma(r, (1-p)/p))
+  const scale = p / (1 - p); // because lambda = r * scale when p = lambda/(lambda+r)
+  const lam = gammaDraw(r, rng) * scale;
+  return poissonDraw(lam, rng);
+}
+
+// Convenience: draw a try count for an expected lambda using NB(r=4.5).
+function tryCount(lambda: number, rng: () => number): number {
+  const r = 4.5;
+  return negativeBinomial(r, lambda / (lambda + r), rng);
 }
 
 function binomial(n: number, p: number, rng: () => number): number {

@@ -40,7 +40,7 @@ export function PremiumGate() {
             <ul className="text-left space-y-2 mt-6 w-full">
               {FEATURES.map((f) => (
                 <li key={f} className="flex items-start gap-2 text-sm">
-                  <Check className="h-4 w-4 text-accent mt-1 shrink-1" />
+                  <Check className="h-4 w-4 text-accent mt-0.5 shrink-0" />
                   <span>{f}</span>
                 </li>
               ))}

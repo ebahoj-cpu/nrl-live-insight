@@ -356,7 +356,10 @@ function ImpactBody({ item, data }: { item: NewsItemProps["item"]; data: Article
           <Icon className="h-3.5 w-3.5" />
           {tone.label} on Insights bets
         </div>
-        <InjectButton item={item} data={data} />
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <InjectIntoMatchButton item={item} data={data} />
+          <InjectButton item={item} data={data} />
+        </div>
       </div>
       <div className="text-[10px] uppercase tracking-wider font-bold text-accent/90 mb-1">{tfLabel}</div>
       {data.bettingImpact.timeframeNote && (

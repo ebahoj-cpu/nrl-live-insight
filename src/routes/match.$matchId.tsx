@@ -2028,8 +2028,8 @@ function AnytimeOddsTag({ price }: { price: number | null }) {
   );
 }
 
-function InsightsTab({ insights, insightsError, insightsLoading, home, away, tryscorers, odds }:
-  { insights: any; insightsError: string | null; insightsLoading?: boolean;
+function InsightsTab({ matchId, insights, insightsError, insightsLoading, home, away, tryscorers, odds }:
+  { matchId: string; insights: any; insightsError: string | null; insightsLoading?: boolean;
     home: TeamWithPlayers; away: TeamWithPlayers;
     homeRow?: LadderRow; awayRow?: LadderRow;
     tryscorers: TryscorerMarkets | null; tryscorersError?: string | null;

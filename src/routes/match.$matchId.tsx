@@ -233,6 +233,7 @@ function MatchInner() {
             aftermatch={aftermatch}
             home={details.homeTeam}
             away={details.awayTeam}
+            loading={aftermatchQ.isFetching && !aftermatch}
           />
         )}
       </div>

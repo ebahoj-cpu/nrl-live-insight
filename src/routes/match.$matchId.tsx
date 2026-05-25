@@ -183,6 +183,7 @@ function MatchInner() {
         {tab === "stats" && <StatsTab home={details.homeTeam} away={details.awayTeam} homeRow={homeRow} awayRow={awayRow} statGroups={details.statGroups} recentRecaps={recentRecaps} />}
         {tab === "insights" && (
           <InsightsTab
+            matchId={matchId}
             insights={insights}
             insightsError={insightsLoading ? null : insightsError}
             insightsLoading={insightsLoading}

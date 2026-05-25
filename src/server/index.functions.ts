@@ -356,8 +356,15 @@ export const getMatchPage = createServerFn({ method: "GET" })
     const season = currentSeason();
 
     // ----- Tier 1 (parallel, throws if either fails) -----
+    // NB: fetchMatchDetails can throw (e.g. NRL 404 for invalid / unreleased match ids).
+    // Convert that into a clean Response so the dev server's unhandledRejection
+    // handler doesn't kill the Node process (which would black-screen the whole app).
     const [details, ladder] = await Promise.all([
-      cached(`match:${data.matchId}`, TTL.match, () => fetchMatchDetails(data.matchId), { bypass: data.refresh }),
+      cached(`match:${data.matchId}`, TTL.match, () => fetchMatchDetails(data.matchId), { bypass: data.refresh })
+        .catch((err) => {
+          console.error(`[getMatchPage] match ${data.matchId} unavailable:`, err);
+          throw new Response(`Match not found: ${data.matchId}`, { status: 404 });
+        }),
       cached(`ladder:${season}`, TTL.ladder, () => fetchLadder(season), { bypass: data.refresh }),
     ]);
 

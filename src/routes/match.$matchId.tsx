@@ -1252,6 +1252,17 @@ function GameScriptTab({ insights, insightsLoading, home, away }:
           <Section title="Right edge">{script.edges.right}</Section>
           <Section title="Middle">{script.edges.middle}</Section>
         </div>
+
+        {/* Keys to Victory — surfaces the AI-generated keys from
+            insights.intelligence.keysToVictoryAnalyst. These are built off the
+            Monte Carlo simulation findings and the team's history of winning
+            against the odds (upsets) — i.e. how this side has actually beaten
+            similar opponents before. 3 bullets per team. */}
+        <KeysToVictoryPanel
+          insights={insights}
+          home={home.nickName}
+          away={away.nickName}
+        />
       </Card>
     </div>
   );

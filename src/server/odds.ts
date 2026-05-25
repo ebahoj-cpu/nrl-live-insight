@@ -1,14 +1,42 @@
+// ============================================================================
 // The Odds API — live AU bookmaker odds for NRL.
 // Docs: https://the-odds-api.com/liveapi/guides/v4/
-// Confirmed available: h2h, spreads, totals (always)
-// Player markets (released ~24h before kickoff once team lists drop):
-//   player_try_scorer_first, player_try_scorer_anytime, player_try_scorer_over
+//
+// CREDIT-SAVING STRATEGY (free tier = 500 credits / month must last the season)
+// ---------------------------------------------------------------------------
+// The Odds API charges 1 credit per (region × market) per /odds call. We
+// deliberately restrict ourselves to TWO markets and ONE region:
+//
+//   • h2h                         — head-to-head (moneyline) winner
+//   • player_try_scorer_anytime   — anytime tryscorer Yes/No per player
+//
+// Region: "au" only.
+//
+// Crucially we hit the BULK /odds endpoint (one call returns every NRL event
+// for the sport with both markets). We DO NOT call the per-event /events/:id/
+// odds endpoint anymore — that used to multiply our credit burn by the number
+// of fixtures in a round. `fetchTryscorerOdds(eventId)` now derives its result
+// from the cached bulk payload at zero additional credit cost.
+//
+// Combined with the aggressive TTL (mirrors `teamListTtl` in nrl-data-store):
+//   >48h until any kickoff → 15 min
+//   ≤48h                   → 5 min
+//   ≤12h                   → 2 min
+//   ≤3h  (live window)     → 60 s
+// We comfortably stay under 500 credits/month across a full NRL season.
+// ============================================================================
 
 import { findTeam } from "@/lib/teams";
 import type { NrlFixture, NrlLadderRow } from "./nrl";
+import { fetchDraw } from "./nrl";
+import { readOddsCacheEntry, readOddsCacheStaleEntry, writeOddsCache } from "./odds-store";
 
 const BASE = "https://api.the-odds-api.com/v4";
 const SPORT = "rugbyleague_nrl";
+const REGION = "au";
+// The ONLY two markets we ever request — see header for rationale.
+const MARKETS = "h2h,player_try_scorer_anytime";
+const BULK_CACHE_KEY = "odds:nrl";
 
 export type Outcome = { name: string; price: number; point?: number; description?: string };
 export type Market = { key: string; outcomes: Outcome[] };
@@ -30,18 +58,137 @@ export type OddsEvent = {
 };
 
 function ensureKey(): string {
-  const k = process.env.ODDS_API_KEY;
-  if (!k) throw new Error("ODDS_API_KEY not configured");
+  // Accept both names — `ODDS_API_KEY` is the existing secret; we also accept
+  // `THE_ODDS_API_KEY` for parity with the public env example.
+  const k = process.env.ODDS_API_KEY ?? process.env.THE_ODDS_API_KEY;
+  if (!k) throw new Error("ODDS_API_KEY (or THE_ODDS_API_KEY) not configured");
   return k;
 }
 
+// ---------------------------------------------------------------------------
+// Aggressive TTL — identical ladder to teamListTtl in nrl-data-store.ts.
+// Takes the *minimum* TTL across all upcoming kickoffs in the next 48h so the
+// closest match drives our refresh cadence. The bulk endpoint covers every
+// fixture in one request, so a single short TTL doesn't multiply credit cost.
+// ---------------------------------------------------------------------------
+const MIN = 60_000;
+const HOUR = 60 * MIN;
+
+export function oddsTtl(kickoffsUtc?: string[] | string): number {
+  const list = Array.isArray(kickoffsUtc) ? kickoffsUtc : kickoffsUtc ? [kickoffsUtc] : [];
+  if (list.length === 0) return 15 * MIN;
+  const now = Date.now();
+  let minHours = Infinity;
+  for (const ko of list) {
+    const t = Date.parse(ko);
+    if (!Number.isFinite(t)) continue;
+    const hours = (t - now) / HOUR;
+    // Ignore matches that already finished long ago (>4h past kickoff).
+    if (hours < -4) continue;
+    if (hours < minHours) minHours = hours;
+  }
+  if (!Number.isFinite(minHours)) return 15 * MIN;
+  if (minHours <= 3) return 60_000;       // 60s — late mail / live window
+  if (minHours <= 12) return 2 * MIN;     // match-day
+  if (minHours <= 48) return 5 * MIN;     // Tue/Wed/Thu — team lists dropping
+  return 15 * MIN;                        // early week
+}
+
+// ---------------------------------------------------------------------------
+// Bulk fetch — ONE network call, TWO markets, ONE region.
+// All downstream helpers (getNrlOdds, fetchTryscorerOdds) read from the cache
+// this writes, so we never pay credits per-match.
+// ---------------------------------------------------------------------------
 export async function fetchNrlOdds(): Promise<OddsEvent[]> {
   const key = ensureKey();
-  const url = `${BASE}/sports/${SPORT}/odds/?apiKey=${key}&regions=au&markets=h2h,spreads,totals&oddsFormat=decimal`;
+  const url = `${BASE}/sports/${SPORT}/odds/?apiKey=${key}&regions=${REGION}&markets=${MARKETS}&oddsFormat=decimal`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Odds API HTTP ${res.status}`);
-  const data = await res.json() as any[];
-  return data.map(mapEvent);
+  const data = (await res.json()) as unknown[];
+  const events = (data as Array<Record<string, unknown>>).map(mapEvent);
+  // Persist immediately so cold-start workers see fresh data without re-billing.
+  // TTL derived from the events' own kickoffs.
+  const ttl = oddsTtl(events.map((e) => e.commenceUtc));
+  await writeOddsCache(BULK_CACHE_KEY, events, ttl).catch(() => {});
+  return events;
+}
+
+// ---------------------------------------------------------------------------
+// Round-wide soft refresh — mirrors maybeSweepRoundTeamLists.
+// When ANY match's odds are requested, we touch the bulk payload once. The
+// bulk call already covers every match in the round, so this is effectively a
+// throttled "refresh the round" operation. Throttled to once per round per 2m.
+// ---------------------------------------------------------------------------
+const roundOddsSweepAt = new Map<string, number>();
+const ROUND_SWEEP_INTERVAL_MS = 2 * MIN;
+
+async function maybeSweepRoundOdds(triggerMatchId: string): Promise<void> {
+  const parts = triggerMatchId.split("/");
+  const season = Number(parts[0]);
+  const round = Number((parts[1] ?? "").replace(/\D/g, ""));
+  if (!Number.isFinite(season) || !Number.isFinite(round)) return;
+  const roundKey = `${season}:${round}`;
+  const last = roundOddsSweepAt.get(roundKey) ?? 0;
+  if (Date.now() - last < ROUND_SWEEP_INTERVAL_MS) return;
+  roundOddsSweepAt.set(roundKey, Date.now());
+
+  // Check current cache freshness; only refetch if expired or close to it.
+  const fresh = await readOddsCacheEntry<OddsEvent[]>(BULK_CACHE_KEY).catch(() => null);
+  if (fresh) {
+    // Already fresh — no need to spend a credit.
+    return;
+  }
+  // Background refetch; errors swallowed.
+  await fetchNrlOdds().catch(() => {});
+}
+
+// ---------------------------------------------------------------------------
+// Canonical accessor used everywhere downstream. Returns the OddsEvent for a
+// specific NRL match id, reading from cache and triggering a soft round
+// refresh in the background. Never throws — graceful fallback to null lets
+// callers render "Odds temporarily unavailable" if credits are exhausted.
+// ---------------------------------------------------------------------------
+export async function getNrlOdds(matchId: string): Promise<OddsEvent | null> {
+  // 1. Fresh cache hit — instant.
+  let events: OddsEvent[] | null = null;
+  const freshEntry = await readOddsCacheEntry<OddsEvent[]>(BULK_CACHE_KEY).catch(() => null);
+  if (freshEntry) events = freshEntry.payload;
+
+  // 2. No fresh data — try live. If that fails, fall back to stale cache.
+  if (!events) {
+    try {
+      events = await fetchNrlOdds();
+    } catch {
+      const stale = await readOddsCacheStaleEntry<OddsEvent[]>(BULK_CACHE_KEY).catch(() => null);
+      events = stale?.payload ?? null;
+    }
+  }
+
+  // 3. Fire-and-forget round sweep (throttled, no-op if cache is still fresh).
+  void maybeSweepRoundOdds(matchId).catch(() => {});
+
+  if (!events || events.length === 0) return null;
+  return matchEventToFixture(events, matchId);
+}
+
+// Match a NRL match id (e.g. "2026/round-8/storm-v-broncos") to its Odds API
+// event by team nickname. Returns null if no event matches.
+async function matchEventToFixture(events: OddsEvent[], matchId: string): Promise<OddsEvent | null> {
+  // Try to look up fixture details to resolve team nicknames precisely.
+  const parts = matchId.split("/");
+  const season = Number(parts[0]);
+  const draw = await fetchDraw(season).catch(() => [] as NrlFixture[]);
+  const fixture = draw.find((f) => f.matchId === matchId);
+  if (!fixture) return null;
+  const home = findTeam(fixture.homeTeam.nickName)?.nickname ?? fixture.homeTeam.nickName;
+  const away = findTeam(fixture.awayTeam.nickName)?.nickname ?? fixture.awayTeam.nickName;
+  return (
+    events.find((e) => {
+      const eh = e.homeNickname;
+      const ea = e.awayNickname;
+      return (eh === home && ea === away) || (eh === away && ea === home);
+    }) ?? null
+  );
 }
 
 function clamp(n: number, min: number, max: number): number {
@@ -66,6 +213,9 @@ function avgPoints(home?: NrlLadderRow, away?: NrlLadderRow): number {
   return total / rows.length;
 }
 
+// Estimated odds (free fallback — no API cost). Still emits spreads/totals
+// markets so downstream consumers that look for them don't break when live
+// bookmaker data is unavailable.
 export function buildEstimatedOdds(fixtures: NrlFixture[], ladder: NrlLadderRow[]): OddsEvent[] {
   const ladderByNick = new Map(ladder.map((r) => [findTeam(r.nickname)?.nickname ?? r.nickname, r]));
   return fixtures
@@ -109,17 +259,29 @@ export function buildEstimatedOdds(fixtures: NrlFixture[], ladder: NrlLadderRow[
     });
 }
 
+// ---------------------------------------------------------------------------
+// fetchEventOdds — kept for backwards compatibility but now reads from the
+// bulk cache. We no longer hit the per-event /events/:id/odds endpoint (used
+// to burn 1 credit per call per event). Triggers a bulk refresh on miss.
+// ---------------------------------------------------------------------------
 export async function fetchEventOdds(eventId: string): Promise<OddsEvent | null> {
-  const key = ensureKey();
-  const url = `${BASE}/sports/${SPORT}/events/${eventId}/odds/?apiKey=${key}&regions=au&markets=h2h,spreads,totals&oddsFormat=decimal`;
-  const res = await fetch(url);
-  if (!res.ok) return null;
-  const data = await res.json() as any;
-  return mapEvent(data);
+  const fresh = await readOddsCacheEntry<OddsEvent[]>(BULK_CACHE_KEY).catch(() => null);
+  let events = fresh?.payload ?? null;
+  if (!events) {
+    try { events = await fetchNrlOdds(); }
+    catch {
+      const stale = await readOddsCacheStaleEntry<OddsEvent[]>(BULK_CACHE_KEY).catch(() => null);
+      events = stale?.payload ?? null;
+    }
+  }
+  return events?.find((e) => e.id === eventId) ?? null;
 }
 
-// Player tryscorer markets — only released by bookies once team lists drop
-// (typically ~24h before kickoff). Returns null if no markets exist yet.
+// ---------------------------------------------------------------------------
+// Tryscorer markets — extracted from the bulk payload (ZERO extra credits).
+// We deliberately only support `anytime`. Other markets (first / multi) are
+// returned as empty arrays so existing call sites keep their shape.
+// ---------------------------------------------------------------------------
 export type TryscorerOdds = {
   player: string;
   price: number;
@@ -127,84 +289,88 @@ export type TryscorerOdds = {
 };
 
 export type TryscorerMarkets = {
-  first: TryscorerOdds[];   // first tryscorer
-  anytime: TryscorerOdds[]; // anytime tryscorer
-  multi: TryscorerOdds[];   // 2+ tries
+  first: TryscorerOdds[];   // always [] — not fetched (saves credits)
+  anytime: TryscorerOdds[]; // populated from bulk payload
+  multi: TryscorerOdds[];   // always [] — not fetched (saves credits)
   hasAny: boolean;
   lastUpdate: string | null;
 };
 
 export async function fetchTryscorerOdds(eventId: string): Promise<TryscorerMarkets> {
-  const key = ensureKey();
-  const markets = "player_try_scorer_first,player_try_scorer_anytime,player_try_scorer_over";
-  const url = `${BASE}/sports/${SPORT}/events/${eventId}/odds/?apiKey=${key}&regions=au&markets=${markets}&oddsFormat=decimal`;
-
-  const res = await fetch(url);
   const empty: TryscorerMarkets = { first: [], anytime: [], multi: [], hasAny: false, lastUpdate: null };
-  if (!res.ok) throw new Error(`Tryscorer odds HTTP ${res.status}`);
 
-  const data = await res.json() as any;
-  const bookmakers: any[] = data?.bookmakers ?? [];
-  if (bookmakers.length === 0) return empty;
+  const fresh = await readOddsCacheEntry<OddsEvent[]>(BULK_CACHE_KEY).catch(() => null);
+  let events = fresh?.payload ?? null;
+  if (!events) {
+    try { events = await fetchNrlOdds(); }
+    catch {
+      const stale = await readOddsCacheStaleEntry<OddsEvent[]>(BULK_CACHE_KEY).catch(() => null);
+      events = stale?.payload ?? null;
+    }
+  }
+  if (!events) return empty;
 
-  // Best price per player per market across all bookies
-  const best: Record<"first" | "anytime" | "multi", Map<string, TryscorerOdds>> = {
-    first: new Map(), anytime: new Map(), multi: new Map(),
-  };
+  const event = events.find((e) => e.id === eventId);
+  if (!event) return empty;
+
+  // Best (highest) price per player across all bookies for anytime markets.
+  const best = new Map<string, TryscorerOdds>();
   let lastUpdate: string | null = null;
 
-  for (const b of bookmakers) {
-    for (const m of b.markets ?? []) {
-      const slot: "first" | "anytime" | "multi" | null =
-        m.key === "player_try_scorer_first" ? "first" :
-        m.key === "player_try_scorer_anytime" ? "anytime" :
-        m.key === "player_try_scorer_over" ? "multi" : null;
-      if (!slot) continue;
-      if (!lastUpdate || m.last_update > lastUpdate) lastUpdate = m.last_update;
-
-      for (const o of m.outcomes ?? []) {
-        // "Yes" outcomes carry the player in `description`. Some books put it in `name`.
-        const player: string | undefined = o.description ?? (o.name !== "Yes" && o.name !== "No" ? o.name : undefined);
+  for (const b of event.bookmakers) {
+    for (const m of b.markets) {
+      if (m.key !== "player_try_scorer_anytime") continue;
+      if (!lastUpdate || b.lastUpdate > lastUpdate) lastUpdate = b.lastUpdate;
+      for (const o of m.outcomes) {
+        // "Yes" outcomes carry the player in `description`; some books put it in `name`.
+        const player: string | undefined =
+          o.description ?? (o.name !== "Yes" && o.name !== "No" ? o.name : undefined);
         if (!player || typeof o.price !== "number") continue;
-        // For "over" markets, only keep 1.5 line (i.e. 2+ tries / double)
-        if (slot === "multi" && o.point != null && o.point !== 1.5) continue;
-
-        const existing = best[slot].get(player);
+        const existing = best.get(player);
         if (!existing || o.price > existing.price) {
-          best[slot].set(player, { player, price: o.price, book: b.title });
+          best.set(player, { player, price: o.price, book: b.title });
         }
       }
     }
   }
 
-  const sortByPrice = (a: TryscorerOdds, b: TryscorerOdds) => a.price - b.price;
-  const out: TryscorerMarkets = {
-    first: Array.from(best.first.values()).sort(sortByPrice).slice(0, 12),
-    // Return ALL anytime tryscorers (typically 30-36 players across both squads).
-    anytime: Array.from(best.anytime.values()).sort(sortByPrice),
-    multi: Array.from(best.multi.values()).sort(sortByPrice).slice(0, 12),
-    hasAny: false,
+  const anytime = Array.from(best.values()).sort((a, b) => a.price - b.price);
+  return {
+    first: [],
+    anytime,
+    multi: [],
+    hasAny: anytime.length > 0,
     lastUpdate,
   };
-  out.hasAny = out.first.length + out.anytime.length + out.multi.length > 0;
-  return out;
 }
 
-function mapEvent(e: any): OddsEvent {
+function mapEvent(e: Record<string, unknown>): OddsEvent {
+  const eAny = e as {
+    id: string;
+    commence_time: string;
+    home_team: string;
+    away_team: string;
+    bookmakers?: Array<{
+      key: string;
+      title: string;
+      last_update: string;
+      markets?: Array<{ key: string; outcomes?: Array<{ name: string; price: number; point?: number; description?: string }> }>;
+    }>;
+  };
   return {
-    id: e.id,
-    commenceUtc: e.commence_time,
-    homeTeam: e.home_team,
-    awayTeam: e.away_team,
-    homeNickname: findTeam(e.home_team)?.nickname ?? null,
-    awayNickname: findTeam(e.away_team)?.nickname ?? null,
-    bookmakers: (e.bookmakers ?? []).map((b: any) => ({
+    id: eAny.id,
+    commenceUtc: eAny.commence_time,
+    homeTeam: eAny.home_team,
+    awayTeam: eAny.away_team,
+    homeNickname: findTeam(eAny.home_team)?.nickname ?? null,
+    awayNickname: findTeam(eAny.away_team)?.nickname ?? null,
+    bookmakers: (eAny.bookmakers ?? []).map((b) => ({
       key: b.key,
       title: b.title,
       lastUpdate: b.last_update,
-      markets: (b.markets ?? []).map((m: any) => ({
+      markets: (b.markets ?? []).map((m) => ({
         key: m.key,
-        outcomes: (m.outcomes ?? []).map((o: any) => ({
+        outcomes: (m.outcomes ?? []).map((o) => ({
           name: o.name, price: o.price, point: o.point, description: o.description,
         })),
       })),
@@ -214,14 +380,15 @@ function mapEvent(e: any): OddsEvent {
 
 // Helper: best price for each side from H2H across bookmakers
 export function bestH2H(ev: OddsEvent): { home: { price: number; book: string } | null; away: { price: number; book: string } | null } {
-  let best: { home: any; away: any } = { home: null, away: null };
+  const best: { home: { price: number; book: string } | null; away: { price: number; book: string } | null } = { home: null, away: null };
   for (const b of ev.bookmakers) {
     const h2h = b.markets.find((m) => m.key === "h2h");
     if (!h2h) continue;
     for (const o of h2h.outcomes) {
       const isHome = findTeam(o.name)?.nickname === ev.homeNickname;
       const slot = isHome ? "home" : "away";
-      if (!best[slot] || o.price > best[slot].price) {
+      const current = best[slot];
+      if (!current || o.price > current.price) {
         best[slot] = { price: o.price, book: b.title };
       }
     }

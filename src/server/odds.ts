@@ -31,6 +31,10 @@ import { findTeam } from "@/lib/teams";
 import type { NrlFixture, NrlLadderRow } from "./nrl";
 import { fetchDraw } from "./nrl";
 import { readOddsCacheEntry, readOddsCacheStaleEntry, writeOddsCache } from "./odds-store";
+// Lineup-gated tryscorer fetching: we share the team-list TTL ladder so player
+// props refresh at exactly the same cadence as named lineups, and we never
+// burn a credit before lineups are out.
+import { getTeamLists, teamListTtl, getFixtures } from "./nrl-data-store";
 
 const BASE = "https://api.the-odds-api.com/v4";
 const SPORT = "rugbyleague_nrl";
@@ -121,9 +125,10 @@ export async function fetchNrlOdds(): Promise<OddsEvent[]> {
 
 // ---------------------------------------------------------------------------
 // Round-wide soft refresh — mirrors maybeSweepRoundTeamLists.
-// When ANY match's odds are requested, we touch the bulk payload once. The
-// bulk call already covers every match in the round, so this is effectively a
-// throttled "refresh the round" operation. Throttled to once per round per 2m.
+// When ANY match's odds are requested, we touch the bulk h2h payload once
+// and (for matches whose lineups are already NAMED) trigger a cached
+// per-event tryscorer refresh. Throttled to once per round per 2m so even
+// frequent UI requests can never hammer The Odds API.
 // ---------------------------------------------------------------------------
 const roundOddsSweepAt = new Map<string, number>();
 const ROUND_SWEEP_INTERVAL_MS = 2 * MIN;
@@ -138,14 +143,39 @@ async function maybeSweepRoundOdds(triggerMatchId: string): Promise<void> {
   if (Date.now() - last < ROUND_SWEEP_INTERVAL_MS) return;
   roundOddsSweepAt.set(roundKey, Date.now());
 
-  // Check current cache freshness; only refetch if expired or close to it.
+  // 1. Bulk h2h refresh (1 credit, only if cache expired).
   const fresh = await readOddsCacheEntry<OddsEvent[]>(BULK_CACHE_KEY).catch(() => null);
-  if (fresh) {
-    // Already fresh — no need to spend a credit.
-    return;
+  let events: OddsEvent[] | null = fresh?.payload ?? null;
+  if (!events) {
+    events = await fetchNrlOdds().catch(() => null);
   }
-  // Background refetch; errors swallowed.
-  await fetchNrlOdds().catch(() => {});
+  if (!events || events.length === 0) return;
+
+  // 2. Tryscorer prefetch — only for upcoming matches with NAMED lineups.
+  //    Each fetchTryscorerOdds() internally re-gates on lineups + cache, so
+  //    we never spend a credit for matches without team lists, and matches
+  //    whose per-event cache is still fresh are no-ops.
+  const fixtures = await getFixtures({ season, round }).catch(() => null);
+  if (!fixtures) return;
+  const now = Date.now();
+  const upcoming = fixtures.filter((f) => {
+    const ko = Date.parse(f.kickoffUtc);
+    return Number.isFinite(ko) && ko > now - 30 * MIN;
+  });
+  await Promise.allSettled(
+    upcoming.map(async (fx) => {
+      const tl = await getTeamLists({ matchId: fx.matchId, kickoffUtc: fx.kickoffUtc }).catch(() => null);
+      if (!tl?.home.isNamed || !tl?.away.isNamed) return; // gate — no credit spent
+      const event = events!.find((e) => {
+        const fh = findTeam(fx.homeNickname)?.nickname ?? fx.homeNickname;
+        const fa = findTeam(fx.awayNickname)?.nickname ?? fx.awayNickname;
+        return (e.homeNickname === fh && e.awayNickname === fa)
+            || (e.homeNickname === fa && e.awayNickname === fh);
+      });
+      if (!event) return;
+      await fetchTryscorerOdds(event.id).catch(() => {});
+    }),
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -284,12 +314,21 @@ export async function fetchEventOdds(eventId: string): Promise<OddsEvent | null>
 }
 
 // ---------------------------------------------------------------------------
-// Tryscorer markets — fetched per-event from /events/:id/odds (bulk /odds
-// does NOT accept player_*  markets, only featured h2h/spreads/totals).
-// Each call costs 1 credit per region per market = 1 credit. We cache each
-// event's tryscorer payload with the same kickoff-aware TTL ladder used for
-// h2h so a typical round only burns ~8 credits per refresh cycle.
-// Only `anytime` is requested; `first`/`multi` stay [] for shape parity.
+// Tryscorer markets — LINEUP-GATED + per-event /events/:id/odds.
+//
+// Strategy (credit-saving + freshness):
+//   1. Before spending a credit, look up the latest team lists for the match
+//      (cached, no force-refresh). If neither side has named lineups
+//      (`isNamed === true`), we SKIP the API call entirely and return an
+//      empty payload tagged "lineups_unreleased". Anytime tryscorer markets
+//      are meaningless before lineups drop anyway.
+//   2. Once lineups are named, fetch /events/:id/odds for player_try_scorer
+//      _anytime (1 credit per event) and cache it.
+//   3. Cache TTL reuses `teamListTtl` so player props refresh on the exact
+//      same cadence as the lineups themselves:
+//        >48h → 15min   ≤48h → 5min   ≤12h → 2min   ≤3h → 60s
+//   4. Stale-while-revalidate: if a live fetch fails, we serve the last
+//      cached payload (regardless of expiry) so the UI never blanks out.
 // ---------------------------------------------------------------------------
 export type TryscorerOdds = {
   player: string;
@@ -303,6 +342,12 @@ export type TryscorerMarkets = {
   multi: TryscorerOdds[];   // always [] — not fetched (saves credits)
   hasAny: boolean;
   lastUpdate: string | null;
+  // New: explains an empty payload so callers can render the right message.
+  // "ok"                 — we have (or attempted) live data
+  // "lineups_unreleased" — gated off; lineups not yet named, no credit spent
+  // "unavailable"        — fetch failed and no stale cache exists
+  status?: "ok" | "lineups_unreleased" | "unavailable";
+  message?: string;
 };
 
 async function fetchEventTryscorerLive(eventId: string): Promise<OddsEvent | null> {
@@ -314,29 +359,76 @@ async function fetchEventTryscorerLive(eventId: string): Promise<OddsEvent | nul
   return mapEvent(data);
 }
 
+// Reverse-lookup: given an Odds API eventId, find the matching NRL matchId
+// and kickoff so we can consult getTeamLists() / teamListTtl(). Uses only the
+// cached bulk h2h payload + cached fixtures — no network calls of its own.
+async function resolveEventContext(
+  eventId: string,
+): Promise<{ matchId: string; kickoffUtc: string } | null> {
+  const fresh = await readOddsCacheEntry<OddsEvent[]>(BULK_CACHE_KEY).catch(() => null);
+  const stale = fresh ? null : await readOddsCacheStaleEntry<OddsEvent[]>(BULK_CACHE_KEY).catch(() => null);
+  const events = fresh?.payload ?? stale?.payload ?? null;
+  const event = events?.find((e) => e.id === eventId);
+  if (!event) return null;
+  const season = new Date(event.commenceUtc).getUTCFullYear();
+  const fixtures = await getFixtures({ season }).catch(() => null);
+  if (!fixtures) return null;
+  const home = event.homeNickname;
+  const away = event.awayNickname;
+  const fx = fixtures.find((f) => {
+    const fh = findTeam(f.homeNickname)?.nickname ?? f.homeNickname;
+    const fa = findTeam(f.awayNickname)?.nickname ?? f.awayNickname;
+    return (fh === home && fa === away) || (fh === away && fa === home);
+  });
+  if (!fx) return null;
+  return { matchId: fx.matchId, kickoffUtc: fx.kickoffUtc };
+}
+
 export async function fetchTryscorerOdds(eventId: string): Promise<TryscorerMarkets> {
-  const empty: TryscorerMarkets = { first: [], anytime: [], multi: [], hasAny: false, lastUpdate: null };
+  const empty = (status: TryscorerMarkets["status"], message?: string): TryscorerMarkets => ({
+    first: [], anytime: [], multi: [], hasAny: false, lastUpdate: null, status, message,
+  });
   const cacheKey = tryscorerCacheKey(eventId);
 
-  // 1. Fresh cache for this event.
+  // 1. Fresh cache hit — instant, no credit spent.
   let event: OddsEvent | null = null;
   const fresh = await readOddsCacheEntry<OddsEvent>(cacheKey).catch(() => null);
   if (fresh) event = fresh.payload;
 
-  // 2. Miss → live per-event fetch (1 credit). Fall back to stale on error.
+  // 2. Cache miss → LINEUP GATE before we spend a credit.
   if (!event) {
-    try {
-      event = await fetchEventTryscorerLive(eventId);
-      if (event) {
-        const ttl = oddsTtl(event.commenceUtc);
-        await writeOddsCache(cacheKey, event, ttl).catch(() => {});
-      }
-    } catch {
+    const ctx = await resolveEventContext(eventId).catch(() => null);
+    // If we can't resolve the match (very early week / new fixture), play it
+    // safe and skip the spend; UI will retry once fixtures cache populates.
+    if (!ctx) {
       const stale = await readOddsCacheStaleEntry<OddsEvent>(cacheKey).catch(() => null);
-      event = stale?.payload ?? null;
+      if (stale?.payload) { event = stale.payload; }
+      else return empty("lineups_unreleased", "Lineups not yet released — player props unavailable");
+    } else {
+      const tl = await getTeamLists({ matchId: ctx.matchId, kickoffUtc: ctx.kickoffUtc }).catch(() => null);
+      const lineupsNamed = !!(tl?.home.isNamed && tl?.away.isNamed);
+      if (!lineupsNamed) {
+        // Serve last cached value if we have it (might be stale but useful),
+        // otherwise gate the spend entirely.
+        const stale = await readOddsCacheStaleEntry<OddsEvent>(cacheKey).catch(() => null);
+        if (stale?.payload) { event = stale.payload; }
+        else return empty("lineups_unreleased", "Lineups not yet released — player props unavailable");
+      } else {
+        // 3. Gate passed → live per-event fetch (1 credit). TTL mirrors lineups.
+        try {
+          event = await fetchEventTryscorerLive(eventId);
+          if (event) {
+            const ttl = teamListTtl(ctx.kickoffUtc);
+            await writeOddsCache(cacheKey, event, ttl).catch(() => {});
+          }
+        } catch {
+          const stale = await readOddsCacheStaleEntry<OddsEvent>(cacheKey).catch(() => null);
+          event = stale?.payload ?? null;
+        }
+      }
     }
   }
-  if (!event) return empty;
+  if (!event) return empty("unavailable", "Player props temporarily unavailable");
 
   // Best (highest) price per player across all bookies for anytime markets.
   const best = new Map<string, TryscorerOdds>();
@@ -366,6 +458,7 @@ export async function fetchTryscorerOdds(eventId: string): Promise<TryscorerMark
     multi: [],
     hasAny: anytime.length > 0,
     lastUpdate,
+    status: "ok",
   };
 }
 

@@ -106,10 +106,25 @@ function findImage(itemXml: string): string | undefined {
 
 async function parseFeed(source: string, url: string, team?: string): Promise<NewsItem[]> {
   try {
-    const res = await fetch(url, {
-      headers: { "User-Agent": UA, Accept: "application/rss+xml,application/xml,text/xml,*/*" },
-    });
+    // Per-feed timeout — without it a single slow feed can hang the whole
+    // batch and the Worker eventually rejects with a generic HTTPError.
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 6000);
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        headers: { "User-Agent": UA, Accept: "application/rss+xml,application/xml,text/xml,*/*" },
+        signal: controller.signal,
+        redirect: "follow",
+      });
+    } finally {
+      clearTimeout(timer);
+    }
     if (!res.ok) return [];
+    const ct = res.headers.get("content-type") ?? "";
+    // Some feeds 301 to an HTML homepage (e.g. Zero Tackle). Skip HTML payloads
+    // so we don't waste CPU regex-matching megabytes of unrelated markup.
+    if (ct.includes("text/html")) return [];
     const xml = await res.text();
     const items: NewsItem[] = [];
     const itemBlocks = xml.match(/<item[\s\S]*?<\/item>/gi) ?? [];
@@ -118,25 +133,17 @@ async function parseFeed(source: string, url: string, team?: string): Promise<Ne
       const link = pick(block, "link") || pickAttr(block, "link", "href");
       const pubDate = pick(block, "pubDate") || pick(block, "published") || pick(block, "dc:date");
       if (!rawTitle || !link) continue;
-      // Require a real publish date — without one we cannot guarantee freshness,
-      // and falling back to "now" caused years-old articles to surface as new.
       if (!pubDate) continue;
       const parsed = new Date(pubDate);
       if (Number.isNaN(parsed.getTime())) continue;
       const dateIso = parsed.toISOString();
 
-      // Google News items embed the real publisher in <source> and append
-      // " - Publisher" to the title. Prefer <source> when present so each
-      // article is attributed to its underlying outlet rather than "Google News".
       const publisher = pick(block, "source");
       const cleanTitle = stripHtml(rawTitle).replace(/\s+-\s+[^-]+$/, "").trim();
       const effectiveSource = publisher ? stripHtml(publisher) : source;
 
-      // For per-team feeds, summary becomes the publisher attribution so the
-      // card shows "{Team} · {Publisher}" semantics without losing the brand.
       const rawDescription = pick(block, "description") ?? "";
       const cleanedDesc = stripHtml(rawDescription);
-      // Drop summaries that are just URLs / link soup (common in Google News items).
       const looksLikeUrl = /^https?:\/\//i.test(cleanedDesc) || /^<?a\s+href=/i.test(cleanedDesc);
       const usableDesc = looksLikeUrl ? "" : cleanedDesc;
       const summary = team
@@ -168,8 +175,10 @@ async function fetchAllFeeds(): Promise<NewsItem[]> {
   const BATCH = 4;
   for (let i = 0; i < FEEDS.length; i += BATCH) {
     const slice = FEEDS.slice(i, i + BATCH);
-    const results = await Promise.all(slice.map((f) => parseFeed(f.source, f.url, f.team)));
-    for (const r of results) out.push(...r);
+    const results = await Promise.allSettled(slice.map((f) => parseFeed(f.source, f.url, f.team)));
+    for (const r of results) {
+      if (r.status === "fulfilled") out.push(...r.value);
+    }
   }
   return out;
 }

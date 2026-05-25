@@ -5,5 +5,10 @@ import { fetchNews } from "./news";
 export const getNews = createServerFn({ method: "GET" })
   .inputValidator((i: { refresh?: boolean } | undefined) => i ?? {})
   .handler(async ({ data }) => {
-    return cached(`news:nrl`, 10 * 60_000, () => fetchNews(), { bypass: data.refresh });
+    try {
+      return await cached(`news:nrl`, 10 * 60_000, () => fetchNews(), { bypass: data.refresh });
+    } catch (err) {
+      console.error("[news] fetch failed", err);
+      return [];
+    }
   });

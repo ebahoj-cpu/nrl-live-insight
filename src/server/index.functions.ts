@@ -461,6 +461,38 @@ export const getMatchPage = createServerFn({ method: "GET" })
     };
   });
 
+// Lazy aftermatch — called by the client after the page renders when a finished
+// match has no stored aftermatch yet. Fetches NRL recap + runs the writeup, then
+// persists forever. Returns the existing row if already stored.
+export const getMatchAftermatch = createServerFn({ method: "GET" })
+  .inputValidator((i: { matchId: string }) => {
+    if (!i?.matchId) throw new Error("matchId required");
+    return i;
+  })
+  .handler(async ({ data }) => {
+    const existing = await readAftermatch(data.matchId);
+    if (existing) return { aftermatch: existing };
+    const details = await cached(`match:${data.matchId}`, TTL.match, () => fetchMatchDetails(data.matchId));
+    const { finished } = hasStartedOrFinished(details);
+    if (!finished) return { aftermatch: null };
+    try {
+      const ownRecap = await fetchMatchRecap(`https://www.nrl.com${matchIdToPath(data.matchId)}`);
+      const locked = await readLockedSharedInsights(data.matchId, details.kickoffUtc);
+      const aftermatch = await ensureAftermatch({
+        matchId: data.matchId,
+        details,
+        recap: ownRecap,
+        insights: locked?.payload ?? null,
+      });
+      return { aftermatch };
+    } catch (e) {
+      console.warn("lazy aftermatch generation failed:", e);
+      return { aftermatch: null };
+    }
+  });
+
+
+
 // Lazily generate insights — called by the client AFTER the match page renders.
 // PRIMARY path: deterministic stats engine (fast, no AI). It always runs and is
 // persisted immediately so the Insights tab renders within ~1-2 seconds. AI

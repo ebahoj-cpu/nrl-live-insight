@@ -160,8 +160,22 @@ async function parseFeed(source: string, url: string, team?: string): Promise<Ne
   }
 }
 
+// Cloudflare Workers cap concurrent in-flight fetches (~6). Firing all
+// ~22 feeds in parallel triggers "stalled HTTP response was canceled"
+// and the whole news call fails. Process feeds in small batches.
+async function fetchAllFeeds(): Promise<NewsItem[]> {
+  const out: NewsItem[] = [];
+  const BATCH = 4;
+  for (let i = 0; i < FEEDS.length; i += BATCH) {
+    const slice = FEEDS.slice(i, i + BATCH);
+    const results = await Promise.all(slice.map((f) => parseFeed(f.source, f.url, f.team)));
+    for (const r of results) out.push(...r);
+  }
+  return out;
+}
+
 export async function fetchNews(): Promise<NewsItem[]> {
-  const all = (await Promise.all(FEEDS.map((f) => parseFeed(f.source, f.url, f.team)))).flat();
+  const all = await fetchAllFeeds();
 
   // Filter ABC to NRL/rugby league only (it's a general sport feed)
   const filtered = all.filter((n) => {

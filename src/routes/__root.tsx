@@ -77,6 +77,11 @@ function RootShell({ children }: { children: React.ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+
+  useEffect(() => {
+    cleanupPreviewServiceWorkers();
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <Header />
@@ -93,6 +98,31 @@ type BIPEvent = Event & {
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 };
 
+function isPreviewRuntime() {
+  if (typeof window === "undefined") return false;
+  const host = window.location.hostname;
+  const inIframe = (() => {
+    try {
+      return window.self !== window.top;
+    } catch {
+      return true;
+    }
+  })();
+  return inIframe || host.includes("id-preview--") || host.includes("lovableproject.com");
+}
+
+function cleanupPreviewServiceWorkers() {
+  if (typeof window === "undefined" || !isPreviewRuntime()) return;
+  // Installed preview PWAs can keep an old cached shell and show only the launch icon.
+  // In Lovable preview/iframe contexts, clear any prior service worker/cache state.
+  void navigator.serviceWorker?.getRegistrations().then((registrations) => {
+    registrations.forEach((registration) => void registration.unregister());
+  });
+  void window.caches?.keys().then((names) => {
+    names.forEach((name) => void window.caches.delete(name));
+  });
+}
+
 function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [installPrompt, setInstallPrompt] = useState<BIPEvent | null>(null);
@@ -100,6 +130,11 @@ function Header() {
   const [showIosHint, setShowIosHint] = useState(false);
 
   useEffect(() => {
+    if (isPreviewRuntime()) {
+      setInstalled(true);
+      return;
+    }
+
     const onBIP = (e: Event) => {
       e.preventDefault();
       setInstallPrompt(e as BIPEvent);

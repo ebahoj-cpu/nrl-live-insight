@@ -27,6 +27,8 @@ import type { NormalisedTeamStats, NormalisedInjury, NormalisedMatchOfficial } f
 import { buildSimulationInput } from "./simulation-feature-builder";
 import { runSimulation } from "./simulation-engine";
 import { findTeam } from "@/lib/teams";
+// Learning layer: pulls gentle adjustments derived from past scored matches.
+import { getConfidenceAdjustments } from "./prediction-tracking";
 
 // Feature flag. Server-only — NEVER expose to the client.
 // Explicit truthy ("true"|"1"|"yes") or falsy ("false"|"0"|"no"|"off") values

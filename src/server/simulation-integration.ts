@@ -330,6 +330,110 @@ export async function getOrGenerateSimulation(args: {
   }
 }
 
+// ============================================================================
+// applyUserArticleInjections — PERSONAL-ONLY perturbation layer.
+//
+// Takes a SimulationSummary (already validated / cached) and a list of the
+// CURRENT user's article injections for that match, and returns a NEW
+// summary with conservative, clamped adjustments applied:
+//   - per-team expected score (via delta_expected_points)
+//   - attack / defence / tempo multipliers on expected totals
+//   - per-player anytime / multi try rates (delta_player_try_rate)
+//   - rebalanced home/away win probabilities (margin shift, soft logistic)
+//
+// IMPORTANT: This MUST be called per-request, per-user. It must NEVER be
+// written back to the shared simulation_summaries cache.
+// ============================================================================
+export type UserInjectionForSim = {
+  affected_team?: string | null;
+  affected_player?: string | null;
+  delta_expected_points?: number | null;
+  delta_attack?: number | null;
+  delta_defence?: number | null;
+  delta_tempo?: number | null;
+  delta_player_try_rate?: number | null;
+};
+
+function clamp(n: number, lo: number, hi: number) { return Math.max(lo, Math.min(hi, n)); }
+
+export function applyUserArticleInjections(
+  summary: SimulationSummary,
+  injections: UserInjectionForSim[],
+  ctx: { homeNickname: string; awayNickname: string },
+): SimulationSummary {
+  if (!injections || injections.length === 0) return summary;
+
+  // Aggregate deltas (capped per side so a flood of injections can't dominate).
+  let homePts = 0, awayPts = 0;
+  let tempoMul = 1, totalAttackMul = 1;
+  for (const inj of injections) {
+    const team = (inj.affected_team ?? "").toLowerCase();
+    const isHome = team === ctx.homeNickname.toLowerCase();
+    const isAway = team === ctx.awayNickname.toLowerCase();
+    const dp = inj.delta_expected_points ?? 0;
+    const da = inj.delta_attack ?? 0;
+    const dd = inj.delta_defence ?? 0;
+    const dt = inj.delta_tempo ?? 0;
+    if (isHome) { homePts += dp; totalAttackMul *= 1 + da; awayPts -= dd * 1.5; }
+    else if (isAway) { awayPts += dp; totalAttackMul *= 1 + da; homePts -= dd * 1.5; }
+    else {
+      // Unaffiliated → spread across both sides at half-strength.
+      homePts += dp / 2; awayPts += dp / 2;
+    }
+    tempoMul *= 1 + dt;
+  }
+  homePts = clamp(homePts, -12, 12);
+  awayPts = clamp(awayPts, -12, 12);
+  tempoMul = clamp(tempoMul, 0.85, 1.15);
+  totalAttackMul = clamp(totalAttackMul, 0.85, 1.15);
+
+  const newHome = Math.max(0, summary.expectedHomeScore + homePts);
+  const newAway = Math.max(0, summary.expectedAwayScore + awayPts);
+  const newTotal = (newHome + newAway) * tempoMul * totalAttackMul;
+  const newMargin = newHome - newAway;
+
+  // Soft logistic re-balance of win probs around the new margin.
+  // Use a gentle slope so a ±2pt swing nudges win prob by a few percent.
+  const slope = 0.10;
+  const baseMargin = summary.expectedMargin ?? (summary.expectedHomeScore - summary.expectedAwayScore);
+  const deltaMargin = newMargin - baseMargin;
+  const homeShift = 1 / (1 + Math.exp(-slope * deltaMargin)) - 0.5; // -0.5..0.5
+  let h = clamp(summary.homeWinProb + homeShift, 0.02, 0.98);
+  const d = summary.drawProb;
+  let a = Math.max(0.02, 1 - h - d);
+  const sum = h + a + d; h /= sum; a /= sum;
+
+  // Per-player try-rate nudges (only for entries that name affectedPlayer).
+  const playerProbabilities = summary.playerProbabilities.map((p) => {
+    let mult = 1;
+    for (const inj of injections) {
+      if (!inj.affected_player) continue;
+      if (p.name.trim().toLowerCase() !== inj.affected_player.trim().toLowerCase()) continue;
+      mult *= 1 + (inj.delta_player_try_rate ?? 0);
+    }
+    mult = clamp(mult, 0.4, 1.6);
+    if (mult === 1) return p;
+    return {
+      ...p,
+      anytimeProb: clamp(p.anytimeProb * mult, 0, 0.99),
+      firstTryProb: clamp(p.firstTryProb * mult, 0, 0.99),
+      multiTryProb: clamp(p.multiTryProb * mult, 0, 0.99),
+    };
+  });
+
+  return {
+    ...summary,
+    expectedHomeScore: newHome,
+    expectedAwayScore: newAway,
+    expectedTotal: newTotal,
+    expectedMargin: newMargin,
+    homeWinProb: h,
+    awayWinProb: a,
+    drawProb: d,
+    playerProbabilities,
+  };
+}
+
 // ---------- Market price extraction ----------
 // Pulls the best (highest decimal odds) per outcome out of the existing
 // OddsEvent / TryscorerMarkets shapes so the value engine can score them.

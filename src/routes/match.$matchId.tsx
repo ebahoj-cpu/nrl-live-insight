@@ -14,6 +14,7 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { YourInjectedInsights } from "@/components/YourInjectedInsights";
 
 const matchQO = (matchId: string) => queryOptions({
   queryKey: ["match", matchId],
@@ -183,6 +184,7 @@ function MatchInner() {
         {tab === "stats" && <StatsTab home={details.homeTeam} away={details.awayTeam} homeRow={homeRow} awayRow={awayRow} statGroups={details.statGroups} recentRecaps={recentRecaps} />}
         {tab === "insights" && (
           <InsightsTab
+            matchId={matchId}
             insights={insights}
             insightsError={insightsLoading ? null : insightsError}
             insightsLoading={insightsLoading}
@@ -2027,8 +2029,8 @@ function AnytimeOddsTag({ price }: { price: number | null }) {
   );
 }
 
-function InsightsTab({ insights, insightsError, insightsLoading, home, away, tryscorers, odds }:
-  { insights: any; insightsError: string | null; insightsLoading?: boolean;
+function InsightsTab({ matchId, insights, insightsError, insightsLoading, home, away, tryscorers, odds }:
+  { matchId: string; insights: any; insightsError: string | null; insightsLoading?: boolean;
     home: TeamWithPlayers; away: TeamWithPlayers;
     homeRow?: LadderRow; awayRow?: LadderRow;
     tryscorers: TryscorerMarkets | null; tryscorersError?: string | null;
@@ -2076,6 +2078,9 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
 
   return (
     <div className="space-y-4">
+      {/* Personal-only: user's own article-based injections for this match */}
+      <YourInjectedInsights matchId={matchId} />
+
       {/* 1 — Match Winner */}
       <Card title="Match winner" icon={Trophy} className="accent-glow">
         <div className="flex items-center gap-3 mb-2">

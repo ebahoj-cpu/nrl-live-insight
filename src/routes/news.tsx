@@ -4,9 +4,11 @@ import { Suspense, useState } from "react";
 import { getNews } from "@/server/news.functions";
 import { summariseArticle, type ArticleSummary } from "@/server/news-summary.functions";
 import { injectNewsImpact, listInjectedArticles } from "@/server/news-impacts.functions";
-import { ExternalLink, Sparkles, TrendingUp, TrendingDown, Minus, Loader2, ClipboardList, Plus, Check } from "lucide-react";
+import { ExternalLink, Sparkles, TrendingUp, TrendingDown, Minus, Loader2, ClipboardList, Plus, Check, Target } from "lucide-react";
 import { findTeam } from "@/lib/teams";
 import { TeamLogo } from "@/components/TeamLogo";
+import { InjectIntoMatchDialog } from "@/components/InjectIntoMatchDialog";
+import { useAuth } from "@/hooks/useAuth";
 
 // Publisher logos for known sources (matched case-insensitively, substring).
 const PUBLISHER_LOGOS: { match: RegExp; src: string; alt: string }[] = [
@@ -307,6 +309,35 @@ function InjectButton({ item, data }: { item: NewsItemProps["item"]; data: Artic
   );
 }
 
+/**
+ * PERSONAL injection — premium users can apply an article's insight to one
+ * or more specific matches in their OWN view only. Distinct from the global
+ * "Add to model" InjectButton above.
+ */
+function InjectIntoMatchButton({ item, data }: { item: NewsItemProps["item"]; data: ArticleSummary }) {
+  const { session, isPremium } = useAuth();
+  const [open, setOpen] = useState(false);
+  if (!session || !isPremium) return null;
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        title="Apply this insight to specific matches in your personal view"
+        className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full bg-accent text-accent-foreground hover:bg-accent/90 transition"
+      >
+        <Target className="h-3 w-3" /> Inject into Match
+      </button>
+      <InjectIntoMatchDialog
+        open={open}
+        onClose={() => setOpen(false)}
+        article={{ id: item.id, title: item.title, link: item.link, source: item.source }}
+        summary={data}
+      />
+    </>
+  );
+}
+
 function ImpactBody({ item, data }: { item: NewsItemProps["item"]; data: ArticleSummary }) {
   const dir = data.bettingImpact.direction;
   const tone =
@@ -325,7 +356,10 @@ function ImpactBody({ item, data }: { item: NewsItemProps["item"]; data: Article
           <Icon className="h-3.5 w-3.5" />
           {tone.label} on Insights bets
         </div>
-        <InjectButton item={item} data={data} />
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <InjectIntoMatchButton item={item} data={data} />
+          <InjectButton item={item} data={data} />
+        </div>
       </div>
       <div className="text-[10px] uppercase tracking-wider font-bold text-accent/90 mb-1">{tfLabel}</div>
       {data.bettingImpact.timeframeNote && (
@@ -370,7 +404,10 @@ function SummaryBody({ item, data }: { item: NewsItemProps["item"]; data: Articl
             <Icon className="h-3.5 w-3.5" />
             {tone.label} on Insights bets
           </div>
-          <InjectButton item={item} data={data} />
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <InjectIntoMatchButton item={item} data={data} />
+            <InjectButton item={item} data={data} />
+          </div>
         </div>
         <p className="text-xs leading-relaxed text-foreground/90">{data.bettingImpact.note}</p>
       </div>

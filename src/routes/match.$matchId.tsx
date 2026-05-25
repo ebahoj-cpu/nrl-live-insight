@@ -9,7 +9,7 @@ import {
   ArrowLeft, Clock, MapPin, Users, BarChart3, Sparkles,
   Trophy, Target, Flag, Crown, TrendingUp, AlertCircle, CloudSun, Calendar, Zap, Hourglass,
   ThumbsUp, ThumbsDown, Activity, Shield, Compass, Gauge, Check,
-  Receipt, X, Newspaper, History, GraduationCap, ScrollText,
+  Receipt, X, Newspaper, History, ScrollText,
 } from "lucide-react";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -64,7 +64,7 @@ function MatchPage() {
 function MatchInner() {
   const { matchId } = Route.useParams();
   const { data } = useSuspenseQuery(matchQO(matchId));
-  const { details, ladder, odds, tryscorers, oddsError, oddsStale, tryscorersError, recentRecaps, aftermatch, lessons } = data as any;
+  const { details, ladder, odds, tryscorers, oddsError, oddsStale, tryscorersError, recentRecaps, aftermatch } = data as any;
 
   // Lazy AI insights — fetched in background after the page renders.
   // Initial value comes from the page payload (cache hit on the server).
@@ -193,7 +193,6 @@ function MatchInner() {
             tryscorers={tryscorers}
             tryscorersError={tryscorersError}
             odds={odds}
-            lessons={lessons}
           />
         )}
         {tab === "script" && (
@@ -2028,13 +2027,12 @@ function AnytimeOddsTag({ price }: { price: number | null }) {
   );
 }
 
-function InsightsTab({ insights, insightsError, insightsLoading, home, away, tryscorers, odds, lessons }:
+function InsightsTab({ insights, insightsError, insightsLoading, home, away, tryscorers, odds }:
   { insights: any; insightsError: string | null; insightsLoading?: boolean;
     home: TeamWithPlayers; away: TeamWithPlayers;
     homeRow?: LadderRow; awayRow?: LadderRow;
     tryscorers: TryscorerMarkets | null; tryscorersError?: string | null;
-    odds?: OddsEvent | null;
-    lessons?: { home: any | null; away: any | null } }) {
+    odds?: OddsEvent | null; } ) {
   if (insightsLoading) return <InsightsLoading />;
   if (insightsError && !insights) return <Empty msg={insightsError} />;
   if (!insights) return <Empty msg="Insights unavailable." />;
@@ -2339,9 +2337,6 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
           </div>
         )}
       </Card>
-
-      {/* Last week's lessons (carry-forward from previous Aftermatch) — always render so empty states are visible */}
-      <LessonsCard home={home} away={away} lessons={lessons ?? { home: null, away: null }} />
 
       {/* Injected News Insights — articles that have been read & applied to this fixture's predictions */}
       <InjectedNewsCard impacts={(insights as any)?.newsImpactsApplied ?? []} />
@@ -3299,91 +3294,4 @@ function StatusBadge({ status }: { status: "hit" | "miss" | "partial" }) {
   );
 }
 
-/* ================= LESSONS CARD (carry-forward in Insights tab) ================= */
-
-type TeamLessonShape = {
-  matchId: string;
-  opponentNickname: string;
-  finalScore: { team: number; opponent: number };
-  result: "W" | "L" | "D";
-  scoreLine: { hits: number; total: number };
-  topConsistencies: string[];
-  topInconsistencies: string[];
-  summary: string;
-};
-
-function LessonsCard({ home, away, lessons }:
-  { home: TeamWithPlayers; away: TeamWithPlayers; lessons: { home: TeamLessonShape | null; away: TeamLessonShape | null } }) {
-  return (
-    <Card title="Last week's lessons" icon={GraduationCap}>
-      <p className="text-[11px] text-muted-foreground mb-3 leading-relaxed">
-        What the model learned from each side's most recent game — used to sharpen this week's read.
-      </p>
-      <div className="grid sm:grid-cols-2 gap-3">
-        <LessonColumn team={home} lesson={lessons.home} />
-        <LessonColumn team={away} lesson={lessons.away} />
-      </div>
-    </Card>
-  );
-}
-
-function LessonColumn({ team, lesson }: { team: TeamWithPlayers; lesson: TeamLessonShape | null }) {
-  return (
-    <div className="rounded-lg border border-border bg-surface-2/40 p-3">
-      <div className="flex items-center gap-2 mb-2">
-        <TeamLogo themeKey={team.themeKey} name={team.nickName} size={28} />
-        <div className="min-w-0">
-          <div className="text-xs font-extrabold uppercase tracking-wider truncate">{team.nickName}</div>
-          {lesson ? (
-            <div className="text-[10px] text-muted-foreground">
-              {lesson.result === "W" ? "Won" : lesson.result === "L" ? "Lost" : "Drew"} {lesson.finalScore.team}-{lesson.finalScore.opponent} v {lesson.opponentNickname}
-            </div>
-          ) : (
-            <div className="text-[10px] text-muted-foreground">No prior comparison yet.</div>
-          )}
-        </div>
-      </div>
-      {lesson ? (
-        <>
-          {lesson.summary && (
-            <p className="text-xs leading-relaxed text-foreground/90 mb-2">{lesson.summary}</p>
-          )}
-          {lesson.topConsistencies.length > 0 && (
-            <div className="mt-3 mb-3">
-              <div className="text-[10px] font-bold uppercase tracking-wider text-accent mb-1.5">What worked</div>
-              <ul className="space-y-1">
-                {lesson.topConsistencies.slice(0, 2).map((c, i) => (
-                  <li key={i} className="text-[11px] leading-snug text-foreground/85">• {c}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-          {lesson.topInconsistencies.length > 0 && (
-            <div className="mb-3">
-              <div className="text-[10px] font-bold uppercase tracking-wider text-danger mb-1.5">What missed</div>
-              <ul className="space-y-1">
-                {lesson.topInconsistencies.slice(0, 2).map((c, i) => (
-                  <li key={i} className="text-[11px] leading-snug text-foreground/85">• {c}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-          {(() => {
-            const carry = (lesson.summary.match(/Carry into this week:\s*([^]*?)$/i)?.[1] ?? "").trim();
-            const next = carry || lesson.summary;
-            if (!next) return null;
-            return (
-              <div>
-                <div className="text-[10px] font-bold uppercase tracking-wider text-primary mb-1.5">Lessons for next week</div>
-                <p className="text-[11px] leading-snug text-foreground/85">{next}</p>
-              </div>
-            );
-          })()}
-        </>
-      ) : (
-        <p className="text-[11px] text-muted-foreground">Lessons will appear here after this team plays a finished round.</p>
-      )}
-    </div>
-  );
-}
 

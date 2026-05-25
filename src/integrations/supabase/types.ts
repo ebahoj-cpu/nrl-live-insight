@@ -608,12 +608,78 @@ export type Database = {
         }
         Relationships: []
       }
+      user_article_injections: {
+        Row: {
+          affected_player: string | null
+          affected_team: string | null
+          article_id: string
+          article_source: string | null
+          article_title: string
+          article_url: string
+          created_at: string
+          delta_attack: number | null
+          delta_defence: number | null
+          delta_expected_points: number | null
+          delta_player_try_rate: number | null
+          delta_tempo: number | null
+          id: string
+          impact_direction: string
+          impact_strength: string
+          impact_summary: string
+          injected_insight: string
+          match_id: string
+          user_id: string
+        }
+        Insert: {
+          affected_player?: string | null
+          affected_team?: string | null
+          article_id: string
+          article_source?: string | null
+          article_title: string
+          article_url: string
+          created_at?: string
+          delta_attack?: number | null
+          delta_defence?: number | null
+          delta_expected_points?: number | null
+          delta_player_try_rate?: number | null
+          delta_tempo?: number | null
+          id?: string
+          impact_direction?: string
+          impact_strength?: string
+          impact_summary: string
+          injected_insight: string
+          match_id: string
+          user_id: string
+        }
+        Update: {
+          affected_player?: string | null
+          affected_team?: string | null
+          article_id?: string
+          article_source?: string | null
+          article_title?: string
+          article_url?: string
+          created_at?: string
+          delta_attack?: number | null
+          delta_defence?: number | null
+          delta_expected_points?: number | null
+          delta_player_try_rate?: number | null
+          delta_tempo?: number | null
+          id?: string
+          impact_direction?: string
+          impact_strength?: string
+          impact_summary?: string
+          injected_insight?: string
+          match_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      is_premium_user: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
       [_ in never]: never

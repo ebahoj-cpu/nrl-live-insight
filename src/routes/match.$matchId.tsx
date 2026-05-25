@@ -1260,6 +1260,7 @@ function GameScriptTab({ insights, insightsLoading, home, away }:
             similar opponents before. 3 bullets per team. */}
         <KeysToVictoryPanel
           insights={insights}
+          insightsLoading={insightsLoading}
           home={home.nickName}
           away={away.nickName}
         />

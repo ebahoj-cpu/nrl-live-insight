@@ -2338,9 +2338,6 @@ function InsightsTab({ insights, insightsError, insightsLoading, home, away, try
         )}
       </Card>
 
-      {/* Last week's lessons (carry-forward from previous Aftermatch) — always render so empty states are visible */}
-      <LessonsCard home={home} away={away} lessons={lessons ?? { home: null, away: null }} />
-
       {/* Injected News Insights — articles that have been read & applied to this fixture's predictions */}
       <InjectedNewsCard impacts={(insights as any)?.newsImpactsApplied ?? []} />
 

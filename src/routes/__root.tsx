@@ -4,8 +4,10 @@ import {
 } from "@tanstack/react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import appCss from "../styles.css?url";
-import { Menu, X, Swords, ListOrdered, Newspaper, Bird, Settings, UserCircle2, LogOut } from "lucide-react";
+import { Menu, X, Swords, ListOrdered, Newspaper, Bird, Settings, UserCircle2, LogOut, Crown } from "lucide-react";
 import { useEffect, useState } from "react";
+import { AuthProvider, useAuth } from "@/hooks/useAuth";
+import { AuthGate } from "@/components/AuthGate";
 
 interface RouterContext { queryClient: QueryClient }
 
@@ -83,11 +85,15 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <Header />
-      <main className="mx-auto max-w-6xl px-4 sm:px-6 pt-16 pb-32 overflow-x-hidden">
-        <Outlet />
-      </main>
-      <BottomNav />
+      <AuthProvider>
+        <Header />
+        <main className="mx-auto max-w-6xl px-4 sm:px-6 pt-16 pb-32 overflow-x-hidden">
+          <AuthGate>
+            <Outlet />
+          </AuthGate>
+        </main>
+        <BottomNav />
+      </AuthProvider>
     </QueryClientProvider>
   );
 }

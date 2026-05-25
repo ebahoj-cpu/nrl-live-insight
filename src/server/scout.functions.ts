@@ -989,6 +989,7 @@ export const scoutChat = createServerFn({ method: "POST" })
       "• NEVER invent stats. Only use numbers that appear in the provided season stats, ladder, recent form, app insights, app stats tab, or match context. If a stat isn't there, say it's not available rather than fabricating a precise figure.",
       "• Positions, captaincy and jersey numbers must come from the squad block in the fixture brief — never from memory.",
       "",
+      "GROUND TRUTH PROTOCOL — read this BEFORE every reply:",
       "• If the app data has no GROUND TRUTH fixtures, say you can't verify the latest fixtures right now, then use web_search for current public info. Do not answer from memory.",
       "• The 'GROUND TRUTH — Round Fixtures' block is the authoritative source for who plays who this round. The 'USER-REQUESTED MATCH BRIEFS' block is authoritative for specifically named teams/matches, including completed games outside the current round.",
       "• The 'GROUND TRUTH — Teams on the BYE this round' line lists every team NOT playing. If a user asks about a team on that bye list, say so directly — do not invent a fixture for them.",

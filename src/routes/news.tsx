@@ -309,7 +309,35 @@ function InjectButton({ item, data }: { item: NewsItemProps["item"]; data: Artic
   );
 }
 
-function ImpactBody({ item, data }: { item: NewsItemProps["item"]; data: ArticleSummary }) {
+/**
+ * PERSONAL injection — premium users can apply an article's insight to one
+ * or more specific matches in their OWN view only. Distinct from the global
+ * "Add to model" InjectButton above.
+ */
+function InjectIntoMatchButton({ item, data }: { item: NewsItemProps["item"]; data: ArticleSummary }) {
+  const { session, isPremium } = useAuth();
+  const [open, setOpen] = useState(false);
+  if (!session || !isPremium) return null;
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        title="Apply this insight to specific matches in your personal view"
+        className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full bg-accent text-accent-foreground hover:bg-accent/90 transition"
+      >
+        <Target className="h-3 w-3" /> Inject into Match
+      </button>
+      <InjectIntoMatchDialog
+        open={open}
+        onClose={() => setOpen(false)}
+        article={{ id: item.id, title: item.title, link: item.link, source: item.source }}
+        summary={data}
+      />
+    </>
+  );
+}
+
   const dir = data.bettingImpact.direction;
   const tone =
     dir === "positive"

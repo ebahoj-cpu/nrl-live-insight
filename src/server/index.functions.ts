@@ -824,7 +824,12 @@ export const getMatchInsights = createServerFn({ method: "GET" })
       inFlight.set(lockKey, job);
       try {
         const insights = await job;
-        if (insights) return { insights, insightsError: null as string | null };
+        if (insights) {
+          return {
+            insights: normaliseStoredInsights(insights, detailsForCheck.homeTeam.nickName, detailsForCheck.awayTeam.nickName),
+            insightsError: null as string | null,
+          };
+        }
         return { insights: null, insightsError: "Insights engine produced no output" };
       } finally {
         inFlight.delete(lockKey);
@@ -836,10 +841,20 @@ export const getMatchInsights = createServerFn({ method: "GET" })
       const stateStarted = detailsForCheck?.matchState ? !/^(Upcoming|Pre[\s_-]?Game|Scheduled)$/i.test(detailsForCheck.matchState) : false;
       if (kickoffPassed || stateStarted) {
         const locked = await readLockedSharedInsights(data.matchId, kickoffUtc);
-        if (locked) return { insights: locked.payload, insightsError: null as string | null };
+        if (locked && detailsForCheck) {
+          return {
+            insights: normaliseStoredInsights(locked.payload, detailsForCheck.homeTeam.nickName, detailsForCheck.awayTeam.nickName),
+            insightsError: null as string | null,
+          };
+        }
       }
       const stale = await readAnySharedInsights(data.matchId);
-      if (stale) return { insights: stale.payload, insightsError: null as string | null };
+      if (stale && detailsForCheck) {
+        return {
+          insights: normaliseStoredInsights(stale.payload, detailsForCheck.homeTeam.nickName, detailsForCheck.awayTeam.nickName),
+          insightsError: null as string | null,
+        };
+      }
       return { insights: null, insightsError: e instanceof Error ? e.message : "Insights unavailable" };
     }
   });

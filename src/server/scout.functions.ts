@@ -8,7 +8,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { cached, staleWhileRevalidate, TTL } from "./cache";
-import { fetchDraw, fetchLadder, fetchMatchDetails, type NrlFixture, type NrlLadderRow, type NrlMatchDetails } from "./nrl";
+import { fetchDraw, fetchLadder, fetchMatchDetails, type NrlFixture, type NrlLadderRow, type NrlMatchDetails, type NrlPlayer } from "./nrl";
+import { getTeamLists } from "./nrl-data-store";
 import { buildEstimatedOdds, fetchNrlOdds, fetchTryscorerOdds, bestH2H, type OddsEvent, type TryscorerMarkets } from "./odds";
 import { fetchNews, type NewsItem } from "./news";
 import { getSeasonSnapshot, getTeam, type SeasonSnapshot, type TeamSeasonStats } from "./season-stats";
@@ -382,6 +383,53 @@ async function buildFixtureBrief(
     FIXTURE_TTL,
     async () => fetchMatchDetails(matchId).catch(() => null),
   );
+
+  // LATE-MAIL FRESHNESS: always pull the absolute freshest official team lists,
+  // bypassing every cache layer, so any in-week lineup change (named squad,
+  // 24h confirmation, 1h late mail) is reflected immediately in Scout. The
+  // aggressive TTL in nrl-data-store keeps NRL.com load reasonable; this just
+  // ensures Scout never serves a stale roster.
+  const freshTeamLists = await withTimeout(
+    getTeamLists({
+      matchId,
+      kickoffUtc: details?.kickoffUtc,
+      forceRefresh: true,
+    }).catch(() => null),
+    5000,
+    null,
+  );
+  if (details && freshTeamLists) {
+    const mergePlayers = (existing: NrlPlayer[] | undefined, list: typeof freshTeamLists.home | null): NrlPlayer[] | undefined => {
+      if (!list || !list.isNamed || !list.players?.length) return existing;
+      const captainById = new Map<number, boolean>();
+      for (const p of existing ?? []) {
+        // Preserve captain flag by matching firstName+lastName since playerId
+        // isn't on NrlPlayer; fall back to no captain marking otherwise.
+      }
+      const captainNames = new Set(
+        (existing ?? []).filter((p) => p.isCaptain).map((p) => `${p.firstName} ${p.lastName}`.toLowerCase()),
+      );
+      const existingHead = new Map(
+        (existing ?? []).map((p) => [`${p.firstName} ${p.lastName}`.toLowerCase(), p.headImage] as const),
+      );
+      return list.players.map<NrlPlayer>((p) => {
+        const key = `${p.firstName} ${p.lastName}`.toLowerCase();
+        return {
+          firstName: p.firstName,
+          lastName: p.lastName,
+          position: p.position,
+          jerseyNumber: p.jerseyNumber,
+          headImage: p.headshotUrl ?? existingHead.get(key),
+          isCaptain: captainNames.has(key),
+        };
+      });
+    };
+    const home = mergePlayers(details.homeTeam.players, freshTeamLists.home);
+    const away = mergePlayers(details.awayTeam.players, freshTeamLists.away);
+    if (home) details.homeTeam.players = home;
+    if (away) details.awayTeam.players = away;
+  }
+
   const ev = matchOddsEvent(oddsAll, homeNick, awayNick);
   const tryscorer = ev
     ? await fetchFreshTryscorerMarkets(ev.id)
@@ -932,6 +980,14 @@ export const scoutChat = createServerFn({ method: "POST" })
 
     const system = [
       "You are SCOUT — a sharp, friendly NRL betting analyst inside LINEBREAK. Sporty, confident, plain-spoken Aussie tone.",
+      "",
+      "ANTI-HALLUCINATION CORE RULES — these override everything else:",
+      "• You are an honest NRL expert. You MUST only use information from the provided context (APP DATA, fixture briefs, ROSTER ALLOWLISTs, stats, insights, news, web_search results).",
+      "• NEVER guess or invent player names, positions, jersey numbers, stats, form, injuries, or recent results. If a fact is not in the context, say so.",
+      "• Before naming any player for a team, silently confirm they appear in that team's ROSTER ALLOWLIST / named squad for the current fixture. If a player is not in the official team list, treat them as 'Not in the named team list' and pick someone who is.",
+      "• Always cross-reference any player mention against the current confirmed roster. If unsure whether a player is named, hedge with 'based on the latest team lists…' and stay conservative — don't assert.",
+      "• NEVER invent stats. Only use numbers that appear in the provided season stats, ladder, recent form, app insights, app stats tab, or match context. If a stat isn't there, say it's not available rather than fabricating a precise figure.",
+      "• Positions, captaincy and jersey numbers must come from the squad block in the fixture brief — never from memory.",
       "",
       "GROUND TRUTH PROTOCOL — read this BEFORE every reply:",
       "• If the app data has no GROUND TRUTH fixtures, say you can't verify the latest fixtures right now, then use web_search for current public info. Do not answer from memory.",

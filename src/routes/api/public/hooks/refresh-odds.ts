@@ -36,10 +36,9 @@ async function handle(request: Request): Promise<Response> {
     await writeOddsCache("odds:nrl", events, ttl);
     result.oddsCount = events.length;
     result.ttlMs = ttl;
-    // anytime tryscorer markets are now included inline per-event.
-    result.anytimeMarketsIncluded = events.some((e) =>
-      e.bookmakers.some((b) => b.markets.some((m) => m.key === "player_try_scorer_anytime")),
-    );
+    // Tryscorers are fetched lazily per-event on demand (bulk /odds doesn't
+    // support player_* markets). Cron only warms the h2h bulk payload.
+    result.tryscorersMode = "lazy-per-event";
   } catch (e) {
     result.oddsError = e instanceof Error ? e.message : "odds fetch failed";
     return new Response(JSON.stringify(result, null, 2), {

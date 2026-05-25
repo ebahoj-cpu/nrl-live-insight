@@ -1274,14 +1274,13 @@ function GameScriptTab({ insights, insightsLoading, home, away }:
    (edge attack, tempo, scoring pattern, defensive zones) and (b) the side's
    record of winning against the odds — historical upsets are examined to
    surface the repeatable ways this team beats stronger opponents. */
-function KeysToVictoryPanel({ insights, home, away }:
-  { insights: any; home: string; away: string }) {
+function KeysToVictoryPanel({ insights, insightsLoading, home, away }:
+  { insights: any; insightsLoading?: boolean; home: string; away: string }) {
   const kt = insights?.intelligence?.keysToVictoryAnalyst;
   const homeKeys: Array<{ key: string; targetsWeakness?: string; reasoning?: string }> =
     Array.isArray(kt?.home) ? kt.home.slice(0, 3) : [];
   const awayKeys: Array<{ key: string; targetsWeakness?: string; reasoning?: string }> =
     Array.isArray(kt?.away) ? kt.away.slice(0, 3) : [];
-  if (homeKeys.length === 0 && awayKeys.length === 0) return null;
 
   const Column = ({ team, keys }: { team: string; keys: typeof homeKeys }) => (
     <div>
@@ -1292,7 +1291,9 @@ function KeysToVictoryPanel({ insights, home, away }:
         </div>
       </div>
       {keys.length === 0 ? (
-        <p className="text-xs text-muted-foreground italic">Keys pending — refresh in a moment.</p>
+        <p className="text-xs text-muted-foreground italic">
+          {insightsLoading ? "Generating from Monte Carlo simulation…" : "Keys pending — refresh in a moment."}
+        </p>
       ) : (
         <ul className="space-y-2">
           {keys.map((k, i) => (

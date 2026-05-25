@@ -1,5 +1,25 @@
 {
-  "name": "tanstack_start_ts",
+  "name": "nrl-live-insight",
+  "version": "1.0.0",
+  "description": "LINEBREAK — AI-powered NRL prediction, insights and betting companion. Built with TanStack Start, React 19, Supabase and Cloudflare Workers.",
+  "author": "LINEBREAK contributors",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-org/nrl-live-insight.git"
+  },
+  "homepage": "https://nrl-live-insight.lovable.app",
+  "keywords": [
+    "nrl",
+    "rugby-league",
+    "predictions",
+    "betting",
+    "ai",
+    "tanstack-start",
+    "react",
+    "supabase",
+    "cloudflare"
+  ],
   "private": true,
   "sideEffects": false,
   "type": "module",

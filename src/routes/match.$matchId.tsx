@@ -3183,10 +3183,10 @@ type AftermatchPayload = {
   };
 };
 
-function AftermatchTab({ aftermatch, home, away }:
-  { aftermatch: AftermatchPayload | null; home: TeamWithPlayers; away: TeamWithPlayers }) {
+function AftermatchTab({ aftermatch, home, away, loading }:
+  { aftermatch: AftermatchPayload | null; home: TeamWithPlayers; away: TeamWithPlayers; loading?: boolean }) {
   if (!aftermatch) {
-    return <Empty msg="Aftermatch comparison is being generated — refresh in a moment." />;
+    return <Empty msg={loading ? "Generating aftermatch report…" : "Aftermatch comparison is being generated — refresh in a moment."} />;
   }
   const pct = aftermatch.scoreLine.total > 0
     ? Math.round((aftermatch.scoreLine.hits / aftermatch.scoreLine.total) * 100)

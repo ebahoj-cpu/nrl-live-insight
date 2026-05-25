@@ -175,8 +175,10 @@ async function fetchAllFeeds(): Promise<NewsItem[]> {
   const BATCH = 4;
   for (let i = 0; i < FEEDS.length; i += BATCH) {
     const slice = FEEDS.slice(i, i + BATCH);
-    const results = await Promise.all(slice.map((f) => parseFeed(f.source, f.url, f.team)));
-    for (const r of results) out.push(...r);
+    const results = await Promise.allSettled(slice.map((f) => parseFeed(f.source, f.url, f.team)));
+    for (const r of results) {
+      if (r.status === "fulfilled") out.push(...r.value);
+    }
   }
   return out;
 }

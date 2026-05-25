@@ -4,8 +4,10 @@ import {
 } from "@tanstack/react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import appCss from "../styles.css?url";
-import { Menu, X, Swords, ListOrdered, Newspaper, Bird, Settings, UserCircle2, LogOut } from "lucide-react";
+import { Menu, X, Swords, ListOrdered, Newspaper, Bird, Settings, UserCircle2, LogOut, Crown } from "lucide-react";
 import { useEffect, useState } from "react";
+import { AuthProvider, useAuth } from "@/hooks/useAuth";
+import { AuthGate } from "@/components/AuthGate";
 
 interface RouterContext { queryClient: QueryClient }
 
@@ -83,11 +85,15 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <Header />
-      <main className="mx-auto max-w-6xl px-4 sm:px-6 pt-16 pb-32 overflow-x-hidden">
-        <Outlet />
-      </main>
-      <BottomNav />
+      <AuthProvider>
+        <Header />
+        <main className="mx-auto max-w-6xl px-4 sm:px-6 pt-16 pb-32 overflow-x-hidden">
+          <AuthGate>
+            <Outlet />
+          </AuthGate>
+        </main>
+        <BottomNav />
+      </AuthProvider>
     </QueryClientProvider>
   );
 }
@@ -187,14 +193,7 @@ function NavMenu({ onClose }: { onClose: () => void }) {
           </button>
         </div>
 
-        {/* Profile header */}
-        <div className="px-5 pt-2 pb-5 flex flex-col items-center text-center border-b border-border">
-          <span className="inline-flex h-20 w-20 items-center justify-center rounded-full bg-accent/15 text-accent border border-accent/30 mb-3">
-            <UserCircle2 className="h-12 w-12" />
-          </span>
-          <div className="font-display font-extrabold text-lg leading-tight">Guest</div>
-          <div className="text-xs text-muted-foreground mt-0.5">Sign in to sync picks</div>
-        </div>
+        <ProfileBlock />
 
         {/* Primary nav */}
         <nav className="flex-1 overflow-y-auto px-3 py-4">
@@ -229,25 +228,49 @@ function NavMenu({ onClose }: { onClose: () => void }) {
             <Settings className="h-5 w-5" />
             <span className="font-semibold text-sm uppercase tracking-wider">Settings</span>
           </Link>
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-foreground hover:bg-surface-2 transition"
-          >
-            <UserCircle2 className="h-5 w-5" />
-            <span className="font-semibold text-sm uppercase tracking-wider">Account</span>
-          </button>
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-muted-foreground hover:bg-surface-2 hover:text-foreground transition"
-          >
-            <LogOut className="h-5 w-5" />
-            <span className="font-semibold text-sm uppercase tracking-wider">Sign in</span>
-          </button>
+          <AccountActions onClose={onClose} />
         </div>
       </aside>
     </>
+  );
+}
+
+function ProfileBlock() {
+  const { user, profile, isPremium } = useAuth();
+  const displayName = profile?.full_name || profile?.username || user?.email || "Guest";
+  return (
+    <div className="px-5 pt-2 pb-5 flex flex-col items-center text-center border-b border-border">
+      <span className="inline-flex h-20 w-20 items-center justify-center rounded-full bg-accent/15 text-accent border border-accent/30 mb-3">
+        <UserCircle2 className="h-12 w-12" />
+      </span>
+      <div className="font-display font-extrabold text-lg leading-tight truncate max-w-full">{displayName}</div>
+      {user ? (
+        isPremium ? (
+          <div className="inline-flex items-center gap-1 mt-1 text-xs font-bold text-accent">
+            <Crown className="h-3 w-3" /> PREMIUM
+          </div>
+        ) : (
+          <div className="text-xs text-muted-foreground mt-0.5">Free tier · fixtures & ladder</div>
+        )
+      ) : (
+        <div className="text-xs text-muted-foreground mt-0.5">Sign in to access premium</div>
+      )}
+    </div>
+  );
+}
+
+function AccountActions({ onClose }: { onClose: () => void }) {
+  const { user, signOut } = useAuth();
+  if (!user) return null;
+  return (
+    <button
+      type="button"
+      onClick={async () => { await signOut(); onClose(); }}
+      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-muted-foreground hover:bg-surface-2 hover:text-foreground transition"
+    >
+      <LogOut className="h-5 w-5" />
+      <span className="font-semibold text-sm uppercase tracking-wider">Sign out</span>
+    </button>
   );
 }
 

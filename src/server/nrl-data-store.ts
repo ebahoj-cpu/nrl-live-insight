@@ -200,12 +200,24 @@ function ladderTtl(): number {
   return matchDay ? 15 * MIN : 60 * MIN;
 }
 
-function teamListTtl(kickoffUtc?: string): number {
-  if (!kickoffUtc) return 30 * MIN;
+// Aggressive team-list TTLs so newly named/changed lineups are picked up fast.
+// NRL publishes team lists Tuesday ~4pm AEST and revises them through to
+// 1 hour before kickoff (late mail). We bias heavily toward freshness as
+// kickoff approaches:
+//   >48h  → 15min   (early week — squad shape rarely changes hour-to-hour)
+//   ≤48h  → 5min    (Tuesday drop window + Wed/Thu changes)
+//   ≤12h  → 2min    (match-day adjustments, illness, late ins/outs)
+//   ≤3h   → 60s     (late mail / 1h-before-kick changes — must be fresh)
+//   no kickoff info → 15min (safe default — assume mid-week)
+// Stale-while-revalidate still serves instantly; TTL only controls when a
+// background refetch is fired.
+export function teamListTtl(kickoffUtc?: string): number {
+  if (!kickoffUtc) return 15 * MIN;
   const hoursUntil = (Date.parse(kickoffUtc) - Date.now()) / HOUR;
-  if (hoursUntil <= 1.5) return 2 * MIN;
-  if (hoursUntil <= 24) return 5 * MIN;
-  return 30 * MIN;
+  if (hoursUntil <= 3) return 60_000;          // 60s
+  if (hoursUntil <= 12) return 2 * MIN;
+  if (hoursUntil <= 48) return 5 * MIN;
+  return 15 * MIN;
 }
 
 // ---------- Fixtures ----------

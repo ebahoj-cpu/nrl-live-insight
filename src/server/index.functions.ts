@@ -21,7 +21,7 @@ import { generateDeterministicInsights, type DeterministicInsights } from "./ins
 import { resolveModelMode, squadIsNamed, squadSignature, modeAdvanced, type ModelMode } from "./model-mode";
 import { buildDeterministicBets } from "./bets-engine";
 import { indexSquads, isInSquad } from "./validate-picks";
-import { ensureAftermatch, getLastLessonForTeam, readAftermatch, type AftermatchPayload, type TeamLesson } from "./aftermatch";
+import { ensureAftermatch, readAftermatch, type AftermatchPayload } from "./aftermatch";
 import { fetchZylaLadder, getZylaRequestCount } from "./zyla";
 import { generateScript, type ScriptPayload } from "./script-engine";
 import { readOddsCache, readOddsCacheEntry, readOddsCacheStale, readOddsCacheStaleEntry, writeOddsCache } from "./odds-store";
@@ -431,18 +431,6 @@ export const getMatchPage = createServerFn({ method: "GET" })
       }
     }
 
-    // Lessons from each team's previous finished match (only relevant for
-    // upcoming/in-progress fixtures — for finished matches the aftermatch
-    // is the latest data anyway).
-    let lessons: { home: TeamLesson | null; away: TeamLesson | null } = { home: null, away: null };
-    if (!finished) {
-      const [homeLesson, awayLesson] = await Promise.all([
-        getLastLessonForTeam({ nickname: details.homeTeam.nickName, excludeMatchId: data.matchId, recentForm: details.homeTeam.recentForm }),
-        getLastLessonForTeam({ nickname: details.awayTeam.nickName, excludeMatchId: data.matchId, recentForm: details.awayTeam.recentForm }),
-      ]);
-      lessons = { home: homeLesson, away: awayLesson };
-    }
-
     return {
       details: { ...details, weather },
       odds,
@@ -455,7 +443,6 @@ export const getMatchPage = createServerFn({ method: "GET" })
       insightsError: null,
       recentRecaps: { home: homeRecaps, away: awayRecaps },
       aftermatch,
-      lessons,
       generatedAt: new Date().toISOString(),
     };
   });

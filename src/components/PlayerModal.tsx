@@ -143,11 +143,6 @@ export function PlayerProfileCard({ args, payload, loading }: {
           <BioCircle icon={<HandIcon className="h-5 w-5" />}    label="Hand"   value="R" />
           <BioCircle icon={<Footprints className="h-5 w-5" />}  label="Foot"   value="R" />
         </div>
-        {profile?.nickname && (
-          <p className="mt-4 text-center text-xs text-muted-foreground italic">
-            “{profile.nickname}” · debut {profile.debutClub ?? "—"}
-          </p>
-        )}
       </div>
 
       {/* Performance Edge */}
@@ -168,10 +163,10 @@ export function PlayerProfileCard({ args, payload, loading }: {
 function BioCircle({ icon, label, value, unit }: { icon: ReactNode; label: string; value: string; unit?: string }) {
   return (
     <div className="flex flex-col items-center gap-2">
-      <div className="relative h-16 w-16 sm:h-20 sm:w-20 rounded-full border-2 border-accent/50 bg-surface-2/50 flex flex-col items-center justify-center">
-        <div className="text-accent mb-0.5">{icon}</div>
-        <div className="text-[11px] sm:text-xs font-extrabold leading-none">
-          {value}{unit && <span className="text-[8px] text-muted-foreground ml-0.5">{unit}</span>}
+      <div className="relative h-20 w-20 sm:h-24 sm:w-24 rounded-full border-2 border-accent/50 bg-surface-2/50 flex flex-col items-center justify-center px-2 py-2.5">
+        <div className="text-accent flex items-center justify-center mb-1.5">{icon}</div>
+        <div className="text-xs sm:text-sm font-extrabold leading-none text-center">
+          {value}{unit && <span className="text-[9px] text-muted-foreground ml-0.5">{unit}</span>}
         </div>
       </div>
       <span className="text-[10px] sm:text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">
@@ -222,8 +217,8 @@ function PerformanceEdgeSection({ edge, loading, profile }: {
 
   return (
     <section className="rounded-xl bg-surface-2/40 ring-1 ring-accent/15 p-4">
-      <div className="flex items-center justify-between mb-3 pb-2 border-b border-accent/20">
-        <h3 className="font-display font-extrabold uppercase tracking-wider text-sm">
+      <div className="flex items-center justify-between mb-5 pb-3 border-b border-accent/20">
+        <h3 className="font-display font-extrabold uppercase tracking-wider text-lg sm:text-xl">
           Performance <span className="text-accent">Edge</span>
         </h3>
         <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
@@ -232,7 +227,7 @@ function PerformanceEdgeSection({ edge, loading, profile }: {
       </div>
 
       {/* Top meters: Experience · Form · Energy */}
-      <div className="space-y-2.5 mb-4">
+      <div className="space-y-2.5 mb-4 pt-2">
         <Meter
           icon={<Activity className="h-3 w-3" />}
           label="Experience"

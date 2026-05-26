@@ -20,6 +20,7 @@ import { playerSlug } from "@/lib/player-slug";
 const matchQO = (matchId: string) => queryOptions({
   queryKey: ["match", matchId],
   queryFn: () => getMatchPage({ data: { matchId } }),
+  staleTime: 60_000,
 });
 
 const insightsQO = (matchId: string) => queryOptions({
@@ -39,9 +40,16 @@ export const Route = createFileRoute("/match/$matchId")({
     parse: (raw: Record<string, string>) => ({ matchId: decodeURIComponent(raw.matchId) }),
     stringify: (p: { matchId: string }) => ({ matchId: encodeURIComponent(p.matchId) }),
   },
-  loader: ({ context: { queryClient }, params }) => {
-    void queryClient.ensureQueryData(matchQO(params.matchId));
-  },
+  // AWAIT the data in the loader (don't fire-and-forget). Reason: AuthGate
+  // unmounts/remounts <Outlet/> when the auth profile state flips (sign-in,
+  // token refresh, premium reload). A fire-and-forget loader + Suspense
+  // fallback can get caught in a remount loop where each new mount cancels
+  // the in-flight server-fn request before it resolves (logged as status 0
+  // in the worker). Awaiting ensures the data is cached before MatchPage
+  // mounts, so useSuspenseQuery hits the cache synchronously and the
+  // "Loading match…" fallback never has a chance to get stuck.
+  loader: ({ context: { queryClient }, params }) =>
+    queryClient.ensureQueryData(matchQO(params.matchId)),
 
   component: MatchPage,
   errorComponent: ({ error }) => {

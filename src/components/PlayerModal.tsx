@@ -163,10 +163,10 @@ export function PlayerProfileCard({ args, payload, loading }: {
 function BioCircle({ icon, label, value, unit }: { icon: ReactNode; label: string; value: string; unit?: string }) {
   return (
     <div className="flex flex-col items-center gap-2">
-      <div className="relative h-16 w-16 sm:h-20 sm:w-20 rounded-full border-2 border-accent/50 bg-surface-2/50 flex flex-col items-center justify-center">
-        <div className="text-accent mb-0.5">{icon}</div>
-        <div className="text-[11px] sm:text-xs font-extrabold leading-none">
-          {value}{unit && <span className="text-[8px] text-muted-foreground ml-0.5">{unit}</span>}
+      <div className="relative h-20 w-20 sm:h-24 sm:w-24 rounded-full border-2 border-accent/50 bg-surface-2/50 flex flex-col items-center justify-center px-2 py-2.5">
+        <div className="text-accent flex items-center justify-center mb-1.5">{icon}</div>
+        <div className="text-xs sm:text-sm font-extrabold leading-none text-center">
+          {value}{unit && <span className="text-[9px] text-muted-foreground ml-0.5">{unit}</span>}
         </div>
       </div>
       <span className="text-[10px] sm:text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">

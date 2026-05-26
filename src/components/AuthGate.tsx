@@ -27,13 +27,19 @@ export function AuthGate({ children }: { children: ReactNode }) {
   const { session, isPremium, loading } = useAuth();
   const { pathname } = useLocation();
 
-  if (loading) {
+  // Only show the full-page loader on the *initial* boot (no session yet).
+  // Once a session is in hand, never unmount children for transient profile
+  // reloads (token refresh, premium reload, etc.) — unmounting <Outlet/>
+  // mid-flight cancels any in-progress route loaders / server-fn requests
+  // and can leave Suspense fallbacks stuck (see match.$matchId loader).
+  if (loading && !session) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center text-muted-foreground text-sm">
         Loading…
       </div>
     );
   }
+
 
   if (!session) return <LoginScreen />;
 

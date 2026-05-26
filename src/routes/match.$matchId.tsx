@@ -2,8 +2,8 @@ import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useSuspenseQuery, useQuery, queryOptions } from "@tanstack/react-query";
 import { getMatchPage, getMatchInsights, getMatchAftermatch } from "@/server/index.functions";
 import { TeamLogo } from "@/components/TeamLogo";
-import type { TryscorerMarkets, OddsEvent } from "@/server/odds";
-import { bestH2H } from "@/server/odds";
+import type { TryscorerMarkets, OddsEvent } from "@/lib/odds-shared";
+import { bestH2H } from "@/lib/odds-shared";
 import { Suspense, useState } from "react";
 import {
   ArrowLeft, Clock, MapPin, Users, BarChart3, Sparkles,

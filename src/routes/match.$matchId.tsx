@@ -4,7 +4,7 @@ import { getMatchPage, getMatchInsights, getMatchAftermatch } from "@/server/ind
 import { TeamLogo } from "@/components/TeamLogo";
 import type { TryscorerMarkets, OddsEvent } from "@/lib/odds-shared";
 import { bestH2H } from "@/lib/odds-shared";
-import { Suspense, useState } from "react";
+import { Suspense, useState, useEffect } from "react";
 import {
   ArrowLeft, Clock, MapPin, Users, BarChart3, Sparkles,
   Trophy, Target, Flag, Crown, TrendingUp, AlertCircle, CloudSun, Calendar, Zap, Hourglass,
@@ -71,9 +71,45 @@ export const Route = createFileRoute("/match/$matchId")({
 
 type TabKey = "lineup" | "stats" | "insights" | "bet" | "aftermatch" | "script";
 
+function MatchLoading() {
+  const steps = [
+    "Loading match…",
+    "Fetching team lineups",
+    "Pulling latest odds",
+    "Running prediction models",
+    "Analysing player matchups",
+    "Generating insights",
+    "Finalising scout report",
+  ];
+  const [i, setI] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setI((n) => Math.min(n + 1, steps.length - 1)), 1400);
+    return () => clearInterval(id);
+  }, []);
+  return (
+    <div className="py-16 flex flex-col items-center gap-4 text-muted-foreground">
+      <div className="relative h-10 w-10">
+        <div className="absolute inset-0 rounded-full border-2 border-accent/20" />
+        <div className="absolute inset-0 rounded-full border-2 border-accent border-t-transparent animate-spin" />
+      </div>
+      <ul className="space-y-1.5 text-sm text-center min-h-[10rem]">
+        {steps.slice(0, i + 1).map((s, idx) => (
+          <li
+            key={s}
+            className={`flex items-center justify-center gap-2 transition-opacity ${idx === i ? "text-foreground font-medium" : "opacity-60"}`}
+          >
+            {idx < i ? <Check className="h-3.5 w-3.5 text-accent" /> : <Sparkles className="h-3.5 w-3.5 text-accent animate-pulse" />}
+            <span>{s}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function MatchPage() {
   return (
-    <Suspense fallback={<div className="py-12 text-center text-muted-foreground">Loading match…</div>}>
+    <Suspense fallback={<MatchLoading />}>
       <MatchInner />
     </Suspense>
   );

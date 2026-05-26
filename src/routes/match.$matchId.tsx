@@ -2374,7 +2374,7 @@ function InsightsTab({ matchId, insights, insightsError, insightsLoading, home, 
 
       {/* 7 — First / Second / Third Tryscorer */}
       <Card title="First / second / third tryscorer" icon={Target}>
-        <ul className="space-y-2.5">
+        <ul className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
           {[det.rankedTryscorers?.first, det.rankedTryscorers?.second, det.rankedTryscorers?.third].map((p: any, i: number) => (
             <li key={i} className="flex flex-col items-center text-center gap-2 bg-surface-2 rounded-lg p-2.5 pt-14 sm:pt-20">
               <PlayerHeadshot name={p?.name} teams={[home, away]} size={72} minSize={56} maxSize={96} />

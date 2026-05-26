@@ -2455,7 +2455,7 @@ function InsightsTab({ matchId, insights, insightsError, insightsLoading, home, 
         ) : (
           <>
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Next-best scorers if the top 6 anytimes don't convert</div>
-            <ul className="space-y-2.5">
+            <ul className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
               {asArray<any>(det.forwardPicks).map((r: any, i: number) => (
                 <li key={`${r.name}-${i}`} className="flex flex-col items-center text-center gap-2 bg-surface-2 rounded-lg p-2.5 pt-14 sm:pt-20">
                   <PlayerHeadshot name={r.name} teams={[home, away]} size={72} minSize={56} maxSize={96} />

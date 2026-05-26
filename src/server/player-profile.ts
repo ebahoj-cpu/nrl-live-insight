@@ -207,15 +207,17 @@ export async function fetchPlayerProfile(args: {
   const html = await res.text();
 
   const bio = parseBioTable(html);
-  // The page contains TWO appearance blocks: the first under "NRL Career"
-  // and the second the current season. We use the second occurrence for
-  // season stats and the first for career.
   const seasonStats = parseStatsTable(html);
-  // Crude career split: re-scan and pick the first "Appearances" / "Tries"
-  // occurrence (which is the career block).
-  const careerMatch = html.match(/Appearances[^0-9]{0,40}([0-9,]+)[\s\S]{0,200}?Tries[^0-9]{0,40}([0-9,]+)/i);
-  const careerAppearances = careerMatch ? num(careerMatch[1]) : 0;
-  const careerTries = careerMatch ? num(careerMatch[2]) : 0;
+  // Total NRL games = max across every "Appearances" dt/dd on the profile
+  // page. NRL.com renders the page with multiple Appearances entries (career
+  // total, current season, and sometimes per-comp splits); the career total
+  // is always the largest. Same approach for total tries.
+  const allAppearances = [...html.matchAll(/<dt[^>]*>\s*Appearances[:\s]*<\/dt>\s*<dd[^>]*>([\s\S]*?)<\/dd>/gi)]
+    .map((m) => num(m[1].replace(/<[^>]+>/g, "")));
+  const allTries = [...html.matchAll(/<dt[^>]*>\s*Tries[:\s]*<\/dt>\s*<dd[^>]*>([\s\S]*?)<\/dd>/gi)]
+    .map((m) => num(m[1].replace(/<[^>]+>/g, "")));
+  const careerAppearances = allAppearances.length ? Math.max(...allAppearances) : 0;
+  const careerTries = allTries.length ? Math.max(...allTries) : 0;
 
   const heightCm = bio["Height"] ? num(bio["Height"]) : null;
   const weightKg = bio["Weight"] ? num(bio["Weight"]) : null;

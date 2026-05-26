@@ -217,7 +217,7 @@ function PerformanceEdgeSection({ edge, loading, profile }: {
 
   return (
     <section className="rounded-xl bg-surface-2/40 ring-1 ring-accent/15 p-4">
-      <div className="mb-5 pb-3 border-b border-accent/20">
+      <div className="mb-5 pb-3 border-b border-accent/20 text-center">
         <h3 className="font-display font-extrabold uppercase tracking-wider text-lg sm:text-xl whitespace-nowrap">
           Performance <span className="text-accent">Edge</span>
         </h3>

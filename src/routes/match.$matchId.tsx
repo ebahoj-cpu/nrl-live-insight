@@ -382,10 +382,12 @@ const POSITION_ORDER = [
 type NewsOut = { playerName: string; reason: string; sourceUrl: string; sourceTitle: string; source: string; publishedUtc: string };
 type TeamNews = { ins: string[]; outs: string[]; blurb: string; sourceUrl: string; newsOuts?: NewsOut[] } | null;
 
-function LineupTab({ home, away, officials, teamNews: _teamNews }: { home: any; away: any; officials: { position: string; firstName: string; lastName: string; headImage?: string }[]; teamNews?: { home: TeamNews; away: TeamNews } }) {
+function LineupTab({ home, away, officials, teamNews }: { home: any; away: any; officials: { position: string; firstName: string; lastName: string; headImage?: string }[]; teamNews?: { home: TeamNews; away: TeamNews } }) {
   return (
     <div className="space-y-4">
       <H2HPanel home={home} away={away} />
+      <SquadPanel team={home} news={teamNews?.home} />
+      <SquadPanel team={away} news={teamNews?.away} />
       <OfficialsCard officials={officials} />
     </div>
   );

@@ -29,21 +29,22 @@ const playerQO = (args: {
 
 export const Route = createFileRoute("/player/$teamThemeKey/$playerSlug")({
   validateSearch: zodValidator(searchSchema),
-  head: ({ search }) => ({
-    meta: [
-      { title: `${search.firstName ?? "Player"} ${search.lastName ?? ""} – Player Profile | LINEBREAK` },
-      { name: "description", content: `NRL player profile for ${search.firstName ?? ""} ${search.lastName ?? ""}. Stats, form, and Performance Edge.` },
-    ],
+  loaderDeps: ({ search }) => ({
+    firstName: search.firstName,
+    lastName: search.lastName,
+    teamNickname: search.teamNickname,
+    position: search.position,
+    jerseyNumber: search.jerseyNumber,
   }),
-  loader: ({ context: { queryClient }, params, search }) => {
-    if (!search.firstName || !search.lastName) return;
+  loader: ({ context: { queryClient }, params, deps }) => {
+    if (!deps.firstName || !deps.lastName) return;
     const args = {
       teamThemeKey: params.teamThemeKey,
-      teamNickname: search.teamNickname ?? params.teamThemeKey,
-      firstName: search.firstName,
-      lastName: search.lastName,
-      position: search.position,
-      jerseyNumber: search.jerseyNumber,
+      teamNickname: deps.teamNickname ?? params.teamThemeKey,
+      firstName: deps.firstName,
+      lastName: deps.lastName,
+      position: deps.position,
+      jerseyNumber: deps.jerseyNumber,
     };
     void queryClient.ensureQueryData(playerQO(args));
   },
@@ -53,7 +54,7 @@ export const Route = createFileRoute("/player/$teamThemeKey/$playerSlug")({
       <div className="text-center">
         <p className="text-danger font-semibold">Couldn&apos;t load player</p>
         <p className="mt-2 text-sm text-muted-foreground">{error.message}</p>
-        <Link to="/" className="mt-6 inline-block px-5 py-2 bg-accent text-accent-foreground rounded-full font-semibold">
+        <Link to="/" search={{ round: undefined }} className="mt-6 inline-block px-5 py-2 bg-accent text-accent-foreground rounded-full font-semibold">
           Back to fixtures
         </Link>
       </div>
@@ -62,7 +63,7 @@ export const Route = createFileRoute("/player/$teamThemeKey/$playerSlug")({
 });
 
 function PlayerPage() {
-  const { teamThemeKey, playerSlug } = Route.useParams();
+  const { teamThemeKey } = Route.useParams();
   const search = Route.useSearch();
 
   const args = {
@@ -89,7 +90,7 @@ function PlayerPage() {
   return (
     <div className="min-h-screen pt-6 pb-12">
       <div className="max-w-3xl mx-auto px-4 sm:px-0">
-        <Link to="/" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-4">
+        <Link to="/" search={{ round: undefined }} className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-4">
           <ArrowLeft className="h-4 w-4" /> Back to fixtures
         </Link>
 

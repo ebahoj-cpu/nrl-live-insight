@@ -29,9 +29,13 @@ export type TryscorerOdds = {
 };
 
 export type TryscorerMarkets = {
+  first: TryscorerOdds[];
   anytime: TryscorerOdds[];
-  first?: TryscorerOdds[];
-  last?: TryscorerOdds[];
+  multi: TryscorerOdds[];
+  hasAny: boolean;
+  lastUpdate: string | null;
+  status?: "ok" | "lineups_unreleased" | "unavailable";
+  message?: string;
 };
 
 export function bestH2H(ev: OddsEvent): {

@@ -40,13 +40,14 @@ function googleNewsUrl(query: string): string {
 }
 
 const FEEDS: { source: string; url: string; team?: string }[] = [
-  // Approved league-wide publishers only.
-  { source: "Zero Tackle",            url: "https://www.zerotackle.com/nrl/feed/" },
-  { source: "NRL.com",                url: googleNewsUrl("site:nrl.com news") },
-  { source: "Fox Sports",             url: googleNewsUrl("site:foxsports.com.au NRL") },
-  { source: "Sporting News Australia", url: googleNewsUrl("site:sportingnews.com/au rugby league") },
-  { source: "Yahoo Sport Australia",  url: googleNewsUrl("site:au.sports.yahoo.com NRL") },
-  // Per-club feeds (Google News, attributed to the underlying publisher per item)
+  // League-wide publishers (per spec): Yahoo, Zero Tackle, NRL.com, Fox Sports.
+  // Zero Tackle's native /nrl/feed/ now 301-redirects to its homepage (Yoast
+  // disabled taxonomy feeds), so we pull it via Google News too.
+  { source: "NRL.com",               url: googleNewsUrl("site:nrl.com news") },
+  { source: "Fox Sports",            url: googleNewsUrl("site:foxsports.com.au NRL") },
+  { source: "Yahoo Sport Australia", url: googleNewsUrl("site:au.sports.yahoo.com NRL") },
+  { source: "Zero Tackle",           url: googleNewsUrl("site:zerotackle.com NRL") },
+  // One feed per NRL club via Google News.
   ...TEAM_QUERIES.map((t) => ({ source: t.team, team: t.team, url: googleNewsUrl(t.query) })),
 ];
 

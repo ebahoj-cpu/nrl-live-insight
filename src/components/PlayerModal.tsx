@@ -143,11 +143,6 @@ export function PlayerProfileCard({ args, payload, loading }: {
           <BioCircle icon={<HandIcon className="h-5 w-5" />}    label="Hand"   value="R" />
           <BioCircle icon={<Footprints className="h-5 w-5" />}  label="Foot"   value="R" />
         </div>
-        {profile?.nickname && (
-          <p className="mt-4 text-center text-xs text-muted-foreground italic">
-            “{profile.nickname}” · debut {profile.debutClub ?? "—"}
-          </p>
-        )}
       </div>
 
       {/* Performance Edge */}

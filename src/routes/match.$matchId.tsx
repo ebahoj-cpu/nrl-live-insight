@@ -3207,7 +3207,7 @@ function BetTab({ insights, insightsError, insightsLoading, home, away }:
                       <div className="text-sm font-bold mt-0.5 leading-tight">
                         Projected Tryscorers
                       </div>
-                      <div className="mt-2 space-y-4">
+                      <div className={`mt-2 ${active.id === "secondaries" ? "space-y-4" : "space-y-4 sm:grid sm:grid-cols-3 sm:gap-3 sm:space-y-0"}`}>
                         {anytimeLegs.map((al) => (
                           <div key={al.id} className="relative flex flex-col items-center text-center gap-2 pt-14 sm:pt-20">
                             <button

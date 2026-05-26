@@ -16,7 +16,8 @@ import { getPlayerProfile, type PlayerProfilePayload } from "@/server/player-pro
 import type { SkillRating, EnergyTier } from "@/lib/performance-edge";
 import {
   Activity, Sword, Zap, Shield, Hand, Dumbbell, Footprints,
-  Hand as HandIcon, User2, Flame, BatteryFull, BatteryLow,
+  Hand as HandIcon, User2, BatteryFull, BatteryLow,
+  Cake, Ruler, Weight as WeightIcon, TrendingUp,
 } from "lucide-react";
 
 export type OpenPlayerArgs = {

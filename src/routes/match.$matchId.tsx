@@ -2394,7 +2394,7 @@ function InsightsTab({ matchId, insights, insightsError, insightsLoading, home, 
         <Card title="Predicted outcome" icon={Trophy} className="accent-glow">
           <p className="font-chat text-sm leading-relaxed text-foreground/90 mb-3">{det.predictedOutcome.summary}</p>
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Three anytime tryscorers backing this script</div>
-          <ul className="space-y-2.5">
+          <ul className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
             {asArray<any>(det.predictedOutcome.picks).map((p: any, i: number) => (
               <li key={`${p.name}-${i}`} className="flex flex-col items-center text-center gap-2 bg-surface-2 rounded-lg p-2.5 pt-14 sm:pt-20">
                 <PlayerHeadshot name={p?.name} teams={[home, away]} size={72} minSize={56} maxSize={96} />

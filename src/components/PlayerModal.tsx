@@ -98,31 +98,25 @@ export function PlayerProfileCard({ args, payload, loading }: {
 
   return (
     <div className="flex flex-col">
-      {/* Energy bar (full width across the top) */}
-      <EnergyBar tier={edge?.energy.tier ?? "Moderate"} loading={loading} />
-
-      {/* Hero block: large image left, identity + bio lines right */}
-      <div className="flex flex-col sm:flex-row gap-4 p-4 sm:p-6">
-        {/* Headshot */}
-        <div className="relative shrink-0 w-full sm:w-44 h-56 sm:h-64 rounded-xl bg-gradient-to-b from-accent/15 to-surface-2 ring-1 ring-accent/25 overflow-hidden flex items-end justify-center">
-          {heroImg ? (
-            <img
-              src={heroImg}
-              alt={fullName}
-              loading="eager"
-              className="h-full w-auto max-w-none object-contain object-bottom drop-shadow-[0_4px_10px_rgba(0,0,0,0.5)]"
-              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-            />
-          ) : (
-            <User2 className="h-24 w-24 text-muted-foreground/40" />
-          )}
-        </div>
-
-        {/* Right column: name + logo + position + bio */}
-        <div className="flex-1 min-w-0 flex flex-col">
-          <div className="flex items-center gap-3 mb-1">
-            <TeamLogo themeKey={args.teamThemeKey} name={args.teamNickname} size={36} light />
-            <div className="min-w-0">
+      {/* Hero block: large image + identity */}
+      <div className="px-4 sm:px-6 pt-4 sm:pt-6">
+        <div className="relative w-full rounded-2xl bg-gradient-to-b from-accent/20 via-surface to-surface-2 ring-1 ring-accent/30 overflow-hidden">
+          <div className="flex justify-center items-end h-64 sm:h-80">
+            {heroImg ? (
+              <img
+                src={heroImg}
+                alt={fullName}
+                loading="eager"
+                className="h-full w-auto object-contain object-bottom drop-shadow-[0_8px_16px_rgba(0,0,0,0.5)]"
+                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+              />
+            ) : (
+              <User2 className="h-24 w-24 text-muted-foreground/40" />
+            )}
+          </div>
+          <div className="flex items-center gap-3 px-4 py-3 border-t border-accent/20 bg-surface/60 backdrop-blur">
+            <TeamLogo themeKey={args.teamThemeKey} name={args.teamNickname} size={40} light />
+            <div className="min-w-0 flex-1">
               <div className="text-[10px] uppercase tracking-wider text-muted-foreground truncate">
                 {args.firstName}
               </div>
@@ -137,33 +131,28 @@ export function PlayerProfileCard({ args, payload, loading }: {
               </div>
             </div>
           </div>
-
-          {/* Bio line 1: Age | Height | Weight | Handed | Footed */}
-          <BioLine items={[
-            { label: "Age",    value: profile?.age != null ? String(profile.age) : "—" },
-            { label: "Height", value: profile?.heightCm ? `${profile.heightCm} cm` : "—" },
-            { label: "Weight", value: profile?.weightKg ? `${profile.weightKg} kg` : "—" },
-            { label: "Handed", icon: <HandIcon className="h-3 w-3" />, value: "Right" },
-            { label: "Footed", icon: <Footprints className="h-3 w-3" />, value: "Right" },
-          ]} />
-
-          {/* Bio line 2: Temperament + Experience progress bars */}
-          <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <TemperamentBar profile={profile} />
-            <ExperienceBar profile={profile} />
-          </div>
-
-          {profile?.nickname && (
-            <p className="mt-3 text-xs text-muted-foreground italic">
-              “{profile.nickname}” · debut {profile.debutClub ?? "—"}
-            </p>
-          )}
         </div>
       </div>
 
+      {/* Bio circles: Age | Height | Weight  /  Hand | Foot */}
+      <div className="px-4 sm:px-6 pt-5">
+        <div className="grid grid-cols-3 sm:grid-cols-5 gap-3 sm:gap-4 max-w-md sm:max-w-none mx-auto">
+          <BioCircle icon={<Cake className="h-5 w-5" />}        label="Age"    value={profile?.age != null ? String(profile.age) : "—"} />
+          <BioCircle icon={<Ruler className="h-5 w-5" />}       label="Height" value={profile?.heightCm ? `${profile.heightCm}` : "—"} unit={profile?.heightCm ? "cm" : undefined} />
+          <BioCircle icon={<WeightIcon className="h-5 w-5" />}  label="Weight" value={profile?.weightKg ? `${profile.weightKg}` : "—"} unit={profile?.weightKg ? "kg" : undefined} />
+          <BioCircle icon={<HandIcon className="h-5 w-5" />}    label="Hand"   value="R" />
+          <BioCircle icon={<Footprints className="h-5 w-5" />}  label="Foot"   value="R" />
+        </div>
+        {profile?.nickname && (
+          <p className="mt-4 text-center text-xs text-muted-foreground italic">
+            “{profile.nickname}” · debut {profile.debutClub ?? "—"}
+          </p>
+        )}
+      </div>
+
       {/* Performance Edge */}
-      <div className="px-4 sm:px-6 pb-6">
-        <PerformanceEdgeSection edge={edge} loading={loading} />
+      <div className="px-4 sm:px-6 pt-6 pb-6">
+        <PerformanceEdgeSection edge={edge} loading={loading} profile={profile} />
       </div>
 
       {loading && (
@@ -172,6 +161,22 @@ export function PlayerProfileCard({ args, payload, loading }: {
       {payload?.error && (
         <div className="px-6 pb-4 text-xs text-danger">{payload.error}</div>
       )}
+    </div>
+  );
+}
+
+function BioCircle({ icon, label, value, unit }: { icon: ReactNode; label: string; value: string; unit?: string }) {
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <div className="relative h-16 w-16 sm:h-20 sm:w-20 rounded-full border-2 border-accent/50 bg-surface-2/50 flex flex-col items-center justify-center">
+        <div className="text-accent mb-0.5">{icon}</div>
+        <div className="text-[11px] sm:text-xs font-extrabold leading-none">
+          {value}{unit && <span className="text-[8px] text-muted-foreground ml-0.5">{unit}</span>}
+        </div>
+      </div>
+      <span className="text-[10px] sm:text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">
+        {label}
+      </span>
     </div>
   );
 }

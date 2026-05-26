@@ -217,8 +217,8 @@ function PerformanceEdgeSection({ edge, loading, profile }: {
 
   return (
     <section className="rounded-xl bg-surface-2/40 ring-1 ring-accent/15 p-4">
-      <div className="flex items-center justify-between mb-3 pb-2 border-b border-accent/20">
-        <h3 className="font-display font-extrabold uppercase tracking-wider text-sm">
+      <div className="flex items-center justify-between mb-5 pb-3 border-b border-accent/20">
+        <h3 className="font-display font-extrabold uppercase tracking-wider text-lg sm:text-xl">
           Performance <span className="text-accent">Edge</span>
         </h3>
         <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
@@ -227,7 +227,7 @@ function PerformanceEdgeSection({ edge, loading, profile }: {
       </div>
 
       {/* Top meters: Experience · Form · Energy */}
-      <div className="space-y-2.5 mb-4">
+      <div className="space-y-2.5 mb-4 pt-2">
         <Meter
           icon={<Activity className="h-3 w-3" />}
           label="Experience"

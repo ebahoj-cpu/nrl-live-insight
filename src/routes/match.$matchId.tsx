@@ -51,6 +51,14 @@ export const Route = createFileRoute("/match/$matchId")({
   loader: ({ context: { queryClient }, params }) =>
     queryClient.ensureQueryData(matchQO(params.matchId)),
 
+  // Show the sequential progress UI immediately while the loader is running.
+  // pendingMs: 0 means no delay before showing it; when the data is already
+  // cached, ensureQueryData resolves synchronously and the pending UI never
+  // appears, so the Lineup/Stats/Insights tabs render instantly.
+  pendingMs: 0,
+  pendingMinMs: 0,
+  pendingComponent: MatchLoading,
+
   component: MatchPage,
   errorComponent: ({ error }) => {
     const router = useRouter();

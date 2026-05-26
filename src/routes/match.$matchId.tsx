@@ -30,8 +30,10 @@ const insightsQO = (matchId: string) => queryOptions({
 });
 
 export const Route = createFileRoute("/match/$matchId")({
-  parseParams: (p) => ({ matchId: decodeURIComponent(p.matchId) }),
-  stringifyParams: (p) => ({ matchId: encodeURIComponent(p.matchId) }),
+  // matchId contains slashes (e.g. "2026/round-13/knights-v-eels").
+  // TanStack Router handles URL-encoding of path params automatically —
+  // do NOT add parseParams/stringifyParams here or the slashes get
+  // double-encoded (%252F) and the loader receives a broken id.
   loader: ({ context: { queryClient }, params }) => {
     void queryClient.ensureQueryData(matchQO(params.matchId));
   },

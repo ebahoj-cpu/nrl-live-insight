@@ -70,13 +70,13 @@ type TabKey = "lineup" | "stats" | "insights" | "bet" | "aftermatch" | "script";
 
 function MatchLoading() {
   const steps = [
-    { text: "Loading match…", base: 800, jitter: 400 },
-    { text: "Fetching team lineups", base: 1800, jitter: 800 },
-    { text: "Pulling latest odds", base: 1200, jitter: 600 },
-    { text: "Running prediction models", base: 3200, jitter: 900 },
-    { text: "Analysing player matchups", base: 2600, jitter: 700 },
-    { text: "Generating insights", base: 2200, jitter: 600 },
-    { text: "Finalising scout report", base: 2400, jitter: 800 },
+    { text: "Loading match…", base: 1600, jitter: 800 },
+    { text: "Fetching team lineups", base: 3600, jitter: 1600 },
+    { text: "Pulling latest odds", base: 2400, jitter: 1200 },
+    { text: "Running prediction models", base: 6400, jitter: 1800 },
+    { text: "Analysing player matchups", base: 5200, jitter: 1400 },
+    { text: "Generating insights", base: 4400, jitter: 1200 },
+    { text: "Finalising scout report", base: 4800, jitter: 1600 },
   ];
 
   const [i, setI] = useState(0);
@@ -98,7 +98,7 @@ function MatchLoading() {
       for (let c = 1; c <= text.length; c++) {
         if (cancelled) return;
         setVisibleText(text.slice(0, c));
-        await sleep(jitter(35, 20)); // irregular typing speed
+        await sleep(jitter(70, 40)); // irregular typing speed
       }
       setPhase("holding");
     };
@@ -106,11 +106,11 @@ function MatchLoading() {
     const erase = async (text: string) => {
       setPhase("erasing");
       setFadeOut(true);
-      await sleep(250); // brief fade before next line
+      await sleep(500); // brief fade before next line
       for (let c = text.length; c >= 0; c--) {
         if (cancelled) return;
         setVisibleText(text.slice(0, c));
-        await sleep(jitter(20, 10));
+        await sleep(jitter(40, 20));
       }
     };
 
@@ -146,7 +146,7 @@ function MatchLoading() {
       </div>
       <div className="min-h-[2rem] flex items-center justify-center">
         <div
-          className={`flex items-center gap-2 text-sm text-foreground font-mono transition-opacity duration-200 ${fadeOut ? "opacity-0" : "opacity-100"}`}
+          className={`flex items-center gap-2 text-sm text-foreground font-mono transition-opacity duration-500 ${fadeOut ? "opacity-0" : "opacity-100"}`}
         >
           <span className="text-accent">{phase === "erasing" ? "<" : ">"}</span>
           <span className="whitespace-pre">{visibleText}</span>

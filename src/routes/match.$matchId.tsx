@@ -80,26 +80,31 @@ function MatchLoading() {
   ];
   const [i, setI] = useState(0);
   useEffect(() => {
-    const id = setInterval(() => setI((n) => Math.min(n + 1, steps.length - 1)), 1400);
+    const id = setInterval(() => setI((n) => Math.min(n + 1, steps.length - 1)), 3000);
     return () => clearInterval(id);
   }, []);
   return (
-    <div className="py-16 flex flex-col items-center gap-4 text-muted-foreground">
-      <div className="relative h-10 w-10">
-        <div className="absolute inset-0 rounded-full border-2 border-accent/20" />
-        <div className="absolute inset-0 rounded-full border-2 border-accent border-t-transparent animate-spin" />
-      </div>
-      <ul className="space-y-1.5 text-sm text-center min-h-[10rem]">
-        {steps.slice(0, i + 1).map((s, idx) => (
-          <li
-            key={s}
-            className={`flex items-center justify-center gap-2 transition-opacity ${idx === i ? "text-foreground font-medium" : "opacity-60"}`}
-          >
-            {idx < i ? <Check className="h-3.5 w-3.5 text-accent" /> : <Sparkles className="h-3.5 w-3.5 text-accent animate-pulse" />}
-            <span>{s}</span>
-          </li>
+    <div className="py-16 flex flex-col items-center gap-5 text-muted-foreground">
+      {/* Terminal-style audio-bar indicator — feels like code is running */}
+      <div className="flex items-end gap-1 h-6">
+        {[3, 5, 2, 6, 4].map((h, idx) => (
+          <span
+            key={idx}
+            className="w-1 bg-accent rounded-sm animate-[pulse_0.9s_ease-in-out_infinite]"
+            style={{ height: `${h * 4}px`, animationDelay: `${idx * 0.15}s` }}
+          />
         ))}
-      </ul>
+      </div>
+      <div className="min-h-[2rem] flex items-center justify-center">
+        <div
+          key={steps[i]}
+          className="flex items-center gap-2 text-sm text-foreground font-mono animate-fade-in"
+        >
+          <span className="text-accent">{">"}</span>
+          <span>{steps[i]}</span>
+          <span className="inline-block w-2 h-4 bg-accent animate-pulse" />
+        </div>
+      </div>
     </div>
   );
 }

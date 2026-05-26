@@ -10,13 +10,14 @@ import { createContext, useContext, useState, useCallback, type ReactNode } from
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { Progress } from "@/components/ui/progress";
+
 import { TeamLogo } from "@/components/TeamLogo";
 import { getPlayerProfile, type PlayerProfilePayload } from "@/server/player-profile.functions";
 import type { SkillRating, EnergyTier } from "@/lib/performance-edge";
 import {
   Activity, Sword, Zap, Shield, Hand, Dumbbell, Footprints,
-  Hand as HandIcon, User2, Flame, BatteryFull, BatteryLow,
+  Hand as HandIcon, User2, BatteryFull, BatteryLow,
+  Cake, Ruler, Weight as WeightIcon, TrendingUp,
 } from "lucide-react";
 
 export type OpenPlayerArgs = {
@@ -97,31 +98,25 @@ export function PlayerProfileCard({ args, payload, loading }: {
 
   return (
     <div className="flex flex-col">
-      {/* Energy bar (full width across the top) */}
-      <EnergyBar tier={edge?.energy.tier ?? "Moderate"} loading={loading} />
-
-      {/* Hero block: large image left, identity + bio lines right */}
-      <div className="flex flex-col sm:flex-row gap-4 p-4 sm:p-6">
-        {/* Headshot */}
-        <div className="relative shrink-0 w-full sm:w-44 h-56 sm:h-64 rounded-xl bg-gradient-to-b from-accent/15 to-surface-2 ring-1 ring-accent/25 overflow-hidden flex items-end justify-center">
-          {heroImg ? (
-            <img
-              src={heroImg}
-              alt={fullName}
-              loading="eager"
-              className="h-full w-auto max-w-none object-contain object-bottom drop-shadow-[0_4px_10px_rgba(0,0,0,0.5)]"
-              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-            />
-          ) : (
-            <User2 className="h-24 w-24 text-muted-foreground/40" />
-          )}
-        </div>
-
-        {/* Right column: name + logo + position + bio */}
-        <div className="flex-1 min-w-0 flex flex-col">
-          <div className="flex items-center gap-3 mb-1">
-            <TeamLogo themeKey={args.teamThemeKey} name={args.teamNickname} size={36} light />
-            <div className="min-w-0">
+      {/* Hero block: large image + identity */}
+      <div className="px-4 sm:px-6 pt-4 sm:pt-6">
+        <div className="relative w-full rounded-2xl bg-gradient-to-b from-accent/20 via-surface to-surface-2 ring-1 ring-accent/30 overflow-hidden">
+          <div className="flex justify-center items-end h-64 sm:h-80">
+            {heroImg ? (
+              <img
+                src={heroImg}
+                alt={fullName}
+                loading="eager"
+                className="h-full w-auto object-contain object-bottom drop-shadow-[0_8px_16px_rgba(0,0,0,0.5)]"
+                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+              />
+            ) : (
+              <User2 className="h-24 w-24 text-muted-foreground/40" />
+            )}
+          </div>
+          <div className="flex items-center gap-3 px-4 py-3 border-t border-accent/20 bg-surface/60 backdrop-blur">
+            <TeamLogo themeKey={args.teamThemeKey} name={args.teamNickname} size={40} light />
+            <div className="min-w-0 flex-1">
               <div className="text-[10px] uppercase tracking-wider text-muted-foreground truncate">
                 {args.firstName}
               </div>
@@ -136,33 +131,28 @@ export function PlayerProfileCard({ args, payload, loading }: {
               </div>
             </div>
           </div>
-
-          {/* Bio line 1: Age | Height | Weight | Handed | Footed */}
-          <BioLine items={[
-            { label: "Age",    value: profile?.age != null ? String(profile.age) : "—" },
-            { label: "Height", value: profile?.heightCm ? `${profile.heightCm} cm` : "—" },
-            { label: "Weight", value: profile?.weightKg ? `${profile.weightKg} kg` : "—" },
-            { label: "Handed", icon: <HandIcon className="h-3 w-3" />, value: "Right" },
-            { label: "Footed", icon: <Footprints className="h-3 w-3" />, value: "Right" },
-          ]} />
-
-          {/* Bio line 2: Temperament + Experience progress bars */}
-          <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <TemperamentBar profile={profile} />
-            <ExperienceBar profile={profile} />
-          </div>
-
-          {profile?.nickname && (
-            <p className="mt-3 text-xs text-muted-foreground italic">
-              “{profile.nickname}” · debut {profile.debutClub ?? "—"}
-            </p>
-          )}
         </div>
       </div>
 
+      {/* Bio circles: Age | Height | Weight  /  Hand | Foot */}
+      <div className="px-4 sm:px-6 pt-5">
+        <div className="grid grid-cols-3 sm:grid-cols-5 gap-3 sm:gap-4 max-w-md sm:max-w-none mx-auto">
+          <BioCircle icon={<Cake className="h-5 w-5" />}        label="Age"    value={profile?.age != null ? String(profile.age) : "—"} />
+          <BioCircle icon={<Ruler className="h-5 w-5" />}       label="Height" value={profile?.heightCm ? `${profile.heightCm}` : "—"} unit={profile?.heightCm ? "cm" : undefined} />
+          <BioCircle icon={<WeightIcon className="h-5 w-5" />}  label="Weight" value={profile?.weightKg ? `${profile.weightKg}` : "—"} unit={profile?.weightKg ? "kg" : undefined} />
+          <BioCircle icon={<HandIcon className="h-5 w-5" />}    label="Hand"   value="R" />
+          <BioCircle icon={<Footprints className="h-5 w-5" />}  label="Foot"   value="R" />
+        </div>
+        {profile?.nickname && (
+          <p className="mt-4 text-center text-xs text-muted-foreground italic">
+            “{profile.nickname}” · debut {profile.debutClub ?? "—"}
+          </p>
+        )}
+      </div>
+
       {/* Performance Edge */}
-      <div className="px-4 sm:px-6 pb-6">
-        <PerformanceEdgeSection edge={edge} loading={loading} />
+      <div className="px-4 sm:px-6 pt-6 pb-6">
+        <PerformanceEdgeSection edge={edge} loading={loading} profile={profile} />
       </div>
 
       {loading && (
@@ -175,86 +165,23 @@ export function PlayerProfileCard({ args, payload, loading }: {
   );
 }
 
-// -------------------------- Sub-components --------------------------
-
-function EnergyBar({ tier, loading }: { tier: EnergyTier; loading: boolean }) {
-  // 0..100 visual fill matched to the descriptive label.
-  const fill: Record<EnergyTier, number> = {
-    Supercharged: 100, High: 80, Moderate: 60, Tired: 40, Fatigued: 20,
-  };
-  const Icon = tier === "Fatigued" || tier === "Tired" ? BatteryLow : BatteryFull;
+function BioCircle({ icon, label, value, unit }: { icon: ReactNode; label: string; value: string; unit?: string }) {
   return (
-    <div className="px-4 sm:px-6 pt-4 pb-2">
-      <div className="flex items-center justify-between text-[10px] uppercase tracking-wider font-bold text-muted-foreground mb-1">
-        <span className="flex items-center gap-1.5">
-          <Icon className="h-3 w-3 text-accent" /> Energy
-        </span>
-        <span className="text-accent">{loading ? "…" : tier}</span>
-      </div>
-      <div className="h-2 w-full rounded-full bg-surface-2 overflow-hidden">
-        <div
-          className="h-full bg-gradient-to-r from-accent/60 to-accent transition-all"
-          style={{ width: `${fill[tier]}%` }}
-        />
-      </div>
-    </div>
-  );
-}
-
-function BioLine({ items }: { items: { label: string; value: string; icon?: ReactNode }[] }) {
-  return (
-    <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1.5 text-[11px] sm:text-xs">
-      {items.map((it, i) => (
-        <div key={i} className="flex items-center gap-1.5">
-          <span className="uppercase tracking-wider text-muted-foreground text-[9px] sm:text-[10px] font-semibold">
-            {it.label}
-          </span>
-          <span className="flex items-center gap-1 font-bold text-foreground">
-            {it.icon}{it.value}
-          </span>
+    <div className="flex flex-col items-center gap-2">
+      <div className="relative h-16 w-16 sm:h-20 sm:w-20 rounded-full border-2 border-accent/50 bg-surface-2/50 flex flex-col items-center justify-center">
+        <div className="text-accent mb-0.5">{icon}</div>
+        <div className="text-[11px] sm:text-xs font-extrabold leading-none">
+          {value}{unit && <span className="text-[8px] text-muted-foreground ml-0.5">{unit}</span>}
         </div>
-      ))}
-    </div>
-  );
-}
-
-function TemperamentBar({ profile }: { profile: { seasonStats: { errors: number; appearances: number; tackleBreaks: number } } | null | undefined }) {
-  // Temperament = composure under pressure. We proxy it from
-  // (low errors per game) + (positive tackle-bust rate). 0..100.
-  let value = 65;
-  if (profile && profile.seasonStats.appearances > 0) {
-    const errPerGame = profile.seasonStats.errors / profile.seasonStats.appearances;
-    const breaks = profile.seasonStats.tackleBreaks / profile.seasonStats.appearances;
-    value = Math.max(15, Math.min(95, 70 - errPerGame * 12 + breaks * 4));
-  }
-  return (
-    <MiniStat icon={<Flame className="h-3 w-3" />} label="Temperament" value={Math.round(value)} suffix="/100" />
-  );
-}
-
-function ExperienceBar({ profile }: { profile: { careerAppearances: number } | null | undefined }) {
-  const caps = profile?.careerAppearances ?? 0;
-  // 250 caps = 100%, scaled.
-  const pct = Math.max(5, Math.min(100, (caps / 250) * 100));
-  return (
-    <MiniStat icon={<Activity className="h-3 w-3" />} label="Experience" value={caps} suffix=" caps" widthPct={pct} />
-  );
-}
-
-function MiniStat({ icon, label, value, suffix, widthPct }: {
-  icon: ReactNode; label: string; value: number; suffix: string; widthPct?: number;
-}) {
-  const pct = widthPct ?? value;
-  return (
-    <div>
-      <div className="flex items-center justify-between text-[10px] uppercase tracking-wider font-bold text-muted-foreground mb-1">
-        <span className="flex items-center gap-1.5">{icon}{label}</span>
-        <span className="text-foreground">{value}{suffix}</span>
       </div>
-      <Progress value={pct} className="h-1.5" />
+      <span className="text-[10px] sm:text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">
+        {label}
+      </span>
     </div>
   );
 }
+
+// -------------------------- Sub-components --------------------------
 
 // -------------------------- Performance Edge --------------------------
 
@@ -268,28 +195,67 @@ const SKILL_ICONS = {
   kicking:  Footprints,
 } as const;
 
-function PerformanceEdgeSection({ edge, loading }: { edge: typeof undefined | null | import("@/lib/performance-edge").PerformanceEdge; loading: boolean }) {
+type PE = import("@/lib/performance-edge").PerformanceEdge;
+type Profile = import("@/server/player-profile").PlayerProfile;
+
+const ENERGY_FILL: Record<EnergyTier, number> = {
+  Supercharged: 100, High: 80, Moderate: 60, Tired: 40, Fatigued: 20,
+};
+const FORM_FILL: Record<PE["form"]["tier"], number> = {
+  "Red Hot": 100, "Good Form": 80, "Average": 60, "Below Average": 40, "Cold": 20,
+};
+const FORM_TONE: Record<PE["form"]["tier"], SkillRating["tone"]> = {
+  "Red Hot": "great", "Good Form": "good", "Average": "ok", "Below Average": "low", "Cold": "low",
+};
+const ENERGY_TONE: Record<EnergyTier, SkillRating["tone"]> = {
+  Supercharged: "great", High: "good", Moderate: "ok", Tired: "low", Fatigued: "low",
+};
+
+function PerformanceEdgeSection({ edge, loading, profile }: {
+  edge: PE | null | undefined; loading: boolean; profile: Profile | null | undefined;
+}) {
+  const formTier = edge?.form.tier ?? "Average";
+  const energyT = edge?.energy.tier ?? "Moderate";
+  const caps = profile?.careerAppearances ?? 0;
+  const expPct = Math.max(5, Math.min(100, (caps / 250) * 100));
+  const EnergyIcon = energyT === "Fatigued" || energyT === "Tired" ? BatteryLow : BatteryFull;
+
   return (
-    <section>
-      <div className="flex items-center justify-between mb-2">
+    <section className="rounded-xl bg-surface-2/40 ring-1 ring-accent/15 p-4">
+      <div className="flex items-center justify-between mb-3 pb-2 border-b border-accent/20">
         <h3 className="font-display font-extrabold uppercase tracking-wider text-sm">
           Performance <span className="text-accent">Edge</span>
         </h3>
-        {edge && (
-          <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
-            Overall <span className="text-accent font-bold">{edge.overall}</span>
-          </span>
-        )}
+        <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+          Overall <span className="text-accent font-bold">{edge?.overall ?? "—"}</span>
+        </span>
       </div>
-      {edge && (
-        <p className="text-[10px] text-muted-foreground mb-3">
-          Form: <span className="text-foreground font-bold">{edge.form.tier}</span> ·
-          {" "}Energy: <span className="text-foreground font-bold">{edge.energy.tier}</span>
-          {edge.energy.minutesPerGame != null && (
-            <span className="text-muted-foreground"> ({Math.round(edge.energy.minutesPerGame)} min/game)</span>
-          )}
-        </p>
-      )}
+
+      {/* Top meters: Experience · Form · Energy */}
+      <div className="space-y-2.5 mb-4">
+        <Meter
+          icon={<Activity className="h-3 w-3" />}
+          label="Experience"
+          valueText={`${caps} caps`}
+          pct={expPct}
+          tone="ok"
+        />
+        <Meter
+          icon={<TrendingUp className="h-3 w-3" />}
+          label="Form"
+          valueText={loading ? "…" : formTier}
+          pct={FORM_FILL[formTier]}
+          tone={FORM_TONE[formTier]}
+        />
+        <Meter
+          icon={<EnergyIcon className="h-3 w-3" />}
+          label="Energy"
+          valueText={loading ? "…" : energyT}
+          pct={ENERGY_FILL[energyT]}
+          tone={ENERGY_TONE[energyT]}
+        />
+      </div>
+
       <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2.5">
         {(edge?.skills ?? PLACEHOLDER_SKILLS).map((s) => {
           const Icon = SKILL_ICONS[s.key];
@@ -317,6 +283,23 @@ function PerformanceEdgeSection({ edge, loading }: { edge: typeof undefined | nu
     </section>
   );
 }
+
+function Meter({ icon, label, valueText, pct, tone }: {
+  icon: ReactNode; label: string; valueText: string; pct: number; tone: SkillRating["tone"];
+}) {
+  return (
+    <div>
+      <div className="flex items-center justify-between text-[10px] uppercase tracking-wider font-bold text-muted-foreground mb-1">
+        <span className="flex items-center gap-1.5 text-accent">{icon}<span className="text-muted-foreground">{label}</span></span>
+        <span className={toneClass(tone)}>{valueText}</span>
+      </div>
+      <div className="h-1.5 w-full rounded-full bg-surface-2 overflow-hidden">
+        <div className={`h-full transition-all ${toneBgClass(tone)}`} style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  );
+}
+
 
 const PLACEHOLDER_SKILLS: SkillRating[] = [
   { key: "stamina",  label: "Stamina",       base: 0, final: 0, word: "—", tone: "ok" },

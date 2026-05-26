@@ -40,24 +40,13 @@ export const Route = createFileRoute("/match/$matchId")({
     parse: (raw: Record<string, string>) => ({ matchId: decodeURIComponent(raw.matchId) }),
     stringify: (p: { matchId: string }) => ({ matchId: encodeURIComponent(p.matchId) }),
   },
-  // AWAIT the data in the loader (don't fire-and-forget). Reason: AuthGate
-  // unmounts/remounts <Outlet/> when the auth profile state flips (sign-in,
-  // token refresh, premium reload). A fire-and-forget loader + Suspense
-  // fallback can get caught in a remount loop where each new mount cancels
-  // the in-flight server-fn request before it resolves (logged as status 0
-  // in the worker). Awaiting ensures the data is cached before MatchPage
-  // mounts, so useSuspenseQuery hits the cache synchronously and the
-  // "Loading match…" fallback never has a chance to get stuck.
-  loader: ({ context: { queryClient }, params }) =>
-    queryClient.ensureQueryData(matchQO(params.matchId)),
-
-  // Show the sequential progress UI immediately while the loader is running.
-  // pendingMs: 0 means no delay before showing it; when the data is already
-  // cached, ensureQueryData resolves synchronously and the pending UI never
-  // appears, so the Lineup/Stats/Insights tabs render instantly.
-  pendingMs: 0,
-  pendingMinMs: 0,
-  pendingComponent: MatchLoading,
+  // Fire-and-forget prefetch so the navigation feels instant. The page shell
+  // (back link + skeleton header + tabs) renders immediately while data is
+  // still in flight; the MatchLoading progress UI fills the tab content area
+  // until the query resolves. Cached visits resolve synchronously.
+  loader: ({ context: { queryClient }, params }) => {
+    void queryClient.ensureQueryData(matchQO(params.matchId));
+  },
 
   component: MatchPage,
   errorComponent: ({ error }) => {
@@ -115,9 +104,48 @@ function MatchLoading() {
   );
 }
 
+// Lightweight page shell shown immediately on navigation, before match data
+// has loaded. Mirrors the real layout so the transition feels instant; the
+// MatchLoading progress UI fills the tab content area until data resolves.
+function MatchPageSkeleton() {
+  return (
+    <div className="pt-6">
+      <Link to="/" search={{ round: undefined }} className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-4">
+        <ArrowLeft className="h-4 w-4" /> Back to fixtures
+      </Link>
+      <section className="glass p-6 sm:p-8">
+        <div className="h-3 w-24 rounded bg-surface-2 animate-pulse" />
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center mt-4 gap-2 sm:gap-4">
+          <div className="flex flex-col items-center gap-2">
+            <div className="h-14 w-14 rounded-full bg-surface-2 animate-pulse" />
+            <div className="h-3 w-20 rounded bg-surface-2 animate-pulse" />
+          </div>
+          <div className="text-2xl sm:text-3xl font-extrabold text-muted-foreground">vs</div>
+          <div className="flex flex-col items-center gap-2">
+            <div className="h-14 w-14 rounded-full bg-surface-2 animate-pulse" />
+            <div className="h-3 w-20 rounded bg-surface-2 animate-pulse" />
+          </div>
+        </div>
+        <div className="mt-6 pt-5 border-t border-border space-y-2">
+          <div className="h-3 w-2/3 rounded bg-surface-2 animate-pulse mx-auto sm:mx-0" />
+          <div className="h-3 w-1/2 rounded bg-surface-2 animate-pulse mx-auto sm:mx-0" />
+        </div>
+      </section>
+      <div className="mt-6 grid grid-cols-5 gap-1 p-1 glass">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} className="h-9 rounded-lg bg-surface-2/60 animate-pulse" />
+        ))}
+      </div>
+      <div className="mt-6">
+        <MatchLoading />
+      </div>
+    </div>
+  );
+}
+
 function MatchPage() {
   return (
-    <Suspense fallback={<MatchLoading />}>
+    <Suspense fallback={<MatchPageSkeleton />}>
       <MatchInner />
     </Suspense>
   );

@@ -146,7 +146,7 @@ function MatchLoading() {
       </div>
       <div className="min-h-[2rem] flex items-center justify-center">
         <div
-          className={`flex items-center gap-2 text-sm text-foreground font-mono transition-opacity duration-200 ${fadeOut ? "opacity-0" : "opacity-100"}`}
+          className={`flex items-center gap-2 text-sm text-foreground font-mono transition-opacity duration-500 ${fadeOut ? "opacity-0" : "opacity-100"}`}
         >
           <span className="text-accent">{phase === "erasing" ? "<" : ">"}</span>
           <span className="whitespace-pre">{visibleText}</span>

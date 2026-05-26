@@ -772,26 +772,11 @@ function SquadPanel({ team, news }: { team: { nickName: string; themeKey: string
     const fullName = `${p.firstName} ${p.lastName}`.toLowerCase();
     const newsOut = newsOutsByName.get(fullName);
     const isOut = officialOutsLc.has(fullName) || !!newsOut;
-    const handleOpen = () => {
-      openPlayer({
-        firstName: p.firstName,
-        lastName: p.lastName,
-        teamThemeKey: team.themeKey,
-        teamNickname: team.nickName,
-        position: positionLabel,
-        jerseyNumber: p.jerseyNumber,
-        headImage: p.headImage,
-      });
-    };
+    const slug = playerSlug(p.firstName, p.lastName);
     return (
       <li
         key={i}
-        role="button"
-        tabIndex={0}
-        onClick={handleOpen}
-        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleOpen(); } }}
-        // overflow-visible so the headshot can extend above the card edge.
-        className={`relative flex items-stretch h-24 sm:h-28 rounded-lg overflow-visible cursor-pointer touch-manipulation select-none transition-transform active:scale-[0.99] hover:ring-2 hover:ring-accent/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+        className={`relative flex items-stretch h-24 sm:h-28 rounded-lg overflow-visible ${
           isOut ? "bg-danger/10 ring-1 ring-danger/40" : "bg-accent/15 ring-1 ring-accent/25"
         }`}
       >
@@ -827,21 +812,28 @@ function SquadPanel({ team, news }: { team: { nickName: string; themeKey: string
 
         {/* Name + position — offset so it clears the overlapping headshot. Long surnames shrink to fit, never truncate. */}
         <div className="flex-1 min-w-0 flex flex-col justify-center px-2 sm:px-3 leading-tight">
-          <div className="text-[10px] sm:text-[11px] uppercase tracking-wider text-muted-foreground whitespace-nowrap overflow-hidden">
-            {p.firstName}
-          </div>
-          <div className={`font-black uppercase whitespace-nowrap ${
-            (p.lastName?.length ?? 0) >= 13
-              ? "text-[10px] sm:text-sm"
-              : (p.lastName?.length ?? 0) >= 11
-                ? "text-[11px] sm:text-base"
-                : (p.lastName?.length ?? 0) >= 9
-                  ? "text-xs sm:text-lg"
-                  : "text-sm sm:text-lg"
-          } ${isOut ? "text-danger line-through decoration-2" : ""}`}>
-            {p.lastName}
-            {p.isCaptain && <Crown className="inline h-3 w-3 sm:h-3.5 sm:w-3.5 mx-1 text-accent align-[-1px]" />}
-          </div>
+          <Link
+            to="/player/$teamThemeKey/$playerSlug"
+            params={{ teamThemeKey: team.themeKey, playerSlug: slug }}
+            search={{ firstName: p.firstName, lastName: p.lastName, teamNickname: team.nickName, position: positionLabel, jerseyNumber: p.jerseyNumber, headImage: p.headImage }}
+            className="group"
+          >
+            <div className="text-[10px] sm:text-[11px] uppercase tracking-wider text-muted-foreground whitespace-nowrap overflow-hidden group-hover:text-accent transition-colors">
+              {p.firstName}
+            </div>
+            <div className={`font-black uppercase whitespace-nowrap ${
+              (p.lastName?.length ?? 0) >= 13
+                ? "text-[10px] sm:text-sm"
+                : (p.lastName?.length ?? 0) >= 11
+                  ? "text-[11px] sm:text-base"
+                  : (p.lastName?.length ?? 0) >= 9
+                    ? "text-xs sm:text-lg"
+                    : "text-sm sm:text-lg"
+            } ${isOut ? "text-danger line-through decoration-2" : ""} group-hover:text-accent transition-colors`}>
+              {p.lastName}
+              {p.isCaptain && <Crown className="inline h-3 w-3 sm:h-3.5 sm:w-3.5 mx-1 text-accent align-[-1px]" />}
+            </div>
+          </Link>
           <div className="text-[9px] sm:text-[10px] uppercase tracking-wider text-accent/70 font-bold mt-0.5 whitespace-nowrap">
             {positionLabel}
           </div>
@@ -850,7 +842,7 @@ function SquadPanel({ team, news }: { team: { nickName: string; themeKey: string
               href={newsOut?.sourceUrl ?? news?.sourceUrl ?? "#"}
               target="_blank"
               rel="noreferrer"
-              onClick={(e) => { e.stopPropagation(); if (!newsOut?.sourceUrl && !news?.sourceUrl) e.preventDefault(); }}
+              onClick={(e) => { if (!newsOut?.sourceUrl && !news?.sourceUrl) e.preventDefault(); }}
               className="mt-1 inline-flex items-center gap-1 self-start rounded-sm bg-danger/20 ring-1 ring-danger/50 px-1.5 py-0.5 text-[8px] sm:text-[9px] uppercase tracking-wider font-bold text-danger hover:bg-danger/30"
               title={newsOut?.sourceTitle ?? "Ruled out per official team list"}
             >

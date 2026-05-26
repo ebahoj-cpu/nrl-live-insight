@@ -521,11 +521,11 @@ function H2HPanel({ home, away }: { home: any; away: any }) {
     const rowLabel = label ?? BACKLINE_LABEL[n];
     return (
       <li className="relative flex items-start justify-between gap-2 sm:gap-4 rounded-lg bg-accent/10 ring-1 ring-accent/25 hover:ring-accent/50 transition px-2 sm:px-4 py-2 overflow-visible">
-        <HeadshotWithName p={h} side="left" />
+        <HeadshotWithName p={h} side="left" themeKey={home.themeKey} teamNickname={home.nickName} />
         <div className="flex-1 flex items-center justify-center pt-4 sm:pt-6">
           <CenterBadge n={n} label={rowLabel} displayNumber={displayNumber} />
         </div>
-        <HeadshotWithName p={a} side="right" />
+        <HeadshotWithName p={a} side="right" themeKey={away.themeKey} teamNickname={away.nickName} />
       </li>
     );
   };

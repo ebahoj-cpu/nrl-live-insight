@@ -15,6 +15,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { YourInjectedInsights } from "@/components/YourInjectedInsights";
+import { usePlayerModal } from "@/components/PlayerModal";
 
 const matchQO = (matchId: string) => queryOptions({
   queryKey: ["match", matchId],
@@ -726,6 +727,7 @@ function OfficialAvatar({ src, firstName, lastName, size }: { src?: string; firs
 }
 
 function SquadPanel({ team, news }: { team: { nickName: string; themeKey: string; players: { firstName: string; lastName: string; position: string; jerseyNumber?: number; isCaptain?: boolean; headImage?: string }[] }; news?: TeamNews }) {
+  const { open: openPlayer } = usePlayerModal();
   const sorted = [...team.players].sort((a, b) => {
     const ai = a.jerseyNumber ?? 999;
     const bi = b.jerseyNumber ?? 999;
@@ -763,11 +765,26 @@ function SquadPanel({ team, news }: { team: { nickName: string; themeKey: string
     const fullName = `${p.firstName} ${p.lastName}`.toLowerCase();
     const newsOut = newsOutsByName.get(fullName);
     const isOut = officialOutsLc.has(fullName) || !!newsOut;
+    const handleOpen = () => {
+      openPlayer({
+        firstName: p.firstName,
+        lastName: p.lastName,
+        teamThemeKey: team.themeKey,
+        teamNickname: team.nickName,
+        position: positionLabel,
+        jerseyNumber: p.jerseyNumber,
+        headImage: p.headImage,
+      });
+    };
     return (
       <li
         key={i}
+        role="button"
+        tabIndex={0}
+        onClick={handleOpen}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleOpen(); } }}
         // overflow-visible so the headshot can extend above the card edge.
-        className={`relative flex items-stretch h-24 sm:h-28 rounded-lg overflow-visible ${
+        className={`relative flex items-stretch h-24 sm:h-28 rounded-lg overflow-visible cursor-pointer touch-manipulation select-none transition-transform active:scale-[0.99] hover:ring-2 hover:ring-accent/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
           isOut ? "bg-danger/10 ring-1 ring-danger/40" : "bg-accent/15 ring-1 ring-accent/25"
         }`}
       >

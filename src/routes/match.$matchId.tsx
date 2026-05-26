@@ -70,19 +70,68 @@ type TabKey = "lineup" | "stats" | "insights" | "bet" | "aftermatch" | "script";
 
 function MatchLoading() {
   const steps = [
-    "Loading match…",
-    "Fetching team lineups",
-    "Pulling latest odds",
-    "Running prediction models",
-    "Analysing player matchups",
-    "Generating insights",
-    "Finalising scout report",
+    { text: "Loading match…", base: 800, jitter: 400 },
+    { text: "Fetching team lineups", base: 1800, jitter: 800 },
+    { text: "Pulling latest odds", base: 1200, jitter: 600 },
+    { text: "Running prediction models", base: 3200, jitter: 900 },
+    { text: "Analysing player matchups", base: 2600, jitter: 700 },
+    { text: "Generating insights", base: 2200, jitter: 600 },
+    { text: "Finalising scout report", base: 2400, jitter: 800 },
   ];
+
   const [i, setI] = useState(0);
+  const [phase, setPhase] = useState<"typing" | "holding" | "erasing">("typing");
+  const [visibleText, setVisibleText] = useState("");
+  const [fadeOut, setFadeOut] = useState(false);
+
   useEffect(() => {
-    const id = setInterval(() => setI((n) => Math.min(n + 1, steps.length - 1)), 3000);
-    return () => clearInterval(id);
+    let cancelled = false;
+
+    const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+    const jitter = (base: number, j: number) =>
+      base + (Math.random() * j * 2 - j);
+
+    const typeOut = async (text: string) => {
+      setPhase("typing");
+      setFadeOut(false);
+      for (let c = 1; c <= text.length; c++) {
+        if (cancelled) return;
+        setVisibleText(text.slice(0, c));
+        await sleep(jitter(35, 20)); // irregular typing speed
+      }
+      setPhase("holding");
+    };
+
+    const erase = async (text: string) => {
+      setPhase("erasing");
+      setFadeOut(true);
+      await sleep(250); // brief fade before next line
+      for (let c = text.length; c >= 0; c--) {
+        if (cancelled) return;
+        setVisibleText(text.slice(0, c));
+        await sleep(jitter(20, 10));
+      }
+    };
+
+    (async () => {
+      for (let idx = 0; idx < steps.length; idx++) {
+        if (cancelled) return;
+        setI(idx);
+        const { text, base, jitter: j } = steps[idx];
+        await typeOut(text);
+        if (cancelled) return;
+        await sleep(jitter(base, j));
+        if (idx < steps.length - 1) await erase(text);
+      }
+      setPhase("holding");
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
+
   return (
     <div className="py-16 flex flex-col items-center gap-5 text-muted-foreground">
       {/* Terminal-style audio-bar indicator — feels like code is running */}
@@ -97,11 +146,10 @@ function MatchLoading() {
       </div>
       <div className="min-h-[2rem] flex items-center justify-center">
         <div
-          key={steps[i]}
-          className="flex items-center gap-2 text-sm text-foreground font-mono animate-fade-in"
+          className={`flex items-center gap-2 text-sm text-foreground font-mono transition-opacity duration-200 ${fadeOut ? "opacity-0" : "opacity-100"}`}
         >
-          <span className="text-accent">{">"}</span>
-          <span>{steps[i]}</span>
+          <span className="text-accent">{phase === "erasing" ? "<" : ">"}</span>
+          <span className="whitespace-pre">{visibleText}</span>
           <span className="inline-block w-2 h-4 bg-accent animate-pulse" />
         </div>
       </div>

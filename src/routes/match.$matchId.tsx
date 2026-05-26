@@ -82,7 +82,7 @@ function MatchLoading() {
     "Finalising scout report",
   ];
   const [i, setI] = useState(0);
-  React.useEffect(() => {
+  useEffect(() => {
     const id = setInterval(() => setI((n) => Math.min(n + 1, steps.length - 1)), 1400);
     return () => clearInterval(id);
   }, []);

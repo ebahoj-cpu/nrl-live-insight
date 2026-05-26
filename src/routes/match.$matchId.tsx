@@ -15,7 +15,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { YourInjectedInsights } from "@/components/YourInjectedInsights";
-import { usePlayerModal } from "@/components/PlayerModal";
+import { playerSlug } from "@/server/player-profile";
 
 const matchQO = (matchId: string) => queryOptions({
   queryKey: ["match", matchId],
@@ -382,10 +382,12 @@ const POSITION_ORDER = [
 type NewsOut = { playerName: string; reason: string; sourceUrl: string; sourceTitle: string; source: string; publishedUtc: string };
 type TeamNews = { ins: string[]; outs: string[]; blurb: string; sourceUrl: string; newsOuts?: NewsOut[] } | null;
 
-function LineupTab({ home, away, officials, teamNews: _teamNews }: { home: any; away: any; officials: { position: string; firstName: string; lastName: string; headImage?: string }[]; teamNews?: { home: TeamNews; away: TeamNews } }) {
+function LineupTab({ home, away, officials, teamNews }: { home: any; away: any; officials: { position: string; firstName: string; lastName: string; headImage?: string }[]; teamNews?: { home: TeamNews; away: TeamNews } }) {
   return (
     <div className="space-y-4">
       <H2HPanel home={home} away={away} />
+      <SquadPanel team={home} news={teamNews?.home} />
+      <SquadPanel team={away} news={teamNews?.away} />
       <OfficialsCard officials={officials} />
     </div>
   );
@@ -436,7 +438,7 @@ function H2HPanel({ home, away }: { home: any; away: any }) {
   // the outer edges. The player's name sits as a gradient overlay across the
   // bottom of the headshot (where the jersey is, so the face is still visible)
   // AND repeats as a clean caption directly underneath the headshot.
-  const HeadshotWithName = ({ p, side }: { p?: P; side: "left" | "right" }) => {
+  const HeadshotWithName = ({ p, side, themeKey, teamNickname }: { p?: P; side: "left" | "right"; themeKey: string; teamNickname: string }) => {
     const len = p?.lastName?.length ?? 0;
     // Aggressive scale-down so the surname always fits without truncation
     const lastSize =
@@ -468,21 +470,26 @@ function H2HPanel({ home, away }: { home: any; away: any }) {
           {p ? <InitialsAvatar firstName={p.firstName} lastName={p.lastName} hidden={!!p.headImage} /> : null}
         </div>
         {/* Caption centered under the player's face. Stays within the player's half so it never collides with the centre badge. */}
-        <div className="mt-3 w-[88px] sm:w-32 leading-tight text-center">
-          {p ? (
-            <>
-              <div className={`${firstSize} uppercase tracking-wider text-muted-foreground whitespace-nowrap`}>
-                {p.firstName}
-              </div>
-              <div className={`font-black uppercase whitespace-nowrap ${lastSize}`}>
-                {p.lastName}
-                {p.isCaptain && <Crown className="inline h-3 w-3 mx-0.5 text-accent align-[-1px]" />}
-              </div>
-            </>
-          ) : (
+        {p ? (
+          <Link
+            to="/player/$teamThemeKey/$playerSlug"
+            params={{ teamThemeKey: themeKey, playerSlug: playerSlug(p.firstName, p.lastName) }}
+            search={{ firstName: p.firstName, lastName: p.lastName, teamNickname, position: p.position, jerseyNumber: p.jerseyNumber, headImage: p.headImage }}
+            className="mt-3 w-[88px] sm:w-32 leading-tight text-center group"
+          >
+            <div className={`${firstSize} uppercase tracking-wider text-muted-foreground whitespace-nowrap group-hover:text-accent transition-colors`}>
+              {p.firstName}
+            </div>
+            <div className={`font-black uppercase whitespace-nowrap ${lastSize} group-hover:text-accent transition-colors`}>
+              {p.lastName}
+              {p.isCaptain && <Crown className="inline h-3 w-3 mx-0.5 text-accent align-[-1px]" />}
+            </div>
+          </Link>
+        ) : (
+          <div className="mt-3 w-[88px] sm:w-32 leading-tight text-center">
             <div className="text-[10px] sm:text-[12px] uppercase tracking-wider text-muted-foreground/60 italic">— TBC —</div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     );
   };
@@ -516,11 +523,11 @@ function H2HPanel({ home, away }: { home: any; away: any }) {
     const rowLabel = label ?? BACKLINE_LABEL[n];
     return (
       <li className="relative flex items-start justify-between gap-2 sm:gap-4 rounded-lg bg-accent/10 ring-1 ring-accent/25 hover:ring-accent/50 transition px-2 sm:px-4 py-2 overflow-visible">
-        <HeadshotWithName p={h} side="left" />
+        <HeadshotWithName p={h} side="left" themeKey={home.themeKey} teamNickname={home.nickName} />
         <div className="flex-1 flex items-center justify-center pt-4 sm:pt-6">
           <CenterBadge n={n} label={rowLabel} displayNumber={displayNumber} />
         </div>
-        <HeadshotWithName p={a} side="right" />
+        <HeadshotWithName p={a} side="right" themeKey={away.themeKey} teamNickname={away.nickName} />
       </li>
     );
   };
@@ -735,7 +742,6 @@ function OfficialAvatar({ src, firstName, lastName, size }: { src?: string; firs
 }
 
 function SquadPanel({ team, news }: { team: { nickName: string; themeKey: string; players: { firstName: string; lastName: string; position: string; jerseyNumber?: number; isCaptain?: boolean; headImage?: string }[] }; news?: TeamNews }) {
-  const { open: openPlayer } = usePlayerModal();
   const sorted = [...team.players].sort((a, b) => {
     const ai = a.jerseyNumber ?? 999;
     const bi = b.jerseyNumber ?? 999;
@@ -773,26 +779,11 @@ function SquadPanel({ team, news }: { team: { nickName: string; themeKey: string
     const fullName = `${p.firstName} ${p.lastName}`.toLowerCase();
     const newsOut = newsOutsByName.get(fullName);
     const isOut = officialOutsLc.has(fullName) || !!newsOut;
-    const handleOpen = () => {
-      openPlayer({
-        firstName: p.firstName,
-        lastName: p.lastName,
-        teamThemeKey: team.themeKey,
-        teamNickname: team.nickName,
-        position: positionLabel,
-        jerseyNumber: p.jerseyNumber,
-        headImage: p.headImage,
-      });
-    };
+    const slug = playerSlug(p.firstName, p.lastName);
     return (
       <li
         key={i}
-        role="button"
-        tabIndex={0}
-        onClick={handleOpen}
-        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleOpen(); } }}
-        // overflow-visible so the headshot can extend above the card edge.
-        className={`relative flex items-stretch h-24 sm:h-28 rounded-lg overflow-visible cursor-pointer touch-manipulation select-none transition-transform active:scale-[0.99] hover:ring-2 hover:ring-accent/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+        className={`relative flex items-stretch h-24 sm:h-28 rounded-lg overflow-visible ${
           isOut ? "bg-danger/10 ring-1 ring-danger/40" : "bg-accent/15 ring-1 ring-accent/25"
         }`}
       >
@@ -828,21 +819,28 @@ function SquadPanel({ team, news }: { team: { nickName: string; themeKey: string
 
         {/* Name + position — offset so it clears the overlapping headshot. Long surnames shrink to fit, never truncate. */}
         <div className="flex-1 min-w-0 flex flex-col justify-center px-2 sm:px-3 leading-tight">
-          <div className="text-[10px] sm:text-[11px] uppercase tracking-wider text-muted-foreground whitespace-nowrap overflow-hidden">
-            {p.firstName}
-          </div>
-          <div className={`font-black uppercase whitespace-nowrap ${
-            (p.lastName?.length ?? 0) >= 13
-              ? "text-[10px] sm:text-sm"
-              : (p.lastName?.length ?? 0) >= 11
-                ? "text-[11px] sm:text-base"
-                : (p.lastName?.length ?? 0) >= 9
-                  ? "text-xs sm:text-lg"
-                  : "text-sm sm:text-lg"
-          } ${isOut ? "text-danger line-through decoration-2" : ""}`}>
-            {p.lastName}
-            {p.isCaptain && <Crown className="inline h-3 w-3 sm:h-3.5 sm:w-3.5 mx-1 text-accent align-[-1px]" />}
-          </div>
+          <Link
+            to="/player/$teamThemeKey/$playerSlug"
+            params={{ teamThemeKey: team.themeKey, playerSlug: slug }}
+            search={{ firstName: p.firstName, lastName: p.lastName, teamNickname: team.nickName, position: positionLabel, jerseyNumber: p.jerseyNumber, headImage: p.headImage }}
+            className="group"
+          >
+            <div className="text-[10px] sm:text-[11px] uppercase tracking-wider text-muted-foreground whitespace-nowrap overflow-hidden group-hover:text-accent transition-colors">
+              {p.firstName}
+            </div>
+            <div className={`font-black uppercase whitespace-nowrap ${
+              (p.lastName?.length ?? 0) >= 13
+                ? "text-[10px] sm:text-sm"
+                : (p.lastName?.length ?? 0) >= 11
+                  ? "text-[11px] sm:text-base"
+                  : (p.lastName?.length ?? 0) >= 9
+                    ? "text-xs sm:text-lg"
+                    : "text-sm sm:text-lg"
+            } ${isOut ? "text-danger line-through decoration-2" : ""} group-hover:text-accent transition-colors`}>
+              {p.lastName}
+              {p.isCaptain && <Crown className="inline h-3 w-3 sm:h-3.5 sm:w-3.5 mx-1 text-accent align-[-1px]" />}
+            </div>
+          </Link>
           <div className="text-[9px] sm:text-[10px] uppercase tracking-wider text-accent/70 font-bold mt-0.5 whitespace-nowrap">
             {positionLabel}
           </div>
@@ -851,7 +849,7 @@ function SquadPanel({ team, news }: { team: { nickName: string; themeKey: string
               href={newsOut?.sourceUrl ?? news?.sourceUrl ?? "#"}
               target="_blank"
               rel="noreferrer"
-              onClick={(e) => { e.stopPropagation(); if (!newsOut?.sourceUrl && !news?.sourceUrl) e.preventDefault(); }}
+              onClick={(e) => { if (!newsOut?.sourceUrl && !news?.sourceUrl) e.preventDefault(); }}
               className="mt-1 inline-flex items-center gap-1 self-start rounded-sm bg-danger/20 ring-1 ring-danger/50 px-1.5 py-0.5 text-[8px] sm:text-[9px] uppercase tracking-wider font-bold text-danger hover:bg-danger/30"
               title={newsOut?.sourceTitle ?? "Ruled out per official team list"}
             >

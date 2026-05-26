@@ -16,6 +16,7 @@ import { Route as LadderRouteImport } from './routes/ladder'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as MatchMatchIdRouteImport } from './routes/match.$matchId'
 import { Route as ApiScoutVoiceRouteImport } from './routes/api/scout-voice'
+import { Route as PlayerTeamThemeKeyPlayerSlugRouteImport } from './routes/player.$teamThemeKey.$playerSlug'
 import { Route as ApiPublicManifestRouteImport } from './routes/api/public/manifest'
 import { Route as ApiPublicAppIconRouteImport } from './routes/api/public/app-icon'
 import { Route as ApiPublicHooksRefreshOddsRouteImport } from './routes/api/public/hooks/refresh-odds'
@@ -58,6 +59,12 @@ const ApiScoutVoiceRoute = ApiScoutVoiceRouteImport.update({
   path: '/api/scout-voice',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PlayerTeamThemeKeyPlayerSlugRoute =
+  PlayerTeamThemeKeyPlayerSlugRouteImport.update({
+    id: '/player/$teamThemeKey/$playerSlug',
+    path: '/player/$teamThemeKey/$playerSlug',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicManifestRoute = ApiPublicManifestRouteImport.update({
   id: '/api/public/manifest',
   path: '/api/public/manifest',
@@ -103,6 +110,7 @@ export interface FileRoutesByFullPath {
   '/match/$matchId': typeof MatchMatchIdRoute
   '/api/public/app-icon': typeof ApiPublicAppIconRoute
   '/api/public/manifest': typeof ApiPublicManifestRoute
+  '/player/$teamThemeKey/$playerSlug': typeof PlayerTeamThemeKeyPlayerSlugRoute
   '/api/public/hooks/model-health': typeof ApiPublicHooksModelHealthRoute
   '/api/public/hooks/precompute-insights': typeof ApiPublicHooksPrecomputeInsightsRoute
   '/api/public/hooks/refresh-nrl-data': typeof ApiPublicHooksRefreshNrlDataRoute
@@ -118,6 +126,7 @@ export interface FileRoutesByTo {
   '/match/$matchId': typeof MatchMatchIdRoute
   '/api/public/app-icon': typeof ApiPublicAppIconRoute
   '/api/public/manifest': typeof ApiPublicManifestRoute
+  '/player/$teamThemeKey/$playerSlug': typeof PlayerTeamThemeKeyPlayerSlugRoute
   '/api/public/hooks/model-health': typeof ApiPublicHooksModelHealthRoute
   '/api/public/hooks/precompute-insights': typeof ApiPublicHooksPrecomputeInsightsRoute
   '/api/public/hooks/refresh-nrl-data': typeof ApiPublicHooksRefreshNrlDataRoute
@@ -134,6 +143,7 @@ export interface FileRoutesById {
   '/match/$matchId': typeof MatchMatchIdRoute
   '/api/public/app-icon': typeof ApiPublicAppIconRoute
   '/api/public/manifest': typeof ApiPublicManifestRoute
+  '/player/$teamThemeKey/$playerSlug': typeof PlayerTeamThemeKeyPlayerSlugRoute
   '/api/public/hooks/model-health': typeof ApiPublicHooksModelHealthRoute
   '/api/public/hooks/precompute-insights': typeof ApiPublicHooksPrecomputeInsightsRoute
   '/api/public/hooks/refresh-nrl-data': typeof ApiPublicHooksRefreshNrlDataRoute
@@ -151,6 +161,7 @@ export interface FileRouteTypes {
     | '/match/$matchId'
     | '/api/public/app-icon'
     | '/api/public/manifest'
+    | '/player/$teamThemeKey/$playerSlug'
     | '/api/public/hooks/model-health'
     | '/api/public/hooks/precompute-insights'
     | '/api/public/hooks/refresh-nrl-data'
@@ -166,6 +177,7 @@ export interface FileRouteTypes {
     | '/match/$matchId'
     | '/api/public/app-icon'
     | '/api/public/manifest'
+    | '/player/$teamThemeKey/$playerSlug'
     | '/api/public/hooks/model-health'
     | '/api/public/hooks/precompute-insights'
     | '/api/public/hooks/refresh-nrl-data'
@@ -181,6 +193,7 @@ export interface FileRouteTypes {
     | '/match/$matchId'
     | '/api/public/app-icon'
     | '/api/public/manifest'
+    | '/player/$teamThemeKey/$playerSlug'
     | '/api/public/hooks/model-health'
     | '/api/public/hooks/precompute-insights'
     | '/api/public/hooks/refresh-nrl-data'
@@ -197,6 +210,7 @@ export interface RootRouteChildren {
   MatchMatchIdRoute: typeof MatchMatchIdRoute
   ApiPublicAppIconRoute: typeof ApiPublicAppIconRoute
   ApiPublicManifestRoute: typeof ApiPublicManifestRoute
+  PlayerTeamThemeKeyPlayerSlugRoute: typeof PlayerTeamThemeKeyPlayerSlugRoute
   ApiPublicHooksModelHealthRoute: typeof ApiPublicHooksModelHealthRoute
   ApiPublicHooksPrecomputeInsightsRoute: typeof ApiPublicHooksPrecomputeInsightsRoute
   ApiPublicHooksRefreshNrlDataRoute: typeof ApiPublicHooksRefreshNrlDataRoute
@@ -254,6 +268,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiScoutVoiceRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/player/$teamThemeKey/$playerSlug': {
+      id: '/player/$teamThemeKey/$playerSlug'
+      path: '/player/$teamThemeKey/$playerSlug'
+      fullPath: '/player/$teamThemeKey/$playerSlug'
+      preLoaderRoute: typeof PlayerTeamThemeKeyPlayerSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/manifest': {
       id: '/api/public/manifest'
       path: '/api/public/manifest'
@@ -309,6 +330,7 @@ const rootRouteChildren: RootRouteChildren = {
   MatchMatchIdRoute: MatchMatchIdRoute,
   ApiPublicAppIconRoute: ApiPublicAppIconRoute,
   ApiPublicManifestRoute: ApiPublicManifestRoute,
+  PlayerTeamThemeKeyPlayerSlugRoute: PlayerTeamThemeKeyPlayerSlugRoute,
   ApiPublicHooksModelHealthRoute: ApiPublicHooksModelHealthRoute,
   ApiPublicHooksPrecomputeInsightsRoute: ApiPublicHooksPrecomputeInsightsRoute,
   ApiPublicHooksRefreshNrlDataRoute: ApiPublicHooksRefreshNrlDataRoute,
@@ -317,3 +339,12 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+  }
+}

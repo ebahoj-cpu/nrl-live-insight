@@ -79,13 +79,13 @@ function PlayerModal({ args, onClose }: { args: OpenPlayerArgs | null; onClose: 
   return (
     <Dialog open={!!args} onOpenChange={(v) => { if (!v) onClose(); }}>
       <DialogContent className="max-w-3xl w-[96vw] max-h-[92vh] overflow-y-auto p-0 gap-0 bg-surface border-accent/30">
-        {args && <PlayerModalBody args={args} payload={data} loading={isLoading} />}
+        {args && <PlayerProfileCard args={args} payload={data} loading={isLoading} />}
       </DialogContent>
     </Dialog>
   );
 }
 
-function PlayerModalBody({ args, payload, loading }: {
+export function PlayerProfileCard({ args, payload, loading }: {
   args: OpenPlayerArgs;
   payload: PlayerProfilePayload | undefined;
   loading: boolean;

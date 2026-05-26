@@ -735,7 +735,6 @@ function OfficialAvatar({ src, firstName, lastName, size }: { src?: string; firs
 }
 
 function SquadPanel({ team, news }: { team: { nickName: string; themeKey: string; players: { firstName: string; lastName: string; position: string; jerseyNumber?: number; isCaptain?: boolean; headImage?: string }[] }; news?: TeamNews }) {
-  const { open: openPlayer } = usePlayerModal();
   const sorted = [...team.players].sort((a, b) => {
     const ai = a.jerseyNumber ?? 999;
     const bi = b.jerseyNumber ?? 999;

@@ -843,7 +843,7 @@ function SquadPanel({ team, news }: { team: { nickName: string; themeKey: string
               href={newsOut?.sourceUrl ?? news?.sourceUrl ?? "#"}
               target="_blank"
               rel="noreferrer"
-              onClick={(e) => { if (!newsOut?.sourceUrl && !news?.sourceUrl) e.preventDefault(); }}
+              onClick={(e) => { e.stopPropagation(); if (!newsOut?.sourceUrl && !news?.sourceUrl) e.preventDefault(); }}
               className="mt-1 inline-flex items-center gap-1 self-start rounded-sm bg-danger/20 ring-1 ring-danger/50 px-1.5 py-0.5 text-[8px] sm:text-[9px] uppercase tracking-wider font-bold text-danger hover:bg-danger/30"
               title={newsOut?.sourceTitle ?? "Ruled out per official team list"}
             >

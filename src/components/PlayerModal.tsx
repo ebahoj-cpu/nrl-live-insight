@@ -10,7 +10,7 @@ import { createContext, useContext, useState, useCallback, type ReactNode } from
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { Progress } from "@/components/ui/progress";
+
 import { TeamLogo } from "@/components/TeamLogo";
 import { getPlayerProfile, type PlayerProfilePayload } from "@/server/player-profile.functions";
 import type { SkillRating, EnergyTier } from "@/lib/performance-edge";

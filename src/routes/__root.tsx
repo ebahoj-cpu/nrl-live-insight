@@ -87,13 +87,15 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <Header />
-        <main className="mx-auto max-w-6xl px-4 sm:px-6 pt-16 pb-32 overflow-x-hidden">
-          <AuthGate>
-            <Outlet />
-          </AuthGate>
-        </main>
-        <BottomNav />
+        <PlayerModalProvider>
+          <Header />
+          <main className="mx-auto max-w-6xl px-4 sm:px-6 pt-16 pb-32 overflow-x-hidden">
+            <AuthGate>
+              <Outlet />
+            </AuthGate>
+          </main>
+          <BottomNav />
+        </PlayerModalProvider>
       </AuthProvider>
     </QueryClientProvider>
   );

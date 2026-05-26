@@ -436,7 +436,7 @@ function H2HPanel({ home, away }: { home: any; away: any }) {
   // the outer edges. The player's name sits as a gradient overlay across the
   // bottom of the headshot (where the jersey is, so the face is still visible)
   // AND repeats as a clean caption directly underneath the headshot.
-  const HeadshotWithName = ({ p, side }: { p?: P; side: "left" | "right" }) => {
+  const HeadshotWithName = ({ p, side, themeKey, teamNickname }: { p?: P; side: "left" | "right"; themeKey: string; teamNickname: string }) => {
     const len = p?.lastName?.length ?? 0;
     // Aggressive scale-down so the surname always fits without truncation
     const lastSize =
@@ -468,21 +468,26 @@ function H2HPanel({ home, away }: { home: any; away: any }) {
           {p ? <InitialsAvatar firstName={p.firstName} lastName={p.lastName} hidden={!!p.headImage} /> : null}
         </div>
         {/* Caption centered under the player's face. Stays within the player's half so it never collides with the centre badge. */}
-        <div className="mt-3 w-[88px] sm:w-32 leading-tight text-center">
-          {p ? (
-            <>
-              <div className={`${firstSize} uppercase tracking-wider text-muted-foreground whitespace-nowrap`}>
-                {p.firstName}
-              </div>
-              <div className={`font-black uppercase whitespace-nowrap ${lastSize}`}>
-                {p.lastName}
-                {p.isCaptain && <Crown className="inline h-3 w-3 mx-0.5 text-accent align-[-1px]" />}
-              </div>
-            </>
-          ) : (
+        {p ? (
+          <Link
+            to="/player/$teamThemeKey/$playerSlug"
+            params={{ teamThemeKey: themeKey, playerSlug: playerSlug(p.firstName, p.lastName) }}
+            search={{ firstName: p.firstName, lastName: p.lastName, teamNickname, position: p.position, jerseyNumber: p.jerseyNumber, headImage: p.headImage }}
+            className="mt-3 w-[88px] sm:w-32 leading-tight text-center group"
+          >
+            <div className={`${firstSize} uppercase tracking-wider text-muted-foreground whitespace-nowrap group-hover:text-accent transition-colors`}>
+              {p.firstName}
+            </div>
+            <div className={`font-black uppercase whitespace-nowrap ${lastSize} group-hover:text-accent transition-colors`}>
+              {p.lastName}
+              {p.isCaptain && <Crown className="inline h-3 w-3 mx-0.5 text-accent align-[-1px]" />}
+            </div>
+          </Link>
+        ) : (
+          <div className="mt-3 w-[88px] sm:w-32 leading-tight text-center">
             <div className="text-[10px] sm:text-[12px] uppercase tracking-wider text-muted-foreground/60 italic">— TBC —</div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     );
   };

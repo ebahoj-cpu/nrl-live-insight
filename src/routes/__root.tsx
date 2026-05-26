@@ -8,6 +8,7 @@ import { Menu, X, Swords, ListOrdered, Newspaper, Bird, Settings, UserCircle2, L
 import { useEffect, useState } from "react";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { AuthGate } from "@/components/AuthGate";
+import { PlayerModalProvider } from "@/components/PlayerModal";
 
 interface RouterContext { queryClient: QueryClient }
 

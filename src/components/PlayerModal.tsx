@@ -136,7 +136,7 @@ export function PlayerProfileCard({ args, payload, loading }: {
 
       {/* Bio circles: Age | Height | Weight  /  Hand | Foot */}
       <div className="px-4 sm:px-6 pt-5">
-        <div className="grid grid-cols-3 sm:grid-cols-5 gap-3 sm:gap-4 max-w-md sm:max-w-none mx-auto">
+        <div className="flex flex-wrap justify-center gap-3 sm:gap-4 max-w-md sm:max-w-none mx-auto">
           <BioCircle icon={<Cake className="h-5 w-5" />}        label="Age"    value={profile?.age != null ? String(profile.age) : "—"} />
           <BioCircle icon={<Ruler className="h-5 w-5" />}       label="Height" value={profile?.heightCm ? `${profile.heightCm}` : "—"} unit={profile?.heightCm ? "cm" : undefined} />
           <BioCircle icon={<WeightIcon className="h-5 w-5" />}  label="Weight" value={profile?.weightKg ? `${profile.weightKg}` : "—"} unit={profile?.weightKg ? "kg" : undefined} />
@@ -217,61 +217,45 @@ function PerformanceEdgeSection({ edge, loading, profile }: {
 
   return (
     <section className="rounded-xl bg-surface-2/40 ring-1 ring-accent/15 p-4">
-      <div className="flex items-center justify-between mb-5 pb-3 border-b border-accent/20">
-        <h3 className="font-display font-extrabold uppercase tracking-wider text-lg sm:text-xl">
+      <div className="mb-5 pb-3 border-b border-accent/20">
+        <h3 className="font-display font-extrabold uppercase tracking-wider text-lg sm:text-xl whitespace-nowrap">
           Performance <span className="text-accent">Edge</span>
         </h3>
-        <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
-          Overall <span className="text-accent font-bold">{edge?.overall ?? "—"}</span>
-        </span>
       </div>
 
-      {/* Top meters: Experience · Form · Energy */}
-      <div className="space-y-2.5 mb-4 pt-2">
+      <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2.5">
         <Meter
-          icon={<Activity className="h-3 w-3" />}
+          icon={<Activity className="h-3.5 w-3.5 text-accent shrink-0" />}
           label="Experience"
           valueText={`${caps} caps`}
           pct={expPct}
           tone="ok"
         />
         <Meter
-          icon={<TrendingUp className="h-3 w-3" />}
+          icon={<TrendingUp className="h-3.5 w-3.5 text-accent shrink-0" />}
           label="Form"
           valueText={loading ? "…" : formTier}
           pct={FORM_FILL[formTier]}
           tone={FORM_TONE[formTier]}
         />
         <Meter
-          icon={<EnergyIcon className="h-3 w-3" />}
+          icon={<EnergyIcon className="h-3.5 w-3.5 text-accent shrink-0" />}
           label="Energy"
           valueText={loading ? "…" : energyT}
           pct={ENERGY_FILL[energyT]}
           tone={ENERGY_TONE[energyT]}
         />
-      </div>
-
-      <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2.5">
         {(edge?.skills ?? PLACEHOLDER_SKILLS).map((s) => {
           const Icon = SKILL_ICONS[s.key];
           return (
-            <li key={s.key} className="flex items-center gap-2">
-              <Icon className="h-3.5 w-3.5 text-accent shrink-0" />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between text-[11px] mb-0.5">
-                  <span className="font-bold uppercase tracking-wider">{s.label}</span>
-                  <span className={`font-bold ${toneClass(s.tone)}`}>
-                    {loading ? "…" : s.word}
-                  </span>
-                </div>
-                <div className="h-1.5 w-full rounded-full bg-surface-2 overflow-hidden">
-                  <div
-                    className={`h-full transition-all ${toneBgClass(s.tone)}`}
-                    style={{ width: `${s.final}%` }}
-                  />
-                </div>
-              </div>
-            </li>
+            <Meter
+              key={s.key}
+              icon={<Icon className="h-3.5 w-3.5 text-accent shrink-0" />}
+              label={s.label}
+              valueText={loading ? "…" : s.word}
+              pct={s.final}
+              tone={s.tone}
+            />
           );
         })}
       </ul>
@@ -283,17 +267,21 @@ function Meter({ icon, label, valueText, pct, tone }: {
   icon: ReactNode; label: string; valueText: string; pct: number; tone: SkillRating["tone"];
 }) {
   return (
-    <div>
-      <div className="flex items-center justify-between text-[10px] uppercase tracking-wider font-bold text-muted-foreground mb-1">
-        <span className="flex items-center gap-1.5 text-accent">{icon}<span className="text-muted-foreground">{label}</span></span>
-        <span className={toneClass(tone)}>{valueText}</span>
+    <li className="flex items-center gap-2">
+      {icon}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center justify-between text-[11px] mb-0.5">
+          <span className="font-bold uppercase tracking-wider">{label}</span>
+          <span className={`font-bold ${toneClass(tone)}`}>{valueText}</span>
+        </div>
+        <div className="h-1.5 w-full rounded-full bg-surface-2 overflow-hidden">
+          <div className={`h-full transition-all ${toneBgClass(tone)}`} style={{ width: `${pct}%` }} />
+        </div>
       </div>
-      <div className="h-1.5 w-full rounded-full bg-surface-2 overflow-hidden">
-        <div className={`h-full transition-all ${toneBgClass(tone)}`} style={{ width: `${pct}%` }} />
-      </div>
-    </div>
+    </li>
   );
 }
+
 
 
 const PLACEHOLDER_SKILLS: SkillRating[] = [

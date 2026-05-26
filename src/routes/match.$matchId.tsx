@@ -15,7 +15,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { YourInjectedInsights } from "@/components/YourInjectedInsights";
-import { playerSlug } from "@/server/player-profile";
+import { playerSlug } from "@/lib/player-slug";
 
 const matchQO = (matchId: string) => queryOptions({
   queryKey: ["match", matchId],

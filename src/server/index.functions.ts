@@ -399,9 +399,10 @@ export const getMatchPage = createServerFn({ method: "GET" })
     // Script/Aftermatch) reads from stored snapshots. Skip all Tier-2 network calls
     // and return the locked prediction + cached aftermatch immediately.
     if (finished) {
-      const [locked, aftermatch] = await Promise.all([
+      const [locked, aftermatch, recentH2H] = await Promise.all([
         sealFromLockedInsights(data.matchId, details),
         readAftermatch(data.matchId),
+        recentH2HP,
       ]);
       return {
         details: { ...details, weather: null },
@@ -414,6 +415,7 @@ export const getMatchPage = createServerFn({ method: "GET" })
         insights: locked?.payload ?? null,
         insightsError: null,
         recentRecaps: { home: [], away: [] },
+        recentH2H,
         aftermatch: aftermatch ?? null,
         generatedAt: new Date().toISOString(),
         // NB: if aftermatch is null here, the client can lazily request it.

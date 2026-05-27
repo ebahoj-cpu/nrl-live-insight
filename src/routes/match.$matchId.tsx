@@ -4,7 +4,7 @@ import { getMatchPage, getMatchInsights, getMatchAftermatch } from "@/server/ind
 import { TeamLogo } from "@/components/TeamLogo";
 import type { TryscorerMarkets, OddsEvent } from "@/lib/odds-shared";
 import { bestH2H } from "@/lib/odds-shared";
-import { Suspense, useState, useEffect } from "react";
+import { Suspense, useState, useEffect, type ReactElement } from "react";
 import {
   ArrowLeft, Clock, MapPin, Users, BarChart3, Sparkles,
   Trophy, Target, Flag, Crown, TrendingUp, AlertCircle, CloudSun, Calendar, Zap, Hourglass,
@@ -1070,28 +1070,187 @@ function SquadPanel({ team, news }: { team: { nickName: string; themeKey: string
     );
   };
 
-  return (
-    <section className="card-surface p-5">
-      <div className="flex items-center justify-between gap-2 mb-4">
-        <div className="flex items-center gap-2 min-w-0">
-          <Users className="h-4 w-4 text-accent shrink-0" />
-          <h3 className="font-bold text-sm uppercase tracking-wider truncate">{team.nickName}</h3>
+  return <SquadPanelInner team={team} sorted={sorted} starters={starters} interchange={interchange} reserves={reserves} unnumbered={unnumbered} renderRow={renderRow} officialOutsLc={officialOutsLc} newsOutsByName={newsOutsByName} />;
+
+  function SquadPanelInner(props: {
+    team: typeof team; sorted: P[]; starters: P[]; interchange: P[]; reserves: P[]; unnumbered: P[];
+    renderRow: (p: P, i: number) => ReactElement;
+    officialOutsLc: Set<string>; newsOutsByName: Map<string, NewsOut>;
+  }) {
+    const [view, setView] = useState<"list" | "field">("list");
+    return (
+      <section className="card-surface p-5">
+        <div className="flex items-center justify-between gap-2 mb-4">
+          <div className="flex items-center gap-2 min-w-0">
+            <Users className="h-4 w-4 text-accent shrink-0" />
+            <h3 className="font-bold text-sm uppercase tracking-wider truncate">{props.team.nickName}</h3>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="inline-flex rounded-full bg-surface-2 p-0.5 ring-1 ring-border">
+              <button
+                type="button"
+                onClick={() => setView("list")}
+                className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-full transition-colors ${view === "list" ? "bg-accent text-accent-foreground" : "text-muted-foreground"}`}
+              >List</button>
+              <button
+                type="button"
+                onClick={() => setView("field")}
+                className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-full transition-colors ${view === "field" ? "bg-accent text-accent-foreground" : "text-muted-foreground"}`}
+              >Field</button>
+            </div>
+            <TeamLogo themeKey={props.team.themeKey} name={props.team.nickName} size={36} />
+          </div>
         </div>
-        <TeamLogo themeKey={team.themeKey} name={team.nickName} size={36} />
+        {props.sorted.length === 0 ? (
+          <div className="text-xs text-muted-foreground">Squad not yet named.</div>
+        ) : view === "field" ? (
+          <FieldFormation team={props.team} players={props.sorted} officialOutsLc={props.officialOutsLc} newsOutsByName={props.newsOutsByName} />
+        ) : (
+          <div className="space-y-3">
+            <Group items={props.starters} />
+            <Group label="Interchange" items={props.interchange} />
+            <Group label="Reserves" items={props.reserves} />
+            {props.unnumbered.length > 0 && <Group label="Unnamed" items={props.unnumbered} />}
+          </div>
+        )}
+      </section>
+    );
+  }
+}
+
+type FieldP = { firstName: string; lastName: string; position: string; jerseyNumber?: number; isCaptain?: boolean; headImage?: string };
+
+// Standard NRL formation, viewed from above (attack up). Each row's `cols` lists jersey numbers left→right.
+const FIELD_ROWS: { cols: number[] }[] = [
+  { cols: [5, 4, 1, 3, 2] },    // back five (fullback centred)
+  { cols: [7, 6] },              // halves
+  { cols: [13] },                // lock
+  { cols: [12, 11] },            // second row
+  { cols: [10, 9, 8] },          // front row
+];
+
+function FieldFormation({ team, players, officialOutsLc, newsOutsByName }: {
+  team: { nickName: string; themeKey: string };
+  players: FieldP[];
+  officialOutsLc: Set<string>;
+  newsOutsByName: Map<string, NewsOut>;
+}) {
+  const byNumber = new Map<number, FieldP>();
+  for (const p of players) if (p.jerseyNumber != null) byNumber.set(p.jerseyNumber, p);
+  const interchange = players.filter((p) => p.jerseyNumber != null && p.jerseyNumber >= 14 && p.jerseyNumber <= 17);
+
+  const Spot = ({ n }: { n: number }) => {
+    const p = byNumber.get(n);
+    const fullName = p ? `${p.firstName} ${p.lastName}`.toLowerCase() : "";
+    const isOut = !!p && (officialOutsLc.has(fullName) || newsOutsByName.has(fullName));
+    const slug = p ? playerSlug(p.firstName, p.lastName) : "";
+    const content = (
+      <div className="flex flex-col items-center w-[58px] sm:w-[88px]">
+        <div className="relative">
+          <div className={`relative h-12 w-12 sm:h-16 sm:w-16 rounded-full overflow-hidden ring-2 ring-white/80 bg-accent/20 shadow-md ${isOut ? "grayscale opacity-60" : ""}`}>
+            {p?.headImage ? (
+              <img src={p.headImage} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover object-top" />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center text-[10px] sm:text-xs font-black text-accent">
+                {p ? `${p.firstName[0]}${p.lastName[0]}` : "—"}
+              </div>
+            )}
+          </div>
+          {/* Jersey-number badge in the team accent colour */}
+          <span className="absolute -top-1 -right-1 flex h-5 min-w-5 sm:h-6 sm:min-w-6 px-1 items-center justify-center rounded-full bg-accent text-accent-foreground text-[10px] sm:text-xs font-black tabular-nums shadow ring-2 ring-white/90">
+            {n}
+          </span>
+        </div>
+        {p ? (
+          <div className="mt-1 text-center leading-tight">
+            {p.isCaptain && <span className="text-[8px] sm:text-[9px] font-bold text-white/90">(C) </span>}
+            <span className={`text-[10px] sm:text-xs font-bold text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)] ${isOut ? "line-through" : ""}`}>
+              {p.lastName}
+            </span>
+          </div>
+        ) : (
+          <div className="mt-1 text-[9px] sm:text-[10px] uppercase tracking-wider text-white/70 italic">TBC</div>
+        )}
       </div>
-      {sorted.length === 0 ? (
-        <div className="text-xs text-muted-foreground">Squad not yet named.</div>
-      ) : (
-        <div className="space-y-3">
-          <Group items={starters} />
-          <Group label="Interchange" items={interchange} />
-          <Group label="Reserves" items={reserves} />
-          {unnumbered.length > 0 && <Group label="Unnamed" items={unnumbered} />}
+    );
+    return p ? (
+      <Link
+        to="/player/$teamThemeKey/$playerSlug"
+        params={{ teamThemeKey: team.themeKey, playerSlug: slug }}
+        search={{ firstName: p.firstName, lastName: p.lastName, teamNickname: team.nickName, position: JERSEY_POSITION[n] ?? p.position, jerseyNumber: p.jerseyNumber, headImage: p.headImage }}
+      >{content}</Link>
+    ) : content;
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Pitch */}
+      <div
+        className="relative rounded-2xl px-2 py-5 sm:py-7 ring-1 ring-white/10 shadow-inner overflow-hidden"
+        style={{
+          background:
+            "repeating-linear-gradient(90deg, color-mix(in oklab, var(--accent) 35%, #1a3a1a) 0 28px, color-mix(in oklab, var(--accent) 28%, #143014) 28px 56px)",
+        }}
+      >
+        {/* Halfway / try lines */}
+        <div className="pointer-events-none absolute inset-x-3 top-3 h-px bg-white/40" />
+        <div className="pointer-events-none absolute inset-x-3 bottom-3 h-px bg-white/40" />
+        <div className="pointer-events-none absolute inset-x-3 top-1/2 h-px bg-white/30" />
+
+        <div className="relative flex flex-col gap-3 sm:gap-5">
+          {FIELD_ROWS.map((row, ri) => (
+            <div key={ri} className="flex items-end justify-around gap-1 sm:gap-2">
+              {row.cols.map((n) => <Spot key={n} n={n} />)}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Interchange strip */}
+      {interchange.length > 0 && (
+        <div>
+          <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-accent/80 mb-2">Interchange</div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {interchange.map((p) => {
+              const fullName = `${p.firstName} ${p.lastName}`.toLowerCase();
+              const isOut = officialOutsLc.has(fullName) || newsOutsByName.has(fullName);
+              const slug = playerSlug(p.firstName, p.lastName);
+              return (
+                <Link
+                  key={p.jerseyNumber}
+                  to="/player/$teamThemeKey/$playerSlug"
+                  params={{ teamThemeKey: team.themeKey, playerSlug: slug }}
+                  search={{ firstName: p.firstName, lastName: p.lastName, teamNickname: team.nickName, position: "Interchange", jerseyNumber: p.jerseyNumber, headImage: p.headImage }}
+                  className={`flex items-center gap-2 rounded-lg p-2 ring-1 ring-border bg-surface-2 hover:ring-accent/40 transition-colors ${isOut ? "opacity-60" : ""}`}
+                >
+                  <div className="relative">
+                    <div className="h-9 w-9 rounded-full overflow-hidden bg-accent/20 ring-1 ring-border">
+                      {p.headImage ? (
+                        <img src={p.headImage} alt="" loading="lazy" className="h-full w-full object-cover object-top" />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-[10px] font-black text-accent">
+                          {p.firstName[0]}{p.lastName[0]}
+                        </div>
+                      )}
+                    </div>
+                    <span className="absolute -top-1 -right-1 flex h-4 min-w-4 px-1 items-center justify-center rounded-full bg-accent text-accent-foreground text-[9px] font-black tabular-nums ring-2 ring-background">
+                      {p.jerseyNumber}
+                    </span>
+                  </div>
+                  <span className={`text-xs font-bold truncate ${isOut ? "line-through" : ""}`}>
+                    {p.lastName}{p.isCaptain && " (C)"}
+                  </span>
+                </Link>
+              );
+            })}
+          </div>
         </div>
       )}
-    </section>
+    </div>
   );
 }
+
+
 
 /* ================= STATS TAB ================= */
 

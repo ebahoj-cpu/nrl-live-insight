@@ -480,6 +480,7 @@ export const getMatchPage = createServerFn({ method: "GET" })
       insights: insightsForResponse,
       insightsError: null,
       recentRecaps: { home: homeRecaps, away: awayRecaps },
+      recentH2H,
       aftermatch: null as AftermatchPayload | null,
       generatedAt: new Date().toISOString(),
     };

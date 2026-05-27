@@ -2823,14 +2823,6 @@ function InsightsTab({ matchId, insights, insightsError, insightsLoading, home, 
               )}
             </div>
             <div className="flex flex-col items-center gap-1.5">
-              {(() => {
-                const doublePrice = getMulti(det.playerDouble.name) ?? det.playerDouble.price ?? null;
-                return doublePrice != null ? (
-                  <span className="text-lg font-black tabular-nums px-3 py-1.5 rounded-full bg-accent !text-white border border-accent shadow-[0_2px_8px_-2px_color-mix(in_oklab,var(--accent)_60%,transparent)]">
-                    {doublePrice.toFixed(2)}
-                  </span>
-                ) : null;
-              })()}
               <AnytimeOddsTag price={getAnytime(det.playerDouble.name)} />
             </div>
           </div>

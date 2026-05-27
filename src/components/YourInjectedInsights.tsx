@@ -6,7 +6,7 @@
 // These NEVER affect other users — see src/server/user-injections.functions.ts.
 // ============================================================================
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ExternalLink, Sparkles, TrendingUp, TrendingDown, Minus, X, Loader2 } from "lucide-react";
+import { ExternalLink, Sparkles, TrendingUp, TrendingDown, Minus, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import {
   listUserInjectionsForMatch,
@@ -94,15 +94,9 @@ function InjectionRow({ item, onDelete, deleting }: { item: UserArticleInjection
             {item.article_source ?? "Source"} · {item.article_title}
           </a>
         </div>
-        <button
-          type="button"
-          onClick={onDelete}
-          disabled={deleting}
-          title="Remove this injection"
-          className="shrink-0 p-1 rounded-full hover:bg-foreground/10 disabled:opacity-50"
-        >
-          {deleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-3.5 w-3.5" />}
-        </button>
+        {deleting ? (
+          <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0 text-muted-foreground" />
+        ) : null}
       </div>
     </li>
   );

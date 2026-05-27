@@ -246,35 +246,118 @@ export function formTier(recentMultiplier: number): FormTier {
   return "Cold";
 }
 
+// ==================== LEADERBOARD BOOSTS ====================
+// When a player appears in the NRL.com top-5 for a stat category we juice
+// the relevant skill base AND the form modifier. Calibrated so a #1 finisher
+// gets a meaningful (but not absurd) bump on top of the season-stat baseline,
+// and a top-5 finisher is clearly elevated above the pack.
+
+type LeaderboardEntry = { title: string; rank: number };
+
+// Rank → bonus points added to the relevant skill base (out of 100).
+function rankBonus(rank: number): number {
+  if (rank <= 0) return 0;
+  return Math.max(0, 22 - (rank - 1) * 4); // #1=22, #2=18, #3=14, #4=10, #5=6
+}
+
+// Map a leaderboard category title to which skill(s) it should boost.
+function skillsForCategory(title: string): SkillKey[] {
+  const t = title.toLowerCase();
+  if (t.includes("try assist")) return ["attack", "handling"];
+  if (t.includes("try")) return ["attack"];
+  if (t.includes("line break") || t.includes("linebreak")) return ["attack", "agility"];
+  if (t.includes("tackle break") || t.includes("bust")) return ["agility", "strength"];
+  if (t.includes("post-contact") || t.includes("post contact")) return ["strength"];
+  if (t.includes("offload")) return ["handling", "strength"];
+  if (t.includes("run metre") || t.includes("metres gained") || t.includes("all run metres") || t.includes("metres")) return ["strength", "attack"];
+  if (t.includes("tackle") && !t.includes("missed")) return ["defence"];
+  if (t.includes("missed tackle")) return []; // negative — skip rather than penalise
+  if (t.includes("kick") && !t.includes("kick return")) return ["kicking"];
+  if (t.includes("kick return")) return ["agility"];
+  if (t.includes("goal") || t.includes("conversion") || t.includes("field goal")) return ["kicking"];
+  if (t.includes("point")) return ["attack"];
+  if (t.includes("hit up")) return ["strength"];
+  return [];
+}
+
+function applyLeaderboardBoost(
+  baseByKey: Record<SkillKey, number>,
+  rankings: LeaderboardEntry[] | undefined,
+): { boosted: Record<SkillKey, number>; formBonus: number } {
+  const boosted = { ...baseByKey };
+  if (!rankings || rankings.length === 0) return { boosted, formBonus: 1.0 };
+  let bestRank = 99;
+  let topFiveHits = 0;
+  for (const r of rankings) {
+    const bonus = rankBonus(r.rank);
+    if (bonus <= 0) continue;
+    topFiveHits++;
+    if (r.rank < bestRank) bestRank = r.rank;
+    for (const k of skillsForCategory(r.title)) {
+      boosted[k] = clamp(boosted[k] + bonus);
+    }
+  }
+  // Form bonus: top-5 in anything = at least Good Form territory; #1 in
+  // anything or multiple top-5s pushes toward Red Hot.
+  let formBonus = 1.0;
+  if (bestRank === 1) formBonus = 1.18;
+  else if (bestRank <= 3) formBonus = 1.12;
+  else if (topFiveHits > 0) formBonus = 1.06;
+  if (topFiveHits >= 3) formBonus = Math.max(formBonus, 1.20);
+  return { boosted, formBonus };
+}
+
 // ==================== MAIN ====================
 export function computePerformanceEdge(args: {
   position: string | null | undefined;
   seasonStats: PlayerSeasonStats;
   careerAppearances?: number;
   recentMultiplier?: number;
+  /** Optional NRL.com leaderboard finishes — boosts skills + form when present. */
+  rankings?: LeaderboardEntry[];
 }): PerformanceEdge {
   const group = groupForPosition(args.position);
   const s = args.seasonStats;
   const energy = calculateEnergy(s);
-  const form = calculateForm(s);
+  const baseForm = calculateForm(s);
   const caps = args.careerAppearances ?? 0;
   const exp = experienceTierFromCaps(caps);
 
-  const SKILL_BASES = [
-    { key: "attack" as const,   label: "Attack",        base: baseAttack(s) },
-    { key: "agility" as const,  label: "Agility/Speed", base: baseAgility(s) },
-    { key: "defence" as const,  label: "Defence",       base: baseDefence(s) },
-    { key: "handling" as const, label: "Handling",      base: baseHandling(s) },
-    { key: "strength" as const, label: "Strength",      base: baseStrength(s) },
-    { key: "kicking" as const,  label: "Kicking",       base: baseKicking(s) },
-  ];
+  const rawBases: Record<SkillKey, number> = {
+    attack:   baseAttack(s),
+    agility:  baseAgility(s),
+    defence:  baseDefence(s),
+    handling: baseHandling(s),
+    strength: baseStrength(s),
+    kicking:  baseKicking(s),
+  };
 
-  const skills: SkillRating[] = SKILL_BASES.map(({ key, label, base }) => {
-    const weighted = clamp(base * WEIGHTS[key][group]);
+  const { boosted, formBonus } = applyLeaderboardBoost(rawBases, args.rankings);
+
+  // Apply leaderboard form bonus, then re-tier (so the modifier is consistent
+  // with the displayed tier).
+  const boostedFormMod = clamp(baseForm.modifier * formBonus, 0.5, 1.4);
+  const form: PerformanceEdge["form"] = {
+    tier:
+      boostedFormMod >= 1.25 ? "Red Hot" :
+      boostedFormMod >= 1.10 ? "Good Form" :
+      boostedFormMod >= 0.95 ? "Average" :
+      boostedFormMod >= 0.82 ? "Below Average" : "Cold",
+    modifier: boostedFormMod,
+  };
+
+  const SKILL_LABELS: Record<SkillKey, string> = {
+    attack: "Attack", agility: "Agility/Speed", defence: "Defence",
+    handling: "Handling", strength: "Strength", kicking: "Kicking",
+  };
+  const KEYS: SkillKey[] = ["attack", "agility", "defence", "handling", "strength", "kicking"];
+
+  const skills: SkillRating[] = KEYS.map((key) => {
+    const weighted = clamp(boosted[key] * WEIGHTS[key][group]);
     const expMod = experienceModifier(exp.tier, key);
     const final = clamp(weighted * energy.modifier * form.modifier * expMod);
     const { word, tone } = describe(final);
-    return { key, label, base: Math.round(weighted), final: Math.round(final), word, tone };
+    return { key, label: SKILL_LABELS[key], base: Math.round(weighted), final: Math.round(final), word, tone };
   });
 
   const overall = Math.round(skills.reduce((a, x) => a + x.final, 0) / skills.length);

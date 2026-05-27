@@ -4,7 +4,7 @@ import { getMatchPage, getMatchInsights, getMatchAftermatch } from "@/server/ind
 import { TeamLogo } from "@/components/TeamLogo";
 import type { TryscorerMarkets, OddsEvent } from "@/lib/odds-shared";
 import { bestH2H } from "@/lib/odds-shared";
-import { Suspense, useState, useEffect } from "react";
+import { Suspense, useState, useEffect, type ReactElement } from "react";
 import {
   ArrowLeft, Clock, MapPin, Users, BarChart3, Sparkles,
   Trophy, Target, Flag, Crown, TrendingUp, AlertCircle, CloudSun, Calendar, Zap, Hourglass,

@@ -3070,9 +3070,7 @@ function OutlookCell({ label, pick, price, accent }: { label: string; pick: stri
     <div className={`rounded-lg p-3 border ${accent ? "bg-accent/10 border-accent/30" : "bg-surface-2 border-border/40"}`}>
       <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">{label}</div>
       <div className={`text-sm font-black mt-1 leading-tight ${accent ? "text-accent" : "text-foreground"}`}>{pick}</div>
-      {price ? (
-        <div className="mt-1.5 text-[11px] font-black tabular-nums inline-block px-1.5 py-0.5 rounded-full bg-accent !text-white border border-accent shadow-[0_2px_8px_-2px_color-mix(in_oklab,var(--accent)_60%,transparent)]">{price}</div>
-      ) : null}
+      {null}
     </div>
   );
 }

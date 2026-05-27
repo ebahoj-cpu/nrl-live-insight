@@ -176,42 +176,72 @@ function parseTeamsFromMatchId(matchId: string): { home: string; away: string } 
   return { home: fix(home), away: fix(away) };
 }
 
+function parseRoundFromMatchId(matchId: string): string | null {
+  const m = matchId.match(/round-(\d+)/i);
+  return m ? m[1] : null;
+}
+
 function nicknameFromThemeKey(k: string): string {
-  return k.split("-").map((p) => p[0].toUpperCase() + p.slice(1)).join(" ");
+  // Strip "sea-eagles" / "wests-tigers" suffixes for short display name
+  if (k.endsWith("sea-eagles")) return "Sea Eagles";
+  if (k === "wests-tigers") return "Wests Tigers";
+  const last = k.split("-").pop() ?? k;
+  return last[0].toUpperCase() + last.slice(1);
 }
 
 function MatchPageSkeleton() {
   const { matchId } = Route.useParams();
   const teams = parseTeamsFromMatchId(matchId);
+  const round = parseRoundFromMatchId(matchId);
   return (
     <div className="pt-6">
       <Link to="/" search={{ round: undefined }} className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-4">
         <ArrowLeft className="h-4 w-4" /> Back to fixtures
       </Link>
       <section className="glass p-6 sm:p-8">
-        <div className="h-3 w-24 rounded bg-surface-2 animate-pulse" />
+        <div className="text-[11px] uppercase tracking-widest text-accent font-bold">
+          {round ? `Round ${round}` : <span className="inline-block h-3 w-20 rounded bg-surface-2 animate-pulse align-middle" />}
+        </div>
         <div className="grid grid-cols-[1fr_auto_1fr] items-center mt-4 gap-2 sm:gap-4">
           <div className="flex flex-col items-center gap-2">
             {teams ? (
-              <TeamLogo themeKey={teams.home} name={nicknameFromThemeKey(teams.home)} size={56} />
+              <>
+                <TeamLogo themeKey={teams.home} name={nicknameFromThemeKey(teams.home)} size={64} />
+                <div className="text-sm sm:text-base font-bold uppercase tracking-wide">{nicknameFromThemeKey(teams.home)}</div>
+              </>
             ) : (
-              <div className="h-14 w-14 rounded-full bg-surface-2 animate-pulse" />
+              <>
+                <div className="h-16 w-16 rounded-full bg-surface-2 animate-pulse" />
+                <div className="h-3 w-20 rounded bg-surface-2 animate-pulse" />
+              </>
             )}
-            <div className="h-3 w-20 rounded bg-surface-2 animate-pulse" />
           </div>
-          <div className="text-2xl sm:text-3xl font-extrabold text-muted-foreground">vs</div>
+          <div className="text-2xl sm:text-3xl font-extrabold">vs</div>
           <div className="flex flex-col items-center gap-2">
             {teams ? (
-              <TeamLogo themeKey={teams.away} name={nicknameFromThemeKey(teams.away)} size={56} />
+              <>
+                <TeamLogo themeKey={teams.away} name={nicknameFromThemeKey(teams.away)} size={64} />
+                <div className="text-sm sm:text-base font-bold uppercase tracking-wide">{nicknameFromThemeKey(teams.away)}</div>
+              </>
             ) : (
-              <div className="h-14 w-14 rounded-full bg-surface-2 animate-pulse" />
+              <>
+                <div className="h-16 w-16 rounded-full bg-surface-2 animate-pulse" />
+                <div className="h-3 w-20 rounded bg-surface-2 animate-pulse" />
+              </>
             )}
-            <div className="h-3 w-20 rounded bg-surface-2 animate-pulse" />
           </div>
         </div>
-        <div className="mt-6 pt-5 border-t border-border space-y-2">
-          <div className="h-3 w-2/3 rounded bg-surface-2 animate-pulse mx-auto sm:mx-0" />
-          <div className="h-3 w-1/2 rounded bg-surface-2 animate-pulse mx-auto sm:mx-0" />
+        <div className="mt-6 pt-5 border-t border-border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm">
+          <div className="inline-flex items-center justify-center sm:justify-start gap-2">
+            <Calendar className="h-4 w-4 text-accent shrink-0" />
+            <div className="h-3 w-28 rounded bg-surface-2 animate-pulse" />
+            <Clock className="h-4 w-4 text-accent shrink-0 ml-1" />
+            <div className="h-3 w-14 rounded bg-surface-2 animate-pulse" />
+          </div>
+          <div className="inline-flex items-center justify-center sm:justify-end gap-2">
+            <MapPin className="h-4 w-4 text-accent shrink-0" />
+            <div className="h-3 w-40 rounded bg-surface-2 animate-pulse" />
+          </div>
         </div>
       </section>
       <div className="mt-6 grid grid-cols-5 gap-1 p-1 glass">

@@ -160,7 +160,29 @@ function MatchLoading() {
 // Lightweight page shell shown immediately on navigation, before match data
 // has loaded. Mirrors the real layout so the transition feels instant; the
 // MatchLoading progress UI fills the tab content area until data resolves.
+// Try to derive home/away theme keys from the matchId slug (e.g.
+// "2026/round-13/knights-v-eels") so the skeleton can show real team logos
+// during the initial load instead of blank circles.
+function parseTeamsFromMatchId(matchId: string): { home: string; away: string } | null {
+  const slug = matchId.split("/").pop() ?? "";
+  const m = slug.match(/^(.+)-v-(.+)$/);
+  if (!m) return null;
+  const fix = (s: string) => s === "sea" ? "sea-eagles" : s === "wests" ? "wests-tigers" : s;
+  // handle multi-word theme keys: rejoin known compounds
+  let home = m[1];
+  let away = m[2];
+  if (home.endsWith("-sea")) home = home.slice(0, -4) + "sea-eagles";
+  if (away.endsWith("-sea")) away = away.slice(0, -4) + "sea-eagles";
+  return { home: fix(home), away: fix(away) };
+}
+
+function nicknameFromThemeKey(k: string): string {
+  return k.split("-").map((p) => p[0].toUpperCase() + p.slice(1)).join(" ");
+}
+
 function MatchPageSkeleton() {
+  const { matchId } = Route.useParams();
+  const teams = parseTeamsFromMatchId(matchId);
   return (
     <div className="pt-6">
       <Link to="/" search={{ round: undefined }} className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-4">
@@ -170,12 +192,20 @@ function MatchPageSkeleton() {
         <div className="h-3 w-24 rounded bg-surface-2 animate-pulse" />
         <div className="grid grid-cols-[1fr_auto_1fr] items-center mt-4 gap-2 sm:gap-4">
           <div className="flex flex-col items-center gap-2">
-            <div className="h-14 w-14 rounded-full bg-surface-2 animate-pulse" />
+            {teams ? (
+              <TeamLogo themeKey={teams.home} name={nicknameFromThemeKey(teams.home)} size={56} />
+            ) : (
+              <div className="h-14 w-14 rounded-full bg-surface-2 animate-pulse" />
+            )}
             <div className="h-3 w-20 rounded bg-surface-2 animate-pulse" />
           </div>
           <div className="text-2xl sm:text-3xl font-extrabold text-muted-foreground">vs</div>
           <div className="flex flex-col items-center gap-2">
-            <div className="h-14 w-14 rounded-full bg-surface-2 animate-pulse" />
+            {teams ? (
+              <TeamLogo themeKey={teams.away} name={nicknameFromThemeKey(teams.away)} size={56} />
+            ) : (
+              <div className="h-14 w-14 rounded-full bg-surface-2 animate-pulse" />
+            )}
             <div className="h-3 w-20 rounded bg-surface-2 animate-pulse" />
           </div>
         </div>

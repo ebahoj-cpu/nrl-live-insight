@@ -472,20 +472,8 @@ function TeamColumn({ name, themeKey }: { name: string; themeKey: string; positi
   );
 }
 
-function OddsPill({ odds, isFav }: { odds: { price: number; book: string } | null; isFav: boolean }) {
-  if (!odds) {
-    return (
-      <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-surface-2 text-[11px] font-bold tabular-nums text-muted-foreground border border-border shrink-0">—</span>
-    );
-  }
-  return (
-    <span
-      className="inline-flex items-center px-3 py-1 rounded-full bg-accent !text-black text-[12px] font-black tabular-nums tracking-tight shadow-[0_4px_14px_-4px_color-mix(in_oklab,var(--accent)_60%,transparent)] shrink-0"
-      title={`Best price: ${odds.book}${isFav ? " · favourite" : ""}`}
-    >
-      {odds.price.toFixed(2)}
-    </span>
-  );
+function OddsPill(_: { odds: { price: number; book: string } | null; isFav: boolean }) {
+  return null;
 }
 
 function shortWeather(c: string): string {

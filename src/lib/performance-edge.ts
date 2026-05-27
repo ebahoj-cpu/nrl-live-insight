@@ -66,8 +66,18 @@ function baseAttack(s: PlayerSeasonStats): number {
   const metres = perGame(s.totalRunMetres, s.appearances);
   const pcm = perGame(s.postContactMetres, s.appearances);
   const tb = perGame(s.tackleBreaks, s.appearances);
+  const offloads = perGame(s.offloads, s.appearances);
 
-  const score = (tries * 25) + (assists * 20) + (breaks * 20) + (metres / 20) + (pcm / 40) + (tb * 8);
+  // Re-weighted so big-minutes forwards (heavy metres, PCM, tackle busts,
+  // offloads) score competitively with try-scoring outside backs.
+  const score =
+    (tries * 22) +
+    (assists * 18) +
+    (breaks * 18) +
+    (metres / 8) +         // 150m → ~19 pts
+    (pcm / 18) +           // 60m  → ~3.3 pts
+    (tb * 11) +            // 3/g  → 33 pts
+    (offloads * 10);       // 1.5/g → 15 pts
   return clamp(score);
 }
 
@@ -75,7 +85,7 @@ function baseAgility(s: PlayerSeasonStats): number {
   const breaks = perGame(s.lineBreaks, s.appearances);
   const tb = perGame(s.tackleBreaks, s.appearances);
   const metres = perGame(s.totalRunMetres, s.appearances);
-  const score = breaks * 45 + tb * 25 + (metres / 15) * 1.5;
+  const score = breaks * 45 + tb * 28 + (metres / 12) * 1.5;
   return clamp(score);
 }
 

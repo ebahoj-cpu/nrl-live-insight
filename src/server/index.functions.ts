@@ -10,7 +10,7 @@
 
 import { createServerFn } from "@tanstack/react-start";
 import { cached, TTL, insightsTtlMs } from "./cache";
-import { fetchDraw, fetchLadder, fetchMatchDetails, fetchMatchRecap, matchIdToPath, type NrlFixture, type NrlMatchRecap } from "./nrl";
+import { fetchDraw, fetchLadder, fetchMatchDetails, fetchMatchRecap, fetchRecentH2H, matchIdToPath, type NrlFixture, type NrlMatchRecap, type RecentH2HMatch } from "./nrl";
 import { buildEstimatedOdds, fetchNrlOdds, fetchEventOdds, fetchTryscorerOdds, type OddsEvent, type TryscorerMarkets } from "./odds";
 import { generateInsights, type RealOdds, type Insights } from "./ai-insights";
 import { fetchVenueWeather, type WeatherSnapshot } from "./weather";
@@ -382,6 +382,15 @@ export const getMatchPage = createServerFn({ method: "GET" })
       cached(`ladder:${season}`, TTL.ladder, () => fetchLadder(season), { bypass: data.refresh }),
     ]);
 
+    // Last 5 head-to-head fixtures between these two teams (cached 24h — past
+    // results don't change). Isolated so failure never blocks the page.
+    const recentH2HP = cached(
+      `h2h:${details.homeTeam.nickName}:${details.awayTeam.nickName}:${season}`,
+      24 * 60 * 60_000,
+      () => fetchRecentH2H(details.homeTeam.nickName, details.awayTeam.nickName, season, 5),
+      { bypass: data.refresh },
+    ).catch((err) => { console.warn("[getMatchPage] recentH2H failed:", err); return [] as RecentH2HMatch[]; });
+
     const { started, finished } = hasStartedOrFinished(details);
 
     // ===== FAST PATH for finished matches =====
@@ -390,9 +399,10 @@ export const getMatchPage = createServerFn({ method: "GET" })
     // Script/Aftermatch) reads from stored snapshots. Skip all Tier-2 network calls
     // and return the locked prediction + cached aftermatch immediately.
     if (finished) {
-      const [locked, aftermatch] = await Promise.all([
+      const [locked, aftermatch, recentH2H] = await Promise.all([
         sealFromLockedInsights(data.matchId, details),
         readAftermatch(data.matchId),
+        recentH2HP,
       ]);
       return {
         details: { ...details, weather: null },
@@ -405,6 +415,7 @@ export const getMatchPage = createServerFn({ method: "GET" })
         insights: locked?.payload ?? null,
         insightsError: null,
         recentRecaps: { home: [], away: [] },
+        recentH2H,
         aftermatch: aftermatch ?? null,
         generatedAt: new Date().toISOString(),
         // NB: if aftermatch is null here, the client can lazily request it.
@@ -417,11 +428,12 @@ export const getMatchPage = createServerFn({ method: "GET" })
     const homeNick = findTeam(details.homeTeam.nickName)?.nickname ?? details.homeTeam.nickName;
     const awayNick = findTeam(details.awayTeam.nickName)?.nickname ?? details.awayTeam.nickName;
 
-    const [oddsResult, weather, homeRecaps, awayRecaps] = await Promise.all([
+    const [oddsResult, weather, homeRecaps, awayRecaps, recentH2H] = await Promise.all([
       safeOdds(data.refresh),
       safeWeather(data.matchId, details.venue, details.venueCity, details.kickoffUtc, data.refresh),
       safeRecaps(details.homeTeam.recentForm, data.refresh),
       safeRecaps(details.awayTeam.recentForm, data.refresh),
+      recentH2HP,
     ]);
 
     let odds: OddsEvent | null = oddsResult.data.find((e) => {
@@ -468,6 +480,7 @@ export const getMatchPage = createServerFn({ method: "GET" })
       insights: insightsForResponse,
       insightsError: null,
       recentRecaps: { home: homeRecaps, away: awayRecaps },
+      recentH2H,
       aftermatch: null as AftermatchPayload | null,
       generatedAt: new Date().toISOString(),
     };

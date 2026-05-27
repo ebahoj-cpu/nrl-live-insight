@@ -420,3 +420,68 @@ export async function fetchMatchRecap(matchUrl: string): Promise<NrlMatchRecap |
     firstTry,
   };
 }
+
+// ---------- Recent head-to-head fixtures between two teams ----------
+export type RecentH2HMatch = {
+  matchId: string;
+  roundNumber: number;
+  season: number;
+  kickoffUtc: string;
+  homeNick: string;
+  awayNick: string;
+  homeThemeKey: string;
+  awayThemeKey: string;
+  homeScore: number;
+  awayScore: number;
+  url: string;
+};
+
+// Walks back up to `seasonsBack` seasons (including current) looking for finished
+// matchups between the two teams. Returns up to `limit` most recent (kickoff desc).
+export async function fetchRecentH2H(
+  homeNick: string,
+  awayNick: string,
+  currentSeason: number,
+  limit = 5,
+  seasonsBack = 5,
+): Promise<RecentH2HMatch[]> {
+  const out: RecentH2HMatch[] = [];
+  const seen = new Set<string>();
+  const h = homeNick.toLowerCase();
+  const a = awayNick.toLowerCase();
+  for (let i = 0; i < seasonsBack && out.length < limit + 4; i++) {
+    const season = currentSeason - i;
+    let fixtures: NrlFixture[] = [];
+    try {
+      fixtures = await fetchDraw(season);
+    } catch {
+      continue;
+    }
+    for (const f of fixtures) {
+      const hn = (f.homeTeam.nickName || "").toLowerCase();
+      const an = (f.awayTeam.nickName || "").toLowerCase();
+      const isMatch = (hn === h && an === a) || (hn === a && an === h);
+      if (!isMatch) continue;
+      const hs = f.homeTeam.score;
+      const as = f.awayTeam.score;
+      if (hs == null || as == null) continue; // unplayed
+      if (seen.has(f.matchId)) continue;
+      seen.add(f.matchId);
+      out.push({
+        matchId: f.matchId,
+        roundNumber: f.roundNumber,
+        season,
+        kickoffUtc: f.kickoffUtc,
+        homeNick: f.homeTeam.nickName,
+        awayNick: f.awayTeam.nickName,
+        homeThemeKey: f.homeTeam.themeKey,
+        awayThemeKey: f.awayTeam.themeKey,
+        homeScore: Number(hs),
+        awayScore: Number(as),
+        url: `https://www.nrl.com${f.matchCentrePath}`,
+      });
+    }
+  }
+  out.sort((x, y) => (y.kickoffUtc || "").localeCompare(x.kickoffUtc || ""));
+  return out.slice(0, limit);
+}

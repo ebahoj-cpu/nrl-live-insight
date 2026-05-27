@@ -6,7 +6,7 @@
 // These NEVER affect other users — see src/server/user-injections.functions.ts.
 // ============================================================================
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ExternalLink, Sparkles, TrendingUp, TrendingDown, Minus, X, Loader2 } from "lucide-react";
+import { ExternalLink, Sparkles, TrendingUp, TrendingDown, Minus, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import {
   listUserInjectionsForMatch,

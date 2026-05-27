@@ -1280,7 +1280,7 @@ function CombinedFieldPanel({ home, away, teamNews }: {
 
   return (
     <section className="card-surface p-3 sm:p-5 space-y-4">
-      {/* Combined pitch: home top half, away bottom half (mirrored) */}
+      {/* Combined pitch: home top half, halfway line + padding, away bottom half (mirrored) */}
       <div
         className="relative rounded-2xl px-2 py-5 sm:py-7 ring-1 ring-white/10 shadow-inner overflow-hidden"
         style={{
@@ -1290,14 +1290,17 @@ function CombinedFieldPanel({ home, away, teamNews }: {
       >
         <div className="pointer-events-none absolute inset-x-3 top-3 h-px bg-white/40" />
         <div className="pointer-events-none absolute inset-x-3 bottom-3 h-px bg-white/40" />
-        <div className="pointer-events-none absolute inset-x-3 top-1/2 h-px bg-white/60" />
 
         {/* Home half (top) — accent uses team theme via wrapper */}
         <div className="relative" data-theme-team={home.themeKey}>
           <HalfFormation team={home} {...homeOuts} mirror={false} />
         </div>
+
+        {/* Halfway line — sits between halves with breathing room on both sides */}
+        <div className="my-10 sm:my-14 h-px bg-white/60 mx-3" />
+
         {/* Away half (bottom, mirrored) */}
-        <div className="relative mt-14 sm:mt-20" data-theme-team={away.themeKey}>
+        <div className="relative pb-2 sm:pb-4" data-theme-team={away.themeKey}>
           <HalfFormation team={away} {...awayOuts} mirror={true} />
         </div>
       </div>

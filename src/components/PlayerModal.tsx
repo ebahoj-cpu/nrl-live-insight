@@ -194,22 +194,11 @@ function RankingBadges({ rankings, loading }: { rankings: PlayerRanking[]; loadi
             Top <span className="text-accent">Leaderboards</span>
           </h3>
         </div>
-        <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2.5">
-          {sorted.map((r) => {
-            const Icon = iconForCategory(r.title);
-            const pct = Math.max(20, 100 - (r.rank - 1) * 20);
-            return (
-              <Meter
-                key={r.statId}
-                icon={<Icon className="h-3.5 w-3.5 text-accent shrink-0" />}
-                label={r.title}
-                valueText={`#${r.rank}`}
-                pct={pct}
-                tone="great"
-              />
-            );
-          })}
-        </ul>
+        <div className="flex flex-wrap justify-center gap-x-6 gap-y-5 sm:gap-x-8">
+          {sorted.map((r) => (
+            <RankingBadge key={r.statId} ranking={r} />
+          ))}
+        </div>
       </section>
     </div>
   );
@@ -231,6 +220,21 @@ function iconForCategory(title: string) {
   if (t.includes("point")) return Star;
   if (t.includes("hit")) return Shield;
   return Trophy;
+}
+
+function RankingBadge({ ranking }: { ranking: PlayerRanking }) {
+  const Icon = iconForCategory(ranking.title);
+  return (
+    <div className="flex flex-col items-center text-center w-20 sm:w-24">
+      <Icon className="h-7 w-7 text-accent" strokeWidth={2} />
+      <div className="mt-1.5 text-[9px] uppercase tracking-wider font-bold text-accent leading-tight line-clamp-2">
+        Top {ranking.title}
+      </div>
+      <div className="mt-1 text-sm font-extrabold tabular-nums leading-none">
+        #{ranking.rank}
+      </div>
+    </div>
+  );
 }
 
 // -------------------------- Sub-components --------------------------

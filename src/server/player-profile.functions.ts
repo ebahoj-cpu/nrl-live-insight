@@ -41,6 +41,7 @@ export const getPlayerProfile = createServerFn({ method: "POST" })
       const edge = computePerformanceEdge({
         position: profile.position ?? data.position,
         seasonStats: profile.seasonStats,
+        careerAppearances: profile.careerAppearances,
       });
       return { profile, edge, error: null };
     } catch (err) {

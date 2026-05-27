@@ -13,6 +13,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 
 import { TeamLogo } from "@/components/TeamLogo";
 import { getPlayerProfile, type PlayerProfilePayload } from "@/server/player-profile.functions";
+import type { PlayerRanking } from "@/server/stats-leaders";
 import type { SkillRating, EnergyTier } from "@/lib/performance-edge";
 import {
   Activity, Sword, Zap, Shield, Hand, Dumbbell, Footprints,

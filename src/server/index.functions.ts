@@ -428,11 +428,12 @@ export const getMatchPage = createServerFn({ method: "GET" })
     const homeNick = findTeam(details.homeTeam.nickName)?.nickname ?? details.homeTeam.nickName;
     const awayNick = findTeam(details.awayTeam.nickName)?.nickname ?? details.awayTeam.nickName;
 
-    const [oddsResult, weather, homeRecaps, awayRecaps] = await Promise.all([
+    const [oddsResult, weather, homeRecaps, awayRecaps, recentH2H] = await Promise.all([
       safeOdds(data.refresh),
       safeWeather(data.matchId, details.venue, details.venueCity, details.kickoffUtc, data.refresh),
       safeRecaps(details.homeTeam.recentForm, data.refresh),
       safeRecaps(details.awayTeam.recentForm, data.refresh),
+      recentH2HP,
     ]);
 
     let odds: OddsEvent | null = oddsResult.data.find((e) => {

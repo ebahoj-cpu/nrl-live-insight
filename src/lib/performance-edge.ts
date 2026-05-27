@@ -93,14 +93,6 @@ function perGame(total: number, apps: number): number {
   return apps > 0 ? total / apps : 0;
 }
 
-function baseStamina(s: PlayerSeasonStats): number {
-  // tackles + runs per minute. Without minutes we approximate using
-  // tackles + runs per appearance and benchmark vs 35 (elite workload).
-  const tackles = perGame(s.tacklesMade, s.appearances);
-  const runs = perGame(s.totalRunMetres / 9, s.appearances); // ~9m per run avg
-  const work = tackles + runs;
-  return clamp((work / 35) * 100);
-}
 
 function baseAttack(s: PlayerSeasonStats): number {
   const tries = perGame(s.tries, s.appearances);

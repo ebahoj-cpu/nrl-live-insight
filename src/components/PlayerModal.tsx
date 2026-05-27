@@ -19,6 +19,7 @@ import {
   Activity, Sword, Zap, Shield, Hand, Dumbbell, Footprints,
   Hand as HandIcon, User2, BatteryFull, BatteryLow,
   Cake, Ruler, Weight as WeightIcon, TrendingUp,
+  Trophy, Flame, Target, Swords, Move, Hand as HandIcon2, Wind, Crosshair, ShieldCheck, Star,
 } from "lucide-react";
 
 export type OpenPlayerArgs = {

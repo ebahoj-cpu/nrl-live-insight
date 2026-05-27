@@ -429,6 +429,42 @@ function rankTryscorers(inp: EngineInputs, home: TeamSeasonStats, away: TeamSeas
     return null;
   };
 
+  // NRL.com leaderboard boost lookup — multiplies the candidate's final
+  // tryscorer-ranking score when the player appears in attack-oriented
+  // top-5 lists (tries, line breaks, tackle breaks, try assists, points,
+  // metres). A #1 finisher gets a meaningful but bounded bump.
+  const leaderboards = inp.leaderboards ?? null;
+  const ATTACK_CATS = /try|line ?break|tackle ?break|bust|assist|point|metre/i;
+  const leaderboardBoostFor = (firstName: string, lastName: string): { mult: number; topHit: { title: string; rank: number } | null } => {
+    if (!leaderboards) return { mult: 1, topHit: null };
+    const slug = `${firstName}-${lastName}`
+      .toLowerCase()
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+      .replace(/['’`.]/g, "")
+      .replace(/[^a-z0-9-]/g, "");
+    const nameKey = `${firstName} ${lastName}`
+      .toLowerCase()
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+      .replace(/['’`.]/g, "")
+      .replace(/[^a-z0-9 ]/g, "")
+      .trim();
+    const entries = leaderboards.get(slug) ?? leaderboards.get(nameKey) ?? [];
+    if (entries.length === 0) return { mult: 1, topHit: null };
+    let mult = 1;
+    let best: { title: string; rank: number } | null = null;
+    for (const e of entries) {
+      if (!ATTACK_CATS.test(e.title)) continue;
+      // #1=+30%, #2=+22%, #3=+16%, #4=+11%, #5=+7%
+      const bump = Math.max(0, 0.30 - (e.rank - 1) * 0.06);
+      mult *= 1 + bump;
+      if (!best || e.rank < best.rank) best = { title: e.title, rank: e.rank };
+    }
+    // Cap so a player in 4 categories doesn't run away with the model
+    mult = Math.min(mult, 1.55);
+    return { mult, topHit: best };
+  };
+
+
   const rows: RankedRow[] = [];
 
   const considerSquad = (squad: NrlPlayer[], teamNick: string, teamSeason: TeamSeasonStats, oppSeason: TeamSeasonStats, isWinner: boolean, byId: Map<number, PlayerSeasonStats>, byName: Map<string, PlayerSeasonStats>) => {

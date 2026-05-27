@@ -472,20 +472,8 @@ function TeamColumn({ name, themeKey }: { name: string; themeKey: string; positi
   );
 }
 
-function OddsPill({ odds, isFav }: { odds: { price: number; book: string } | null; isFav: boolean }) {
-  if (!odds) {
-    return (
-      <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-surface-2 text-[11px] font-bold tabular-nums text-muted-foreground border border-border shrink-0">—</span>
-    );
-  }
-  return (
-    <span
-      className="inline-flex items-center px-3 py-1 rounded-full bg-accent !text-black text-[12px] font-black tabular-nums tracking-tight shadow-[0_4px_14px_-4px_color-mix(in_oklab,var(--accent)_60%,transparent)] shrink-0"
-      title={`Best price: ${odds.book}${isFav ? " · favourite" : ""}`}
-    >
-      {odds.price.toFixed(2)}
-    </span>
-  );
+function OddsPill(_: { odds: { price: number; book: string } | null; isFav: boolean }) {
+  return null;
 }
 
 function shortWeather(c: string): string {
@@ -1280,7 +1268,7 @@ function CombinedFieldPanel({ home, away, teamNews }: {
 
   return (
     <section className="card-surface p-3 sm:p-5 space-y-4">
-      {/* Combined pitch: home top half, away bottom half (mirrored) */}
+      {/* Combined pitch: home top half, halfway line + padding, away bottom half (mirrored) */}
       <div
         className="relative rounded-2xl px-2 py-5 sm:py-7 ring-1 ring-white/10 shadow-inner overflow-hidden"
         style={{
@@ -1290,14 +1278,17 @@ function CombinedFieldPanel({ home, away, teamNews }: {
       >
         <div className="pointer-events-none absolute inset-x-3 top-3 h-px bg-white/40" />
         <div className="pointer-events-none absolute inset-x-3 bottom-3 h-px bg-white/40" />
-        <div className="pointer-events-none absolute inset-x-3 top-1/2 h-px bg-white/60" />
 
         {/* Home half (top) — accent uses team theme via wrapper */}
         <div className="relative" data-theme-team={home.themeKey}>
           <HalfFormation team={home} {...homeOuts} mirror={false} />
         </div>
+
+        {/* Halfway line — sits between halves with breathing room on both sides */}
+        <div className="my-10 sm:my-14 h-px bg-white/60 mx-3" />
+
         {/* Away half (bottom, mirrored) */}
-        <div className="relative mt-14 sm:mt-20" data-theme-team={away.themeKey}>
+        <div className="relative pb-2 sm:pb-4" data-theme-team={away.themeKey}>
           <HalfFormation team={away} {...awayOuts} mirror={true} />
         </div>
       </div>
@@ -2550,7 +2541,7 @@ function TryscorerTeamColumn({ title, picks, accent }: { title: string; picks: A
             <li key={`${p.name}-${i}`} className="flex items-center gap-2">
               <span className="kbd h-5 w-5 rounded-full bg-surface-2 text-[10px] font-bold flex items-center justify-center shrink-0">{i + 1}</span>
               <span className="text-sm font-semibold truncate flex-1">{p.name}</span>
-              <span className="text-xs font-black tabular-nums px-2 py-0.5 rounded-full bg-accent !text-white border border-accent shadow-[0_2px_8px_-2px_color-mix(in_oklab,var(--accent)_60%,transparent)]">{p.price.toFixed(2)}</span>
+              {null}
             </li>
           ))}
         </ul>
@@ -2570,7 +2561,7 @@ function MultiTryscorerCard({ insights, tryscorers }: { insights: any; tryscorer
             <li key={i} className="flex items-center gap-3 text-sm">
               <span className="kbd w-5 text-center text-[11px] font-bold text-muted-foreground">{i + 1}</span>
               <span className="flex-1 font-medium truncate">{p.player}</span>
-              <span className="text-xs font-black tabular-nums px-2 py-0.5 rounded-full bg-accent !text-white border border-accent shadow-[0_2px_8px_-2px_color-mix(in_oklab,var(--accent)_60%,transparent)]">{p.price.toFixed(2)}</span>
+              {null}
             </li>
           ))}
         </ul>
@@ -2731,11 +2722,7 @@ function InsightsTab({ matchId, insights, insightsError, insightsLoading, home, 
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Projected winner</div>
             <div className="text-lg font-black truncate">{winnerNick}</div>
           </div>
-          {winnerPrice ? (
-            <span className="text-base font-black tabular-nums px-3 py-1.5 rounded-full bg-accent !text-white border border-accent shadow-[0_2px_8px_-2px_color-mix(in_oklab,var(--accent)_60%,transparent)] shrink-0">
-              {winnerPrice.price.toFixed(2)}
-            </span>
-          ) : null}
+          {null}
         </div>
         <p className="font-chat text-sm leading-relaxed text-foreground/90">{det.matchWinner?.reasoning}</p>
       </Card>
@@ -3071,9 +3058,7 @@ function OutlookCell({ label, pick, price, accent }: { label: string; pick: stri
     <div className={`rounded-lg p-3 border ${accent ? "bg-accent/10 border-accent/30" : "bg-surface-2 border-border/40"}`}>
       <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">{label}</div>
       <div className={`text-sm font-black mt-1 leading-tight ${accent ? "text-accent" : "text-foreground"}`}>{pick}</div>
-      {price ? (
-        <div className="mt-1.5 text-[11px] font-black tabular-nums inline-block px-1.5 py-0.5 rounded-full bg-accent !text-white border border-accent shadow-[0_2px_8px_-2px_color-mix(in_oklab,var(--accent)_60%,transparent)]">{price}</div>
-      ) : null}
+      {null}
     </div>
   );
 }

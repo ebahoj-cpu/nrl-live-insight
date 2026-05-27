@@ -1176,6 +1176,10 @@ function StatsTab({ home, away, homeRow, awayRow, statGroups, recentRecaps, rece
           </div>
         </Card>
       ))}
+
+      {recentH2H && recentH2H.length > 0 && (
+        <HeadToHeadCard home={home} away={away} matches={recentH2H} />
+      )}
     </div>
   );
 }

@@ -146,6 +146,9 @@ export function PlayerProfileCard({ args, payload, loading }: {
         </div>
       </div>
 
+      {/* NRL.com leaderboard rankings */}
+      <RankingBadges rankings={payload?.rankings ?? []} loading={loading} />
+
       {/* Performance Edge */}
       <div className="px-4 sm:px-6 pt-6 pb-6">
         <PerformanceEdgeSection edge={edge} loading={loading} profile={profile} />

@@ -181,7 +181,6 @@ function BioCircle({ icon, label, value, unit }: { icon: ReactNode; label: strin
 // -------------------------- Performance Edge --------------------------
 
 const SKILL_ICONS = {
-  stamina:  Activity,
   attack:   Sword,
   agility:  Zap,
   defence:  Shield,

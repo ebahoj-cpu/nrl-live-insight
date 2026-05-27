@@ -211,3 +211,32 @@ export function rankingsForPlayer(
   }
   return out;
 }
+
+// Build a player-keyed map of top-5 leaderboard finishes. Keyed by URL slug
+// (primary) and a normalised "firstname lastname" key (fallback) so insights
+// callers can look up either way. Used by the insights engine to apply a
+// scoring boost to players ranked in attack-oriented categories.
+export type PlayerLeaderboardMap = Map<string, { title: string; rank: number; value: string }[]>;
+
+export function buildPlayerLeaderboardMap(boards: Leaderboards): PlayerLeaderboardMap {
+  const map: PlayerLeaderboardMap = new Map();
+  const push = (key: string, entry: { title: string; rank: number; value: string }) => {
+    const arr = map.get(key) ?? [];
+    arr.push(entry);
+    map.set(key, arr);
+  };
+  for (const g of boards.groups) {
+    g.leaders.forEach((l, idx) => {
+      const entry = { title: g.title, rank: idx + 1, value: String(l.value) };
+      if (l.url) {
+        // URL form: /players/{team}/{slug}/ — pull the slug segment.
+        const parts = l.url.split("/").filter(Boolean);
+        const slug = parts[parts.length - 1];
+        if (slug) push(slug.toLowerCase(), entry);
+      }
+      const nameKey = `${normalize(l.firstName || "")} ${normalize(l.lastName || "")}`.trim();
+      if (nameKey) push(nameKey, entry);
+    });
+  }
+  return map;
+}

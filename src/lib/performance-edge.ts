@@ -34,7 +34,7 @@
 import type { PlayerSeasonStats } from "@/server/player-profile";
 
 export type SkillKey =
-  | "stamina" | "attack" | "agility" | "defence"
+  | "attack" | "agility" | "defence"
   | "handling" | "strength" | "kicking";
 
 export type SkillRating = {
@@ -42,20 +42,22 @@ export type SkillRating = {
   label: string;
   base: number;        // 0-100 before modifiers
   final: number;       // 0-100 after modifiers
-  word: string;        // "Marvelous" | "Superior" | ... | "Poor"
-  // color is a CSS variable name we already define in the design system
-  // so the UI doesn't hardcode colours.
+  word: string;
   tone: "great" | "good" | "ok" | "low";
 };
 
 export type EnergyTier = "Supercharged" | "High" | "Moderate" | "Tired" | "Fatigued";
 export type FormTier = "Red Hot" | "Good Form" | "Average" | "Below Average" | "Cold";
+export type ExperienceTier =
+  | "ROOKIE" | "EMERGING" | "ESTABLISHED" | "SEASONED"
+  | "VETERAN" | "STALWART" | "LEGEND";
 
 export type PerformanceEdge = {
   skills: SkillRating[];
   energy: { tier: EnergyTier; modifier: number; minutesPerGame: number | null };
   form: { tier: FormTier; modifier: number };
-  overall: number;             // average of 7 finals
+  experience: { tier: ExperienceTier; pct: number; caps: number };
+  overall: number;
 };
 
 // ---------- Position grouping --------------------------------------------
@@ -72,7 +74,6 @@ function groupForPosition(position: string | null | undefined): PositionGroup {
 
 // weights: multiplier applied to the base 0-100 score. 1.0 = neutral.
 const WEIGHTS: Record<SkillKey, Record<PositionGroup, number>> = {
-  stamina:  { forward: 1.10, spine: 1.05, back: 0.95, edge: 1.00 },
   attack:   { forward: 0.85, spine: 1.15, back: 1.10, edge: 1.00 },
   agility:  { forward: 0.85, spine: 1.05, back: 1.20, edge: 1.05 },
   defence:  { forward: 1.10, spine: 0.95, back: 0.90, edge: 1.05 },
@@ -92,14 +93,6 @@ function perGame(total: number, apps: number): number {
   return apps > 0 ? total / apps : 0;
 }
 
-function baseStamina(s: PlayerSeasonStats): number {
-  // tackles + runs per minute. Without minutes we approximate using
-  // tackles + runs per appearance and benchmark vs 35 (elite workload).
-  const tackles = perGame(s.tacklesMade, s.appearances);
-  const runs = perGame(s.totalRunMetres / 9, s.appearances); // ~9m per run avg
-  const work = tackles + runs;
-  return clamp((work / 35) * 100);
-}
 
 function baseAttack(s: PlayerSeasonStats): number {
   const tries = perGame(s.tries, s.appearances);
@@ -167,20 +160,27 @@ export function energyTier(minutesPerGame: number | null): EnergyTier {
   return "Fatigued";
 }
 
-function energyModifier(tier: EnergyTier): number {
-  switch (tier) {
-    case "Supercharged": return 1.12;
-    case "High":         return 1.05;
-    case "Moderate":     return 1.00;
-    case "Tired":        return 0.92;
-    case "Fatigued":     return 0.85;
-  }
+function calculateEnergy(
+  s: PlayerSeasonStats,
+): { tier: EnergyTier; modifier: number; minutesPerGame: number | null } {
+  const mpg = s.minutesPerGame;
+  const gamesMissed = Math.max(0, 27 - (s.appearances ?? 0));
+
+  let baseMod = 1.0;
+  if (mpg != null && mpg < 40) baseMod = 1.15;       // fresh / bench
+  else if (mpg != null && mpg > 75) baseMod = 0.88;  // heavy workload
+
+  const finalMod = Math.max(0.75, Math.min(1.25, baseMod * (1 - gamesMissed * 0.008)));
+
+  const tier: EnergyTier =
+    finalMod > 1.12 ? "Supercharged" :
+    finalMod > 1.05 ? "High" :
+    finalMod > 0.95 ? "Moderate" :
+    finalMod > 0.85 ? "Tired" : "Fatigued";
+
+  return { tier, modifier: finalMod, minutesPerGame: mpg };
 }
 
-// We don't have per-round splits, so derive a form tier from
-// (recent average points or tries) vs season average. The caller can pass a
-// `recentMultiplier` override (e.g. 1.2 = 20% above season pace in last 4-6
-// games). Until we wire per-round data, default to 1.0 (Average).
 export function formTier(recentMultiplier: number): FormTier {
   if (recentMultiplier >= 1.25) return "Red Hot";
   if (recentMultiplier >= 1.10) return "Good Form";
@@ -197,6 +197,32 @@ function formModifier(tier: FormTier): number {
     case "Below Average": return 0.92;
     case "Cold":          return 0.85;
   }
+}
+
+// ---------- Experience ----------------------------------------------------
+
+function experienceTierFromCaps(caps: number): { tier: ExperienceTier; pct: number } {
+  const pct = Math.max(2, Math.min(100, (caps / 250) * 100));
+  let tier: ExperienceTier;
+  if (caps <= 20) tier = "ROOKIE";
+  else if (caps <= 50) tier = "EMERGING";
+  else if (caps <= 75) tier = "ESTABLISHED";
+  else if (caps <= 100) tier = "SEASONED";
+  else if (caps <= 150) tier = "VETERAN";
+  else if (caps <= 200) tier = "STALWART";
+  else tier = "LEGEND";
+  return { tier, pct };
+}
+
+const EXP_BOOST: Record<ExperienceTier, number> = {
+  ROOKIE: 0, EMERGING: 0.5, ESTABLISHED: 1.5, SEASONED: 2.5,
+  VETERAN: 3.5, STALWART: 4.5, LEGEND: 5,
+};
+
+function experienceModifier(tier: ExperienceTier, skillKey: SkillKey): number {
+  const boost = EXP_BOOST[tier] / 100;
+  if (skillKey === "defence" || skillKey === "handling") return 1 + boost * 1.2;
+  return 1 + boost * 0.3;
 }
 
 // ---------- Descriptive word ---------------------------------------------
@@ -216,18 +242,18 @@ export function describe(final: number): { word: string; tone: SkillRating["tone
 export function computePerformanceEdge(args: {
   position: string | null | undefined;
   seasonStats: PlayerSeasonStats;
-  recentMultiplier?: number; // 1.0 default until per-round splits are wired
+  careerAppearances?: number;
+  recentMultiplier?: number;
 }): PerformanceEdge {
   const group = groupForPosition(args.position);
   const s = args.seasonStats;
-  const minutes = s.minutesPerGame;
-  const eTier = energyTier(minutes);
-  const eMod = energyModifier(eTier);
+  const energy = calculateEnergy(s);
   const fTier = formTier(args.recentMultiplier ?? 1.0);
   const fMod = formModifier(fTier);
+  const caps = args.careerAppearances ?? 0;
+  const exp = experienceTierFromCaps(caps);
 
   const SKILL_BASES: { key: SkillKey; label: string; base: number }[] = [
-    { key: "stamina",  label: "Stamina",       base: baseStamina(s)  },
     { key: "attack",   label: "Attack",        base: baseAttack(s)   },
     { key: "agility",  label: "Agility/Speed", base: baseAgility(s)  },
     { key: "defence",  label: "Defence",       base: baseDefence(s)  },
@@ -238,7 +264,8 @@ export function computePerformanceEdge(args: {
 
   const skills: SkillRating[] = SKILL_BASES.map(({ key, label, base }) => {
     const weighted = clamp(base * WEIGHTS[key][group]);
-    const final = clamp(weighted * eMod * fMod);
+    const expMod = experienceModifier(exp.tier, key);
+    const final = clamp(weighted * energy.modifier * fMod * expMod);
     const { word, tone } = describe(final);
     return { key, label, base: Math.round(weighted), final: Math.round(final), word, tone };
   });
@@ -247,8 +274,10 @@ export function computePerformanceEdge(args: {
 
   return {
     skills,
-    energy: { tier: eTier, modifier: eMod, minutesPerGame: minutes },
+    energy,
     form: { tier: fTier, modifier: fMod },
+    experience: { tier: exp.tier, pct: exp.pct, caps },
     overall,
   };
 }
+

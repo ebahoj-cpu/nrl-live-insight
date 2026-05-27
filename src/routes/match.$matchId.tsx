@@ -2553,7 +2553,7 @@ function TryscorerTeamColumn({ title, picks, accent }: { title: string; picks: A
             <li key={`${p.name}-${i}`} className="flex items-center gap-2">
               <span className="kbd h-5 w-5 rounded-full bg-surface-2 text-[10px] font-bold flex items-center justify-center shrink-0">{i + 1}</span>
               <span className="text-sm font-semibold truncate flex-1">{p.name}</span>
-              <span className="text-xs font-black tabular-nums px-2 py-0.5 rounded-full bg-accent !text-white border border-accent shadow-[0_2px_8px_-2px_color-mix(in_oklab,var(--accent)_60%,transparent)]">{p.price.toFixed(2)}</span>
+              {null}
             </li>
           ))}
         </ul>

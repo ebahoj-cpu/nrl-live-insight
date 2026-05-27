@@ -1128,10 +1128,6 @@ function StatsTab({ home, away, homeRow, awayRow, statGroups, recentRecaps, rece
   { home: any; away: any; homeRow?: any; awayRow?: any; statGroups: StatGroup[]; recentRecaps?: { home: any[]; away: any[] }; recentH2H?: RecentH2HMatch[] }) {
   return (
     <div className="space-y-4">
-      {recentH2H && recentH2H.length > 0 && (
-        <HeadToHeadCard home={home} away={away} matches={recentH2H} />
-      )}
-
       {(homeRow && awayRow) && (
         <Card title="Ladder side by side" icon={BarChart3}>
           <CompareRow label="Ladder position" h={`#${homeRow.position}`} a={`#${awayRow.position}`} />

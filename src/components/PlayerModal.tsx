@@ -19,6 +19,7 @@ import {
   Activity, Sword, Zap, Shield, Hand, Dumbbell, Footprints,
   Hand as HandIcon, User2, BatteryFull, BatteryLow,
   Cake, Ruler, Weight as WeightIcon, TrendingUp,
+  Trophy, Flame, Target, Swords, Wind, Crosshair, ShieldCheck, Star,
 } from "lucide-react";
 
 export type OpenPlayerArgs = {
@@ -187,11 +188,13 @@ function RankingBadges({ rankings, loading }: { rankings: PlayerRanking[]; loadi
   // Sort by best rank first, then by category title
   const sorted = [...rankings].sort((a, b) => a.rank - b.rank || a.title.localeCompare(b.title));
   return (
-    <div className="px-4 sm:px-6 pt-5">
-      <div className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground font-bold text-center mb-2">
-        NRL.com 2026 Leaderboards
+    <div className="px-4 sm:px-6 pt-6">
+      <div className="mb-4 pb-3 border-b border-accent/20 text-center">
+        <h3 className="font-display font-extrabold uppercase tracking-wider text-lg sm:text-xl whitespace-nowrap">
+          Top <span className="text-accent">Leaderboards</span>
+        </h3>
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 max-w-md sm:max-w-2xl mx-auto">
+      <div className="grid grid-cols-4 gap-3 sm:gap-4 max-w-md sm:max-w-2xl mx-auto">
         {sorted.map((r) => (
           <RankingBadge key={r.statId} ranking={r} />
         ))}
@@ -200,26 +203,34 @@ function RankingBadges({ rankings, loading }: { rankings: PlayerRanking[]; loadi
   );
 }
 
+// Map an NRL.com leaderboard category title to a representative icon.
+function iconForCategory(title: string) {
+  const t = title.toLowerCase();
+  if (t.includes("try")) return Trophy;
+  if (t.includes("linebreak")) return Zap;
+  if (t.includes("tackle break") || t.includes("bust")) return Flame;
+  if (t.includes("offload")) return Hand;
+  if (t.includes("run metre") || t.includes("metres")) return Wind;
+  if (t.includes("post-contact") || t.includes("post contact")) return Swords;
+  if (t.includes("tackle")) return ShieldCheck;
+  if (t.includes("kick")) return Footprints;
+  if (t.includes("goal") || t.includes("conversion")) return Crosshair;
+  if (t.includes("assist")) return Target;
+  if (t.includes("point")) return Star;
+  if (t.includes("hit")) return Shield;
+  return Trophy;
+}
+
 function RankingBadge({ ranking }: { ranking: PlayerRanking }) {
-  const r = ranking.rank;
-  const tone =
-    r === 1 ? "border-accent bg-accent/15 text-accent"
-    : r === 2 ? "border-amber-400/60 bg-amber-400/10 text-amber-300"
-    : r === 3 ? "border-orange-400/50 bg-orange-400/10 text-orange-300"
-    : "border-border bg-surface-2/60 text-foreground";
+  const Icon = iconForCategory(ranking.title);
   return (
-    <div className={`flex items-center justify-between gap-2 rounded-lg border px-2.5 py-1.5 ${tone}`}>
-      <div className="min-w-0">
-        <div className="text-[9px] uppercase tracking-wider font-bold opacity-80 truncate">
-          {ranking.section}
-        </div>
-        <div className="text-[11px] font-extrabold leading-tight truncate">
-          {ranking.title}
-        </div>
+    <div className="flex flex-col items-center text-center gap-1 px-1">
+      <Icon className="h-7 w-7 text-accent" strokeWidth={2} />
+      <div className="text-[9px] uppercase tracking-wider font-bold text-accent leading-tight">
+        Top {ranking.title}
       </div>
-      <div className="flex flex-col items-end shrink-0">
-        <span className="text-base font-extrabold leading-none tabular-nums">#{ranking.rank}</span>
-        <span className="text-[9px] opacity-70 tabular-nums">{ranking.value}</span>
+      <div className="text-sm font-extrabold tabular-nums leading-none">
+        #{ranking.rank}
       </div>
     </div>
   );

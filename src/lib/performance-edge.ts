@@ -34,7 +34,7 @@
 import type { PlayerSeasonStats } from "@/server/player-profile";
 
 export type SkillKey =
-  | "stamina" | "attack" | "agility" | "defence"
+  | "attack" | "agility" | "defence"
   | "handling" | "strength" | "kicking";
 
 export type SkillRating = {
@@ -42,20 +42,22 @@ export type SkillRating = {
   label: string;
   base: number;        // 0-100 before modifiers
   final: number;       // 0-100 after modifiers
-  word: string;        // "Marvelous" | "Superior" | ... | "Poor"
-  // color is a CSS variable name we already define in the design system
-  // so the UI doesn't hardcode colours.
+  word: string;
   tone: "great" | "good" | "ok" | "low";
 };
 
 export type EnergyTier = "Supercharged" | "High" | "Moderate" | "Tired" | "Fatigued";
 export type FormTier = "Red Hot" | "Good Form" | "Average" | "Below Average" | "Cold";
+export type ExperienceTier =
+  | "ROOKIE" | "EMERGING" | "ESTABLISHED" | "SEASONED"
+  | "VETERAN" | "STALWART" | "LEGEND";
 
 export type PerformanceEdge = {
   skills: SkillRating[];
   energy: { tier: EnergyTier; modifier: number; minutesPerGame: number | null };
   form: { tier: FormTier; modifier: number };
-  overall: number;             // average of 7 finals
+  experience: { tier: ExperienceTier; pct: number; caps: number };
+  overall: number;
 };
 
 // ---------- Position grouping --------------------------------------------

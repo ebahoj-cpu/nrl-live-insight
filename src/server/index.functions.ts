@@ -10,7 +10,7 @@
 
 import { createServerFn } from "@tanstack/react-start";
 import { cached, TTL, insightsTtlMs } from "./cache";
-import { fetchDraw, fetchLadder, fetchMatchDetails, fetchMatchRecap, matchIdToPath, type NrlFixture, type NrlMatchRecap } from "./nrl";
+import { fetchDraw, fetchLadder, fetchMatchDetails, fetchMatchRecap, fetchRecentH2H, matchIdToPath, type NrlFixture, type NrlMatchRecap, type RecentH2HMatch } from "./nrl";
 import { buildEstimatedOdds, fetchNrlOdds, fetchEventOdds, fetchTryscorerOdds, type OddsEvent, type TryscorerMarkets } from "./odds";
 import { generateInsights, type RealOdds, type Insights } from "./ai-insights";
 import { fetchVenueWeather, type WeatherSnapshot } from "./weather";

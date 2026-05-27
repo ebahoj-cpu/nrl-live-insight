@@ -164,21 +164,35 @@ function calculateEnergy(s: PlayerSeasonStats): { tier: EnergyTier; modifier: nu
 }
 
 // ==================== FORM ====================
+// Form should reward whichever way a player dominates — outside backs through
+// tries/breaks, forwards through metres/PCM/tackle busts/offloads/tackles.
 function calculateForm(s: PlayerSeasonStats): { tier: FormTier; modifier: number } {
-  const triesPerGame = perGame(s.tries, s.appearances);
-  const breaksPerGame = perGame(s.lineBreaks, s.appearances);
-  const metresPerGame = perGame(s.totalRunMetres, s.appearances);
-  const tbPerGame = perGame(s.tackleBreaks, s.appearances);
+  const tries = perGame(s.tries, s.appearances);
+  const breaks = perGame(s.lineBreaks, s.appearances);
+  const metres = perGame(s.totalRunMetres, s.appearances);
+  const pcm = perGame(s.postContactMetres, s.appearances);
+  const tb = perGame(s.tackleBreaks, s.appearances);
+  const offloads = perGame(s.offloads, s.appearances);
+  const tackles = perGame(s.tacklesMade, s.appearances);
 
-  const formScore = (triesPerGame * 35) + (breaksPerGame * 25) + (metresPerGame / 12) + (tbPerGame * 12);
+  // Calibrated so a 150m / 60 PCM / 3 TB / 30 tackle / 1.5 offload prop lands
+  // in Good Form, and a 2-try-a-game winger lands in Red Hot.
+  const formScore =
+    (tries * 30) +
+    (breaks * 22) +
+    (metres / 6) +        // 150m → 25 pts
+    (pcm / 8) +           // 60m  → 7.5 pts
+    (tb * 10) +           // 3/g  → 30 pts
+    (offloads * 9) +      // 1.5  → 13.5 pts
+    (tackles / 3);        // 30/g → 10 pts
 
   let tier: FormTier = "Average";
   let mod = 1.0;
 
-  if (formScore > 110) { tier = "Red Hot"; mod = 1.22; }
-  else if (formScore > 80) { tier = "Good Form"; mod = 1.12; }
-  else if (formScore > 55) { tier = "Average"; mod = 1.00; }
-  else if (formScore > 35) { tier = "Below Average"; mod = 0.88; }
+  if (formScore > 130) { tier = "Red Hot"; mod = 1.22; }
+  else if (formScore > 95) { tier = "Good Form"; mod = 1.12; }
+  else if (formScore > 65) { tier = "Average"; mod = 1.00; }
+  else if (formScore > 45) { tier = "Below Average"; mod = 0.88; }
   else { tier = "Cold"; mod = 0.78; }
 
   return { tier, modifier: mod };

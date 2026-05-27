@@ -227,7 +227,7 @@ function PerformanceEdgeSection({ edge, loading, profile }: {
         <Meter
           icon={<Activity className="h-3.5 w-3.5 text-accent shrink-0" />}
           label="Experience"
-          valueText={loading ? "…" : exp.tier}
+          valueText={loading ? "…" : `${exp.tier} · ${exp.caps} caps`}
           pct={exp.pct}
           tone="ok"
         />

@@ -1421,7 +1421,7 @@ function InterchangeCell({ p, team, side }: { p?: FieldP; team: TeamShape; side:
 const JERSEY_POSITION_SHORT: Record<number, string> = {
   1: "FB", 2: "RW", 3: "RC", 4: "LC", 5: "LW",
   6: "FE", 7: "HLF", 8: "PR", 9: "HK", 10: "PR",
-  11: "2R", 12: "L2R", 13: "LK",
+  11: "R2R", 12: "L2R", 13: "LK",
 };
 
 

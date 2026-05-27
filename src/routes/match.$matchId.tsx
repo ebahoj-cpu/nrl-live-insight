@@ -1074,7 +1074,7 @@ function SquadPanel({ team, news }: { team: { nickName: string; themeKey: string
 
   function SquadPanelInner(props: {
     team: typeof team; sorted: P[]; starters: P[]; interchange: P[]; reserves: P[]; unnumbered: P[];
-    renderRow: (p: P, i: number) => React.ReactElement;
+    renderRow: (p: P, i: number) => ReactElement;
     officialOutsLc: Set<string>; newsOutsByName: Map<string, NewsOut>;
   }) {
     const [view, setView] = useState<"list" | "field">("list");

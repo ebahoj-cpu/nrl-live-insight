@@ -1297,7 +1297,7 @@ function CombinedFieldPanel({ home, away, teamNews }: {
           <HalfFormation team={home} {...homeOuts} mirror={false} />
         </div>
         {/* Away half (bottom, mirrored) */}
-        <div className="relative mt-4 sm:mt-6" data-theme-team={away.themeKey}>
+        <div className="relative mt-14 sm:mt-20" data-theme-team={away.themeKey}>
           <HalfFormation team={away} {...awayOuts} mirror={true} />
         </div>
       </div>

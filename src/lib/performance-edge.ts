@@ -109,29 +109,48 @@ function baseKicking(s: PlayerSeasonStats): number {
   return clamp(score);
 }
 
-// ==================== ENERGY ====================
+// ==================== ENERGY — NOW SMART FOR LOW-GAME PLAYERS ====================
 function calculateEnergy(s: PlayerSeasonStats): { tier: EnergyTier; modifier: number; minutesPerGame: number | null } {
+  const appearances = Math.max(1, s.appearances ?? 0);
   const mpg = s.minutesPerGame ?? 65;
 
   let baseMod = 1.0;
-  if (mpg < 45) baseMod = 1.18;
-  else if (mpg < 65) baseMod = 1.08;
-  else if (mpg <= 78) baseMod = 1.00;
-  else baseMod = 0.92;
+  // Workload tiers (most starters land on Moderate/High)
+  if (mpg < 45) baseMod = 1.22;           // bench / very fresh
+  else if (mpg < 65) baseMod = 1.12;      // rotational
+  else if (mpg <= 78) baseMod = 1.02;     // normal starter
+  else if (mpg <= 82) baseMod = 0.98;     // slightly heavy
+  else baseMod = 0.94;                    // very heavy load
 
-  const gamesPlayed = s.appearances || 1;
-  const gamesMissed = Math.max(0, 27 - gamesPlayed);
-  const missedPenalty = Math.max(0.88, 1 - (gamesMissed / gamesPlayed) * 0.15);
+  // ── SMART GAMES-MISSED LOGIC ──
+  // Players with very few games (e.g. Ponga 2-3 games) treated as FRESH returners
+  let missedPenalty: number;
+  if (appearances <= 5) {
+    missedPenalty = 1.18;                 // fresh returnee bonus
+  } else {
+    const gamesMissed = Math.max(0, 27 - appearances);
+    missedPenalty = Math.max(0.92, 1 - (gamesMissed / 27) * 0.10); // very gentle
+  }
 
-  const finalMod = clamp(baseMod * missedPenalty, 0.85, 1.22);
+  // Hot form players feel fresher (inline form heuristic to avoid circular dep)
+  const triesPerGame = perGame(s.tries, s.appearances);
+  const breaksPerGame = perGame(s.lineBreaks, s.appearances);
+  const metresPerGame = perGame(s.totalRunMetres, s.appearances);
+  const tbPerGame = perGame(s.tackleBreaks, s.appearances);
+  const formScore = (triesPerGame * 35) + (breaksPerGame * 25) + (metresPerGame / 12) + (tbPerGame * 12);
+  const formBonus = formScore > 80 ? 1.08 : 1.0;
 
+  let finalMod = baseMod * missedPenalty * formBonus;
+  finalMod = clamp(finalMod, 0.88, 1.25);
+
+  // Tier — majority of the roster should now be Moderate or better
   const tier: EnergyTier =
-    finalMod > 1.12 ? "Supercharged" :
-    finalMod > 1.05 ? "High" :
-    finalMod > 0.96 ? "Moderate" :
-    finalMod > 0.90 ? "Tired" : "Fatigued";
+    finalMod > 1.14 ? "Supercharged" :
+    finalMod > 1.07 ? "High" :
+    finalMod > 0.97 ? "Moderate" :
+    finalMod > 0.92 ? "Tired" : "Fatigued";
 
-  return { tier, modifier: finalMod, minutesPerGame: s.minutesPerGame };
+  return { tier, modifier: finalMod, minutesPerGame: mpg };
 }
 
 // ==================== FORM ====================

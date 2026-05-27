@@ -194,7 +194,7 @@ function RankingBadges({ rankings, loading }: { rankings: PlayerRanking[]; loadi
           Top <span className="text-accent">Leaderboards</span>
         </h3>
       </div>
-      <div className="grid grid-cols-4 gap-x-3 gap-y-5 sm:gap-x-4 max-w-md sm:max-w-2xl mx-auto justify-items-center">
+      <div className="flex flex-wrap justify-center gap-x-6 gap-y-5 sm:gap-x-8 max-w-md sm:max-w-2xl mx-auto">
         {sorted.map((r) => (
           <RankingBadge key={r.statId} ranking={r} />
         ))}

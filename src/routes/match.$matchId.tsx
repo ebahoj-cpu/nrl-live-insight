@@ -1126,11 +1126,12 @@ type FieldP = { firstName: string; lastName: string; position: string; jerseyNum
 
 // Standard NRL formation, viewed from above (attack up). Each row's `cols` lists jersey numbers left→right.
 const FIELD_ROWS: { cols: number[] }[] = [
-  { cols: [5, 4, 1, 3, 2] },    // back five (fullback centred)
+  { cols: [1] },                 // fullback (alone at the top)
+  { cols: [2, 3, 4, 5] },        // back four — wings and centres
   { cols: [7, 6] },              // halves
   { cols: [13] },                // lock
-  { cols: [12, 11] },            // second row
-  { cols: [10, 9, 8] },          // front row
+  { cols: [11, 12] },            // second row
+  { cols: [8, 9, 10] },          // front row
 ];
 
 function FieldFormation({ team, players, officialOutsLc, newsOutsByName }: {
@@ -1354,10 +1355,10 @@ function HalfFormation({ team, players, officialOutsLc, newsOutsByName, mirror }
                     )}
                   </div>
                   <span
-                    className="absolute -top-1 -right-1 flex h-5 min-w-5 sm:h-6 sm:min-w-6 px-1 items-center justify-center rounded-full text-white text-[9px] sm:text-[10px] font-black uppercase tracking-wider shadow ring-2 ring-white/90"
+                    className="absolute -top-1 -right-1 flex h-5 min-w-5 sm:h-6 sm:min-w-6 px-1 items-center justify-center rounded-full text-white text-[10px] sm:text-xs font-black tabular-nums shadow ring-2 ring-white/90"
                     style={{ background: `var(--team-${team.themeKey}, var(--accent))` }}
                   >
-                    {JERSEY_POSITION_SHORT[n] ?? n}
+                    {n}
                   </span>
                 </div>
                 {p ? (

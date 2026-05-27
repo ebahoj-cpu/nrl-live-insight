@@ -209,10 +209,10 @@ const ENERGY_TONE: Record<EnergyTier, SkillRating["tone"]> = {
 function PerformanceEdgeSection({ edge, loading, profile }: {
   edge: PE | null | undefined; loading: boolean; profile: Profile | null | undefined;
 }) {
+  void profile;
   const formTier = edge?.form.tier ?? "Average";
   const energyT = edge?.energy.tier ?? "Moderate";
-  const caps = profile?.careerAppearances ?? 0;
-  const expPct = Math.max(5, Math.min(100, (caps / 250) * 100));
+  const exp = edge?.experience ?? { tier: "EMERGING" as const, pct: 20, caps: 0 };
   const EnergyIcon = energyT === "Fatigued" || energyT === "Tired" ? BatteryLow : BatteryFull;
 
   return (
@@ -227,8 +227,8 @@ function PerformanceEdgeSection({ edge, loading, profile }: {
         <Meter
           icon={<Activity className="h-3.5 w-3.5 text-accent shrink-0" />}
           label="Experience"
-          valueText={`${caps} caps`}
-          pct={expPct}
+          valueText={loading ? "…" : exp.tier}
+          pct={exp.pct}
           tone="ok"
         />
         <Meter
@@ -266,6 +266,8 @@ function PerformanceEdgeSection({ edge, loading, profile }: {
 function Meter({ icon, label, valueText, pct, tone }: {
   icon: ReactNode; label: string; valueText: string; pct: number; tone: SkillRating["tone"];
 }) {
+  const segments = 10;
+  const filled = Math.round((pct / 100) * segments);
   return (
     <li className="flex items-center gap-2">
       {icon}
@@ -274,18 +276,22 @@ function Meter({ icon, label, valueText, pct, tone }: {
           <span className="font-bold uppercase tracking-wider">{label}</span>
           <span className={`font-bold ${toneClass(tone)}`}>{valueText}</span>
         </div>
-        <div className="h-1.5 w-full rounded-full bg-surface-2 overflow-hidden">
-          <div className={`h-full transition-all ${toneBgClass(tone)}`} style={{ width: `${pct}%` }} />
+        <div className="flex gap-0.5">
+          {Array.from({ length: segments }).map((_, i) => (
+            <div
+              key={i}
+              className={`h-2.5 flex-1 rounded transition-all ${
+                i < filled ? toneBgClass(tone) : "bg-surface-2"
+              }`}
+            />
+          ))}
         </div>
       </div>
     </li>
   );
 }
 
-
-
 const PLACEHOLDER_SKILLS: SkillRating[] = [
-  { key: "stamina",  label: "Stamina",       base: 0, final: 0, word: "—", tone: "ok" },
   { key: "attack",   label: "Attack",        base: 0, final: 0, word: "—", tone: "ok" },
   { key: "agility",  label: "Agility/Speed", base: 0, final: 0, word: "—", tone: "ok" },
   { key: "defence",  label: "Defence",       base: 0, final: 0, word: "—", tone: "ok" },
@@ -293,6 +299,7 @@ const PLACEHOLDER_SKILLS: SkillRating[] = [
   { key: "strength", label: "Strength",      base: 0, final: 0, word: "—", tone: "ok" },
   { key: "kicking",  label: "Kicking",       base: 0, final: 0, word: "—", tone: "ok" },
 ];
+
 
 function toneClass(t: SkillRating["tone"]): string {
   switch (t) {

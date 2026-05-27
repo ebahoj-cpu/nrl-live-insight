@@ -74,7 +74,6 @@ function groupForPosition(position: string | null | undefined): PositionGroup {
 
 // weights: multiplier applied to the base 0-100 score. 1.0 = neutral.
 const WEIGHTS: Record<SkillKey, Record<PositionGroup, number>> = {
-  stamina:  { forward: 1.10, spine: 1.05, back: 0.95, edge: 1.00 },
   attack:   { forward: 0.85, spine: 1.15, back: 1.10, edge: 1.00 },
   agility:  { forward: 0.85, spine: 1.05, back: 1.20, edge: 1.05 },
   defence:  { forward: 1.10, spine: 0.95, back: 0.90, edge: 1.05 },

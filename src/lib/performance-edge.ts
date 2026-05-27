@@ -125,9 +125,7 @@ function calculateEnergy(s: PlayerSeasonStats): { tier: EnergyTier; modifier: nu
 
   const appearances = Math.max(1, s.appearances ?? 0);
 
-  const mpg = s.minutesPerGame ?? (s.minutesPlayed && appearances 
-    ? Math.round(s.minutesPlayed / appearances) 
-    : 65);
+  const mpg = s.minutesPerGame ?? 65;
 
   // SUPER lenient workload logic — most starters should be Moderate/High
 

@@ -529,6 +529,17 @@ function rankTryscorers(inp: EngineInputs, home: TeamSeasonStats, away: TeamSeas
       const oddsFloor = price && price > 0 && price < 8 ? 0.6 : 0;
       let finalScore = baseScore + oddsFloor;
 
+      // ---- NRL.com leaderboard boost ----
+      // Dally-M leaders / top tryscorers / top metres etc. get a meaningful
+      // (capped) multiplier so the model surfaces them ahead of similarly
+      // priced players without leaderboard credentials.
+      const [bFirst, ...bRest] = c.name.split(/\s+/);
+      const bLast = bRest.join(" ");
+      const { mult: leaderboardMult, topHit: leaderboardHit } = leaderboardBoostFor(bFirst || "", bLast || "");
+      if (leaderboardMult > 1) {
+        finalScore *= leaderboardMult;
+      }
+
       // ---- Role gates ----
       if (role === "wing" || role === "centre") {
         finalScore *= 1.05; // headline scoring lanes
@@ -540,11 +551,13 @@ function rankTryscorers(inp: EngineInputs, home: TeamSeasonStats, away: TeamSeas
         const hasEdge = recentTries > 0 || lineBreaks >= 1.5 || tackleBusts >= 4 || (price !== null && price < 9);
         if (!hasEdge) finalScore *= 0.75;
       } else if (role === "middle") {
-        // Props / hookers / locks: cap unless real signal
+        // Props / hookers / locks: cap unless real signal — but a top-5
+        // leaderboard finish counts as a real signal.
         const hasSignal =
           recentTries >= 1 ||
           firstTeamTries >= 2 ||
           (price !== null && price < 8) ||
+          leaderboardHit !== null ||
           (isWinner && teamSeason.scoringEfficiency > 4.5);
         if (!hasSignal) finalScore = Math.min(finalScore, 1.5);
       }

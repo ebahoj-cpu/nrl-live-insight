@@ -2802,11 +2802,6 @@ function InsightsTab({ matchId, insights, insightsError, insightsLoading, home, 
             )}
           </div>
           <div className="flex flex-col items-center gap-1.5">
-            {firstTryPrice != null ? (
-              <span className="text-lg font-black tabular-nums px-3 py-1.5 rounded-full bg-accent !text-white border border-accent shadow-[0_2px_8px_-2px_color-mix(in_oklab,var(--accent)_60%,transparent)]">
-                {firstTryPrice.toFixed(2)}
-              </span>
-            ) : null}
             <AnytimeOddsTag price={getAnytime(det.firstTryscorer?.name)} />
           </div>
         </div>

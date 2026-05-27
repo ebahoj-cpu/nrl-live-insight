@@ -43,8 +43,17 @@ export function AuthGate({ children }: { children: ReactNode }) {
 
   if (!session) return <LoginScreen />;
 
-  if (!isPremium && !isFreePath(pathname)) {
-    return <PremiumGate />;
+  // On a premium route, never flash the gate while the profile (which carries
+  // is_premium) is still loading — wait for auth to fully resolve first.
+  if (!isFreePath(pathname)) {
+    if (loading) {
+      return (
+        <div className="flex min-h-[60vh] items-center justify-center text-muted-foreground text-sm">
+          Loading…
+        </div>
+      );
+    }
+    if (!isPremium) return <PremiumGate />;
   }
 
   return <>{children}</>;

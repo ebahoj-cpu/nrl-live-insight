@@ -1254,6 +1254,176 @@ function FieldFormation({ team, players, officialOutsLc, newsOutsByName }: {
   );
 }
 
+type TeamShape = { nickName: string; themeKey: string; players: FieldP[] };
+
+function CombinedFieldPanel({ home, away, teamNews }: {
+  home: TeamShape; away: TeamShape;
+  teamNews?: { home: TeamNews; away: TeamNews };
+}) {
+  const outsFor = (news?: TeamNews) => {
+    const officialOutsLc = new Set((news?.outs ?? []).map((n) => n.toLowerCase()));
+    const newsOutsByName = new Map<string, NewsOut>();
+    for (const o of news?.newsOuts ?? []) newsOutsByName.set(o.playerName.toLowerCase(), o);
+    return { officialOutsLc, newsOutsByName };
+  };
+  const homeOuts = outsFor(teamNews?.home);
+  const awayOuts = outsFor(teamNews?.away);
+
+  const interchange = (players: FieldP[]) =>
+    players.filter((p) => p.jerseyNumber != null && p.jerseyNumber >= 14 && p.jerseyNumber <= 17)
+      .sort((a, b) => (a.jerseyNumber ?? 0) - (b.jerseyNumber ?? 0));
+
+  const homeInter = interchange(home.players);
+  const awayInter = interchange(away.players);
+  const interRows = Math.max(homeInter.length, awayInter.length);
+
+  return (
+    <section className="card-surface p-3 sm:p-5 space-y-4">
+      {/* Combined pitch: home top half, away bottom half (mirrored) */}
+      <div
+        className="relative rounded-2xl px-2 py-5 sm:py-7 ring-1 ring-white/10 shadow-inner overflow-hidden"
+        style={{
+          background:
+            "repeating-linear-gradient(90deg, color-mix(in oklab, var(--accent) 35%, #1a3a1a) 0 28px, color-mix(in oklab, var(--accent) 28%, #143014) 28px 56px)",
+        }}
+      >
+        <div className="pointer-events-none absolute inset-x-3 top-3 h-px bg-white/40" />
+        <div className="pointer-events-none absolute inset-x-3 bottom-3 h-px bg-white/40" />
+        <div className="pointer-events-none absolute inset-x-3 top-1/2 h-px bg-white/60" />
+
+        {/* Home half (top) — accent uses team theme via wrapper */}
+        <div className="relative" data-theme-team={home.themeKey}>
+          <HalfFormation team={home} {...homeOuts} mirror={false} />
+        </div>
+        {/* Away half (bottom, mirrored) */}
+        <div className="relative mt-4 sm:mt-6" data-theme-team={away.themeKey}>
+          <HalfFormation team={away} {...awayOuts} mirror={true} />
+        </div>
+      </div>
+
+      {/* Paired interchange list */}
+      {interRows > 0 && (
+        <div className="rounded-xl bg-surface-2 ring-1 ring-border p-3 sm:p-4">
+          <div className="text-center text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground mb-3">Interchange</div>
+          <ul className="divide-y divide-border">
+            {Array.from({ length: interRows }).map((_, i) => (
+              <li key={i} className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 py-2">
+                <InterchangeCell p={homeInter[i]} team={home} side="left" />
+                <span className="px-2.5 py-1 rounded-full bg-surface text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Interchange</span>
+                <InterchangeCell p={awayInter[i]} team={away} side="right" />
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function HalfFormation({ team, players, officialOutsLc, newsOutsByName, mirror }: {
+  team: TeamShape;
+  players?: FieldP[];
+  officialOutsLc: Set<string>;
+  newsOutsByName: Map<string, NewsOut>;
+  mirror: boolean;
+}) {
+  const list = players ?? team.players;
+  const byNumber = new Map<number, FieldP>();
+  for (const p of list) if (p.jerseyNumber != null) byNumber.set(p.jerseyNumber, p);
+  const rows = mirror ? [...FIELD_ROWS].reverse() : FIELD_ROWS;
+
+  return (
+    <div className="flex flex-col gap-3 sm:gap-5">
+      {rows.map((row, ri) => (
+        <div key={ri} className="flex items-end justify-around gap-1 sm:gap-2">
+          {row.cols.map((n) => {
+            const p = byNumber.get(n);
+            const fullName = p ? `${p.firstName} ${p.lastName}`.toLowerCase() : "";
+            const isOut = !!p && (officialOutsLc.has(fullName) || newsOutsByName.has(fullName));
+            const slug = p ? playerSlug(p.firstName, p.lastName) : "";
+            const content = (
+              <div className="flex flex-col items-center w-[58px] sm:w-[88px]">
+                <div className="relative">
+                  <div className={`relative h-12 w-12 sm:h-16 sm:w-16 rounded-full overflow-hidden ring-2 ring-white/80 bg-accent/20 shadow-md ${isOut ? "grayscale opacity-60" : ""}`}>
+                    {p?.headImage ? (
+                      <img src={p.headImage} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover object-top" />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-[10px] sm:text-xs font-black text-accent">
+                        {p ? `${p.firstName[0]}${p.lastName[0]}` : "—"}
+                      </div>
+                    )}
+                  </div>
+                  <span
+                    className="absolute -top-1 -right-1 flex h-5 min-w-5 sm:h-6 sm:min-w-6 px-1 items-center justify-center rounded-full text-white text-[9px] sm:text-[10px] font-black uppercase tracking-wider shadow ring-2 ring-white/90"
+                    style={{ background: `var(--team-${team.themeKey}, var(--accent))` }}
+                  >
+                    {JERSEY_POSITION_SHORT[n] ?? n}
+                  </span>
+                </div>
+                {p ? (
+                  <div className="mt-1 text-center leading-tight">
+                    {p.isCaptain && <span className="text-[8px] sm:text-[9px] font-bold text-white/90">(C) </span>}
+                    <span className={`text-[10px] sm:text-xs font-bold text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)] ${isOut ? "line-through" : ""}`}>
+                      {p.lastName}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="mt-1 text-[9px] sm:text-[10px] uppercase tracking-wider text-white/70 italic">TBC</div>
+                )}
+              </div>
+            );
+            return (
+              <div key={n}>
+                {p ? (
+                  <Link
+                    to="/player/$teamThemeKey/$playerSlug"
+                    params={{ teamThemeKey: team.themeKey, playerSlug: slug }}
+                    search={{ firstName: p.firstName, lastName: p.lastName, teamNickname: team.nickName, position: JERSEY_POSITION[n] ?? p.position, jerseyNumber: p.jerseyNumber, headImage: p.headImage }}
+                  >{content}</Link>
+                ) : content}
+              </div>
+            );
+          })}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function InterchangeCell({ p, team, side }: { p?: FieldP; team: TeamShape; side: "left" | "right" }) {
+  if (!p) return <div />;
+  const slug = playerSlug(p.firstName, p.lastName);
+  const isRight = side === "right";
+  return (
+    <Link
+      to="/player/$teamThemeKey/$playerSlug"
+      params={{ teamThemeKey: team.themeKey, playerSlug: slug }}
+      search={{ firstName: p.firstName, lastName: p.lastName, teamNickname: team.nickName, position: "Interchange", jerseyNumber: p.jerseyNumber, headImage: p.headImage }}
+      className={`flex items-center gap-2 min-w-0 ${isRight ? "flex-row-reverse" : ""}`}
+    >
+      <div className="h-9 w-9 rounded-full overflow-hidden bg-accent/20 ring-1 ring-border shrink-0">
+        {p.headImage ? (
+          <img src={p.headImage} alt="" loading="lazy" className="h-full w-full object-cover object-top" />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center text-[10px] font-black text-accent">
+            {p.firstName[0]}{p.lastName[0]}
+          </div>
+        )}
+      </div>
+      <span className="text-xs font-bold truncate">
+        {p.firstName} {p.lastName}{p.isCaptain && " (C)"}
+      </span>
+    </Link>
+  );
+}
+
+// Short position labels shown on the field badges (matches the screenshots).
+const JERSEY_POSITION_SHORT: Record<number, string> = {
+  1: "FB", 2: "RW", 3: "RC", 4: "LC", 5: "LW",
+  6: "FE", 7: "HLF", 8: "PR", 9: "HK", 10: "PR",
+  11: "2R", 12: "L2R", 13: "LK",
+};
+
 
 
 /* ================= STATS TAB ================= */

@@ -382,6 +382,15 @@ export const getMatchPage = createServerFn({ method: "GET" })
       cached(`ladder:${season}`, TTL.ladder, () => fetchLadder(season), { bypass: data.refresh }),
     ]);
 
+    // Last 5 head-to-head fixtures between these two teams (cached 24h — past
+    // results don't change). Isolated so failure never blocks the page.
+    const recentH2HP = cached(
+      `h2h:${details.homeTeam.nickName}:${details.awayTeam.nickName}:${season}`,
+      24 * 60 * 60_000,
+      () => fetchRecentH2H(details.homeTeam.nickName, details.awayTeam.nickName, season, 5),
+      { bypass: data.refresh },
+    ).catch((err) => { console.warn("[getMatchPage] recentH2H failed:", err); return [] as RecentH2HMatch[]; });
+
     const { started, finished } = hasStartedOrFinished(details);
 
     // ===== FAST PATH for finished matches =====

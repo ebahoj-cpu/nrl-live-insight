@@ -140,8 +140,9 @@ export function PlayerProfileCard({ args, payload, loading }: {
           <BioCircle icon={<Cake className="h-5 w-5" />}        label="Age"    value={profile?.age != null ? String(profile.age) : "—"} />
           <BioCircle icon={<Ruler className="h-5 w-5" />}       label="Height" value={profile?.heightCm ? `${profile.heightCm}` : "—"} unit={profile?.heightCm ? "cm" : undefined} />
           <BioCircle icon={<WeightIcon className="h-5 w-5" />}  label="Weight" value={profile?.weightKg ? `${profile.weightKg}` : "—"} unit={profile?.weightKg ? "kg" : undefined} />
-          <BioCircle icon={<HandIcon className="h-5 w-5" />}    label="Hand"   value="R" />
-          <BioCircle icon={<Footprints className="h-5 w-5" />}  label="Foot"   value="R" />
+          <BioCircle icon={<HandIcon className="h-5 w-5" />}    label="Handed" value="RIGHT" />
+          <BioCircle icon={<Footprints className="h-5 w-5" />}  label="Footed" value="RIGHT" />
+
         </div>
       </div>
 

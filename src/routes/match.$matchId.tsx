@@ -2734,11 +2734,7 @@ function InsightsTab({ matchId, insights, insightsError, insightsLoading, home, 
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Projected winner</div>
             <div className="text-lg font-black truncate">{winnerNick}</div>
           </div>
-          {winnerPrice ? (
-            <span className="text-base font-black tabular-nums px-3 py-1.5 rounded-full bg-accent !text-white border border-accent shadow-[0_2px_8px_-2px_color-mix(in_oklab,var(--accent)_60%,transparent)] shrink-0">
-              {winnerPrice.price.toFixed(2)}
-            </span>
-          ) : null}
+          {null}
         </div>
         <p className="font-chat text-sm leading-relaxed text-foreground/90">{det.matchWinner?.reasoning}</p>
       </Card>

@@ -1098,7 +1098,6 @@ function SquadPanel({ team, news }: { team: { nickName: string; themeKey: string
     renderRow: (p: P, i: number) => ReactElement;
     officialOutsLc: Set<string>; newsOutsByName: Map<string, NewsOut>;
   }) {
-    const [view, setView] = useState<"list" | "field">("list");
     return (
       <section className="card-surface p-5">
         <div className="flex items-center justify-between gap-2 mb-4">
@@ -1106,26 +1105,10 @@ function SquadPanel({ team, news }: { team: { nickName: string; themeKey: string
             <Users className="h-4 w-4 text-accent shrink-0" />
             <h3 className="font-bold text-sm uppercase tracking-wider truncate">{props.team.nickName}</h3>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="inline-flex rounded-full bg-surface-2 p-0.5 ring-1 ring-border">
-              <button
-                type="button"
-                onClick={() => setView("list")}
-                className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-full transition-colors ${view === "list" ? "bg-accent text-accent-foreground" : "text-muted-foreground"}`}
-              >List</button>
-              <button
-                type="button"
-                onClick={() => setView("field")}
-                className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-full transition-colors ${view === "field" ? "bg-accent text-accent-foreground" : "text-muted-foreground"}`}
-              >Field</button>
-            </div>
-            <TeamLogo themeKey={props.team.themeKey} name={props.team.nickName} size={36} />
-          </div>
+          <TeamLogo themeKey={props.team.themeKey} name={props.team.nickName} size={36} />
         </div>
         {props.sorted.length === 0 ? (
           <div className="text-xs text-muted-foreground">Squad not yet named.</div>
-        ) : view === "field" ? (
-          <FieldFormation team={props.team} players={props.sorted} officialOutsLc={props.officialOutsLc} newsOutsByName={props.newsOutsByName} />
         ) : (
           <div className="space-y-3">
             <Group items={props.starters} />

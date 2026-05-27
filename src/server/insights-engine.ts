@@ -58,6 +58,8 @@ export type EngineInputs = {
   // confidence, its winner / margin / total / score / htft / player ranking
   // override the legacy ladder-only heuristics.
   simulation?: SimulationSummary | null;
+  /** NRL.com top-5 leaderboard finishes keyed by player slug / "first last". */
+  leaderboards?: PlayerLeaderboardMap | null;
 };
 
 export type EnginePlayerPick = {

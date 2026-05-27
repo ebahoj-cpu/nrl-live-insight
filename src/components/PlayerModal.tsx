@@ -13,6 +13,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 
 import { TeamLogo } from "@/components/TeamLogo";
 import { getPlayerProfile, type PlayerProfilePayload } from "@/server/player-profile.functions";
+import type { PlayerRanking } from "@/server/stats-leaders";
 import type { SkillRating, EnergyTier } from "@/lib/performance-edge";
 import {
   Activity, Sword, Zap, Shield, Hand, Dumbbell, Footprints,
@@ -146,6 +147,9 @@ export function PlayerProfileCard({ args, payload, loading }: {
         </div>
       </div>
 
+      {/* NRL.com leaderboard rankings */}
+      <RankingBadges rankings={payload?.rankings ?? []} loading={loading} />
+
       {/* Performance Edge */}
       <div className="px-4 sm:px-6 pt-6 pb-6">
         <PerformanceEdgeSection edge={edge} loading={loading} profile={profile} />
@@ -173,6 +177,50 @@ function BioCircle({ icon, label, value, unit }: { icon: ReactNode; label: strin
       <span className="text-[10px] sm:text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">
         {label}
       </span>
+    </div>
+  );
+}
+
+function RankingBadges({ rankings, loading }: { rankings: PlayerRanking[]; loading: boolean }) {
+  if (loading && rankings.length === 0) return null;
+  if (!loading && rankings.length === 0) return null;
+  // Sort by best rank first, then by category title
+  const sorted = [...rankings].sort((a, b) => a.rank - b.rank || a.title.localeCompare(b.title));
+  return (
+    <div className="px-4 sm:px-6 pt-5">
+      <div className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground font-bold text-center mb-2">
+        NRL.com 2026 Leaderboards
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 max-w-md sm:max-w-2xl mx-auto">
+        {sorted.map((r) => (
+          <RankingBadge key={r.statId} ranking={r} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function RankingBadge({ ranking }: { ranking: PlayerRanking }) {
+  const r = ranking.rank;
+  const tone =
+    r === 1 ? "border-accent bg-accent/15 text-accent"
+    : r === 2 ? "border-amber-400/60 bg-amber-400/10 text-amber-300"
+    : r === 3 ? "border-orange-400/50 bg-orange-400/10 text-orange-300"
+    : "border-border bg-surface-2/60 text-foreground";
+  return (
+    <div className={`flex items-center justify-between gap-2 rounded-lg border px-2.5 py-1.5 ${tone}`}>
+      <div className="min-w-0">
+        <div className="text-[9px] uppercase tracking-wider font-bold opacity-80 truncate">
+          {ranking.section}
+        </div>
+        <div className="text-[11px] font-extrabold leading-tight truncate">
+          {ranking.title}
+        </div>
+      </div>
+      <div className="flex flex-col items-end shrink-0">
+        <span className="text-base font-extrabold leading-none tabular-nums">#{ranking.rank}</span>
+        <span className="text-[9px] opacity-70 tabular-nums">{ranking.value}</span>
+      </div>
     </div>
   );
 }

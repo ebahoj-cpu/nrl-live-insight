@@ -224,7 +224,7 @@ function iconForCategory(title: string) {
 function RankingBadge({ ranking }: { ranking: PlayerRanking }) {
   const Icon = iconForCategory(ranking.title);
   return (
-    <div className="flex flex-col items-center text-center w-full">
+    <div className="flex flex-col items-center text-center w-20 sm:w-24">
       <div className="h-7 flex items-center justify-center">
         <Icon className="h-7 w-7 text-accent" strokeWidth={2} />
       </div>

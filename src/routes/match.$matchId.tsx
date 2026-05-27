@@ -576,11 +576,32 @@ type NewsOut = { playerName: string; reason: string; sourceUrl: string; sourceTi
 type TeamNews = { ins: string[]; outs: string[]; blurb: string; sourceUrl: string; newsOuts?: NewsOut[] } | null;
 
 function LineupTab({ home, away, officials, teamNews }: { home: any; away: any; officials: { position: string; firstName: string; lastName: string; headImage?: string }[]; teamNews?: { home: TeamNews; away: TeamNews } }) {
+  const [view, setView] = useState<"list" | "field">("list");
   return (
     <div className="space-y-4">
-      <H2HPanel home={home} away={away} />
-      <SquadPanel team={home} news={teamNews?.home} />
-      <SquadPanel team={away} news={teamNews?.away} />
+      <div className="flex items-center justify-center">
+        <div className="inline-flex rounded-full bg-surface-2 p-0.5 ring-1 ring-border">
+          <button
+            type="button"
+            onClick={() => setView("list")}
+            className={`px-4 py-1.5 text-[11px] font-bold uppercase tracking-wider rounded-full transition-colors ${view === "list" ? "bg-accent text-accent-foreground" : "text-muted-foreground"}`}
+          >List View</button>
+          <button
+            type="button"
+            onClick={() => setView("field")}
+            className={`px-4 py-1.5 text-[11px] font-bold uppercase tracking-wider rounded-full transition-colors ${view === "field" ? "bg-accent text-accent-foreground" : "text-muted-foreground"}`}
+          >Field View</button>
+        </div>
+      </div>
+      {view === "list" ? (
+        <>
+          <H2HPanel home={home} away={away} />
+          <SquadPanel team={home} news={teamNews?.home} />
+          <SquadPanel team={away} news={teamNews?.away} />
+        </>
+      ) : (
+        <CombinedFieldPanel home={home} away={away} teamNews={teamNews} />
+      )}
       <OfficialsCard officials={officials} />
     </div>
   );

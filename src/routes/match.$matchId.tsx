@@ -1128,10 +1128,6 @@ function StatsTab({ home, away, homeRow, awayRow, statGroups, recentRecaps, rece
   { home: any; away: any; homeRow?: any; awayRow?: any; statGroups: StatGroup[]; recentRecaps?: { home: any[]; away: any[] }; recentH2H?: RecentH2HMatch[] }) {
   return (
     <div className="space-y-4">
-      {recentH2H && recentH2H.length > 0 && (
-        <HeadToHeadCard home={home} away={away} matches={recentH2H} />
-      )}
-
       {(homeRow && awayRow) && (
         <Card title="Ladder side by side" icon={BarChart3}>
           <CompareRow label="Ladder position" h={`#${homeRow.position}`} a={`#${awayRow.position}`} />
@@ -1180,6 +1176,10 @@ function StatsTab({ home, away, homeRow, awayRow, statGroups, recentRecaps, rece
           </div>
         </Card>
       ))}
+
+      {recentH2H && recentH2H.length > 0 && (
+        <HeadToHeadCard home={home} away={away} matches={recentH2H} />
+      )}
     </div>
   );
 }
@@ -1197,7 +1197,7 @@ function HeadToHeadCard({ home, away, matches }: { home: any; away: any; matches
     else awayWins++;
   }
   return (
-    <Card title={`Head to head · Last ${matches.length}`} icon={Swords}>
+    <Card title={`HEAD 2 HEAD · Last ${matches.length}`} icon={Swords}>
       <div className="flex items-center justify-center gap-3 sm:gap-5 mb-5">
         <TeamLogo themeKey={home.themeKey} name={homeNick} size={44} />
         <ScoreBubble value={homeWins} label="Wins" accent />

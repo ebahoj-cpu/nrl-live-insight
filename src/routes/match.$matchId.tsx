@@ -1403,7 +1403,7 @@ function InterchangeCell({ p, team, side }: { p?: FieldP; team: TeamShape; side:
         )}
       </div>
       <span className="text-xs font-bold truncate">
-        {p.firstName} {p.lastName}{p.isCaptain && " (C)"}
+        {p.lastName}{p.isCaptain && " (C)"}
       </span>
     </Link>
   );

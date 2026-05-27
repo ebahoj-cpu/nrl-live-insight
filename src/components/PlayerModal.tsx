@@ -185,20 +185,32 @@ function BioCircle({ icon, label, value, unit }: { icon: ReactNode; label: strin
 function RankingBadges({ rankings, loading }: { rankings: PlayerRanking[]; loading: boolean }) {
   if (loading && rankings.length === 0) return null;
   if (!loading && rankings.length === 0) return null;
-  // Sort by best rank first, then by category title
   const sorted = [...rankings].sort((a, b) => a.rank - b.rank || a.title.localeCompare(b.title));
   return (
     <div className="px-4 sm:px-6 pt-6">
-      <div className="mb-4 pb-3 border-b border-accent/20 text-center">
-        <h3 className="font-display font-extrabold uppercase tracking-wider text-lg sm:text-xl whitespace-nowrap">
-          Top <span className="text-accent">Leaderboards</span>
-        </h3>
-      </div>
-      <div className="flex flex-wrap justify-center gap-x-6 gap-y-5 sm:gap-x-8 max-w-md sm:max-w-2xl mx-auto">
-        {sorted.map((r) => (
-          <RankingBadge key={r.statId} ranking={r} />
-        ))}
-      </div>
+      <section className="rounded-xl bg-surface-2/40 ring-1 ring-accent/15 p-4">
+        <div className="mb-5 pb-3 border-b border-accent/20 text-center">
+          <h3 className="font-display font-extrabold uppercase tracking-wider text-lg sm:text-xl whitespace-nowrap">
+            Top <span className="text-accent">Leaderboards</span>
+          </h3>
+        </div>
+        <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2.5">
+          {sorted.map((r) => {
+            const Icon = iconForCategory(r.title);
+            const pct = Math.max(20, 100 - (r.rank - 1) * 20);
+            return (
+              <Meter
+                key={r.statId}
+                icon={<Icon className="h-3.5 w-3.5 text-accent shrink-0" />}
+                label={r.title}
+                valueText={`#${r.rank}`}
+                pct={pct}
+                tone="great"
+              />
+            );
+          })}
+        </ul>
+      </section>
     </div>
   );
 }
@@ -219,25 +231,6 @@ function iconForCategory(title: string) {
   if (t.includes("point")) return Star;
   if (t.includes("hit")) return Shield;
   return Trophy;
-}
-
-function RankingBadge({ ranking }: { ranking: PlayerRanking }) {
-  const Icon = iconForCategory(ranking.title);
-  return (
-    <div className="flex flex-col items-center text-center w-20 sm:w-24">
-      <div className="h-7 flex items-center justify-center">
-        <Icon className="h-7 w-7 text-accent" strokeWidth={2} />
-      </div>
-      <div className="mt-1.5 h-7 flex items-start justify-center">
-        <div className="text-[9px] uppercase tracking-wider font-bold text-accent leading-tight line-clamp-2">
-          Top {ranking.title}
-        </div>
-      </div>
-      <div className="mt-1 text-sm font-extrabold tabular-nums leading-none">
-        #{ranking.rank}
-      </div>
-    </div>
-  );
 }
 
 // -------------------------- Sub-components --------------------------

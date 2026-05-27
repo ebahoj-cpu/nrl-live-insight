@@ -664,6 +664,16 @@ export const getMatchInsights = createServerFn({ method: "GET" })
           });
         }
 
+        // NRL.com leaderboard map (top-5 per category) — feeds the deterministic
+        // engine so Dally-M-tier players are surfaced in tryscorer ranking.
+        let leaderboardMap = null;
+        try {
+          const boards = await getLeaderboards(111, season ?? 2026);
+          leaderboardMap = buildPlayerLeaderboardMap(boards);
+        } catch (err) {
+          console.warn("leaderboards fetch failed (non-fatal):", err);
+        }
+
         const engineInputs = snap ? {
           homeNickname: details.homeTeam.nickName,
           awayNickname: details.awayTeam.nickName,
@@ -679,6 +689,7 @@ export const getMatchInsights = createServerFn({ method: "GET" })
           mode: resolved.mode,
           confidence: resolved.confidence,
           simulation,
+          leaderboards: leaderboardMap,
         } : null;
         if (engineInputs) {
           try {

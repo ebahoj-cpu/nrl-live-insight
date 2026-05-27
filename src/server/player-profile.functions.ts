@@ -46,17 +46,18 @@ export const getPlayerProfile = createServerFn({ method: "POST" })
           groups: [],
         })),
       ]);
-      const edge = computePerformanceEdge({
-        position: profile.position ?? data.position,
-        seasonStats: profile.seasonStats,
-        careerAppearances: profile.careerAppearances,
-      });
       const rankings = rankingsForPlayer(
         boards,
         data.firstName,
         data.lastName,
         data.teamThemeKey,
       );
+      const edge = computePerformanceEdge({
+        position: profile.position ?? data.position,
+        seasonStats: profile.seasonStats,
+        careerAppearances: profile.careerAppearances,
+        rankings: rankings.map((r) => ({ title: r.title, rank: r.rank })),
+      });
       return { profile, edge, rankings, error: null };
     } catch (err) {
       console.error("getPlayerProfile failed:", err);

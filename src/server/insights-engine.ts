@@ -23,6 +23,7 @@ import { runMonteCarlo, type SimulationResult } from "./model/simulation";
 import type { SimulationSummary } from "./simulation-types";
 import { appendDriverHint } from "./driver-surfacing";
 import { isMagicRoundVenue, qldBoost } from "./magic-round";
+import type { PlayerLeaderboardMap } from "./stats-leaders";
 
 // Lightweight inline validator — duplicates the strict guard in
 // simulation-integration.ts so the engine stays safe even if a caller
@@ -57,6 +58,8 @@ export type EngineInputs = {
   // confidence, its winner / margin / total / score / htft / player ranking
   // override the legacy ladder-only heuristics.
   simulation?: SimulationSummary | null;
+  /** NRL.com top-5 leaderboard finishes keyed by player slug / "first last". */
+  leaderboards?: PlayerLeaderboardMap | null;
 };
 
 export type EnginePlayerPick = {
@@ -426,6 +429,42 @@ function rankTryscorers(inp: EngineInputs, home: TeamSeasonStats, away: TeamSeas
     return null;
   };
 
+  // NRL.com leaderboard boost lookup — multiplies the candidate's final
+  // tryscorer-ranking score when the player appears in attack-oriented
+  // top-5 lists (tries, line breaks, tackle breaks, try assists, points,
+  // metres). A #1 finisher gets a meaningful but bounded bump.
+  const leaderboards = inp.leaderboards ?? null;
+  const ATTACK_CATS = /try|line ?break|tackle ?break|bust|assist|point|metre/i;
+  const leaderboardBoostFor = (firstName: string, lastName: string): { mult: number; topHit: { title: string; rank: number } | null } => {
+    if (!leaderboards) return { mult: 1, topHit: null };
+    const slug = `${firstName}-${lastName}`
+      .toLowerCase()
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+      .replace(/['’`.]/g, "")
+      .replace(/[^a-z0-9-]/g, "");
+    const nameKey = `${firstName} ${lastName}`
+      .toLowerCase()
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+      .replace(/['’`.]/g, "")
+      .replace(/[^a-z0-9 ]/g, "")
+      .trim();
+    const entries = leaderboards.get(slug) ?? leaderboards.get(nameKey) ?? [];
+    if (entries.length === 0) return { mult: 1, topHit: null };
+    let mult = 1;
+    let best: { title: string; rank: number } | null = null;
+    for (const e of entries) {
+      if (!ATTACK_CATS.test(e.title)) continue;
+      // #1=+30%, #2=+22%, #3=+16%, #4=+11%, #5=+7%
+      const bump = Math.max(0, 0.30 - (e.rank - 1) * 0.06);
+      mult *= 1 + bump;
+      if (!best || e.rank < best.rank) best = { title: e.title, rank: e.rank };
+    }
+    // Cap so a player in 4 categories doesn't run away with the model
+    mult = Math.min(mult, 1.55);
+    return { mult, topHit: best };
+  };
+
+
   const rows: RankedRow[] = [];
 
   const considerSquad = (squad: NrlPlayer[], teamNick: string, teamSeason: TeamSeasonStats, oppSeason: TeamSeasonStats, isWinner: boolean, byId: Map<number, PlayerSeasonStats>, byName: Map<string, PlayerSeasonStats>) => {
@@ -490,6 +529,17 @@ function rankTryscorers(inp: EngineInputs, home: TeamSeasonStats, away: TeamSeas
       const oddsFloor = price && price > 0 && price < 8 ? 0.6 : 0;
       let finalScore = baseScore + oddsFloor;
 
+      // ---- NRL.com leaderboard boost ----
+      // Dally-M leaders / top tryscorers / top metres etc. get a meaningful
+      // (capped) multiplier so the model surfaces them ahead of similarly
+      // priced players without leaderboard credentials.
+      const [bFirst, ...bRest] = c.name.split(/\s+/);
+      const bLast = bRest.join(" ");
+      const { mult: leaderboardMult, topHit: leaderboardHit } = leaderboardBoostFor(bFirst || "", bLast || "");
+      if (leaderboardMult > 1) {
+        finalScore *= leaderboardMult;
+      }
+
       // ---- Role gates ----
       if (role === "wing" || role === "centre") {
         finalScore *= 1.05; // headline scoring lanes
@@ -501,11 +551,13 @@ function rankTryscorers(inp: EngineInputs, home: TeamSeasonStats, away: TeamSeas
         const hasEdge = recentTries > 0 || lineBreaks >= 1.5 || tackleBusts >= 4 || (price !== null && price < 9);
         if (!hasEdge) finalScore *= 0.75;
       } else if (role === "middle") {
-        // Props / hookers / locks: cap unless real signal
+        // Props / hookers / locks: cap unless real signal — but a top-5
+        // leaderboard finish counts as a real signal.
         const hasSignal =
           recentTries >= 1 ||
           firstTeamTries >= 2 ||
           (price !== null && price < 8) ||
+          leaderboardHit !== null ||
           (isWinner && teamSeason.scoringEfficiency > 4.5);
         if (!hasSignal) finalScore = Math.min(finalScore, 1.5);
       }

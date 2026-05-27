@@ -1110,16 +1110,43 @@ function fmtStatValue(v: StatValue, type: string, units?: string): string {
   return `${v.value % 1 === 0 ? v.value.toFixed(0) : v.value.toFixed(1)}`;
 }
 
-function StatsTab({ home, away, homeRow, awayRow, statGroups, recentRecaps }:
-  { home: any; away: any; homeRow?: any; awayRow?: any; statGroups: StatGroup[]; recentRecaps?: { home: any[]; away: any[] } }) {
+type RecentH2HMatch = {
+  matchId: string;
+  roundNumber: number;
+  season: number;
+  kickoffUtc: string;
+  homeNick: string;
+  awayNick: string;
+  homeThemeKey: string;
+  awayThemeKey: string;
+  homeScore: number;
+  awayScore: number;
+  url: string;
+};
+
+function StatsTab({ home, away, homeRow, awayRow, statGroups, recentRecaps, recentH2H }:
+  { home: any; away: any; homeRow?: any; awayRow?: any; statGroups: StatGroup[]; recentRecaps?: { home: any[]; away: any[] }; recentH2H?: RecentH2HMatch[] }) {
   return (
     <div className="space-y-4">
+      {recentH2H && recentH2H.length > 0 && (
+        <HeadToHeadCard home={home} away={away} matches={recentH2H} />
+      )}
+
+      {(homeRow && awayRow) && (
+        <Card title="Ladder side by side" icon={BarChart3}>
+          <CompareRow label="Ladder position" h={`#${homeRow.position}`} a={`#${awayRow.position}`} />
+          <CompareRow label="Wins" h={homeRow.wins} a={awayRow.wins} betterHigh higherWins={homeRow.wins > awayRow.wins} />
+          <CompareRow label="Points for" h={homeRow.for} a={awayRow.for} betterHigh higherWins={homeRow.for > awayRow.for} />
+          <CompareRow label="Points against" h={homeRow.against} a={awayRow.against} higherWins={homeRow.against < awayRow.against} />
+          <CompareRow label="Differential" h={fmtSigned(homeRow.diff)} a={fmtSigned(awayRow.diff)} higherWins={homeRow.diff > awayRow.diff} />
+          <CompareRow label="Comp points" h={homeRow.points} a={awayRow.points} higherWins={homeRow.points > awayRow.points} last />
+        </Card>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <SeasonStats team={home} row={homeRow} />
         <SeasonStats team={away} row={awayRow} />
       </div>
-
-      {/* Recent recaps section removed per request */}
 
       {statGroups && statGroups.length > 0 && statGroups.map((g, gi) => (
         <Card key={gi} title={g.title} icon={Activity}>
@@ -1143,7 +1170,6 @@ function StatsTab({ home, away, homeRow, awayRow, statGroups, recentRecaps }:
                       {fmtStatValue(s.awayValue, s.type, s.units)}
                     </div>
                   </div>
-                  {/* dual bar */}
                   <div className="flex h-1.5 rounded-full overflow-hidden bg-surface-2">
                     <div className={`${s.homeValue.isLeader ? "bg-accent" : "bg-muted-foreground/40"} transition-all`} style={{ width: `${homePct}%` }} />
                     <div className={`${s.awayValue.isLeader ? "bg-accent" : "bg-muted-foreground/40"} transition-all`} style={{ width: `${100 - homePct}%` }} />
@@ -1154,17 +1180,75 @@ function StatsTab({ home, away, homeRow, awayRow, statGroups, recentRecaps }:
           </div>
         </Card>
       ))}
+    </div>
+  );
+}
 
-      {(homeRow && awayRow) && (
-        <Card title="Ladder side by side" icon={BarChart3}>
-          <CompareRow label="Ladder position" h={`#${homeRow.position}`} a={`#${awayRow.position}`} />
-          <CompareRow label="Wins" h={homeRow.wins} a={awayRow.wins} betterHigh higherWins={homeRow.wins > awayRow.wins} />
-          <CompareRow label="Points for" h={homeRow.for} a={awayRow.for} betterHigh higherWins={homeRow.for > awayRow.for} />
-          <CompareRow label="Points against" h={homeRow.against} a={awayRow.against} higherWins={homeRow.against < awayRow.against} />
-          <CompareRow label="Differential" h={fmtSigned(homeRow.diff)} a={fmtSigned(awayRow.diff)} higherWins={homeRow.diff > awayRow.diff} />
-          <CompareRow label="Comp points" h={homeRow.points} a={awayRow.points} higherWins={homeRow.points > awayRow.points} last />
-        </Card>
-      )}
+function HeadToHeadCard({ home, away, matches }: { home: any; away: any; matches: RecentH2HMatch[] }) {
+  const homeNick = String(home.nickName);
+  const awayNick = String(away.nickName);
+  let homeWins = 0, awayWins = 0, draws = 0;
+  for (const m of matches) {
+    const homeIsHome = m.homeNick.toLowerCase() === homeNick.toLowerCase();
+    const ourScore = homeIsHome ? m.homeScore : m.awayScore;
+    const theirScore = homeIsHome ? m.awayScore : m.homeScore;
+    if (ourScore === theirScore) draws++;
+    else if (ourScore > theirScore) homeWins++;
+    else awayWins++;
+  }
+  return (
+    <Card title={`Head to head · Last ${matches.length}`} icon={Swords}>
+      <div className="flex items-center justify-center gap-3 sm:gap-5 mb-5">
+        <TeamLogo themeKey={home.themeKey} name={homeNick} size={44} />
+        <ScoreBubble value={homeWins} label="Wins" accent />
+        <ScoreBubble value={draws} label="Draws" outline />
+        <ScoreBubble value={awayWins} label="Wins" accent />
+        <TeamLogo themeKey={away.themeKey} name={awayNick} size={44} />
+      </div>
+      <div className="divide-y divide-border">
+        {matches.map((m) => {
+          const homeIsHome = m.homeNick.toLowerCase() === homeNick.toLowerCase();
+          const leftScore = homeIsHome ? m.homeScore : m.awayScore;
+          const rightScore = homeIsHome ? m.awayScore : m.homeScore;
+          const leftWon = leftScore > rightScore;
+          const rightWon = rightScore > leftScore;
+          return (
+            <div key={m.matchId} className="py-3">
+              <div className="text-center text-[11px] uppercase tracking-wider text-muted-foreground mb-1.5">
+                Round {m.roundNumber}, {m.season}
+              </div>
+              <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+                <div className="flex items-center justify-end gap-2 min-w-0">
+                  <span className="text-xs sm:text-sm font-semibold truncate">{homeNick}</span>
+                  <TeamLogo themeKey={home.themeKey} name={homeNick} size={22} />
+                </div>
+                <div className="kbd font-black text-sm sm:text-base tabular-nums">
+                  <span className={leftWon ? "text-accent" : "text-foreground"}>{leftScore}</span>
+                  <span className="text-muted-foreground mx-1">–</span>
+                  <span className={rightWon ? "text-accent" : "text-foreground"}>{rightScore}</span>
+                </div>
+                <div className="flex items-center gap-2 min-w-0">
+                  <TeamLogo themeKey={away.themeKey} name={awayNick} size={22} />
+                  <span className="text-xs sm:text-sm font-semibold truncate">{awayNick}</span>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </Card>
+  );
+}
+
+function ScoreBubble({ value, label, accent, outline }: { value: number; label: string; accent?: boolean; outline?: boolean }) {
+  return (
+    <div className="flex flex-col items-center">
+      <span className={`h-12 w-12 sm:h-14 sm:w-14 rounded-full flex items-center justify-center text-lg sm:text-xl font-black tabular-nums ${
+        accent ? "bg-accent text-accent-foreground shadow-[0_0_12px_color-mix(in_oklab,var(--accent)_45%,transparent)]"
+        : outline ? "border-2 border-border text-foreground"
+        : "bg-surface-2 text-foreground"
+      }`}>{value}</span>
+      <span className="mt-1 text-[10px] uppercase tracking-wider text-muted-foreground">{label}</span>
     </div>
   );
 }

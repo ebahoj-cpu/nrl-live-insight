@@ -1197,7 +1197,7 @@ function HeadToHeadCard({ home, away, matches }: { home: any; away: any; matches
     else awayWins++;
   }
   return (
-    <Card title={`Head to head · Last ${matches.length}`} icon={Swords}>
+    <Card title={`HEAD 2 HEAD · Last ${matches.length}`} icon={Swords}>
       <div className="flex items-center justify-center gap-3 sm:gap-5 mb-5">
         <TeamLogo themeKey={home.themeKey} name={homeNick} size={44} />
         <ScoreBubble value={homeWins} label="Wins" accent />

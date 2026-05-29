@@ -34,8 +34,11 @@ export const getRouter = () => {
     routeTree,
     context: { queryClient },
     scrollRestoration: true,
+    // PERF: preload route data on hover/focus so navigation feels instant.
+    defaultPreload: "intent",
     defaultPreloadStaleTime: 0,
     defaultErrorComponent: DefaultErrorComponent,
+
   });
   return router;
 };

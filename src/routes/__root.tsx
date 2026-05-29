@@ -318,7 +318,16 @@ function NavMenu({ onClose }: { onClose: () => void }) {
             <span className="font-semibold text-sm uppercase tracking-wider">Settings</span>
           </Link>
           <AccountActions onClose={onClose} />
+          <button
+            type="button"
+            onClick={handleInstall}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-foreground hover:bg-surface-2 transition"
+          >
+            <Download className="h-5 w-5" />
+            <span className="font-semibold text-sm uppercase tracking-wider">Install app</span>
+          </button>
         </div>
+
       </aside>
     </>
   );

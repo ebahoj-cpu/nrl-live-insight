@@ -45,6 +45,8 @@ export const Route = createFileRoute("/")({
   ),
 });
 
+function HomePage() {
+  return (
     <Suspense fallback={<HomeSkeleton />}>
       <Fixtures />
     </Suspense>
@@ -55,7 +57,10 @@ function Fixtures() {
   const { round: roundParam } = Route.useSearch();
   const round = roundParam || undefined;
   const fx = useSuspenseQuery(fixturesQO(round)).data;
-  const oddsList = useSuspenseQuery(oddsQO()).data;
+  // PERF: odds use a non-suspense query so the fixtures grid paints immediately.
+  // Cards re-render with prices when odds arrive (or stay price-less if odds fail).
+  const oddsList = useQuery(oddsQO()).data ?? [];
+
   const navigate = useNavigate({ from: "/" });
 
   const isHistorical = fx.round < fx.currentRound;

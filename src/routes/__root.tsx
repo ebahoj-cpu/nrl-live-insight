@@ -218,6 +218,8 @@ function Header() {
 }
 
 function NavMenu({ onClose }: { onClose: () => void }) {
+  const { canInstall, installed, promptInstall } = useInstallPrompt();
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", handler);
@@ -227,6 +229,24 @@ function NavMenu({ onClose }: { onClose: () => void }) {
       document.body.style.overflow = "";
     };
   }, [onClose]);
+
+  const handleInstall = async () => {
+    if (canInstall) {
+      await promptInstall();
+      onClose();
+      return;
+    }
+    // Fallback: browser hasn't fired beforeinstallprompt (already installed previously,
+    // unsupported browser like iOS Safari, or prompt not yet available).
+    const ua = navigator.userAgent;
+    const isIOS = /iPad|iPhone|iPod/.test(ua);
+    const msg = isIOS
+      ? "To install: tap the Share button in Safari, then 'Add to Home Screen'."
+      : installed
+      ? "App is already installed. Launch it from your home screen, or use your browser menu → 'Install app' / 'Add to Home Screen' to reinstall."
+      : "Use your browser menu → 'Install app' or 'Add to Home Screen' to install LINEBREAK.";
+    alert(msg);
+  };
 
   return (
     <>
@@ -271,6 +291,17 @@ function NavMenu({ onClose }: { onClose: () => void }) {
                 </Link>
               </li>
             ))}
+            {/* Always-visible install entry so users can reinstall after deleting the PWA */}
+            <li>
+              <button
+                type="button"
+                onClick={handleInstall}
+                className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-foreground hover:bg-surface-2 transition"
+              >
+                <Download className="h-5 w-5" />
+                <span className="font-semibold text-sm uppercase tracking-wider">Install app</span>
+              </button>
+            </li>
           </ul>
         </nav>
 
@@ -292,6 +323,7 @@ function NavMenu({ onClose }: { onClose: () => void }) {
     </>
   );
 }
+
 
 function ProfileBlock() {
   const { user, profile, isPremium } = useAuth();

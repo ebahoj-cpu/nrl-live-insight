@@ -199,14 +199,18 @@ async function safeRecaps(recentForm: { url?: string }[], refresh?: boolean): Pr
 }
 
 // ---------- Fixtures + current round ----------
-// NRL.com's draw endpoint only returns ONE round at a time. To support the
-// round selector (past + upcoming), we:
-//   1. Hit the default endpoint to learn `currentRound`.
-//   2. If the user asked for a different round, fetch that round directly.
-//   3. Build the rounds list by sweeping 1..currentRound+8 (cached 6h, so the
-//      sweep only runs once per worker every 6 hours).
-const ROUNDS_TTL = 6 * 60 * 60_000;
+// PERF: Heavy round-index sweeps were causing slow first paints. We now:
+//   1. Only probe a tiny window of upcoming rounds (current..current+3) instead
+//      of sweeping 1..currentRound+8. Past rounds always exist by definition
+//      and are added directly to the index without a network probe.
+//   2. Cache the rounds-index for 30 min (was 6h, but the previous code still
+//      ran a wide parallel sweep when cold — the new narrow probe is cheap).
+//   3. Skip per-fixture weather enrichment entirely on the list page. Weather
+//      now loads lazily on the match-detail page (where users actually look at
+//      it). This removes N parallel weather API calls from every list render.
+const ROUNDS_TTL = 30 * 60_000; // 30 minutes, per perf brief
 const SEASON_ROUNDS = 27; // NRL regular season caps at 27 rounds
+const UPCOMING_PROBE_WINDOW = 3; // only probe currentRound + 1..3 ahead
 
 export const getCurrentRoundFixtures = createServerFn({ method: "GET" })
   .inputValidator((i: { refresh?: boolean; round?: number } | undefined) => i ?? {})
@@ -224,6 +228,7 @@ export const getCurrentRoundFixtures = createServerFn({ method: "GET" })
     const selectedRound = data.round ?? currentRound;
 
     // Step 2 — fetch the requested round (skip the call if it matches default).
+    // Other rounds are fetched lazily here when the user changes the selector.
     const fixtures = selectedRound === currentRound
       ? defaultDraw.filter((f) => f.roundNumber === currentRound)
       : await cached(
@@ -233,15 +238,18 @@ export const getCurrentRoundFixtures = createServerFn({ method: "GET" })
           { bypass: data.refresh },
         );
 
-    // Step 3 — build the rounds index. Sweep 1..currentRound+8, capped at 27.
-    // Long-cached: only re-runs every 6h per worker.
+    // Step 3 — rounds index. Past rounds are assumed to exist (1..currentRound)
+    // and added without a probe. Only the next few upcoming rounds are probed,
+    // and the whole result is cached for 30 min per worker.
     const rounds = await cached(
       `fixtures:${season}:rounds-index`,
       ROUNDS_TTL,
       async () => {
-        const upper = Math.min(SEASON_ROUNDS, currentRound + 8);
-        const probes = await Promise.all(
-          Array.from({ length: upper }, (_, i) => i + 1).map(async (r) => {
+        const past = Array.from({ length: currentRound }, (_, i) => i + 1);
+        const upper = Math.min(SEASON_ROUNDS, currentRound + UPCOMING_PROBE_WINDOW);
+        const upcoming = Array.from({ length: upper - currentRound }, (_, i) => currentRound + 1 + i);
+        const probed = await Promise.all(
+          upcoming.map(async (r) => {
             try {
               const list = await cached(
                 `fixtures:${season}:r${r}`,
@@ -254,7 +262,7 @@ export const getCurrentRoundFixtures = createServerFn({ method: "GET" })
             }
           }),
         );
-        return probes.filter((r): r is number => r != null);
+        return [...past, ...probed.filter((r): r is number => r != null)];
       },
       { bypass: data.refresh },
     );
@@ -265,17 +273,12 @@ export const getCurrentRoundFixtures = createServerFn({ method: "GET" })
     if (selectedRound) roundSet.add(selectedRound);
     const rounds2 = Array.from(roundSet).sort((a, b) => a - b);
 
-    // Per-fixture weather (cheap & cached). Squad / team-list data is NOT
-    // touched here — that's only fetched on the match-detail page when a
-    // user clicks in, so upcoming rounds appear with matchups + venues +
-    // kickoffs only (no rosters until NRL.com publishes team lists).
-    const enriched = await Promise.all(fixtures.map(async (f) => {
-      const weather = await safeWeather(f.matchId, f.venue, f.venueCity, f.kickoffUtc, data.refresh);
-      return { ...f, weather };
-    }));
-
-    return { season, round: selectedRound, currentRound, rounds: rounds2, fixtures: enriched };
+    // PERF: Weather intentionally NOT fetched here — it's loaded on the match
+    // detail page on demand. Returning fixtures verbatim (weather will be
+    // undefined in the MatchCard, which already renders "Forecast pending").
+    return { season, round: selectedRound, currentRound, rounds: rounds2, fixtures };
   });
+
 
 // ---------- Ladder ----------
 // Primary: NRL.com. Fallback: Zyla (12h cached).

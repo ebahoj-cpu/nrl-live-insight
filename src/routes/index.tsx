@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useSuspenseQuery, queryOptions } from "@tanstack/react-query";
+import { useSuspenseQuery, useQuery, queryOptions } from "@tanstack/react-query";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { getCurrentRoundFixtures, getOdds } from "@/server/index.functions";
@@ -14,18 +14,27 @@ const searchSchema = z.object({
 const fixturesQO = (round?: number) => queryOptions({
   queryKey: ["fixtures", round ?? "current"],
   queryFn: () => getCurrentRoundFixtures({ data: round ? { round } : {} }),
+  // PERF: aggressive client cache so revisits feel instant. Background refetch
+  // still keeps the round selector fresh.
+  staleTime: 5 * 60_000,
+  gcTime: 30 * 60_000,
 });
 const oddsQO = () => queryOptions({
   queryKey: ["odds"],
   queryFn: () => getOdds({ data: {} }),
+  // PERF: odds rarely change outside the final hour pre-kickoff. Match server TTL.
+  staleTime: 15 * 60_000,
+  gcTime: 60 * 60_000,
 });
 
 export const Route = createFileRoute("/")({
   validateSearch: zodValidator(searchSchema),
   loaderDeps: ({ search }) => ({ round: search.round || undefined }),
   loader: ({ context: { queryClient }, deps }) => {
-    void queryClient.ensureQueryData(fixturesQO(deps.round));
-    void queryClient.ensureQueryData(oddsQO());
+    // PERF: only block on fixtures. Odds are kicked off in the background and
+    // hydrate the card lazily — they never delay first paint.
+    void queryClient.prefetchQuery(oddsQO());
+    return queryClient.ensureQueryData(fixturesQO(deps.round));
   },
   component: HomePage,
   errorComponent: ({ error }) => (
@@ -48,7 +57,10 @@ function Fixtures() {
   const { round: roundParam } = Route.useSearch();
   const round = roundParam || undefined;
   const fx = useSuspenseQuery(fixturesQO(round)).data;
-  const oddsList = useSuspenseQuery(oddsQO()).data;
+  // PERF: odds use a non-suspense query so the fixtures grid paints immediately.
+  // Cards re-render with prices when odds arrive (or stay price-less if odds fail).
+  const oddsList = useQuery(oddsQO()).data ?? [];
+
   const navigate = useNavigate({ from: "/" });
 
   const isHistorical = fx.round < fx.currentRound;

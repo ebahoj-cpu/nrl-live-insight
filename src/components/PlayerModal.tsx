@@ -379,6 +379,35 @@ const PLACEHOLDER_SKILLS: SkillRating[] = [
   { key: "temperament", label: "Temperament", base: 0, final: 0, word: "—", tone: "ok" },
 ];
 
+// Compact 10-segment bar used for the three context rows.
+function Meter({ icon, label, valueText, pct, tone }: {
+  icon: ReactNode; label: string; valueText: string; pct: number; tone: SkillRating["tone"];
+}) {
+  const segments = 10;
+  const filled = Math.round((pct / 100) * segments);
+  return (
+    <li className="flex items-center gap-2">
+      {icon}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center justify-between text-[11px] mb-0.5">
+          <span className="font-bold uppercase tracking-wider">{label}</span>
+          <span className={`font-bold ${toneClass(tone)}`}>{valueText}</span>
+        </div>
+        <div className="flex gap-0.5">
+          {Array.from({ length: segments }).map((_, i) => (
+            <div
+              key={i}
+              className={`h-2 flex-1 rounded transition-all ${
+                i < filled ? toneBgClass(tone) : "bg-surface-2"
+              }`}
+            />
+          ))}
+        </div>
+      </div>
+    </li>
+  );
+}
+
 
 function toneClass(t: SkillRating["tone"]): string {
   switch (t) {

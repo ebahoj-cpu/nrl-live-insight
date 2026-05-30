@@ -1,12 +1,20 @@
 // =============================================================================
-// PERFORMANCE EDGE — MAJOR 2026 OVERHAUL
-// Now realistic, calibrated against current NRL leaders, forwards get fair Attack,
-// Energy is no longer overly punitive, Form reacts to hot streaks.
+// PERFORMANCE EDGE — 2026 LEAN REWRITE
+//
+// Surfaces only four skills (Attack, Defence, Handling, Temperament) on top
+// of the three context bars (Experience, Form, Energy).
+//
+// Final formula per skill:
+//   final = clamp( base × energyModifier × formModifier + experienceBonus, 0, 100 )
+//
+//   - Energy modifier:      +12% / +5% / 0% / -8% / -15%
+//   - Form modifier:        +18% / +8% / 0% / -8% / -15%
+//   - Experience bonus:     flat +0..+8 points (Veteran gets the biggest boost)
 // =============================================================================
 
 import type { PlayerSeasonStats } from "@/server/player-profile";
 
-export type SkillKey = "attack" | "agility" | "defence" | "handling" | "strength" | "kicking";
+export type SkillKey = "attack" | "defence" | "handling" | "temperament";
 
 export type SkillRating = {
   key: SkillKey;
@@ -25,178 +33,119 @@ export type PerformanceEdge = {
   skills: SkillRating[];
   energy: { tier: EnergyTier; modifier: number; minutesPerGame: number | null };
   form: { tier: FormTier; modifier: number };
-  experience: { tier: ExperienceTier; pct: number; caps: number };
+  experience: { tier: ExperienceTier; pct: number; caps: number; bonus: number };
   overall: number;
-};
-
-// Position grouping (unchanged)
-type PositionGroup = "forward" | "spine" | "back" | "edge";
-function groupForPosition(position: string | null | undefined): PositionGroup {
-  const p = (position ?? "").toLowerCase();
-  if (/(prop|lock|hooker|second.row|backrow|back-row|back row)/.test(p)) return "forward";
-  if (/(halfback|five.eighth|fiveeighth|five-eighth|fullback)/.test(p)) return "spine";
-  if (/(wing|centre|center)/.test(p)) return "back";
-  if (/(edge)/.test(p)) return "edge";
-  return "forward";
-}
-
-// Improved weights — forwards now get better Attack credit
-const WEIGHTS: Record<SkillKey, Record<PositionGroup, number>> = {
-  attack:   { forward: 1.15, spine: 1.15, back: 1.10, edge: 1.00 },
-  agility:  { forward: 0.90, spine: 1.05, back: 1.25, edge: 1.10 },
-  defence:  { forward: 1.10, spine: 0.95, back: 0.90, edge: 1.05 },
-  handling: { forward: 1.00, spine: 1.15, back: 1.00, edge: 1.00 },
-  strength: { forward: 1.25, spine: 0.85, back: 0.90, edge: 1.15 },
-  kicking:  { forward: 0.30, spine: 1.30, back: 0.40, edge: 0.40 },
 };
 
 function clamp(n: number, lo = 0, hi = 100): number {
   return Math.max(lo, Math.min(hi, n));
 }
-
 function perGame(total: number, apps: number): number {
   return apps > 0 ? total / apps : 0;
 }
 
-// ==================== IMPROVED BASE SKILLS ====================
+// ==================== BASE SKILL CALCULATIONS (0..100) ====================
+
+// Attack: tries + try assists + line breaks + tackle busts + metres (normalised).
+// Calibrated so a top-tier attacking back (~1 try, 0.5 TA, 1 LB, 3 TB, 150m) ≈ 90.
 function baseAttack(s: PlayerSeasonStats): number {
-  const tries = perGame(s.tries, s.appearances);
-  const assists = perGame(s.tryAssists, s.appearances);
-  const breaks = perGame(s.lineBreaks + 0.5 * s.lineBreakAssists, s.appearances);
-  const metres = perGame(s.totalRunMetres, s.appearances);
-  const pcm = perGame(s.postContactMetres, s.appearances);
-  const tb = perGame(s.tackleBreaks, s.appearances);
-  const offloads = perGame(s.offloads, s.appearances);
-
-  // Re-weighted so big-minutes forwards (heavy metres, PCM, tackle busts,
-  // offloads) score competitively with try-scoring outside backs.
+  const apps = Math.max(1, s.appearances);
   const score =
-    (tries * 22) +
-    (assists * 18) +
-    (breaks * 18) +
-    (metres / 8) +         // 150m → ~19 pts
-    (pcm / 18) +           // 60m  → ~3.3 pts
-    (tb * 11) +            // 3/g  → 33 pts
-    (offloads * 10);       // 1.5/g → 15 pts
+    perGame(s.tries, apps) * 22 +
+    perGame(s.tryAssists, apps) * 18 +
+    perGame(s.lineBreaks, apps) * 16 +
+    perGame(s.tackleBreaks, apps) * 9 +
+    perGame(s.totalRunMetres, apps) / 6; // 150m → 25 pts
   return clamp(score);
 }
 
-function baseAgility(s: PlayerSeasonStats): number {
-  const breaks = perGame(s.lineBreaks, s.appearances);
-  const tb = perGame(s.tackleBreaks, s.appearances);
-  const metres = perGame(s.totalRunMetres, s.appearances);
-  const score = breaks * 45 + tb * 28 + (metres / 12) * 1.5;
-  return clamp(score);
-}
-
+// Defence: pure tackle efficiency, weighted slightly by volume.
 function baseDefence(s: PlayerSeasonStats): number {
   const made = s.tacklesMade;
   const missed = s.tacklesMissed;
-  const rate = made + missed > 0 ? made / (made + missed) : 0.85;
-  const perGameTackles = perGame(made, s.appearances);
-  const score = rate * 55 + (perGameTackles / 28) * 45;
-  return clamp(score);
+  const denom = made + missed;
+  if (denom === 0) return 50;
+  const efficiency = made / denom;            // 0..1
+  const volume = clamp(perGame(made, Math.max(1, s.appearances)) / 30, 0, 1); // 30+/g ≈ max
+  return clamp(efficiency * 80 + volume * 20);
 }
 
+// Handling: try assists + line break assists + offloads minus errors.
 function baseHandling(s: PlayerSeasonStats): number {
-  const offloads = perGame(s.offloads, s.appearances);
-  const errors = perGame(s.errors, s.appearances);
-  return clamp(55 + (offloads - errors) * 18);
+  const apps = Math.max(1, s.appearances);
+  const positive =
+    perGame(s.tryAssists, apps) * 20 +
+    perGame(s.lineBreakAssists, apps) * 14 +
+    perGame(s.offloads, apps) * 12;
+  const errors = perGame(s.errors, apps) * 14;
+  return clamp(50 + positive - errors);
 }
 
-function baseStrength(s: PlayerSeasonStats): number {
-  const tb = perGame(s.tackleBreaks, s.appearances);
-  const pcm = perGame(s.postContactMetres, s.appearances);
-  const score = (tb / 4.5) * 50 + (pcm / 45) * 50;
-  return clamp(score);
+// Temperament: discipline indicator. Lower penalties (and errors when penalty
+// data is missing) → much higher score.
+// Falls back gracefully when NRL.com doesn't expose penaltiesConceded.
+function baseTemperament(s: PlayerSeasonStats): number {
+  const apps = Math.max(1, s.appearances);
+  const penalties = (s as { penaltiesConceded?: number }).penaltiesConceded ?? null;
+  if (penalties != null) {
+    const pen = perGame(penalties, apps);
+    // 0 pen/g = 100, 1 pen/g = 72, 2 pen/g = 44, 3 pen/g = 16
+    return clamp(100 - pen * 28);
+  }
+  // Fallback: use handling errors as a discipline proxy.
+  const errPg = perGame(s.errors, apps);
+  return clamp(95 - errPg * 18);
 }
 
-function baseKicking(s: PlayerSeasonStats): number {
-  if (s.averageKickingMetres <= 0 && s.goals <= 0 && s.fieldGoals <= 0 && s.forcedDropOuts <= 0) return 10;
-  const km = s.averageKickingMetres;
-  const dropOuts = perGame(s.forcedDropOuts, s.appearances);
-  const score = (km / 320) * 55 + dropOuts * 25 + (s.goals > 0 ? 20 : 0);
-  return clamp(score);
-}
-
-// ==================== ENERGY — ULTRA FORGIVING FINAL VERSION ====================
+// ==================== CONTEXT BARS ====================
 
 function calculateEnergy(s: PlayerSeasonStats): { tier: EnergyTier; modifier: number; minutesPerGame: number | null } {
-
   const appearances = Math.max(1, s.appearances ?? 0);
-
   const mpg = s.minutesPerGame ?? 65;
 
-  // SUPER lenient workload logic — most starters should be Moderate/High
+  let tier: EnergyTier;
+  if (appearances <= 5 || mpg < 50) tier = "Supercharged";
+  else if (mpg < 65) tier = "High";
+  else if (mpg <= 78) tier = "Moderate";
+  else if (mpg <= 84) tier = "Tired";
+  else tier = "Fatigued";
 
-  let baseMod = 1.08; // default = slightly positive
+  const modifier =
+    tier === "Supercharged" ? 1.12 :
+    tier === "High"         ? 1.05 :
+    tier === "Moderate"     ? 1.00 :
+    tier === "Tired"        ? 0.92 : 0.85;
 
-  if (appearances <= 5) {
-    baseMod = 1.22;                    // fresh returnees / Ponga = High/Supercharged
-  } else if (mpg < 50) {
-    baseMod = 1.18;
-  } else if (mpg < 70) {
-    baseMod = 1.12;
-  } else if (mpg <= 80) {
-    baseMod = 1.02;                    // normal starters = Moderate
-  } else if (mpg <= 85) {
-    baseMod = 0.96;
-  } else {
-    baseMod = 0.92;                    // only the absolute heaviest loads get slight penalty
-  }
-
-  // Almost no games-missed penalty
-  const missedPenalty = appearances <= 8 ? 1.15 : 0.97;
-
-  const finalMod = Math.max(0.88, Math.min(1.25, baseMod * missedPenalty));
-
-  // Tier logic — very hard to reach Fatigued
-  const tier: EnergyTier =
-    finalMod > 1.13 ? "Supercharged" :
-    finalMod > 1.06 ? "High" :
-    finalMod > 0.97 ? "Moderate" :
-    finalMod > 0.93 ? "Tired" : "Fatigued";
-
-  return { tier, modifier: finalMod, minutesPerGame: mpg };
+  return { tier, modifier, minutesPerGame: mpg };
 }
 
-// ==================== FORM ====================
-// Form should reward whichever way a player dominates — outside backs through
-// tries/breaks, forwards through metres/PCM/tackle busts/offloads/tackles.
 function calculateForm(s: PlayerSeasonStats): { tier: FormTier; modifier: number } {
-  const tries = perGame(s.tries, s.appearances);
-  const breaks = perGame(s.lineBreaks, s.appearances);
-  const metres = perGame(s.totalRunMetres, s.appearances);
-  const pcm = perGame(s.postContactMetres, s.appearances);
-  const tb = perGame(s.tackleBreaks, s.appearances);
-  const offloads = perGame(s.offloads, s.appearances);
-  const tackles = perGame(s.tacklesMade, s.appearances);
-
-  // Calibrated so a 150m / 60 PCM / 3 TB / 30 tackle / 1.5 offload prop lands
-  // in Good Form, and a 2-try-a-game winger lands in Red Hot.
+  const apps = Math.max(1, s.appearances);
   const formScore =
-    (tries * 30) +
-    (breaks * 22) +
-    (metres / 6) +        // 150m → 25 pts
-    (pcm / 8) +           // 60m  → 7.5 pts
-    (tb * 10) +           // 3/g  → 30 pts
-    (offloads * 9) +      // 1.5  → 13.5 pts
-    (tackles / 3);        // 30/g → 10 pts
+    perGame(s.tries, apps) * 30 +
+    perGame(s.lineBreaks, apps) * 22 +
+    perGame(s.tackleBreaks, apps) * 10 +
+    perGame(s.offloads, apps) * 9 +
+    perGame(s.totalRunMetres, apps) / 6 +
+    perGame(s.tacklesMade, apps) / 3;
 
-  let tier: FormTier = "Average";
-  let mod = 1.0;
+  let tier: FormTier;
+  if (formScore > 130) tier = "Red Hot";
+  else if (formScore > 95) tier = "Good Form";
+  else if (formScore > 65) tier = "Average";
+  else if (formScore > 45) tier = "Below Average";
+  else tier = "Cold";
 
-  if (formScore > 130) { tier = "Red Hot"; mod = 1.22; }
-  else if (formScore > 95) { tier = "Good Form"; mod = 1.12; }
-  else if (formScore > 65) { tier = "Average"; mod = 1.00; }
-  else if (formScore > 45) { tier = "Below Average"; mod = 0.88; }
-  else { tier = "Cold"; mod = 0.78; }
+  const modifier =
+    tier === "Red Hot"       ? 1.18 :
+    tier === "Good Form"     ? 1.08 :
+    tier === "Average"       ? 1.00 :
+    tier === "Below Average" ? 0.92 : 0.85;
 
-  return { tier, modifier: mod };
+  return { tier, modifier };
 }
 
-// ==================== EXPERIENCE ====================
-function experienceTierFromCaps(caps: number): { tier: ExperienceTier; pct: number } {
+function experienceTierFromCaps(caps: number): { tier: ExperienceTier; pct: number; bonus: number } {
   const pct = Math.max(2, Math.min(100, (caps / 250) * 100));
   let tier: ExperienceTier;
   if (caps <= 20) tier = "ROOKIE";
@@ -206,13 +155,15 @@ function experienceTierFromCaps(caps: number): { tier: ExperienceTier; pct: numb
   else if (caps <= 150) tier = "VETERAN";
   else if (caps <= 200) tier = "STALWART";
   else tier = "LEGEND";
-  return { tier, pct };
-}
-
-function experienceModifier(tier: ExperienceTier, skill: SkillKey): number {
-  const boost = { ROOKIE: 0, EMERGING: 0.5, ESTABLISHED: 1.2, SEASONED: 2.2, VETERAN: 3.2, STALWART: 4.2, LEGEND: 5 }[tier] / 100;
-  if (skill === "defence" || skill === "handling") return 1 + boost * 1.3;
-  return 1 + boost * 0.4;
+  // Flat bonus added to final skill score (Veteran peaks at +8).
+  const bonus =
+    tier === "ROOKIE"      ? 0 :
+    tier === "EMERGING"    ? 3 :
+    tier === "ESTABLISHED" ? 4 :
+    tier === "SEASONED"    ? 6 :
+    tier === "VETERAN"     ? 8 :
+    tier === "STALWART"    ? 7 : 7;
+  return { tier, pct, bonus };
 }
 
 export function describe(score: number): { word: string; tone: SkillRating["tone"] } {
@@ -225,55 +176,44 @@ export function describe(score: number): { word: string; tone: SkillRating["tone
   return { word: "Poor", tone: "low" };
 }
 
-// Kept exports for backwards compatibility with any external imports
+// Back-compat exports (used elsewhere historically — keep stable).
 export function energyTier(minutesPerGame: number | null): EnergyTier {
   if (minutesPerGame == null) return "Moderate";
-  if (minutesPerGame >= 70) return "Supercharged";
-  if (minutesPerGame >= 60) return "High";
-  if (minutesPerGame >= 50) return "Moderate";
-  if (minutesPerGame >= 40) return "Tired";
-  return "Fatigued";
+  if (minutesPerGame >= 80) return "Fatigued";
+  if (minutesPerGame >= 70) return "Tired";
+  if (minutesPerGame >= 60) return "Moderate";
+  if (minutesPerGame >= 50) return "High";
+  return "Supercharged";
 }
-
 export function formTier(recentMultiplier: number): FormTier {
-  if (recentMultiplier >= 1.25) return "Red Hot";
-  if (recentMultiplier >= 1.10) return "Good Form";
-  if (recentMultiplier >= 0.90) return "Average";
-  if (recentMultiplier >= 0.75) return "Below Average";
+  if (recentMultiplier >= 1.15) return "Red Hot";
+  if (recentMultiplier >= 1.05) return "Good Form";
+  if (recentMultiplier >= 0.95) return "Average";
+  if (recentMultiplier >= 0.85) return "Below Average";
   return "Cold";
 }
 
 // ==================== LEADERBOARD BOOSTS ====================
-// When a player appears in the NRL.com top-5 for a stat category we juice
-// the relevant skill base AND the form modifier. Calibrated so a #1 finisher
-// gets a meaningful (but not absurd) bump on top of the season-stat baseline,
-// and a top-5 finisher is clearly elevated above the pack.
+// Top-5 finishes nudge the relevant skill base + form modifier upwards.
 
 type LeaderboardEntry = { title: string; rank: number };
 
-// Rank → bonus points added to the relevant skill base (out of 100).
 function rankBonus(rank: number): number {
   if (rank <= 0) return 0;
-  return Math.max(0, 22 - (rank - 1) * 4); // #1=22, #2=18, #3=14, #4=10, #5=6
+  return Math.max(0, 18 - (rank - 1) * 3); // #1=18, #2=15, #3=12, #4=9, #5=6
 }
 
-// Map a leaderboard category title to which skill(s) it should boost.
 function skillsForCategory(title: string): SkillKey[] {
   const t = title.toLowerCase();
   if (t.includes("try assist")) return ["attack", "handling"];
   if (t.includes("try")) return ["attack"];
-  if (t.includes("line break") || t.includes("linebreak")) return ["attack", "agility"];
-  if (t.includes("tackle break") || t.includes("bust")) return ["agility", "strength"];
-  if (t.includes("post-contact") || t.includes("post contact")) return ["strength"];
-  if (t.includes("offload")) return ["handling", "strength"];
-  if (t.includes("run metre") || t.includes("metres gained") || t.includes("all run metres") || t.includes("metres")) return ["strength", "attack"];
+  if (t.includes("line break assist")) return ["handling"];
+  if (t.includes("line break") || t.includes("linebreak")) return ["attack"];
+  if (t.includes("tackle break") || t.includes("bust")) return ["attack"];
+  if (t.includes("offload")) return ["handling"];
+  if (t.includes("run metre") || t.includes("metres")) return ["attack"];
   if (t.includes("tackle") && !t.includes("missed")) return ["defence"];
-  if (t.includes("missed tackle")) return []; // negative — skip rather than penalise
-  if (t.includes("kick") && !t.includes("kick return")) return ["kicking"];
-  if (t.includes("kick return")) return ["agility"];
-  if (t.includes("goal") || t.includes("conversion") || t.includes("field goal")) return ["kicking"];
-  if (t.includes("point")) return ["attack"];
-  if (t.includes("hit up")) return ["strength"];
+  if (t.includes("error")) return ["temperament"];
   return [];
 }
 
@@ -294,26 +234,30 @@ function applyLeaderboardBoost(
       boosted[k] = clamp(boosted[k] + bonus);
     }
   }
-  // Form bonus: top-5 in anything = at least Good Form territory; #1 in
-  // anything or multiple top-5s pushes toward Red Hot.
   let formBonus = 1.0;
-  if (bestRank === 1) formBonus = 1.18;
-  else if (bestRank <= 3) formBonus = 1.12;
-  else if (topFiveHits > 0) formBonus = 1.06;
-  if (topFiveHits >= 3) formBonus = Math.max(formBonus, 1.20);
+  if (bestRank === 1) formBonus = 1.15;
+  else if (bestRank <= 3) formBonus = 1.10;
+  else if (topFiveHits > 0) formBonus = 1.05;
   return { boosted, formBonus };
 }
 
 // ==================== MAIN ====================
+
+const SKILL_LABELS: Record<SkillKey, string> = {
+  attack: "Attack",
+  defence: "Defence",
+  handling: "Handling",
+  temperament: "Temperament",
+};
+const KEYS: SkillKey[] = ["attack", "defence", "handling", "temperament"];
+
 export function computePerformanceEdge(args: {
   position: string | null | undefined;
   seasonStats: PlayerSeasonStats;
   careerAppearances?: number;
   recentMultiplier?: number;
-  /** Optional NRL.com leaderboard finishes — boosts skills + form when present. */
   rankings?: LeaderboardEntry[];
 }): PerformanceEdge {
-  const group = groupForPosition(args.position);
   const s = args.seasonStats;
   const energy = calculateEnergy(s);
   const baseForm = calculateForm(s);
@@ -321,40 +265,33 @@ export function computePerformanceEdge(args: {
   const exp = experienceTierFromCaps(caps);
 
   const rawBases: Record<SkillKey, number> = {
-    attack:   baseAttack(s),
-    agility:  baseAgility(s),
-    defence:  baseDefence(s),
-    handling: baseHandling(s),
-    strength: baseStrength(s),
-    kicking:  baseKicking(s),
+    attack:      baseAttack(s),
+    defence:     baseDefence(s),
+    handling:    baseHandling(s),
+    temperament: baseTemperament(s),
   };
 
   const { boosted, formBonus } = applyLeaderboardBoost(rawBases, args.rankings);
 
-  // Apply leaderboard form bonus, then re-tier (so the modifier is consistent
-  // with the displayed tier).
+  // Re-tier form once leaderboard bonus is folded in.
   const boostedFormMod = clamp(baseForm.modifier * formBonus, 0.5, 1.4);
   const form: PerformanceEdge["form"] = {
     tier:
-      boostedFormMod >= 1.25 ? "Red Hot" :
-      boostedFormMod >= 1.10 ? "Good Form" :
+      boostedFormMod >= 1.15 ? "Red Hot" :
+      boostedFormMod >= 1.05 ? "Good Form" :
       boostedFormMod >= 0.95 ? "Average" :
-      boostedFormMod >= 0.82 ? "Below Average" : "Cold",
+      boostedFormMod >= 0.88 ? "Below Average" : "Cold",
     modifier: boostedFormMod,
   };
 
-  const SKILL_LABELS: Record<SkillKey, string> = {
-    attack: "Attack", agility: "Agility/Speed", defence: "Defence",
-    handling: "Handling", strength: "Strength", kicking: "Kicking",
-  };
-  const KEYS: SkillKey[] = ["attack", "agility", "defence", "handling", "strength", "kicking"];
-
   const skills: SkillRating[] = KEYS.map((key) => {
-    const weighted = clamp(boosted[key] * WEIGHTS[key][group]);
-    const expMod = experienceModifier(exp.tier, key);
-    const final = clamp(weighted * energy.modifier * form.modifier * expMod);
+    const base = boosted[key];
+    // Temperament reflects discipline — energy/form shouldn't swing it as much.
+    const final = key === "temperament"
+      ? clamp(base + exp.bonus * 0.5)
+      : clamp(base * energy.modifier * form.modifier + exp.bonus);
     const { word, tone } = describe(final);
-    return { key, label: SKILL_LABELS[key], base: Math.round(weighted), final: Math.round(final), word, tone };
+    return { key, label: SKILL_LABELS[key], base: Math.round(base), final: Math.round(final), word, tone };
   });
 
   const overall = Math.round(skills.reduce((a, x) => a + x.final, 0) / skills.length);
@@ -363,7 +300,7 @@ export function computePerformanceEdge(args: {
     skills,
     energy,
     form,
-    experience: { tier: exp.tier, pct: exp.pct, caps },
+    experience: { tier: exp.tier, pct: exp.pct, caps, bonus: exp.bonus },
     overall,
   };
 }

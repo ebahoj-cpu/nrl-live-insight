@@ -586,13 +586,16 @@ function LineupTab({ home, away, officials, teamNews }: { home: any; away: any; 
       </div>
       {view === "list" ? (
         <>
-          <H2HPanel home={home} away={away} />
+          {/* List view: each squad rendered as its own panel with players
+              listed next to each other. The head-to-head opposing layout
+              lives only in the Field View tab now. */}
           <SquadPanel team={home} news={teamNews?.home} />
           <SquadPanel team={away} news={teamNews?.away} />
         </>
       ) : (
         <CombinedFieldPanel home={home} away={away} teamNews={teamNews} />
       )}
+
       <OfficialsCard officials={officials} />
     </div>
   );

@@ -242,14 +242,12 @@ function RankingBadge({ ranking }: { ranking: PlayerRanking }) {
 
 // -------------------------- Performance Edge --------------------------
 
-const SKILL_ICONS = {
-  attack:   Sword,
-  agility:  Zap,
-  defence:  Shield,
-  handling: Hand,
-  strength: Dumbbell,
-  kicking:  Footprints,
-} as const;
+const SKILL_ICONS: Record<SkillKey, typeof Sword> = {
+  attack:      Sword,
+  defence:     Shield,
+  handling:    Hand,
+  temperament: Scale,
+};
 
 type PE = import("@/lib/performance-edge").PerformanceEdge;
 type Profile = import("@/server/player-profile").PlayerProfile;
@@ -273,8 +271,9 @@ function PerformanceEdgeSection({ edge, loading, profile }: {
   void profile;
   const formTier = edge?.form.tier ?? "Average";
   const energyT = edge?.energy.tier ?? "Moderate";
-  const exp = edge?.experience ?? { tier: "EMERGING" as const, pct: 20, caps: 0 };
+  const exp = edge?.experience ?? { tier: "EMERGING" as const, pct: 20, caps: 0, bonus: 0 };
   const EnergyIcon = energyT === "Fatigued" || energyT === "Tired" ? BatteryLow : BatteryFull;
+  const skills = edge?.skills ?? PLACEHOLDER_SKILLS;
 
   return (
     <section className="rounded-xl bg-surface-2/40 ring-1 ring-accent/15 p-4">
@@ -284,7 +283,8 @@ function PerformanceEdgeSection({ edge, loading, profile }: {
         </h3>
       </div>
 
-      <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2.5">
+      {/* Context bars: Experience / Form / Energy */}
+      <ul className="grid grid-cols-1 sm:grid-cols-3 gap-x-4 gap-y-2.5 mb-5 pb-5 border-b border-accent/10">
         <Meter
           icon={<Activity className="h-3.5 w-3.5 text-accent shrink-0" />}
           label="Experience"
@@ -306,16 +306,22 @@ function PerformanceEdgeSection({ edge, loading, profile }: {
           pct={ENERGY_FILL[energyT]}
           tone={ENERGY_TONE[energyT]}
         />
-        {(edge?.skills ?? PLACEHOLDER_SKILLS).map((s) => {
+      </ul>
+
+      {/* Four core skills, scored 0-100 */}
+      <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3">
+        {skills.map((s) => {
           const Icon = SKILL_ICONS[s.key];
+          const isTemperament = s.key === "temperament";
           return (
-            <Meter
+            <SkillMeter
               key={s.key}
-              icon={<Icon className="h-3.5 w-3.5 text-accent shrink-0" />}
+              icon={<Icon className={`h-4 w-4 shrink-0 ${isTemperament ? "text-amber-400" : "text-accent"}`} />}
               label={s.label}
-              valueText={loading ? "…" : s.word}
-              pct={s.final}
+              score={loading ? 0 : s.final}
               tone={s.tone}
+              prominent={isTemperament}
+              loading={loading}
             />
           );
         })}
@@ -324,28 +330,42 @@ function PerformanceEdgeSection({ edge, loading, profile }: {
   );
 }
 
-function Meter({ icon, label, valueText, pct, tone }: {
-  icon: ReactNode; label: string; valueText: string; pct: number; tone: SkillRating["tone"];
+function SkillMeter({ icon, label, score, tone, prominent, loading }: {
+  icon: ReactNode; label: string; score: number; tone: SkillRating["tone"];
+  prominent?: boolean; loading?: boolean;
 }) {
-  const segments = 10;
-  const filled = Math.round((pct / 100) * segments);
+  const pct = Math.max(0, Math.min(100, score));
+  const barColor = prominent ? "bg-amber-400" : toneBgClass(tone);
   return (
-    <li className="flex items-center gap-2">
+    <li
+      className={`flex items-center gap-2.5 ${
+        prominent ? "rounded-lg ring-1 ring-amber-400/40 bg-amber-400/5 p-2 -m-2 sm:col-span-2" : ""
+      }`}
+    >
       {icon}
       <div className="flex-1 min-w-0">
-        <div className="flex items-center justify-between text-[11px] mb-0.5">
-          <span className="font-bold uppercase tracking-wider">{label}</span>
-          <span className={`font-bold ${toneClass(tone)}`}>{valueText}</span>
+        <div className="flex items-baseline justify-between mb-1">
+          <span
+            className={`uppercase tracking-wider font-bold ${
+              prominent ? "text-[12px] text-amber-300" : "text-[11px]"
+            }`}
+          >
+            {label}
+          </span>
+          <span
+            className={`tabular-nums font-extrabold ${
+              prominent ? "text-base text-amber-300" : `text-sm ${toneClass(tone)}`
+            }`}
+          >
+            {loading ? "…" : `${pct}`}
+            <span className="text-[10px] text-muted-foreground font-semibold ml-0.5">/100</span>
+          </span>
         </div>
-        <div className="flex gap-0.5">
-          {Array.from({ length: segments }).map((_, i) => (
-            <div
-              key={i}
-              className={`h-2.5 flex-1 rounded transition-all ${
-                i < filled ? toneBgClass(tone) : "bg-surface-2"
-              }`}
-            />
-          ))}
+        <div className={`relative w-full overflow-hidden rounded-full bg-surface-2 ${prominent ? "h-2.5" : "h-2"}`}>
+          <div
+            className={`h-full ${barColor} transition-all duration-500`}
+            style={{ width: `${pct}%` }}
+          />
         </div>
       </div>
     </li>
@@ -353,12 +373,10 @@ function Meter({ icon, label, valueText, pct, tone }: {
 }
 
 const PLACEHOLDER_SKILLS: SkillRating[] = [
-  { key: "attack",   label: "Attack",        base: 0, final: 0, word: "—", tone: "ok" },
-  { key: "agility",  label: "Agility/Speed", base: 0, final: 0, word: "—", tone: "ok" },
-  { key: "defence",  label: "Defence",       base: 0, final: 0, word: "—", tone: "ok" },
-  { key: "handling", label: "Handling",      base: 0, final: 0, word: "—", tone: "ok" },
-  { key: "strength", label: "Strength",      base: 0, final: 0, word: "—", tone: "ok" },
-  { key: "kicking",  label: "Kicking",       base: 0, final: 0, word: "—", tone: "ok" },
+  { key: "attack",      label: "Attack",      base: 0, final: 0, word: "—", tone: "ok" },
+  { key: "defence",     label: "Defence",     base: 0, final: 0, word: "—", tone: "ok" },
+  { key: "handling",    label: "Handling",    base: 0, final: 0, word: "—", tone: "ok" },
+  { key: "temperament", label: "Temperament", base: 0, final: 0, word: "—", tone: "ok" },
 ];
 
 

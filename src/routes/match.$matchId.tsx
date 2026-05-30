@@ -40,13 +40,16 @@ export const Route = createFileRoute("/match/$matchId")({
     parse: (raw: Record<string, string>) => ({ matchId: decodeURIComponent(raw.matchId) }),
     stringify: (p: { matchId: string }) => ({ matchId: encodeURIComponent(p.matchId) }),
   },
-  // Fire-and-forget prefetch so the navigation feels instant. The page shell
-  // (back link + skeleton header + tabs) renders immediately while data is
-  // still in flight; the MatchLoading progress UI fills the tab content area
-  // until the query resolves. Cached visits resolve synchronously.
+  // Eagerly prefetch BOTH core match data AND AI insights in parallel during
+  // navigation so the Insights/Script/Bet tabs are warm by the time the user
+  // clicks them. Odds + tryscorers are part of the matchQO payload already.
+  // Insights are cached aggressively (60min) — they only meaningfully change
+  // when team lineups change, which busts the server-side insights cache.
   loader: ({ context: { queryClient }, params }) => {
     void queryClient.ensureQueryData(matchQO(params.matchId));
+    void queryClient.prefetchQuery(insightsQO(params.matchId));
   },
+
 
   component: MatchPage,
   errorComponent: ({ error }) => {
